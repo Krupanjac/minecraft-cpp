@@ -1,0 +1,38 @@
+#pragma once
+
+#include "../Util/Types.h"
+#include "../Util/Config.h"
+#include "Chunk.h"
+#include <unordered_map>
+#include <memory>
+#include <vector>
+#include <glm/glm.hpp>
+
+class ChunkManager {
+public:
+    ChunkManager();
+    ~ChunkManager() = default;
+
+    void update(const glm::vec3& cameraPos);
+    
+    std::shared_ptr<Chunk> getChunk(const ChunkPos& pos);
+    std::shared_ptr<Chunk> getChunkAt(const glm::vec3& worldPos);
+    
+    const std::unordered_map<ChunkPos, std::shared_ptr<Chunk>>& getChunks() const {
+        return chunks;
+    }
+    
+    void unloadDistantChunks(const glm::vec3& cameraPos);
+    void requestChunkGeneration(const ChunkPos& pos);
+    
+    std::vector<ChunkPos> getChunksToGenerate(const glm::vec3& cameraPos, int maxChunks);
+    std::vector<std::shared_ptr<Chunk>> getChunksToMesh(int maxChunks);
+
+    static ChunkPos worldToChunk(const glm::vec3& worldPos);
+    static glm::vec3 chunkToWorld(const ChunkPos& chunkPos);
+
+private:
+    std::unordered_map<ChunkPos, std::shared_ptr<Chunk>> chunks;
+    
+    bool isChunkInRange(const ChunkPos& chunkPos, const ChunkPos& centerChunk, int range) const;
+};
