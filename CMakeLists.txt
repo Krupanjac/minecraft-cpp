@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(minecraft_cpp VERSION 1.0.0 LANGUAGES CXX)
+project(minecraft_cpp VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

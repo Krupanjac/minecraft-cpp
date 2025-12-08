@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <glm/glm.hpp>
+#include <functional>
 
 // Common type aliases
 using i8 = int8_t;
@@ -25,8 +26,8 @@ using WorldPos = glm::vec3;
 // Hash function for ChunkPos (for unordered_map)
 namespace std {
     template<>
-    struct hash<ChunkPos> {
-        size_t operator()(const ChunkPos& pos) const noexcept {
+    struct hash<glm::ivec3> {
+        size_t operator()(const glm::ivec3& pos) const noexcept {
             // Simple hash combining
             size_t h1 = std::hash<int>{}(pos.x);
             size_t h2 = std::hash<int>{}(pos.y);
