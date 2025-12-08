@@ -39,9 +39,9 @@ private:
         int x, y, z;
         int w, h;
         int u_axis, v_axis;
+        int nx, ny, nz;
         u8 normal;
         u8 material;
-        bool flip_winding;
     };
     
     void greedyMesh(std::shared_ptr<Chunk> chunk,

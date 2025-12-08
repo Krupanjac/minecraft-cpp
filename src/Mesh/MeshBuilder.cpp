@@ -140,14 +140,12 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     quad.u_axis = u_axis;
                     quad.v_axis = v_axis;
                     
+                    quad.nx = nx;
+                    quad.ny = ny;
+                    quad.nz = nz;
+                    
                     quad.normal = Vertex::packNormal(nx, ny, nz);
                     quad.material = material;
-                    
-                    // Determine winding order
-                    // X- (nx < 0): Inverted
-                    // Y+ (ny > 0): Inverted
-                    // Z- (nz < 0): Inverted
-                    quad.flip_winding = (nx < 0) || (ny > 0) || (nz < 0);
                     
                     addQuad(quad, meshData);
                     
@@ -205,8 +203,11 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
     meshData.vertices.emplace_back(x2, y2, z2, quad.normal, quad.material, uv11);
     meshData.vertices.emplace_back(x3, y3, z3, quad.normal, quad.material, uv01);
     
-    // Add indices (two triangles)
-    if (quad.flip_winding) {
+    // Winding order
+    // Flip for: X- (nx < 0), Y+ (ny > 0), Z- (nz < 0)
+    bool flip = (quad.nx < 0) || (quad.ny > 0) || (quad.nz < 0);
+    
+    if (flip) {
         meshData.indices.push_back(baseIdx + 0);
         meshData.indices.push_back(baseIdx + 2);
         meshData.indices.push_back(baseIdx + 1);

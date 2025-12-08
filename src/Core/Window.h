@@ -33,4 +33,12 @@ private:
     int height;
     
     static void errorCallback(int error, const char* description);
+
+    struct WindowData {
+        std::function<void(int, int, int, int)> keyCallback;
+        std::function<void(double, double)> cursorPosCallback;
+        std::function<void(int, int, int)> mouseButtonCallback;
+        std::function<void(int, int)> framebufferSizeCallback;
+    };
+    WindowData windowData;
 };

@@ -37,6 +37,10 @@ public:
         
         window->setCursorMode(GLFW_CURSOR_DISABLED);
         
+        window->setMouseButtonCallback([this](int button, int action, int mods) {
+            onMouseButton(button, action, mods);
+        });
+
         if (!renderer.initialize()) {
             LOG_ERROR("Failed to initialize renderer");
             return false;
@@ -90,6 +94,38 @@ private:
     bool firstMouse;
     bool running;
     
+    void onMouseButton(int button, int action, int mods) {
+        if (action == GLFW_PRESS) {
+            if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                // Break block
+                auto result = chunkManager.rayCast(camera.getPosition(), camera.getFront(), 5.0f);
+                if (result.hit) {
+                    glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
+                    int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
+                    int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
+                    int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
+                    chunkManager.setBlockAt(x, y, z, Block(BlockType::AIR));
+                }
+            } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+                // Place block
+                auto result = chunkManager.rayCast(camera.getPosition(), camera.getFront(), 5.0f);
+                if (result.hit) {
+                    glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
+                    int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x + result.normal.x;
+                    int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y + result.normal.y;
+                    int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z + result.normal.z;
+                    
+                    // Don't place block inside player
+                    glm::vec3 playerPos = camera.getPosition();
+                    glm::vec3 blockPos(x + 0.5f, y + 0.5f, z + 0.5f);
+                    if (glm::distance(playerPos, blockPos) > 1.0f) { 
+                        chunkManager.setBlockAt(x, y, z, Block(BlockType::STONE));
+                    }
+                }
+            }
+        }
+    }
+
     void processInput(float deltaTime) {
         if (window->isKeyPressed(GLFW_KEY_ESCAPE)) {
             running = false;

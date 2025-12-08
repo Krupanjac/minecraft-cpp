@@ -18,6 +18,8 @@ struct Block {
     
     Block() : type(BlockType::AIR) {}
     Block(BlockType type) : type(type) {}
+
+    BlockType getType() const { return type; }
     
     bool isOpaque() const {
         return type != BlockType::AIR && type != BlockType::WATER;
