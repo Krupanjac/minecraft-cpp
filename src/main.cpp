@@ -15,24 +15,19 @@
 class Application {
 public:
     Application() 
-        : window(nullptr), 
-          camera(glm::vec3(0.0f, 80.0f, 0.0f)),
+        : camera(glm::vec3(0.0f, 80.0f, 0.0f)),
           threadPool(THREAD_POOL_SIZE),
           lastX(0.0), lastY(0.0), firstMouse(true),
           running(true) {
     }
     
-    ~Application() {
-        if (window) {
-            delete window;
-        }
-    }
+    ~Application() = default;
     
     bool initialize() {
         LOG_INFO("Initializing Minecraft C++ Engine");
         
         try {
-            window = new Window(1280, 720, "Minecraft C++");
+            window = std::make_unique<Window>(1280, 720, "Minecraft C++");
         } catch (const std::exception& e) {
             LOG_ERROR("Failed to create window: " + std::string(e.what()));
             return false;
@@ -78,7 +73,7 @@ public:
     }
     
 private:
-    Window* window;
+    std::unique_ptr<Window> window;
     Renderer renderer;
     Camera camera;
     ChunkManager chunkManager;

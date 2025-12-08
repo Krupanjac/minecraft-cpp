@@ -5,6 +5,8 @@
 #include <random>
 
 WorldGenerator::WorldGenerator() : seed(12345) {
+    // TODO: Make seed configurable or random
+    // seed = std::random_device{}();
 }
 
 void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {

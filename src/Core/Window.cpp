@@ -57,7 +57,8 @@ void Window::swapBuffers() {
 }
 
 void Window::setKeyCallback(std::function<void(int, int, int, int)> callback) {
-    // Store callback in user pointer and set GLFW callback
+    // TODO: Fix memory leak - callback pointer is never deleted
+    // Consider storing callbacks as member variables instead
     auto callbackPtr = new std::function<void(int, int, int, int)>(callback);
     glfwSetWindowUserPointer(window, callbackPtr);
     glfwSetKeyCallback(window, [](GLFWwindow* win, int key, int scancode, int action, int mods) {
@@ -67,6 +68,7 @@ void Window::setKeyCallback(std::function<void(int, int, int, int)> callback) {
 }
 
 void Window::setCursorPosCallback(std::function<void(double, double)> callback) {
+    // TODO: Fix memory leak - callback pointer is never deleted
     auto callbackPtr = new std::function<void(double, double)>(callback);
     glfwSetWindowUserPointer(window, callbackPtr);
     glfwSetCursorPosCallback(window, [](GLFWwindow* win, double x, double y) {
@@ -76,6 +78,7 @@ void Window::setCursorPosCallback(std::function<void(double, double)> callback) 
 }
 
 void Window::setMouseButtonCallback(std::function<void(int, int, int)> callback) {
+    // TODO: Fix memory leak - callback pointer is never deleted
     auto callbackPtr = new std::function<void(int, int, int)>(callback);
     glfwSetWindowUserPointer(window, callbackPtr);
     glfwSetMouseButtonCallback(window, [](GLFWwindow* win, int button, int action, int mods) {
@@ -85,6 +88,7 @@ void Window::setMouseButtonCallback(std::function<void(int, int, int)> callback)
 }
 
 void Window::setFramebufferSizeCallback(std::function<void(int, int)> callback) {
+    // TODO: Fix memory leak - callback pointer is never deleted
     auto callbackPtr = new std::function<void(int, int)>(callback);
     glfwSetWindowUserPointer(window, callbackPtr);
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow* win, int w, int h) {

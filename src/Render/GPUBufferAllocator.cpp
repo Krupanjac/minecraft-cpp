@@ -53,6 +53,8 @@ GPUBufferAllocator::Allocation GPUBufferAllocator::allocate(size_t size) {
     currentOffset += size;
     
     // Simple ring buffer wraparound
+    // TODO: Implement proper frame tracking to prevent GPU data corruption
+    // Should track which frames are in-flight and wait for GPU completion
     if (currentOffset >= bufferSize) {
         currentOffset = 0;
         LOG_WARNING("GPU Buffer ring wraparound");

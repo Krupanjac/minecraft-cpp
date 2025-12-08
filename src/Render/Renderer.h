@@ -17,6 +17,9 @@ public:
     void render(ChunkManager& chunkManager, Camera& camera, int windowWidth, int windowHeight);
     
     Shader& getBlockShader() { return blockShader; }
+    
+    // Add mesh for a chunk
+    void uploadChunkMesh(const ChunkPos& pos, const std::vector<Vertex>& vertices, const std::vector<u32>& indices);
 
 private:
     Shader blockShader;

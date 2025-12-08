@@ -86,3 +86,13 @@ bool Renderer::loadShaders() {
     }
     return success;
 }
+
+void Renderer::uploadChunkMesh(const ChunkPos& pos, const std::vector<Vertex>& vertices, const std::vector<u32>& indices) {
+    if (vertices.empty() || indices.empty()) {
+        return;
+    }
+    
+    auto mesh = std::make_unique<Mesh>();
+    mesh->upload(vertices, indices);
+    chunkMeshes[pos] = std::move(mesh);
+}

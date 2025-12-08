@@ -1,5 +1,6 @@
 #include "Ray.h"
 #include <algorithm>
+#include <limits>
 
 bool Ray::intersectAABB(const glm::vec3& min, const glm::vec3& max, float& tMin, float& tMax) const {
     tMin = 0.0f;
