@@ -2,6 +2,7 @@
 #include "../Util/Config.h"
 #include <array>
 #include <cstring>
+#include <tuple>
 
 MeshData MeshBuilder::buildChunkMesh(std::shared_ptr<Chunk> chunk,
                                      std::shared_ptr<Chunk> chunkXPos,
@@ -120,23 +121,33 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     // Add quad
                     Quad quad;
                     if (w_axis == 0) {
-                        quad.x = d; quad.y = u; quad.z = v;
+                        quad.x = (nx > 0) ? d + 1 : d; 
+                        quad.y = u; 
+                        quad.z = v;
                     } else if (w_axis == 1) {
-                        quad.x = u; quad.y = d; quad.z = v;
+                        quad.x = u; 
+                        quad.y = (ny > 0) ? d + 1 : d; 
+                        quad.z = v;
                     } else {
-                        quad.x = u; quad.y = v; quad.z = d;
+                        quad.x = u; 
+                        quad.y = v; 
+                        quad.z = (nz > 0) ? d + 1 : d;
                     }
                     
-                    if (u_axis == 0) {
-                        quad.w = w; quad.h = h;
-                    } else if (u_axis == 1) {
-                        quad.w = w; quad.h = h;
-                    } else {
-                        quad.w = w; quad.h = h;
-                    }
+                    quad.w = w; 
+                    quad.h = h;
+                    
+                    quad.u_axis = u_axis;
+                    quad.v_axis = v_axis;
                     
                     quad.normal = Vertex::packNormal(nx, ny, nz);
                     quad.material = material;
+                    
+                    // Determine winding order
+                    // X- (nx < 0): Inverted
+                    // Y+ (ny > 0): Inverted
+                    // Z- (nz < 0): Inverted
+                    quad.flip_winding = (nx < 0) || (ny > 0) || (nz < 0);
                     
                     addQuad(quad, meshData);
                     
@@ -163,29 +174,53 @@ bool MeshBuilder::isBlockSolid(std::shared_ptr<Chunk> chunk, int x, int y, int z
 void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
     u32 baseIdx = static_cast<u32>(meshData.vertices.size());
     
-    // Create 4 vertices for the quad (simplified for now - proper positioning needed)
-    i16 x = static_cast<i16>(quad.x);
-    i16 y = static_cast<i16>(quad.y);
-    i16 z = static_cast<i16>(quad.z);
-    i16 w = static_cast<i16>(quad.w);
-    i16 h = static_cast<i16>(quad.h);
+    auto getPos = [&](int u, int v) {
+        int px = quad.x;
+        int py = quad.y;
+        int pz = quad.z;
+        
+        if (quad.u_axis == 0) px += u;
+        else if (quad.u_axis == 1) py += u;
+        else pz += u;
+        
+        if (quad.v_axis == 0) px += v;
+        else if (quad.v_axis == 1) py += v;
+        else pz += v;
+        
+        return std::make_tuple(static_cast<i16>(px), static_cast<i16>(py), static_cast<i16>(pz));
+    };
+    
+    auto [x0, y0, z0] = getPos(0, 0);
+    auto [x1, y1, z1] = getPos(quad.w, 0);
+    auto [x2, y2, z2] = getPos(quad.w, quad.h);
+    auto [x3, y3, z3] = getPos(0, quad.h);
     
     u16 uv00 = Vertex::packUV(0.0f, 0.0f);
     u16 uv10 = Vertex::packUV(1.0f, 0.0f);
     u16 uv11 = Vertex::packUV(1.0f, 1.0f);
     u16 uv01 = Vertex::packUV(0.0f, 1.0f);
     
-    meshData.vertices.emplace_back(x, y, z, quad.normal, quad.material, uv00);
-    meshData.vertices.emplace_back(x + w, y, z, quad.normal, quad.material, uv10);
-    meshData.vertices.emplace_back(x + w, y + h, z, quad.normal, quad.material, uv11);
-    meshData.vertices.emplace_back(x, y + h, z, quad.normal, quad.material, uv01);
+    meshData.vertices.emplace_back(x0, y0, z0, quad.normal, quad.material, uv00);
+    meshData.vertices.emplace_back(x1, y1, z1, quad.normal, quad.material, uv10);
+    meshData.vertices.emplace_back(x2, y2, z2, quad.normal, quad.material, uv11);
+    meshData.vertices.emplace_back(x3, y3, z3, quad.normal, quad.material, uv01);
     
     // Add indices (two triangles)
-    meshData.indices.push_back(baseIdx + 0);
-    meshData.indices.push_back(baseIdx + 1);
-    meshData.indices.push_back(baseIdx + 2);
-    
-    meshData.indices.push_back(baseIdx + 0);
-    meshData.indices.push_back(baseIdx + 2);
-    meshData.indices.push_back(baseIdx + 3);
+    if (quad.flip_winding) {
+        meshData.indices.push_back(baseIdx + 0);
+        meshData.indices.push_back(baseIdx + 2);
+        meshData.indices.push_back(baseIdx + 1);
+        
+        meshData.indices.push_back(baseIdx + 0);
+        meshData.indices.push_back(baseIdx + 3);
+        meshData.indices.push_back(baseIdx + 2);
+    } else {
+        meshData.indices.push_back(baseIdx + 0);
+        meshData.indices.push_back(baseIdx + 1);
+        meshData.indices.push_back(baseIdx + 2);
+        
+        meshData.indices.push_back(baseIdx + 0);
+        meshData.indices.push_back(baseIdx + 2);
+        meshData.indices.push_back(baseIdx + 3);
+    }
 }

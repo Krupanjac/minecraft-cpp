@@ -11,6 +11,8 @@
 
 #include <memory>
 #include <iostream>
+#include <mutex>
+#include <vector>
 
 class Application {
 public:
@@ -81,6 +83,9 @@ private:
     MeshBuilder meshBuilder;
     ThreadPool threadPool;
     
+    std::mutex meshMutex;
+    std::vector<std::pair<ChunkPos, MeshData>> pendingMeshes;
+
     double lastX, lastY;
     bool firstMouse;
     bool running;
@@ -154,9 +159,30 @@ private:
             threadPool.enqueue([this, chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg]() {
                 auto meshData = meshBuilder.buildChunkMesh(chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg);
                 
-                // TODO: Upload mesh to GPU in main thread
-                // For now, we'll handle this synchronously
+                std::lock_guard<std::mutex> lock(meshMutex);
+                pendingMeshes.emplace_back(chunk->getPosition(), std::move(meshData));
             });
+        }
+
+        // Upload meshes
+        {
+            std::lock_guard<std::mutex> lock(meshMutex);
+            for (auto& [pos, meshData] : pendingMeshes) {
+                if (!meshData.isEmpty()) {
+                    renderer.uploadChunkMesh(pos, meshData.vertices, meshData.indices);
+                    auto chunk = chunkManager.getChunk(pos);
+                    if (chunk) {
+                        chunk->setState(ChunkState::GPU_UPLOADED);
+                    }
+                } else {
+                    // Empty mesh (e.g. air chunk), but still mark as processed
+                    auto chunk = chunkManager.getChunk(pos);
+                    if (chunk) {
+                        chunk->setState(ChunkState::GPU_UPLOADED);
+                    }
+                }
+            }
+            pendingMeshes.clear();
         }
     }
     
