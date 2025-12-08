@@ -13,6 +13,8 @@ bool Renderer::initialize() {
         return false;
     }
     
+    initCrosshair();
+
     LOG_INFO("Renderer initialized");
     return true;
 }
@@ -66,6 +68,34 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     }
     
     blockShader.unuse();
+
+    renderCrosshair(windowWidth, windowHeight);
+}
+
+void Renderer::renderCrosshair(int windowWidth, int windowHeight) {
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO); // Invert colors
+
+    crosshairShader.use();
+    
+    // Simple orthographic projection for 2D UI
+    // Center is (0,0), range [-1, 1]
+    // We want a fixed size crosshair regardless of aspect ratio
+    float scaleX = 20.0f / windowWidth;  // 20 pixels wide
+    float scaleY = 20.0f / windowHeight; // 20 pixels tall
+    
+    glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(scaleX, scaleY, 1.0f));
+    crosshairShader.setMat4("uModel", model);
+    
+    crosshairMesh->bind();
+    glDrawElements(GL_LINES, 4, GL_UNSIGNED_INT, 0);
+    crosshairMesh->unbind();
+    
+    crosshairShader.unuse();
+    
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
 }
 
 void Renderer::setupOpenGL() {
@@ -84,7 +114,51 @@ bool Renderer::loadShaders() {
     if (success) {
         LOG_INFO("Block shader loaded successfully");
     }
+    
+    // Create simple shader for crosshair inline or load from file
+    // For simplicity, we'll use a very basic shader source here
+    const char* crosshairVert = R"(
+        #version 450 core
+        layout (location = 0) in vec3 aPos;
+        uniform mat4 uModel;
+        void main() {
+            gl_Position = uModel * vec4(aPos, 1.0);
+        }
+    )";
+    
+    const char* crosshairFrag = R"(
+        #version 450 core
+        out vec4 FragColor;
+        void main() {
+            FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        }
+    )";
+    
+    if (!crosshairShader.loadFromSource(crosshairVert, crosshairFrag)) {
+        LOG_ERROR("Failed to load crosshair shader");
+        return false;
+    }
+    
     return success;
+}
+
+void Renderer::initCrosshair() {
+    // Simple crosshair geometry (lines)
+    std::vector<Vertex> vertices;
+    std::vector<u32> indices;
+    
+    // Horizontal line
+    vertices.emplace_back(-1, 0, 0, 0, 0, 0);
+    vertices.emplace_back(1, 0, 0, 0, 0, 0);
+    
+    // Vertical line
+    vertices.emplace_back(0, -1, 0, 0, 0, 0);
+    vertices.emplace_back(0, 1, 0, 0, 0, 0);
+    
+    indices = {0, 1, 2, 3};
+    
+    crosshairMesh = std::make_unique<Mesh>();
+    crosshairMesh->upload(vertices, indices);
 }
 
 void Renderer::uploadChunkMesh(const ChunkPos& pos, const std::vector<Vertex>& vertices, const std::vector<u32>& indices) {

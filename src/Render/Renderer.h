@@ -21,12 +21,17 @@ public:
     // Add mesh for a chunk
     void uploadChunkMesh(const ChunkPos& pos, const std::vector<Vertex>& vertices, const std::vector<u32>& indices);
 
+    void renderCrosshair(int windowWidth, int windowHeight);
+
 private:
     Shader blockShader;
+    Shader crosshairShader;
+    std::unique_ptr<Mesh> crosshairMesh;
     Frustum frustum;
     
     std::unordered_map<ChunkPos, std::unique_ptr<Mesh>> chunkMeshes;
     
     void setupOpenGL();
     bool loadShaders();
+    void initCrosshair();
 };
