@@ -48,6 +48,15 @@ if(NOT glm_FOUND)
     FetchContent_MakeAvailable(glm)
 endif()
 
+# stb
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(stb)
+include_directories(${stb_SOURCE_DIR})
+
 # GLAD
 set(GLAD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/glad)
 if(NOT EXISTS ${GLAD_DIR})
@@ -71,6 +80,7 @@ set(SOURCES
     src/Render/Shader.cpp
     src/Render/Camera.cpp
     src/Render/Renderer.cpp
+    src/Render/Texture.cpp
     src/Render/GPUBufferAllocator.cpp
     src/Render/Frustum.cpp
     src/UI/UIManager.cpp

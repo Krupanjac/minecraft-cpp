@@ -48,6 +48,18 @@ void main() {
     // Unpack UV
     float u = float((aUV >> 8u) & 0xFFu) / 255.0;
     float v = float(aUV & 0xFFu) / 255.0;
+    
+    // Atlas mapping for water
+    float atlasSize = 16.0;
+    float cellSize = 1.0 / atlasSize;
+    
+    uint textureIndex = 205u; // Default water index (often around here in standard atlas)
+    
+    float col = float(textureIndex % 16u);
+    float row = float(textureIndex / 16u);
+    row = 15.0 - row;
+    
+    vTexCoord = vec2((col + u) * cellSize, (row + v) * cellSize);
     vTexCoord = vec2(u, v);
     
     vMaterial = aMaterial;

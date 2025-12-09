@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Shader.h"
+#include "Texture.h"
 #include "Camera.h"
 #include "Frustum.h"
 #include "../World/ChunkManager.h"
@@ -39,6 +40,7 @@ private:
     Shader sunShader;
     std::unique_ptr<Mesh> crosshairMesh;
     std::unique_ptr<Mesh> sunMesh;
+    std::unique_ptr<Texture> blockAtlas;
     Frustum frustum;
     
     std::unordered_map<ChunkPos, std::unique_ptr<Mesh>> chunkMeshes;

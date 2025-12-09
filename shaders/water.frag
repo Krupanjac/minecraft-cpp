@@ -11,11 +11,13 @@ uniform vec3 uLightDir;
 uniform float uFogDist;
 uniform vec3 uSkyColor;
 uniform float uTime;
+uniform sampler2D uTexture;
 
 out vec4 FragColor;
 
 void main() {
-    vec3 baseColor = vec3(0.2, 0.4, 0.8); // Water blue
+    vec4 texColor = texture(uTexture, vTexCoord);
+    vec3 baseColor = texColor.rgb * vec3(0.5, 0.7, 1.0); // Tint blue
     
     // Simple lighting
     vec3 lightDir = normalize(uLightDir);

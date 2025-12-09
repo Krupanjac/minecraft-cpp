@@ -18,6 +18,8 @@ bool Renderer::initialize() {
     initCrosshair();
     initSun();
 
+    blockAtlas = std::make_unique<Texture>("assets/block_atlas.png");
+
     LOG_INFO("Renderer initialized");
     return true;
 }
@@ -38,7 +40,9 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     renderSun(camera, windowWidth, windowHeight);
 
     // Render chunks
+    blockAtlas->bind(0);
     blockShader.use();
+    blockShader.setInt("uTexture", 0);
     blockShader.setMat4("uProjection", projection);
     blockShader.setMat4("uView", view);
     blockShader.setVec3("uCameraPos", camera.getPosition());
@@ -91,6 +95,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     glDisable(GL_CULL_FACE); // Allow seeing water surface from below
     
     waterShader.use();
+    waterShader.setInt("uTexture", 0);
     waterShader.setMat4("uProjection", projection);
     waterShader.setMat4("uView", view);
     waterShader.setFloat("uTime", static_cast<float>(glfwGetTime()));
