@@ -17,7 +17,11 @@ A Minecraft-like voxel engine built from scratch in C++20 with OpenGL 4.5+. Feat
 - **Multithreading**: Asynchronous chunk generation and mesh building
 - **Modern OpenGL**: Uses OpenGL 4.5+ with persistent mapped buffers
 - **Frustum Culling**: Only renders visible chunks
-- **FPS Camera**: Smooth WASD + mouse control
+- **FPS Camera**: Smooth WASD + mouse control with flight mode
+- **Block Interaction**: Place and break blocks with raycasting
+- **Water Rendering**: Transparent animated water with wave effects
+- **Day/Night Cycle**: Dynamic lighting with sunrise/sunset transitions
+- **Player Physics**: Gravity, collision detection, and water physics
 
 ## Requirements
 
@@ -81,10 +85,13 @@ cmake --build .
 ## Controls
 
 - **W/A/S/D** - Move forward/left/backward/right
-- **Space** - Move up
+- **Space** - Move up (double-tap to toggle flight mode)
 - **Left Shift** - Move down
 - **Mouse** - Look around
-- **ESC** - Exit
+- **Left Click** - Break block
+- **Right Click** - Place block
+- **ESC** - Open/close menu
+- **Q** - Exit (from menu)
 
 ## Project Structure
 
@@ -139,10 +146,10 @@ Edit `src/Util/Config.h` to customize:
 
 ## Future Enhancements
 
-- [ ] Block placement/destruction
+- [x] Block placement/destruction
 - [ ] Advanced LOD system
 - [ ] Biomes and caves
-- [ ] Water rendering with transparency
+- [x] Water rendering with transparency
 - [x] Lighting system (Ambient Occlusion)
 - [ ] Save/load world data
 - [x] Player physics and collision
