@@ -4,6 +4,7 @@ layout(location = 0) in vec3 aPos;
 layout(location = 1) in uint aNormal;
 layout(location = 2) in uint aMaterial;
 layout(location = 3) in uint aUV;
+layout(location = 4) in uint aAO;
 
 uniform mat4 uModel;
 uniform mat4 uView;
@@ -13,6 +14,7 @@ out vec3 vWorldPos;
 out vec3 vNormal;
 out vec2 vTexCoord;
 flat out uint vMaterial;
+out float vAO;
 
 void main() {
     vec4 worldPos = uModel * vec4(aPos, 1.0);
@@ -36,4 +38,5 @@ void main() {
     vTexCoord = vec2(u, v);
     
     vMaterial = aMaterial;
+    vAO = float(aAO) / 3.0;
 }

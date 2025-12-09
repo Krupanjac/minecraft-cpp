@@ -136,9 +136,9 @@ Edit `src/Util/Config.h` to customize:
 - [ ] Advanced LOD system
 - [ ] Biomes and caves
 - [ ] Water rendering with transparency
-- [ ] Lighting system
+- [x] Lighting system (Ambient Occlusion)
 - [ ] Save/load world data
-- [ ] Player physics and collision
+- [x] Player physics and collision
 - [ ] Multiplayer support
 
 ## License

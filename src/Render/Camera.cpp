@@ -8,29 +8,55 @@ Camera::Camera(const glm::vec3& position)
       pitch(0.0f),
       movementSpeed(CAMERA_SPEED),
       mouseSensitivity(MOUSE_SENSITIVITY),
-      fov(FOV) {
+      fov(FOV),
+      velocity(0.0f),
+      isFlying(true),
+      onGround(false) {
     updateCameraVectors();
 }
 
-void Camera::update(float deltaTime) {
+void Camera::jump() {
+    if (onGround && !isFlying) {
+        velocity.y = 6.0f; // Jump force
+        onGround = false;
+    }
+}
+
+void Camera::update(float /*deltaTime*/) {
     // Can be used for camera shake, smooth movement, etc.
 }
 
-void Camera::processInput(bool forward, bool backward, bool left, bool right, bool up, bool down, float deltaTime) {
-    float velocity = movementSpeed * deltaTime;
-    
-    if (forward)
-        position += front * velocity;
-    if (backward)
-        position -= front * velocity;
-    if (left)
-        position -= this->right * velocity;
-    if (right)
-        position += this->right * velocity;
-    if (up)
-        position += worldUp * velocity;
-    if (down)
-        position -= worldUp * velocity;
+void Camera::processInput(bool forward, bool backward, bool moveLeft, bool moveRight, bool moveUp, bool moveDown, float deltaTime) {
+    if (isFlying) {
+        float vel = movementSpeed * deltaTime;
+        if (forward) position += front * vel;
+        if (backward) position -= front * vel;
+        if (moveLeft) position -= this->right * vel;
+        if (moveRight) position += this->right * vel;
+        if (moveUp) position += worldUp * vel;
+        if (moveDown) position -= worldUp * vel;
+    } else {
+        // Walking
+        glm::vec3 frontFlat = glm::normalize(glm::vec3(front.x, 0.0f, front.z));
+        glm::vec3 rightFlat = glm::normalize(glm::vec3(this->right.x, 0.0f, this->right.z));
+        
+        glm::vec3 wishDir(0.0f);
+        if (forward) wishDir += frontFlat;
+        if (backward) wishDir -= frontFlat;
+        if (moveLeft) wishDir -= rightFlat;
+        if (moveRight) wishDir += rightFlat;
+        
+        if (glm::length(wishDir) > 0.0f) {
+            wishDir = glm::normalize(wishDir);
+            velocity.x = wishDir.x * movementSpeed * 0.5f; // Walk speed
+            velocity.z = wishDir.z * movementSpeed * 0.5f;
+        } else {
+            velocity.x = 0.0f;
+            velocity.z = 0.0f;
+        }
+        
+        if (moveUp) jump();
+    }
 }
 
 void Camera::processMouseMovement(float xoffset, float yoffset) {

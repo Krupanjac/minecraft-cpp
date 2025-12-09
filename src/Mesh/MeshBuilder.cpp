@@ -147,6 +147,34 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     quad.normal = Vertex::packNormal(nx, ny, nz);
                     quad.material = material;
                     
+                    // Calculate AO
+                    int u_vec[3] = {0}; u_vec[u_axis] = 1;
+                    int v_vec[3] = {0}; v_vec[v_axis] = 1;
+                    int n_vec[3] = {nx, ny, nz};
+                    int neg_u[3] = {-u_vec[0], -u_vec[1], -u_vec[2]};
+                    int neg_v[3] = {-v_vec[0], -v_vec[1], -v_vec[2]};
+                    
+                    // V0: (0, 0) -> Block (0, 0), check -u, -v
+                    quad.ao[0] = calculateVertexAO(chunk, quad.x, quad.y, quad.z, n_vec, neg_u, neg_v, neighbors);
+                    
+                    // V1: (w, 0) -> Block (w-1, 0), check +u, -v
+                    int bx = quad.x + (w-1)*u_vec[0];
+                    int by = quad.y + (w-1)*u_vec[1];
+                    int bz = quad.z + (w-1)*u_vec[2];
+                    quad.ao[1] = calculateVertexAO(chunk, bx, by, bz, n_vec, u_vec, neg_v, neighbors);
+                    
+                    // V2: (w, h) -> Block (w-1, h-1), check +u, +v
+                    bx = quad.x + (w-1)*u_vec[0] + (h-1)*v_vec[0];
+                    by = quad.y + (w-1)*u_vec[1] + (h-1)*v_vec[1];
+                    bz = quad.z + (w-1)*u_vec[2] + (h-1)*v_vec[2];
+                    quad.ao[2] = calculateVertexAO(chunk, bx, by, bz, n_vec, u_vec, v_vec, neighbors);
+                    
+                    // V3: (0, h) -> Block (0, h-1), check -u, +v
+                    bx = quad.x + (h-1)*v_vec[0];
+                    by = quad.y + (h-1)*v_vec[1];
+                    bz = quad.z + (h-1)*v_vec[2];
+                    quad.ao[3] = calculateVertexAO(chunk, bx, by, bz, n_vec, neg_u, v_vec, neighbors);
+                    
                     addQuad(quad, meshData);
                     
                     u += w;
@@ -198,30 +226,74 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
     u16 uv11 = Vertex::packUV(1.0f, 1.0f);
     u16 uv01 = Vertex::packUV(0.0f, 1.0f);
     
-    meshData.vertices.emplace_back(x0, y0, z0, quad.normal, quad.material, uv00);
-    meshData.vertices.emplace_back(x1, y1, z1, quad.normal, quad.material, uv10);
-    meshData.vertices.emplace_back(x2, y2, z2, quad.normal, quad.material, uv11);
-    meshData.vertices.emplace_back(x3, y3, z3, quad.normal, quad.material, uv01);
+    meshData.vertices.emplace_back(x0, y0, z0, quad.normal, quad.material, uv00, quad.ao[0]);
+    meshData.vertices.emplace_back(x1, y1, z1, quad.normal, quad.material, uv10, quad.ao[1]);
+    meshData.vertices.emplace_back(x2, y2, z2, quad.normal, quad.material, uv11, quad.ao[2]);
+    meshData.vertices.emplace_back(x3, y3, z3, quad.normal, quad.material, uv01, quad.ao[3]);
     
     // Winding order
-    // Flip for: X- (nx < 0), Y+ (ny > 0), Z- (nz < 0)
-    bool flip = (quad.nx < 0) || (quad.ny > 0) || (quad.nz < 0);
+    // Determine winding order based on face normal
+    // X- (nx < 0), Y+ (ny > 0), Z- (nz < 0) need CW winding
+    bool reverseWinding = (quad.nx < 0) || (quad.ny > 0) || (quad.nz < 0);
     
-    if (flip) {
-        meshData.indices.push_back(baseIdx + 0);
-        meshData.indices.push_back(baseIdx + 2);
-        meshData.indices.push_back(baseIdx + 1);
-        
-        meshData.indices.push_back(baseIdx + 0);
-        meshData.indices.push_back(baseIdx + 3);
-        meshData.indices.push_back(baseIdx + 2);
+    // Determine triangulation split based on AO
+    // Connect vertices with highest AO (brightest) to avoid dark creases
+    bool flipSplit = (quad.ao[1] + quad.ao[3]) > (quad.ao[0] + quad.ao[2]);
+    
+    if (reverseWinding) {
+        if (flipSplit) {
+            // Connect 1-3, CW winding
+            meshData.indices.push_back(baseIdx + 1);
+            meshData.indices.push_back(baseIdx + 0);
+            meshData.indices.push_back(baseIdx + 3);
+            
+            meshData.indices.push_back(baseIdx + 3);
+            meshData.indices.push_back(baseIdx + 2);
+            meshData.indices.push_back(baseIdx + 1);
+        } else {
+            // Connect 0-2, CW winding
+            meshData.indices.push_back(baseIdx + 0);
+            meshData.indices.push_back(baseIdx + 2);
+            meshData.indices.push_back(baseIdx + 1);
+            
+            meshData.indices.push_back(baseIdx + 0);
+            meshData.indices.push_back(baseIdx + 3);
+            meshData.indices.push_back(baseIdx + 2);
+        }
     } else {
-        meshData.indices.push_back(baseIdx + 0);
-        meshData.indices.push_back(baseIdx + 1);
-        meshData.indices.push_back(baseIdx + 2);
-        
-        meshData.indices.push_back(baseIdx + 0);
-        meshData.indices.push_back(baseIdx + 2);
-        meshData.indices.push_back(baseIdx + 3);
+        if (flipSplit) {
+            // Connect 1-3, CCW winding
+            meshData.indices.push_back(baseIdx + 0);
+            meshData.indices.push_back(baseIdx + 1);
+            meshData.indices.push_back(baseIdx + 3);
+            
+            meshData.indices.push_back(baseIdx + 1);
+            meshData.indices.push_back(baseIdx + 2);
+            meshData.indices.push_back(baseIdx + 3);
+        } else {
+            // Connect 0-2, CCW winding
+            meshData.indices.push_back(baseIdx + 0);
+            meshData.indices.push_back(baseIdx + 1);
+            meshData.indices.push_back(baseIdx + 2);
+            
+            meshData.indices.push_back(baseIdx + 0);
+            meshData.indices.push_back(baseIdx + 2);
+            meshData.indices.push_back(baseIdx + 3);
+        }
     }
+}
+
+u8 MeshBuilder::calculateVertexAO(std::shared_ptr<Chunk> chunk, int x, int y, int z, 
+                                 const int* n_vec, const int* u_vec, const int* v_vec,
+                                 std::shared_ptr<Chunk> neighbors[6]) {
+    // Check 3 neighbors: Side1 (u), Side2 (v), Corner (u+v)
+    // x,y,z is the block inside the quad.
+    // u_vec, v_vec are directions to neighbors.
+    
+    bool s1 = isBlockSolid(chunk, x + u_vec[0], y + u_vec[1], z + u_vec[2], neighbors);
+    bool s2 = isBlockSolid(chunk, x + v_vec[0], y + v_vec[1], z + v_vec[2], neighbors);
+    bool c = isBlockSolid(chunk, x + u_vec[0] + v_vec[0], y + u_vec[1] + v_vec[1], z + u_vec[2] + v_vec[2], neighbors);
+    
+    if (s1 && s2) return 0;
+    return 3 - (s1 + s2 + c);
 }

@@ -40,6 +40,16 @@ public:
         window->setMouseButtonCallback([this](int button, int action, int mods) {
             onMouseButton(button, action, mods);
         });
+        
+        window->setKeyCallback([this](int key, int scancode, int action, int mods) {
+            if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
+                double currentTime = glfwGetTime();
+                if (currentTime - lastSpaceTime < 0.3) {
+                    camera.toggleFlightMode();
+                }
+                lastSpaceTime = currentTime;
+            }
+        });
 
         if (!renderer.initialize()) {
             LOG_ERROR("Failed to initialize renderer");
@@ -91,6 +101,7 @@ private:
     std::vector<std::pair<ChunkPos, MeshData>> pendingMeshes;
 
     double lastX, lastY;
+    double lastSpaceTime = 0.0;
     bool firstMouse;
     bool running;
     
@@ -160,6 +171,7 @@ private:
     }
     
     void update(float deltaTime) {
+        updatePhysics(deltaTime);
         camera.update(deltaTime);
         chunkManager.update(camera.getPosition());
         
@@ -224,6 +236,68 @@ private:
     
     void render() {
         renderer.render(chunkManager, camera, window->getWidth(), window->getHeight());
+    }
+    
+    void updatePhysics(float deltaTime) {
+        if (camera.getFlightMode()) return;
+        
+        // Apply gravity
+        camera.velocity.y -= 18.0f * deltaTime;
+        
+        // Apply velocity
+        glm::vec3 pos = camera.getPosition();
+        glm::vec3 vel = camera.velocity * deltaTime;
+        
+        // Try X movement
+        if (checkCollision(glm::vec3(pos.x + vel.x, pos.y, pos.z))) {
+            vel.x = 0;
+            camera.velocity.x = 0;
+        }
+        pos.x += vel.x;
+        
+        // Try Z movement
+        if (checkCollision(glm::vec3(pos.x, pos.y, pos.z + vel.z))) {
+            vel.z = 0;
+            camera.velocity.z = 0;
+        }
+        pos.z += vel.z;
+        
+        // Try Y movement
+        if (checkCollision(glm::vec3(pos.x, pos.y + vel.y, pos.z))) {
+            if (vel.y < 0) camera.onGround = true;
+            vel.y = 0;
+            camera.velocity.y = 0;
+        } else {
+            camera.onGround = false;
+        }
+        pos.y += vel.y;
+        
+        camera.setPosition(pos);
+        
+        // Friction
+        float friction = camera.onGround ? 10.0f : 2.0f;
+        float damping = 1.0f / (1.0f + friction * deltaTime);
+        camera.velocity.x *= damping;
+        camera.velocity.z *= damping;
+    }
+    
+    bool checkCollision(const glm::vec3& pos) {
+        float minX = pos.x - 0.3f;
+        float maxX = pos.x + 0.3f;
+        float minY = pos.y - 1.6f;
+        float maxY = pos.y + 0.2f;
+        float minZ = pos.z - 0.3f;
+        float maxZ = pos.z + 0.3f;
+        
+        for (int x = static_cast<int>(floor(minX)); x <= static_cast<int>(floor(maxX)); x++) {
+            for (int y = static_cast<int>(floor(minY)); y <= static_cast<int>(floor(maxY)); y++) {
+                for (int z = static_cast<int>(floor(minZ)); z <= static_cast<int>(floor(maxZ)); z++) {
+                    Block block = chunkManager.getBlockAt(x, y, z);
+                    if (block.isSolid()) return true;
+                }
+            }
+        }
+        return false;
     }
 };
 

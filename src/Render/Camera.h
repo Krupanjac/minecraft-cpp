@@ -24,6 +24,15 @@ public:
     void setSpeed(float speed) { movementSpeed = speed; }
     void setSensitivity(float sensitivity) { mouseSensitivity = sensitivity; }
 
+    // Physics
+    void toggleFlightMode() { isFlying = !isFlying; velocity = glm::vec3(0.0f); }
+    bool getFlightMode() const { return isFlying; }
+    void jump();
+    
+    glm::vec3 velocity;
+    bool isFlying;
+    bool onGround;
+
 private:
     glm::vec3 position;
     glm::vec3 front;

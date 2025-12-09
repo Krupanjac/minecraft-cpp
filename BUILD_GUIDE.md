@@ -165,11 +165,11 @@ Current implementation notes:
 
 After getting the basic engine running, consider:
 
-1. **Fix Memory Issues**: Address callback memory leaks in Window.cpp
-2. **Implement Block Interaction**: Add ray casting for block selection
-3. **Add Lighting**: Implement ambient occlusion and sunlight
+1. **Fix Memory Issues**: Address callback memory leaks in Window.cpp (Completed)
+2. **Implement Block Interaction**: Add ray casting for block selection (Completed)
+3. **Add Lighting**: Implement ambient occlusion and sunlight (Completed)
 4. **Improve World Gen**: Add biomes, caves, trees
-5. **Add Physics**: Player collision detection
+5. **Add Physics**: Player collision detection and gravity (Completed)
 6. **Optimize Rendering**: Implement proper LOD system
 7. **Save/Load**: Add world serialization
 

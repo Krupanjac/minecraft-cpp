@@ -17,6 +17,7 @@ public:
     
     std::shared_ptr<Chunk> getChunk(const ChunkPos& pos);
     std::shared_ptr<Chunk> getChunkAt(const glm::vec3& worldPos);
+    Block getBlockAt(int x, int y, int z);
     
     const std::unordered_map<ChunkPos, std::shared_ptr<Chunk>>& getChunks() const {
         return chunks;
@@ -41,7 +42,6 @@ public:
 
     RayCastResult rayCast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance);
     
-    Block getBlockAt(int x, int y, int z);
     void setBlockAt(int x, int y, int z, Block block);
 
 private:

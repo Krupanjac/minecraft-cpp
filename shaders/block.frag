@@ -4,6 +4,7 @@ in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vTexCoord;
 flat in uint vMaterial;
+in float vAO;
 
 uniform vec3 uCameraPos;
 
@@ -30,7 +31,12 @@ void main() {
     float diffuse = max(dot(normal, lightDir), 0.0);
     float ambient = 0.3;
     
-    vec3 lighting = vec3(ambient + diffuse * 0.7);
+    // Apply AO
+    // Use smoothstep for non-linear AO curve
+    float aoCurve = smoothstep(0.0, 1.0, vAO);
+    float aoFactor = mix(0.25, 1.0, aoCurve);
+    
+    vec3 lighting = vec3(ambient + diffuse * 0.7) * aoFactor;
     vec3 color = baseColor * lighting;
     
     // Fog

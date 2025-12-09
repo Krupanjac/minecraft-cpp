@@ -42,6 +42,7 @@ private:
         int nx, ny, nz;
         u8 normal;
         u8 material;
+        u8 ao[4]; // AO for each vertex
     };
     
     void greedyMesh(std::shared_ptr<Chunk> chunk,
@@ -50,6 +51,10 @@ private:
     
     bool isBlockSolid(std::shared_ptr<Chunk> chunk, int x, int y, int z,
                      std::shared_ptr<Chunk> neighbors[6]);
+                     
+    u8 calculateVertexAO(std::shared_ptr<Chunk> chunk, int x, int y, int z, 
+                        const int* n, const int* u, const int* v,
+                        std::shared_ptr<Chunk> neighbors[6]);
     
     void addQuad(const Quad& quad, MeshData& meshData);
 };
