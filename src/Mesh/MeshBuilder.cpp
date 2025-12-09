@@ -91,6 +91,9 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                         // If neighbor is Air, we render.
                         // If neighbor is Water, we don't render.
                         shouldRender = !adjBlock.isWater() && !adjBlock.isOpaque();
+                    } else if (block.isTransparent()) {
+                        // ICE and other transparent blocks
+                        shouldRender = !adjBlock.isOpaque() || adjBlock.isTransparent();
                     } else {
                         // Solid block: Render if neighbor is NOT opaque
                         shouldRender = !adjBlock.isOpaque();
@@ -113,8 +116,8 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     
                     // Compute width
                     int w = 1;
-                    // Disable greedy meshing for water to prevent gaps with vertex displacement
-                    if (material != static_cast<u8>(BlockType::WATER)) {
+                    // Disable greedy meshing for water and ice to prevent gaps with vertex displacement
+                    if (material != static_cast<u8>(BlockType::WATER) && material != static_cast<u8>(BlockType::ICE)) {
                         while (u + w < CHUNK_SIZE && mask[v * CHUNK_SIZE + u + w] == material) {
                             ++w;
                         }
@@ -123,7 +126,7 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     // Compute height
                     int h = 1;
                     bool done = false;
-                    if (material != static_cast<u8>(BlockType::WATER)) {
+                    if (material != static_cast<u8>(BlockType::WATER) && material != static_cast<u8>(BlockType::ICE)) {
                         while (v + h < CHUNK_SIZE && !done) {
                             for (int k = 0; k < w; ++k) {
                                 if (mask[(v + h) * CHUNK_SIZE + u + k] != material) {
@@ -223,10 +226,14 @@ bool MeshBuilder::isBlockSolid(std::shared_ptr<Chunk> chunk, int x, int y, int z
 
 void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
     bool isWater = (quad.material == static_cast<u8>(BlockType::WATER));
+    bool isIce = (quad.material == static_cast<u8>(BlockType::ICE));
+    
+    // Render water and ice as transparent
+    bool isTransparent = isWater || isIce;
     
     // Use appropriate vertex/index list
-    auto& vertices = isWater ? meshData.waterVertices : meshData.vertices;
-    auto& indices = isWater ? meshData.waterIndices : meshData.indices;
+    auto& vertices = isTransparent ? meshData.waterVertices : meshData.vertices;
+    auto& indices = isTransparent ? meshData.waterIndices : meshData.indices;
     
     u32 baseIdx = static_cast<u32>(vertices.size());
     

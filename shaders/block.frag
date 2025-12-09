@@ -29,11 +29,22 @@ void main() {
     
     vec3 baseColor = texColor.rgb;
     
-    // Tinting for biome colors (Grass/Leaves)
+    // Material-based coloring for blocks without textures
+    // GRASS = 1, SAND = 4, SNOW = 8, ICE = 9, GRAVEL = 10, SANDSTONE = 11
     if (vMaterial == 1u && vNormal.y > 0.5) { // Grass Top
         baseColor *= vec3(0.4, 0.8, 0.3);
     } else if (vMaterial == 7u) { // Leaves
         baseColor *= vec3(0.3, 0.7, 0.3);
+    } else if (vMaterial == 4u) { // Sand
+        baseColor = vec3(0.93, 0.87, 0.69);
+    } else if (vMaterial == 8u) { // Snow
+        baseColor = vec3(0.95, 0.95, 0.98);
+    } else if (vMaterial == 9u) { // Ice
+        baseColor = vec3(0.7, 0.85, 0.95);
+    } else if (vMaterial == 10u) { // Gravel
+        baseColor = vec3(0.55, 0.52, 0.50);
+    } else if (vMaterial == 11u) { // Sandstone
+        baseColor = vec3(0.85, 0.75, 0.60);
     }
     
     // Simple lighting

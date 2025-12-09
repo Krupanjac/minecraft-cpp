@@ -3,10 +3,130 @@
 #include "ChunkManager.h"
 #include <cmath>
 #include <random>
+#include <algorithm>
 
 WorldGenerator::WorldGenerator() : seed(12345) {
     // TODO: Make seed configurable or random
     // seed = std::random_device{}();
+}
+
+BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
+    BiomeInfo info;
+    info.type = biome;
+    
+    switch (biome) {
+        case BiomeType::OCEAN:
+            info.temperature = 0.5f;
+            info.humidity = 1.0f;
+            info.heightVariation = 0.3f;
+            info.surfaceBlock = BlockType::SAND;
+            info.subsurfaceBlock = BlockType::SAND;
+            info.surfaceDepth = 3;
+            break;
+            
+        case BiomeType::PLAINS:
+            info.temperature = 0.6f;
+            info.humidity = 0.5f;
+            info.heightVariation = 0.5f;
+            info.surfaceBlock = BlockType::GRASS;
+            info.subsurfaceBlock = BlockType::DIRT;
+            info.surfaceDepth = 4;
+            break;
+            
+        case BiomeType::DESERT:
+            info.temperature = 0.9f;
+            info.humidity = 0.1f;
+            info.heightVariation = 0.4f;
+            info.surfaceBlock = BlockType::SAND;
+            info.subsurfaceBlock = BlockType::SANDSTONE;
+            info.surfaceDepth = 5;
+            break;
+            
+        case BiomeType::FOREST:
+            info.temperature = 0.5f;
+            info.humidity = 0.8f;
+            info.heightVariation = 0.6f;
+            info.surfaceBlock = BlockType::GRASS;
+            info.subsurfaceBlock = BlockType::DIRT;
+            info.surfaceDepth = 4;
+            break;
+            
+        case BiomeType::MOUNTAINS:
+            info.temperature = 0.3f;
+            info.humidity = 0.4f;
+            info.heightVariation = 1.5f;
+            info.surfaceBlock = BlockType::STONE;
+            info.subsurfaceBlock = BlockType::STONE;
+            info.surfaceDepth = 1;
+            break;
+            
+        case BiomeType::SNOWY_TUNDRA:
+            info.temperature = 0.0f;
+            info.humidity = 0.3f;
+            info.heightVariation = 0.4f;
+            info.surfaceBlock = BlockType::SNOW;
+            info.subsurfaceBlock = BlockType::DIRT;
+            info.surfaceDepth = 3;
+            break;
+    }
+    
+    return info;
+}
+
+float WorldGenerator::getTemperature(float x, float z) const {
+    float tempNoise = noise2D(x * 0.003f + 1000.0f, z * 0.003f + 1000.0f);
+    return (tempNoise + 1.0f) * 0.5f; // Map to [0, 1]
+}
+
+float WorldGenerator::getHumidity(float x, float z) const {
+    float humidNoise = noise2D(x * 0.003f + 2000.0f, z * 0.003f + 2000.0f);
+    return (humidNoise + 1.0f) * 0.5f; // Map to [0, 1]
+}
+
+BiomeType WorldGenerator::getBiome(float x, float z) const {
+    float temp = getTemperature(x, z);
+    float humid = getHumidity(x, z);
+    
+    // Simple biome selection based on temperature and humidity
+    // Cold biomes
+    if (temp < 0.25f) {
+        return BiomeType::SNOWY_TUNDRA;
+    }
+    
+    // Hot biomes
+    if (temp > 0.75f) {
+        if (humid < 0.3f) {
+            return BiomeType::DESERT;
+        }
+    }
+    
+    // Medium temperature biomes
+    if (humid > 0.6f) {
+        return BiomeType::FOREST;
+    }
+    
+    if (humid < 0.3f && temp > 0.5f) {
+        return BiomeType::DESERT;
+    }
+    
+    // Default to plains
+    return BiomeType::PLAINS;
+}
+
+bool WorldGenerator::isCave(float x, float y, float z) const {
+    // Don't generate caves too close to surface or too deep
+    if (y > SEA_LEVEL + 10 || y < 5) {
+        return false;
+    }
+    
+    // Use 3D noise for cave generation
+    float caveNoise1 = noise3D(x * 0.02f, y * 0.02f, z * 0.02f);
+    float caveNoise2 = noise3D(x * 0.02f + 100.0f, y * 0.02f + 100.0f, z * 0.02f + 100.0f);
+    
+    // Caves exist where both noise values are in a certain range
+    // This creates worm-like cave systems
+    float threshold = 0.15f;
+    return (std::abs(caveNoise1) < threshold && std::abs(caveNoise2) < threshold);
 }
 
 void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
@@ -18,21 +138,61 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             float worldX = worldPos.x + x;
             float worldZ = worldPos.z + z;
             
-            int height = static_cast<int>(getHeight(worldX, worldZ));
+            // Get biome for this column
+            BiomeType biome = getBiome(worldX, worldZ);
+            BiomeInfo biomeInfo = getBiomeInfo(biome);
+            
+            // Calculate height based on biome
+            float baseHeight = getHeight(worldX, worldZ);
+            
+            // Apply biome-specific height variation
+            float biomeHeightMod = (biomeInfo.heightVariation - 0.5f) * 20.0f;
+            int height = static_cast<int>(baseHeight + biomeHeightMod);
+            
+            // Special case for ocean biome - keep it low
+            if (biome == BiomeType::OCEAN) {
+                height = std::min(height, SEA_LEVEL - 5);
+            }
+            
+            // Special case for mountains - make them tall
+            if (biome == BiomeType::MOUNTAINS) {
+                float mountainNoise = noise2D(worldX * 0.005f, worldZ * 0.005f);
+                height += static_cast<int>(mountainNoise * 30.0f);
+            }
             
             for (int y = 0; y < CHUNK_HEIGHT; ++y) {
                 int worldY = static_cast<int>(worldPos.y) + y;
                 
                 BlockType blockType = BlockType::AIR;
                 
-                if (worldY < height - 4) {
-                    blockType = BlockType::STONE;
-                } else if (worldY < height - 1) {
-                    blockType = BlockType::DIRT;
-                } else if (worldY < height) {
-                    blockType = BlockType::GRASS;
-                } else if (worldY < SEA_LEVEL) {
-                    blockType = BlockType::WATER;
+                // Check if this position should be a cave
+                bool isInCave = isCave(worldX, static_cast<float>(worldY), worldZ);
+                
+                if (!isInCave) {
+                    if (worldY < height - biomeInfo.surfaceDepth) {
+                        blockType = BlockType::STONE;
+                    } else if (worldY < height - 1) {
+                        blockType = biomeInfo.subsurfaceBlock;
+                    } else if (worldY < height) {
+                        blockType = biomeInfo.surfaceBlock;
+                        
+                        // Special case: replace snow with ice if underwater
+                        if (blockType == BlockType::SNOW && worldY < SEA_LEVEL) {
+                            blockType = BlockType::ICE;
+                        }
+                    } else if (worldY < SEA_LEVEL) {
+                        // Water or ice for frozen biomes
+                        if (biome == BiomeType::SNOWY_TUNDRA && worldY == SEA_LEVEL - 1) {
+                            blockType = BlockType::ICE;
+                        } else {
+                            blockType = BlockType::WATER;
+                        }
+                    }
+                } else {
+                    // Cave - but still fill with water if below sea level
+                    if (worldY < SEA_LEVEL) {
+                        blockType = BlockType::WATER;
+                    }
                 }
                 
                 chunk->setBlock(x, y, z, Block(blockType));
