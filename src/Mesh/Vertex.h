@@ -24,10 +24,11 @@ struct Vertex {
         return 0;
     }
     
-    static u16 packUV(float u, float v) {
-        // Pack UV into 16 bits (8 bits each)
-        u8 uu = static_cast<u8>(u * 255.0f);
-        u8 vv = static_cast<u8>(v * 255.0f);
+    static u16 packUV(int u, int v) {
+        // Pack UV dimensions into 16 bits (8 bits each)
+        // u and v are block counts (0-255)
+        u8 uu = static_cast<u8>(u);
+        u8 vv = static_cast<u8>(v);
         return (static_cast<u16>(uu) << 8) | vv;
     }
 };

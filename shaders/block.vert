@@ -13,6 +13,7 @@ uniform mat4 uProjection;
 out vec3 vWorldPos;
 out vec3 vNormal;
 out vec2 vTexCoord;
+flat out vec2 vCellOrigin;
 flat out uint vMaterial;
 out float vAO;
 
@@ -32,9 +33,20 @@ void main() {
     
     vNormal = normalize((uModel * vec4(normal, 0.0)).xyz);
     
-    // Unpack UV
-    float u = float((aUV >> 8u) & 0xFFu) / 255.0;
-    float v = float(aUV & 0xFFu) / 255.0;
+    // Unpack UV (now contains block dimensions for tiling)
+    float u_dim = float((aUV >> 8u) & 0xFFu);
+    float v_dim = float(aUV & 0xFFu);
+    
+    // Pass local UV for tiling (0..w, 0..h)
+    vTexCoord = vec2(u_dim, v_dim);
+    
+    // Fix rotation for X-faces (Normal 0 and 1)
+    // For X-faces, u_dim corresponds to Y (height) and v_dim to Z (width).
+    // We want U to be horizontal (Z) and V to be vertical (Y).
+    // So we swap them.
+    if (aNormal == 0u || aNormal == 1u) {
+        vTexCoord = vec2(v_dim, u_dim);
+    }
     
     // Texture Atlas Mapping
     // Assume 16x16 atlas
@@ -42,13 +54,6 @@ void main() {
     float cellSize = 1.0 / atlasSize;
     
     // Map material to texture index
-    // This mapping depends on the specific layout of block_atlas.png
-    // Standard Minecraft 1.12-ish terrain.png layout:
-    // 0: Grass Top, 1: Stone, 2: Dirt, 3: Grass Side
-    // 4: Wood Plank, 5: Stone Slab Side, 6: Stone Slab Top, 7: Brick
-    // ...
-    // We'll use a simplified mapping logic here.
-    
     uint textureIndex = aMaterial - 1u; // Default mapping
     
     if (aMaterial == 1u) { // Grass
@@ -58,16 +63,9 @@ void main() {
     }
     else if (aMaterial == 2u) textureIndex = 2u;   // Dirt
     else if (aMaterial == 3u) textureIndex = 1u;   // Stone
-    else if (aMaterial == 4u) textureIndex = 11u;  // Sand (often at index 11 or 12)
+    else if (aMaterial == 4u) textureIndex = 11u;  // Sand
     else if (aMaterial == 6u) textureIndex = 4u;   // Wood (Plank)
-    else if (aMaterial == 7u) textureIndex = 52u;  // Leaves (often further down)
-    
-    // Calculate atlas coordinates
-    // In OpenGL, (0,0) is bottom-left.
-    // If the atlas is defined with (0,0) at top-left (standard image), we need to flip row.
-    // But we flipped the texture on load (stbi_set_flip_vertically_on_load(1)).
-    // So (0,0) is bottom-left of the image.
-    // If the atlas indices start from top-left (0, 1, 2...), we need to invert row.
+    else if (aMaterial == 7u) textureIndex = 52u;  // Leaves
     
     float col = float(textureIndex % 16u);
     float row = float(textureIndex / 16u);
@@ -75,7 +73,8 @@ void main() {
     // Invert row because index 0 is usually top-left, but OpenGL 0 is bottom
     row = 15.0 - row;
     
-    vTexCoord = vec2((col + u) * cellSize, (row + v) * cellSize);
+    // Pass the origin of the texture cell in the atlas
+    vCellOrigin = vec2(col * cellSize, row * cellSize);
     
     vMaterial = aMaterial;
     vAO = float(aAO) / 3.0;

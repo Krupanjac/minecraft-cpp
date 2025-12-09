@@ -3,6 +3,7 @@
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vTexCoord;
+flat in vec2 vCellOrigin;
 flat in uint vMaterial;
 in float vAO;
 
@@ -15,7 +16,15 @@ uniform sampler2D uTexture;
 out vec4 FragColor;
 
 void main() {
-    vec4 texColor = texture(uTexture, vTexCoord);
+    // Tiling logic:
+    // vTexCoord contains (0..w, 0..h)
+    // vCellOrigin contains the atlas UV of the top-left of the texture
+    float cellSize = 1.0 / 16.0;
+    
+    // Use textureLod to avoid artifacts at tile boundaries due to discontinuous derivatives from fract()
+    vec2 uv = vCellOrigin + fract(vTexCoord) * cellSize;
+    
+    vec4 texColor = textureLod(uTexture, uv, 0.0);
     if (texColor.a < 0.1) discard;
     
     vec3 baseColor = texColor.rgb;

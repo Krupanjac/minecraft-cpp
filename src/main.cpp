@@ -341,8 +341,8 @@ private:
         bool inWater = false;
         glm::vec3 camPos = camera.getPosition();
         // Check eye level and feet level
-        Block headBlock = chunkManager.getBlockAt(camPos.x, camPos.y, camPos.z);
-        Block feetBlock = chunkManager.getBlockAt(camPos.x, camPos.y - 1.5f, camPos.z);
+        Block headBlock = chunkManager.getBlockAt(static_cast<int>(floor(camPos.x)), static_cast<int>(floor(camPos.y)), static_cast<int>(floor(camPos.z)));
+        Block feetBlock = chunkManager.getBlockAt(static_cast<int>(floor(camPos.x)), static_cast<int>(floor(camPos.y - 1.5f)), static_cast<int>(floor(camPos.z)));
         
         if (headBlock.isWater() || feetBlock.isWater()) {
             inWater = true;

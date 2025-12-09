@@ -14,6 +14,7 @@ uniform float uTime;
 out vec3 vWorldPos;
 out vec3 vNormal;
 out vec2 vTexCoord;
+flat out vec2 vCellOrigin;
 flat out uint vMaterial;
 out float vAO;
 
@@ -45,22 +46,23 @@ void main() {
     
     vNormal = normalize((uModel * vec4(normal, 0.0)).xyz);
     
-    // Unpack UV
-    float u = float((aUV >> 8u) & 0xFFu) / 255.0;
-    float v = float(aUV & 0xFFu) / 255.0;
+    // Unpack UV (block dimensions)
+    float u_dim = float((aUV >> 8u) & 0xFFu);
+    float v_dim = float(aUV & 0xFFu);
+    
+    vTexCoord = vec2(u_dim, v_dim);
     
     // Atlas mapping for water
     float atlasSize = 16.0;
     float cellSize = 1.0 / atlasSize;
     
-    uint textureIndex = 205u; // Default water index (often around here in standard atlas)
+    uint textureIndex = 205u; // Default water index
     
     float col = float(textureIndex % 16u);
     float row = float(textureIndex / 16u);
     row = 15.0 - row;
     
-    vTexCoord = vec2((col + u) * cellSize, (row + v) * cellSize);
-    vTexCoord = vec2(u, v);
+    vCellOrigin = vec2(col * cellSize, row * cellSize);
     
     vMaterial = aMaterial;
     vAO = float(aAO) / 3.0;

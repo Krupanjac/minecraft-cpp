@@ -251,10 +251,11 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
     auto [x2, y2, z2] = getPos(quad.w, quad.h);
     auto [x3, y3, z3] = getPos(0, quad.h);
     
-    u16 uv00 = Vertex::packUV(0.0f, 0.0f);
-    u16 uv10 = Vertex::packUV(1.0f, 0.0f);
-    u16 uv11 = Vertex::packUV(1.0f, 1.0f);
-    u16 uv01 = Vertex::packUV(0.0f, 1.0f);
+    // Pass dimensions (w, h) as UVs for tiling
+    u16 uv00 = Vertex::packUV(0, 0);
+    u16 uv10 = Vertex::packUV(quad.w, 0);
+    u16 uv11 = Vertex::packUV(quad.w, quad.h);
+    u16 uv01 = Vertex::packUV(0, quad.h);
     
     vertices.emplace_back(x0, y0, z0, quad.normal, quad.material, uv00, quad.ao[0]);
     vertices.emplace_back(x1, y1, z1, quad.normal, quad.material, uv10, quad.ao[1]);

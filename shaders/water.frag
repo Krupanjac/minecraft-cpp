@@ -3,6 +3,7 @@
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vTexCoord;
+flat in vec2 vCellOrigin;
 flat in uint vMaterial;
 in float vAO;
 
@@ -16,8 +17,16 @@ uniform sampler2D uTexture;
 out vec4 FragColor;
 
 void main() {
-    vec4 texColor = texture(uTexture, vTexCoord);
-    vec3 baseColor = texColor.rgb * vec3(0.5, 0.7, 1.0); // Tint blue
+    float cellSize = 1.0 / 16.0;
+    
+    // Animate water UVs
+    vec2 animatedTexCoord = vTexCoord;
+    animatedTexCoord.y += uTime * 0.5; // Scroll vertically
+    
+    vec2 uv = vCellOrigin + fract(animatedTexCoord) * cellSize;
+
+    vec4 texColor = textureLod(uTexture, uv, 0.0);
+    vec3 baseColor = texColor.rgb * vec3(0.6, 0.8, 1.0); // Tint blue
     
     // Simple lighting
     vec3 lightDir = normalize(uLightDir);
