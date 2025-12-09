@@ -23,6 +23,7 @@ public:
     void setPosition(const glm::vec3& pos) { position = pos; }
     void setSpeed(float speed) { movementSpeed = speed; }
     void setSensitivity(float sensitivity) { mouseSensitivity = sensitivity; }
+    void setFov(float f) { fov = f; }
 
     // Physics
     void toggleFlightMode() { isFlying = !isFlying; velocity = glm::vec3(0.0f); }

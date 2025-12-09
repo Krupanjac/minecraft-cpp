@@ -18,10 +18,10 @@ constexpr int THREAD_POOL_SIZE = 4;
 
 // Camera configuration
 constexpr float FOV = 70.0f;
+constexpr float MOUSE_SENSITIVITY = 0.1f;
 constexpr float NEAR_PLANE = 0.1f;
 constexpr float FAR_PLANE = 1000.0f;
 constexpr float CAMERA_SPEED = 10.0f;
-constexpr float MOUSE_SENSITIVITY = 0.1f;
 
 // GPU Buffer configuration
 constexpr size_t GPU_BUFFER_SIZE = 256 * 1024 * 1024;  // 256 MB

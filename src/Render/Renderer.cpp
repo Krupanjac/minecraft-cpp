@@ -1,6 +1,7 @@
 #include "Renderer.h"
 #include "../Core/Logger.h"
 #include "../Util/Config.h"
+#include "../Core/Settings.h"
 
 Renderer::Renderer() {
 }
@@ -41,7 +42,14 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     blockShader.setMat4("uView", view);
     blockShader.setVec3("uCameraPos", camera.getPosition());
     blockShader.setVec3("uLightDir", lightDirection);
+    blockShader.setFloat("uAOStrength", Settings::instance().aoStrength);
+    blockShader.setFloat("uGamma", Settings::instance().gamma);
     
+    // Fog settings
+    float fogDist = static_cast<float>(Settings::instance().renderDistance * CHUNK_SIZE);
+    blockShader.setFloat("uFogDist", fogDist);
+    blockShader.setVec3("uSkyColor", skyColor);
+
     int chunksRendered = 0;
     const auto& chunks = chunkManager.getChunks();
     

@@ -1,4 +1,5 @@
 #include "ChunkManager.h"
+#include "../Core/Settings.h"
 #include <cmath>
 #include <algorithm>
 
@@ -24,10 +25,11 @@ std::shared_ptr<Chunk> ChunkManager::getChunkAt(const glm::vec3& worldPos) {
 
 void ChunkManager::unloadDistantChunks(const glm::vec3& cameraPos) {
     ChunkPos centerChunk = worldToChunk(cameraPos);
+    int renderDist = Settings::instance().renderDistance;
     
     std::vector<ChunkPos> toRemove;
     for (const auto& [pos, chunk] : chunks) {
-        if (!isChunkInRange(pos, centerChunk, RENDER_DISTANCE + 2)) {
+        if (!isChunkInRange(pos, centerChunk, renderDist + 2)) {
             toRemove.push_back(pos);
         }
     }
@@ -47,9 +49,10 @@ void ChunkManager::requestChunkGeneration(const ChunkPos& pos) {
 std::vector<ChunkPos> ChunkManager::getChunksToGenerate(const glm::vec3& cameraPos, int maxChunks) {
     std::vector<ChunkPos> result;
     ChunkPos centerChunk = worldToChunk(cameraPos);
+    int renderDist = Settings::instance().renderDistance;
     
     // Generate in a spiral pattern around the player
-    for (int dist = 0; dist <= RENDER_DISTANCE && result.size() < static_cast<size_t>(maxChunks); ++dist) {
+    for (int dist = 0; dist <= renderDist && result.size() < static_cast<size_t>(maxChunks); ++dist) {
         for (int x = -dist; x <= dist && result.size() < static_cast<size_t>(maxChunks); ++x) {
             for (int z = -dist; z <= dist && result.size() < static_cast<size_t>(maxChunks); ++z) {
                 for (int y = -2; y <= 2 && result.size() < static_cast<size_t>(maxChunks); ++y) {

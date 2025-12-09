@@ -73,6 +73,7 @@ set(SOURCES
     src/Render/Renderer.cpp
     src/Render/GPUBufferAllocator.cpp
     src/Render/Frustum.cpp
+    src/UI/UIManager.cpp
     ${GLAD_DIR}/src/glad.c
 )
 

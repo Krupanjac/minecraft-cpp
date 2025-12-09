@@ -93,6 +93,10 @@ void Window::setCursorMode(int mode) {
     glfwSetInputMode(window, GLFW_CURSOR, mode);
 }
 
+void Window::setVSync(bool enabled) {
+    glfwSwapInterval(enabled ? 1 : 0);
+}
+
 bool Window::isKeyPressed(int key) const {
     return glfwGetKey(window, key) == GLFW_PRESS;
 }

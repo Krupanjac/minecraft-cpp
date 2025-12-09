@@ -24,6 +24,7 @@ public:
     void setFramebufferSizeCallback(std::function<void(int, int)> callback);
     
     void setCursorMode(int mode);
+    void setVSync(bool enabled);
     bool isKeyPressed(int key) const;
     bool isMouseButtonPressed(int button) const;
 

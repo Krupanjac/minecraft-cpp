@@ -2,12 +2,14 @@
 #include "Core/Time.h"
 #include "Core/Logger.h"
 #include "Core/ThreadPool.h"
+#include "Core/Settings.h"
 #include "Render/Renderer.h"
 #include "Render/Camera.h"
 #include "World/ChunkManager.h"
 #include "World/WorldGenerator.h"
 #include "Mesh/MeshBuilder.h"
 #include "Util/Config.h"
+#include "UI/UIManager.h"
 
 #include <memory>
 #include <iostream>
@@ -49,12 +51,30 @@ public:
                 }
                 lastSpaceTime = currentTime;
             }
+            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+                bool isMenuOpen = uiManager.isMenuOpen();
+                uiManager.setMenuState(!isMenuOpen);
+                window->setCursorMode(isMenuOpen ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+            }
+        });
+        
+        window->setFramebufferSizeCallback([this](int width, int height) {
+            glViewport(0, 0, width, height);
+            uiManager.handleResize(width, height);
         });
 
         if (!renderer.initialize()) {
             LOG_ERROR("Failed to initialize renderer");
             return false;
         }
+        
+        uiManager.initialize(window->getWidth(), window->getHeight());
+        uiManager.setOnSettingsChanged([this]() {
+            applySettings();
+        });
+        
+        // Apply initial settings
+        applySettings();
         
         LOG_INFO("Application initialized successfully");
         return true;
@@ -96,6 +116,7 @@ private:
     WorldGenerator worldGenerator;
     MeshBuilder meshBuilder;
     ThreadPool threadPool;
+    UIManager uiManager;
     
     std::mutex meshMutex;
     std::vector<std::pair<ChunkPos, MeshData>> pendingMeshes;
@@ -105,7 +126,18 @@ private:
     bool firstMouse;
     bool running;
     
+    void applySettings() {
+        auto& s = Settings::instance();
+        camera.setFov(s.fov);
+        camera.setSensitivity(s.mouseSensitivity);
+        window->setVSync(s.vsync);
+        // Render distance is handled in ChunkManager::update
+        // AO and Gamma are handled in Renderer::render
+    }
+
     void onMouseButton(int button, int action, int /*mods*/) {
+        if (uiManager.isMenuOpen()) return;
+
         if (action == GLFW_PRESS) {
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 // Break block
@@ -138,10 +170,17 @@ private:
     }
 
     void processInput(float deltaTime) {
-        if (window->isKeyPressed(GLFW_KEY_ESCAPE)) {
-            running = false;
-        }
+        // Mouse input for UI
+        double xpos, ypos;
+        glfwGetCursorPos(window->getNative(), &xpos, &ypos);
+        bool mousePressed = glfwGetMouseButton(window->getNative(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
         
+        if (uiManager.isMenuOpen()) {
+            uiManager.update(deltaTime, xpos, ypos, mousePressed);
+            firstMouse = true; // Reset mouse look when returning to game
+            return;
+        }
+
         bool forward = window->isKeyPressed(GLFW_KEY_W);
         bool backward = window->isKeyPressed(GLFW_KEY_S);
         bool left = window->isKeyPressed(GLFW_KEY_A);
@@ -150,10 +189,6 @@ private:
         bool down = window->isKeyPressed(GLFW_KEY_LEFT_SHIFT);
         
         camera.processInput(forward, backward, left, right, up, down, deltaTime);
-        
-        // Mouse input
-        double xpos, ypos;
-        glfwGetCursorPos(window->getNative(), &xpos, &ypos);
         
         if (firstMouse) {
             lastX = xpos;
@@ -171,6 +206,8 @@ private:
     }
     
     void update(float deltaTime) {
+        if (uiManager.isMenuOpen()) return;
+
         // Day/Night Cycle
         // Full cycle = 1200 seconds (20 minutes)
         // 0 = Sunrise, 300 = Noon, 600 = Sunset, 900 = Midnight
@@ -232,7 +269,7 @@ private:
         chunkManager.update(camera.getPosition());
         
         // Generate chunks
-        auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), MAX_CHUNKS_PER_FRAME);
+        auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), Settings::instance().renderDistance);
         for (const auto& pos : chunksToGenerate) {
             chunkManager.requestChunkGeneration(pos);
             auto chunk = chunkManager.getChunk(pos);
@@ -292,6 +329,7 @@ private:
     
     void render() {
         renderer.render(chunkManager, camera, window->getWidth(), window->getHeight());
+        uiManager.render();
     }
     
     void updatePhysics(float deltaTime) {

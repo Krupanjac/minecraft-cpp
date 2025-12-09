@@ -8,6 +8,8 @@ in float vAO;
 
 uniform vec3 uCameraPos;
 uniform vec3 uLightDir;
+uniform float uFogDist;
+uniform vec3 uSkyColor;
 
 out vec4 FragColor;
 
@@ -42,11 +44,11 @@ void main() {
     
     // Fog
     float distance = length(vWorldPos - uCameraPos);
-    float fogStart = 100.0;
-    float fogEnd = 200.0;
+    float fogEnd = uFogDist;
+    float fogStart = fogEnd * 0.75;
     float fogFactor = clamp((fogEnd - distance) / (fogEnd - fogStart), 0.0, 1.0);
-    vec3 fogColor = vec3(0.53, 0.81, 0.92);
-    color = mix(fogColor, color, fogFactor);
+    
+    color = mix(uSkyColor, color, fogFactor);
     
     FragColor = vec4(color, 1.0);
 }
