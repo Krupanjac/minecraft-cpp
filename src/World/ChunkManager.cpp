@@ -46,13 +46,12 @@ void ChunkManager::requestChunkGeneration(const ChunkPos& pos) {
     }
 }
 
-std::vector<ChunkPos> ChunkManager::getChunksToGenerate(const glm::vec3& cameraPos, int maxChunks) {
+std::vector<ChunkPos> ChunkManager::getChunksToGenerate(const glm::vec3& cameraPos, int range, int maxChunks) {
     std::vector<ChunkPos> result;
     ChunkPos centerChunk = worldToChunk(cameraPos);
-    int renderDist = Settings::instance().renderDistance;
     
     // Generate in a spiral pattern around the player
-    for (int dist = 0; dist <= renderDist && result.size() < static_cast<size_t>(maxChunks); ++dist) {
+    for (int dist = 0; dist <= range && result.size() < static_cast<size_t>(maxChunks); ++dist) {
         for (int x = -dist; x <= dist && result.size() < static_cast<size_t>(maxChunks); ++x) {
             for (int z = -dist; z <= dist && result.size() < static_cast<size_t>(maxChunks); ++z) {
                 for (int y = -2; y <= 2 && result.size() < static_cast<size_t>(maxChunks); ++y) {
@@ -233,4 +232,15 @@ void ChunkManager::setBlockAt(int x, int y, int z, Block block) {
             }
         }
     }
+}
+
+std::vector<std::shared_ptr<Chunk>> ChunkManager::getNeighbors(const ChunkPos& pos) {
+    std::vector<std::shared_ptr<Chunk>> neighbors(6);
+    neighbors[0] = getChunk(pos + ChunkPos(1, 0, 0));  // X+
+    neighbors[1] = getChunk(pos + ChunkPos(-1, 0, 0)); // X-
+    neighbors[2] = getChunk(pos + ChunkPos(0, 1, 0));  // Y+
+    neighbors[3] = getChunk(pos + ChunkPos(0, -1, 0)); // Y-
+    neighbors[4] = getChunk(pos + ChunkPos(0, 0, 1));  // Z+
+    neighbors[5] = getChunk(pos + ChunkPos(0, 0, -1)); // Z-
+    return neighbors;
 }

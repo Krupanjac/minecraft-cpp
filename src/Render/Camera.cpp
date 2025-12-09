@@ -17,7 +17,7 @@ Camera::Camera(const glm::vec3& position)
 
 void Camera::jump() {
     if (onGround && !isFlying) {
-        velocity.y = 6.0f; // Jump force
+        velocity.y = 7.0f; // Jump force
         onGround = false;
     }
 }

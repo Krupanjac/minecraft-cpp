@@ -199,6 +199,59 @@ void Renderer::renderCrosshair(int windowWidth, int windowHeight) {
     glEnable(GL_DEPTH_TEST);
 }
 
+void Renderer::renderLoadingScreen(int windowWidth, int windowHeight, float progress) {
+    // Clear screen with dirt background color
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    crosshairShader.use();
+    
+    // Draw background (dirt texture tiled would be better, but solid color for now)
+    // We can use the sun mesh (quad) scaled to cover screen
+    glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 1.0f));
+    crosshairShader.setMat4("uModel", model);
+    crosshairShader.setVec4("uColor", glm::vec4(0.15f, 0.1f, 0.1f, 1.0f)); // Dark brown
+    
+    sunMesh->bind();
+    sunMesh->draw();
+    
+    // Draw progress bar background
+    float barWidth = 0.6f;
+    float barHeight = 0.05f;
+    
+    model = glm::scale(glm::mat4(1.0f), glm::vec3(barWidth, barHeight, 1.0f));
+    crosshairShader.setMat4("uModel", model);
+    crosshairShader.setVec4("uColor", glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)); // Black border
+    sunMesh->draw();
+    
+    // Draw progress bar fill
+    // Scale X by progress
+    // Translate to keep left aligned? No, center aligned is fine for now, or we can offset.
+    // Let's do center aligned growing from center for simplicity, or left aligned.
+    // To left align: translate by -width/2 + (width*progress)/2
+    
+    float currentWidth = barWidth * progress;
+    // model = glm::translate(glm::mat4(1.0f), glm::vec3(-barWidth/2.0f + currentWidth/2.0f, 0.0f, 0.0f));
+    // model = glm::scale(model, glm::vec3(currentWidth, barHeight * 0.8f, 1.0f));
+    
+    // Simple centered green bar
+    model = glm::scale(glm::mat4(1.0f), glm::vec3(currentWidth * 0.98f, barHeight * 0.8f, 1.0f));
+    crosshairShader.setMat4("uModel", model);
+    crosshairShader.setVec4("uColor", glm::vec4(0.0f, 0.8f, 0.0f, 1.0f)); // Green
+    
+    sunMesh->draw();
+    
+    sunMesh->unbind();
+    crosshairShader.unuse();
+    
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+}
+
 void Renderer::setupOpenGL() {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);

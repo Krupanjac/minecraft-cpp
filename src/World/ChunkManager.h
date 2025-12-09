@@ -26,7 +26,7 @@ public:
     void unloadDistantChunks(const glm::vec3& cameraPos);
     void requestChunkGeneration(const ChunkPos& pos);
     
-    std::vector<ChunkPos> getChunksToGenerate(const glm::vec3& cameraPos, int maxChunks);
+    std::vector<ChunkPos> getChunksToGenerate(const glm::vec3& cameraPos, int range, int maxChunks);
     std::vector<std::shared_ptr<Chunk>> getChunksToMesh(int maxChunks);
 
     static ChunkPos worldToChunk(const glm::vec3& worldPos);
@@ -43,6 +43,9 @@ public:
     RayCastResult rayCast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance);
     
     void setBlockAt(int x, int y, int z, Block block);
+    
+    // Helper to get neighbors for meshing
+    std::vector<std::shared_ptr<Chunk>> getNeighbors(const ChunkPos& pos);
 
 private:
     std::unordered_map<ChunkPos, std::shared_ptr<Chunk>> chunks;

@@ -32,6 +32,7 @@ public:
                         const std::vector<u32>& waterIndices);
 
     void renderCrosshair(int windowWidth, int windowHeight);
+    void renderLoadingScreen(int windowWidth, int windowHeight, float progress);
 
 private:
     Shader blockShader;

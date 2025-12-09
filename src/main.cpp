@@ -76,6 +76,78 @@ public:
         // Apply initial settings
         applySettings();
         
+        // Initial world generation loading screen
+        LOG_INFO("Generating initial world...");
+        
+        // Load a small radius around player first (e.g. 4 chunks)
+        // This ensures player sees immediate surroundings quickly
+        int initialRadius = 4;
+        auto chunksToGen = chunkManager.getChunksToGenerate(camera.getPosition(), initialRadius, 10000);
+        int totalChunks = static_cast<int>(chunksToGen.size());
+        int generated = 0;
+        
+        for (const auto& pos : chunksToGen) {
+            chunkManager.requestChunkGeneration(pos);
+            auto chunk = chunkManager.getChunk(pos);
+            if (chunk) {
+                worldGenerator.generate(chunk);
+                chunk->setState(ChunkState::MESH_BUILD);
+                
+                // Mark neighbors for update to ensure no gaps
+                auto neighbors = chunkManager.getNeighbors(pos);
+                for (auto& n : neighbors) {
+                    if (n && n->getState() != ChunkState::UNLOADED) {
+                        n->setState(ChunkState::MESH_BUILD);
+                    }
+                }
+            }
+            
+            generated++;
+            
+            // Update loading screen
+            if (generated % 5 == 0) {
+                float progress = static_cast<float>(generated) / static_cast<float>(totalChunks) * 0.5f;
+                renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
+                window->swapBuffers();
+                window->pollEvents();
+                if (window->shouldClose()) return false;
+            }
+        }
+        
+        // Now wait for initial meshing of this small radius
+        LOG_INFO("Building initial meshes...");
+        bool initialLoadDone = false;
+        int meshedCount = 0;
+        
+        while (!initialLoadDone && !window->shouldClose()) {
+            auto chunksToMesh = chunkManager.getChunksToMesh(10);
+            
+            if (chunksToMesh.empty()) {
+                initialLoadDone = true;
+            } else {
+                for (auto& chunk : chunksToMesh) {
+                    auto neighbors = chunkManager.getNeighbors(chunk->getPosition());
+                    
+                    MeshData meshData = meshBuilder.buildChunkMesh(chunk, 
+                        neighbors[0], neighbors[1], neighbors[2], neighbors[3], neighbors[4], neighbors[5]);
+                        
+                    renderer.uploadChunkMesh(chunk->getPosition(), 
+                        meshData.vertices, meshData.indices, 
+                        meshData.waterVertices, meshData.waterIndices);
+                        
+                    chunk->setState(ChunkState::GPU_UPLOADED);
+                    meshedCount++;
+                }
+                
+                float progress = 0.5f + (static_cast<float>(meshedCount) / static_cast<float>(totalChunks)) * 0.5f;
+                if (progress > 1.0f) progress = 1.0f;
+                
+                renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
+                window->swapBuffers();
+                window->pollEvents();
+            }
+        }
+        
         LOG_INFO("Application initialized successfully");
         return true;
     }
@@ -269,7 +341,7 @@ private:
         chunkManager.update(camera.getPosition());
         
         // Generate chunks
-        auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), Settings::instance().renderDistance);
+        auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), Settings::instance().renderDistance, 10);
         for (const auto& pos : chunksToGenerate) {
             chunkManager.requestChunkGeneration(pos);
             auto chunk = chunkManager.getChunk(pos);
