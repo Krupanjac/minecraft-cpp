@@ -7,6 +7,7 @@ flat in uint vMaterial;
 in float vAO;
 
 uniform vec3 uCameraPos;
+uniform vec3 uLightDir;
 
 out vec4 FragColor;
 
@@ -25,7 +26,7 @@ void main() {
     vec3 baseColor = getMaterialColor(vMaterial);
     
     // Simple lighting
-    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+    vec3 lightDir = normalize(uLightDir);
     vec3 normal = normalize(vNormal);
     
     float diffuse = max(dot(normal, lightDir), 0.0);

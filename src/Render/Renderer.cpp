@@ -14,12 +14,15 @@ bool Renderer::initialize() {
     }
     
     initCrosshair();
+    initSun();
 
     LOG_INFO("Renderer initialized");
     return true;
 }
 
 void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidth, int windowHeight) {
+    // Clear with sky color
+    glClearColor(skyColor.r, skyColor.g, skyColor.b, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     // Update frustum
@@ -29,11 +32,15 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     glm::mat4 viewProj = projection * view;
     frustum.update(viewProj);
     
+    // Render sun first (behind everything)
+    renderSun(camera, windowWidth, windowHeight);
+
     // Render chunks
     blockShader.use();
     blockShader.setMat4("uProjection", projection);
     blockShader.setMat4("uView", view);
     blockShader.setVec3("uCameraPos", camera.getPosition());
+    blockShader.setVec3("uLightDir", lightDirection);
     
     int chunksRendered = 0;
     const auto& chunks = chunkManager.getChunks();
@@ -115,6 +122,11 @@ bool Renderer::loadShaders() {
         LOG_INFO("Block shader loaded successfully");
     }
     
+    if (!sunShader.loadFromFiles("shaders/sun.vert", "shaders/sun.frag")) {
+        LOG_ERROR("Failed to load sun shader");
+        success = false;
+    }
+
     // Create simple shader for crosshair inline or load from file
     // For simplicity, we'll use a very basic shader source here
     const char* crosshairVert = R"(
@@ -148,17 +160,68 @@ void Renderer::initCrosshair() {
     std::vector<u32> indices;
     
     // Horizontal line
-    vertices.emplace_back(-1, 0, 0, 0, 0, 0);
-    vertices.emplace_back(1, 0, 0, 0, 0, 0);
+    vertices.emplace_back(static_cast<i16>(-1), static_cast<i16>(0), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+    vertices.emplace_back(static_cast<i16>(1), static_cast<i16>(0), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
     
     // Vertical line
-    vertices.emplace_back(0, -1, 0, 0, 0, 0);
-    vertices.emplace_back(0, 1, 0, 0, 0, 0);
+    vertices.emplace_back(static_cast<i16>(0), static_cast<i16>(-1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+    vertices.emplace_back(static_cast<i16>(0), static_cast<i16>(1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
     
     indices = {0, 1, 2, 3};
     
     crosshairMesh = std::make_unique<Mesh>();
     crosshairMesh->upload(vertices, indices);
+}
+
+void Renderer::initSun() {
+    // Simple quad for sun
+    std::vector<Vertex> vertices;
+    std::vector<u32> indices;
+    
+    // Quad facing -Z
+    vertices.emplace_back(static_cast<i16>(-1), static_cast<i16>(-1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+    vertices.emplace_back(static_cast<i16>(1), static_cast<i16>(-1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+    vertices.emplace_back(static_cast<i16>(1), static_cast<i16>(1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+    vertices.emplace_back(static_cast<i16>(-1), static_cast<i16>(1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+    
+    indices = {0, 1, 2, 2, 3, 0};
+    
+    sunMesh = std::make_unique<Mesh>();
+    sunMesh->upload(vertices, indices);
+}
+
+void Renderer::renderSun(const Camera& camera, int windowWidth, int windowHeight) {
+    sunShader.use();
+    
+    float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
+    glm::mat4 projection = camera.getProjectionMatrix(aspect);
+    
+    // Remove translation from view matrix so sun stays at infinity (skybox style)
+    glm::mat4 view = glm::mat4(glm::mat3(camera.getViewMatrix()));
+    
+    // Position sun based on light direction
+    // Light direction is vector TO the sun
+    glm::vec3 sunPos = lightDirection * 50.0f; // Distance 50 units away
+    
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), sunPos);
+    // Billboard the sun to face camera
+    model = glm::lookAt(sunPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::inverse(model); // Invert lookAt to get model matrix
+    model = glm::scale(model, glm::vec3(5.0f)); // Scale sun
+    
+    sunShader.setMat4("uProjection", projection);
+    sunShader.setMat4("uView", view);
+    sunShader.setMat4("uModel", model);
+    
+    glDisable(GL_DEPTH_TEST); // Sun is always behind everything
+    glDisable(GL_CULL_FACE);  // Disable culling to ensure sun is visible from any angle
+    sunMesh->bind();
+    sunMesh->draw();
+    sunMesh->unbind();
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+    
+    sunShader.unuse();
 }
 
 void Renderer::uploadChunkMesh(const ChunkPos& pos, const std::vector<Vertex>& vertices, const std::vector<u32>& indices) {

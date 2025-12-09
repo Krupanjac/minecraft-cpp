@@ -41,7 +41,7 @@ public:
             onMouseButton(button, action, mods);
         });
         
-        window->setKeyCallback([this](int key, int scancode, int action, int mods) {
+        window->setKeyCallback([this](int key, int /*scancode*/, int action, int /*mods*/) {
             if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
                 double currentTime = glfwGetTime();
                 if (currentTime - lastSpaceTime < 0.3) {
@@ -105,7 +105,7 @@ private:
     bool firstMouse;
     bool running;
     
-    void onMouseButton(int button, int action, int mods) {
+    void onMouseButton(int button, int action, int /*mods*/) {
         if (action == GLFW_PRESS) {
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 // Break block
@@ -171,6 +171,62 @@ private:
     }
     
     void update(float deltaTime) {
+        // Day/Night Cycle
+        // Full cycle = 1200 seconds (20 minutes)
+        // 0 = Sunrise, 300 = Noon, 600 = Sunset, 900 = Midnight
+        static float timeOfDay = 0.0f;
+        constexpr float DAY_DURATION = 1200.0f; // 20 minutes in seconds
+        
+        // For testing, speed it up significantly (e.g., 1 minute cycle)
+        // Remove the multiplier for real-time
+        timeOfDay += deltaTime * 20.0f; 
+        if (timeOfDay >= DAY_DURATION) timeOfDay -= DAY_DURATION;
+        
+        float angle = (timeOfDay / DAY_DURATION) * glm::two_pi<float>();
+        
+        // Sun moves East (X+) -> Up (Y+) -> West (X-) -> Down (Y-)
+        // We start at sunrise (X+, Y=0)
+        float sunX = cos(angle);
+        float sunY = sin(angle);
+        float sunZ = 0.2f; // Slight tilt
+        
+        glm::vec3 sunDir = glm::normalize(glm::vec3(sunX, sunY, sunZ));
+        renderer.setLightDirection(sunDir);
+        
+        // Calculate sky color based on sun height (sunY)
+        glm::vec3 dayColor(0.53f, 0.81f, 0.92f);
+        glm::vec3 nightColor(0.05f, 0.05f, 0.1f);
+        glm::vec3 sunsetColor(0.8f, 0.4f, 0.2f);
+        
+        glm::vec3 currentSkyColor;
+        
+        if (sunY > 0.2f) {
+            // Day
+            currentSkyColor = dayColor;
+        } else if (sunY < -0.2f) {
+            // Night
+            currentSkyColor = nightColor;
+        } else {
+            // Transition (Sunrise/Sunset)
+            float t = (sunY + 0.2f) / 0.4f; // Map -0.2..0.2 to 0..1
+            if (sunX > 0) {
+                // Sunrise (Night -> Day)
+                // sunY goes -0.2 -> 0.2
+                currentSkyColor = glm::mix(nightColor, dayColor, t);
+                // Add some orange glow
+                float glow = 1.0f - abs(t - 0.5f) * 2.0f;
+                currentSkyColor = glm::mix(currentSkyColor, sunsetColor, glow * 0.5f);
+            } else {
+                // Sunset (Day -> Night)
+                // sunY goes 0.2 -> -0.2
+                currentSkyColor = glm::mix(nightColor, dayColor, t);
+                // Add some orange glow
+                float glow = 1.0f - abs(t - 0.5f) * 2.0f;
+                currentSkyColor = glm::mix(currentSkyColor, sunsetColor, glow * 0.5f);
+            }
+        }
+        renderer.setSkyColor(currentSkyColor);
+
         updatePhysics(deltaTime);
         camera.update(deltaTime);
         chunkManager.update(camera.getPosition());
