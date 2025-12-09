@@ -24,12 +24,17 @@ public:
     Shader& getBlockShader() { return blockShader; }
     
     // Add mesh for a chunk
-    void uploadChunkMesh(const ChunkPos& pos, const std::vector<Vertex>& vertices, const std::vector<u32>& indices);
+    void uploadChunkMesh(const ChunkPos& pos, 
+                        const std::vector<Vertex>& vertices, 
+                        const std::vector<u32>& indices,
+                        const std::vector<Vertex>& waterVertices,
+                        const std::vector<u32>& waterIndices);
 
     void renderCrosshair(int windowWidth, int windowHeight);
 
 private:
     Shader blockShader;
+    Shader waterShader;
     Shader crosshairShader;
     Shader sunShader;
     std::unique_ptr<Mesh> crosshairMesh;
@@ -37,6 +42,7 @@ private:
     Frustum frustum;
     
     std::unordered_map<ChunkPos, std::unique_ptr<Mesh>> chunkMeshes;
+    std::unordered_map<ChunkPos, std::unique_ptr<Mesh>> waterMeshes;
     
     glm::vec3 lightDirection = glm::vec3(0.5f, 1.0f, 0.3f);
     glm::vec3 skyColor = glm::vec3(0.53f, 0.81f, 0.92f);

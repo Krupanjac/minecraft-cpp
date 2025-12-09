@@ -310,7 +310,7 @@ private:
             std::lock_guard<std::mutex> lock(meshMutex);
             for (auto& [pos, meshData] : pendingMeshes) {
                 if (!meshData.isEmpty()) {
-                    renderer.uploadChunkMesh(pos, meshData.vertices, meshData.indices);
+                    renderer.uploadChunkMesh(pos, meshData.vertices, meshData.indices, meshData.waterVertices, meshData.waterIndices);
                     auto chunk = chunkManager.getChunk(pos);
                     if (chunk) {
                         chunk->setState(ChunkState::GPU_UPLOADED);
@@ -321,6 +321,8 @@ private:
                     if (chunk) {
                         chunk->setState(ChunkState::GPU_UPLOADED);
                     }
+                    // Ensure we clear any existing mesh for this chunk
+                    renderer.uploadChunkMesh(pos, {}, {}, {}, {});
                 }
             }
             pendingMeshes.clear();
@@ -335,8 +337,45 @@ private:
     void updatePhysics(float deltaTime) {
         if (camera.getFlightMode()) return;
         
-        // Apply gravity
-        camera.velocity.y -= 18.0f * deltaTime;
+        // Check if in water
+        bool inWater = false;
+        glm::vec3 camPos = camera.getPosition();
+        // Check eye level and feet level
+        Block headBlock = chunkManager.getBlockAt(camPos.x, camPos.y, camPos.z);
+        Block feetBlock = chunkManager.getBlockAt(camPos.x, camPos.y - 1.5f, camPos.z);
+        
+        if (headBlock.isWater() || feetBlock.isWater()) {
+            inWater = true;
+        }
+        
+        if (inWater) {
+            // Water physics
+            // Drag
+            float drag = 1.0f - (2.0f * deltaTime);
+            drag = std::max(0.0f, drag);
+            camera.velocity.x *= drag;
+            camera.velocity.z *= drag;
+            camera.velocity.y *= drag;
+            
+            // Buoyancy / Swim
+            if (window->isKeyPressed(GLFW_KEY_SPACE)) {
+                camera.velocity.y += 10.0f * deltaTime;
+            } else if (window->isKeyPressed(GLFW_KEY_LEFT_SHIFT)) {
+                camera.velocity.y -= 10.0f * deltaTime;
+            }
+            
+            // Slight gravity if not swimming
+            if (!window->isKeyPressed(GLFW_KEY_SPACE)) {
+                 camera.velocity.y -= 2.0f * deltaTime;
+            }
+            
+            // Terminal velocity in water
+            camera.velocity.y = std::max(-4.0f, std::min(4.0f, camera.velocity.y));
+            
+        } else {
+            // Normal gravity
+            camera.velocity.y -= 18.0f * deltaTime;
+        }
         
         // Apply velocity
         glm::vec3 pos = camera.getPosition();

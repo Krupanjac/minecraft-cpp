@@ -26,7 +26,11 @@ struct Block {
     }
     
     bool isSolid() const {
-        return type != BlockType::AIR;
+        return type != BlockType::AIR && type != BlockType::WATER;
+    }
+    
+    bool isWater() const {
+        return type == BlockType::WATER;
     }
     
     u8 getMaterialID() const {

@@ -9,14 +9,18 @@
 struct MeshData {
     std::vector<Vertex> vertices;
     std::vector<u32> indices;
+    std::vector<Vertex> waterVertices;
+    std::vector<u32> waterIndices;
     
     void clear() {
         vertices.clear();
         indices.clear();
+        waterVertices.clear();
+        waterIndices.clear();
     }
     
     bool isEmpty() const {
-        return vertices.empty();
+        return vertices.empty() && waterVertices.empty();
     }
 };
 

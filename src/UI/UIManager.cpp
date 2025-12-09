@@ -133,6 +133,8 @@ void UIManager::setupSettingsMenu() {
 void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mousePressed) {
     if (!menuOpen) return;
 
+    std::function<void()> pendingClick = nullptr;
+
     for (auto& el : elements) {
         // Hit test
         if (mouseX >= el.x && mouseX <= el.x + el.w &&
@@ -163,14 +165,17 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                     
                     if (onSettingsChanged) onSettingsChanged();
                 } else if (el.onClick) {
-                    el.onClick();
-                    // Prevent multiple clicks
-                    return; 
+                    pendingClick = el.onClick;
+                    break; // Stop processing to avoid issues with vector modification
                 }
             }
         } else {
             el.isHovered = false;
         }
+    }
+
+    if (pendingClick) {
+        pendingClick();
     }
 }
 

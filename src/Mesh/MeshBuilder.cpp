@@ -59,7 +59,7 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     if (x >= CHUNK_SIZE || y >= CHUNK_HEIGHT || z >= CHUNK_SIZE) continue;
                     
                     Block block = chunk->getBlock(x, y, z);
-                    if (!block.isSolid()) continue;
+                    if (!block.isSolid() && !block.isWater()) continue;
                     
                     // Check if face should be rendered
                     int adjX = x + nx;
@@ -67,13 +67,32 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     int adjZ = z + nz;
                     
                     bool shouldRender = false;
+                    Block adjBlock;
+                    
                     if (adjX < 0 || adjX >= CHUNK_SIZE || 
                         adjY < 0 || adjY >= CHUNK_HEIGHT || 
                         adjZ < 0 || adjZ >= CHUNK_SIZE) {
                         // Check neighbor chunk
-                        shouldRender = !isBlockSolid(chunk, adjX, adjY, adjZ, neighbors);
+                        // Simple helper to get block from neighbors
+                        if (adjX < 0 && neighbors[1]) adjBlock = neighbors[1]->getBlock(adjX + CHUNK_SIZE, adjY, adjZ);
+                        else if (adjX >= CHUNK_SIZE && neighbors[0]) adjBlock = neighbors[0]->getBlock(adjX - CHUNK_SIZE, adjY, adjZ);
+                        else if (adjY < 0 && neighbors[3]) adjBlock = neighbors[3]->getBlock(adjX, adjY + CHUNK_HEIGHT, adjZ);
+                        else if (adjY >= CHUNK_HEIGHT && neighbors[2]) adjBlock = neighbors[2]->getBlock(adjX, adjY - CHUNK_HEIGHT, adjZ);
+                        else if (adjZ < 0 && neighbors[5]) adjBlock = neighbors[5]->getBlock(adjX, adjY, adjZ + CHUNK_SIZE);
+                        else if (adjZ >= CHUNK_SIZE && neighbors[4]) adjBlock = neighbors[4]->getBlock(adjX, adjY, adjZ - CHUNK_SIZE);
+                        else adjBlock = Block(BlockType::AIR); // Default if neighbor chunk missing
                     } else {
-                        Block adjBlock = chunk->getBlock(adjX, adjY, adjZ);
+                        adjBlock = chunk->getBlock(adjX, adjY, adjZ);
+                    }
+                    
+                    if (block.isWater()) {
+                        // Render water face if neighbor is NOT water and NOT opaque (so Air or Glass)
+                        // Actually, if neighbor is solid, we don't render.
+                        // If neighbor is Air, we render.
+                        // If neighbor is Water, we don't render.
+                        shouldRender = !adjBlock.isWater() && !adjBlock.isOpaque();
+                    } else {
+                        // Solid block: Render if neighbor is NOT opaque
                         shouldRender = !adjBlock.isOpaque();
                     }
                     
@@ -94,21 +113,26 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     
                     // Compute width
                     int w = 1;
-                    while (u + w < CHUNK_SIZE && mask[v * CHUNK_SIZE + u + w] == material) {
-                        ++w;
+                    // Disable greedy meshing for water to prevent gaps with vertex displacement
+                    if (material != static_cast<u8>(BlockType::WATER)) {
+                        while (u + w < CHUNK_SIZE && mask[v * CHUNK_SIZE + u + w] == material) {
+                            ++w;
+                        }
                     }
                     
                     // Compute height
                     int h = 1;
                     bool done = false;
-                    while (v + h < CHUNK_SIZE && !done) {
-                        for (int k = 0; k < w; ++k) {
-                            if (mask[(v + h) * CHUNK_SIZE + u + k] != material) {
-                                done = true;
-                                break;
+                    if (material != static_cast<u8>(BlockType::WATER)) {
+                        while (v + h < CHUNK_SIZE && !done) {
+                            for (int k = 0; k < w; ++k) {
+                                if (mask[(v + h) * CHUNK_SIZE + u + k] != material) {
+                                    done = true;
+                                    break;
+                                }
                             }
+                            if (!done) ++h;
                         }
-                        if (!done) ++h;
                     }
                     
                     // Clear mask
@@ -198,7 +222,13 @@ bool MeshBuilder::isBlockSolid(std::shared_ptr<Chunk> chunk, int x, int y, int z
 }
 
 void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
-    u32 baseIdx = static_cast<u32>(meshData.vertices.size());
+    bool isWater = (quad.material == static_cast<u8>(BlockType::WATER));
+    
+    // Use appropriate vertex/index list
+    auto& vertices = isWater ? meshData.waterVertices : meshData.vertices;
+    auto& indices = isWater ? meshData.waterIndices : meshData.indices;
+    
+    u32 baseIdx = static_cast<u32>(vertices.size());
     
     auto getPos = [&](int u, int v) {
         int px = quad.x;
@@ -226,10 +256,10 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
     u16 uv11 = Vertex::packUV(1.0f, 1.0f);
     u16 uv01 = Vertex::packUV(0.0f, 1.0f);
     
-    meshData.vertices.emplace_back(x0, y0, z0, quad.normal, quad.material, uv00, quad.ao[0]);
-    meshData.vertices.emplace_back(x1, y1, z1, quad.normal, quad.material, uv10, quad.ao[1]);
-    meshData.vertices.emplace_back(x2, y2, z2, quad.normal, quad.material, uv11, quad.ao[2]);
-    meshData.vertices.emplace_back(x3, y3, z3, quad.normal, quad.material, uv01, quad.ao[3]);
+    vertices.emplace_back(x0, y0, z0, quad.normal, quad.material, uv00, quad.ao[0]);
+    vertices.emplace_back(x1, y1, z1, quad.normal, quad.material, uv10, quad.ao[1]);
+    vertices.emplace_back(x2, y2, z2, quad.normal, quad.material, uv11, quad.ao[2]);
+    vertices.emplace_back(x3, y3, z3, quad.normal, quad.material, uv01, quad.ao[3]);
     
     // Winding order
     // Determine winding order based on face normal
@@ -243,42 +273,42 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
     if (reverseWinding) {
         if (flipSplit) {
             // Connect 1-3, CW winding
-            meshData.indices.push_back(baseIdx + 1);
-            meshData.indices.push_back(baseIdx + 0);
-            meshData.indices.push_back(baseIdx + 3);
+            indices.push_back(baseIdx + 1);
+            indices.push_back(baseIdx + 0);
+            indices.push_back(baseIdx + 3);
             
-            meshData.indices.push_back(baseIdx + 3);
-            meshData.indices.push_back(baseIdx + 2);
-            meshData.indices.push_back(baseIdx + 1);
+            indices.push_back(baseIdx + 3);
+            indices.push_back(baseIdx + 2);
+            indices.push_back(baseIdx + 1);
         } else {
             // Connect 0-2, CW winding
-            meshData.indices.push_back(baseIdx + 0);
-            meshData.indices.push_back(baseIdx + 2);
-            meshData.indices.push_back(baseIdx + 1);
+            indices.push_back(baseIdx + 0);
+            indices.push_back(baseIdx + 2);
+            indices.push_back(baseIdx + 1);
             
-            meshData.indices.push_back(baseIdx + 0);
-            meshData.indices.push_back(baseIdx + 3);
-            meshData.indices.push_back(baseIdx + 2);
+            indices.push_back(baseIdx + 0);
+            indices.push_back(baseIdx + 3);
+            indices.push_back(baseIdx + 2);
         }
     } else {
         if (flipSplit) {
             // Connect 1-3, CCW winding
-            meshData.indices.push_back(baseIdx + 0);
-            meshData.indices.push_back(baseIdx + 1);
-            meshData.indices.push_back(baseIdx + 3);
+            indices.push_back(baseIdx + 0);
+            indices.push_back(baseIdx + 1);
+            indices.push_back(baseIdx + 3);
             
-            meshData.indices.push_back(baseIdx + 1);
-            meshData.indices.push_back(baseIdx + 2);
-            meshData.indices.push_back(baseIdx + 3);
+            indices.push_back(baseIdx + 1);
+            indices.push_back(baseIdx + 2);
+            indices.push_back(baseIdx + 3);
         } else {
             // Connect 0-2, CCW winding
-            meshData.indices.push_back(baseIdx + 0);
-            meshData.indices.push_back(baseIdx + 1);
-            meshData.indices.push_back(baseIdx + 2);
+            indices.push_back(baseIdx + 0);
+            indices.push_back(baseIdx + 1);
+            indices.push_back(baseIdx + 2);
             
-            meshData.indices.push_back(baseIdx + 0);
-            meshData.indices.push_back(baseIdx + 2);
-            meshData.indices.push_back(baseIdx + 3);
+            indices.push_back(baseIdx + 0);
+            indices.push_back(baseIdx + 2);
+            indices.push_back(baseIdx + 3);
         }
     }
 }

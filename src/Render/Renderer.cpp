@@ -2,6 +2,7 @@
 #include "../Core/Logger.h"
 #include "../Util/Config.h"
 #include "../Core/Settings.h"
+#include <GLFW/glfw3.h>
 
 Renderer::Renderer() {
 }
@@ -84,6 +85,85 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     
     blockShader.unuse();
 
+    // Render water chunks
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_CULL_FACE); // Allow seeing water surface from below
+    
+    waterShader.use();
+    waterShader.setMat4("uProjection", projection);
+    waterShader.setMat4("uView", view);
+    waterShader.setFloat("uTime", static_cast<float>(glfwGetTime()));
+    waterShader.setVec3("uCameraPos", camera.getPosition());
+    waterShader.setVec3("uLightDir", lightDirection);
+    waterShader.setFloat("uFogDist", fogDist);
+    waterShader.setVec3("uSkyColor", skyColor);
+    
+    for (const auto& [pos, chunk] : chunks) {
+        if (chunk->getState() != ChunkState::GPU_UPLOADED && 
+            chunk->getState() != ChunkState::READY) {
+            continue;
+        }
+        
+        // Frustum culling
+        glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
+        glm::vec3 chunkMin = chunkWorldPos;
+        glm::vec3 chunkMax = chunkWorldPos + glm::vec3(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE);
+        
+        if (!frustum.isBoxVisible(chunkMin, chunkMax)) {
+            continue;
+        }
+        
+        // Get or create mesh
+        auto it = waterMeshes.find(pos);
+        if (it != waterMeshes.end() && it->second->isUploaded()) {
+            glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkWorldPos);
+            waterShader.setMat4("uModel", model);
+            
+            it->second->bind();
+            it->second->draw();
+            it->second->unbind();
+        }
+    }
+    
+    waterShader.unuse();
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+
+    // Underwater overlay
+    glm::vec3 camPos = camera.getPosition();
+    // Simple check: get block at camera position
+    // We need to access chunkManager here
+    auto chunk = chunkManager.getChunkAt(camPos);
+    if (chunk) {
+        glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(chunk->getPosition());
+        int lx = static_cast<int>(floor(camPos.x)) - static_cast<int>(chunkOrigin.x);
+        int ly = static_cast<int>(floor(camPos.y)) - static_cast<int>(chunkOrigin.y);
+        int lz = static_cast<int>(floor(camPos.z)) - static_cast<int>(chunkOrigin.z);
+        
+        if (lx >= 0 && lx < CHUNK_SIZE && ly >= 0 && ly < CHUNK_HEIGHT && lz >= 0 && lz < CHUNK_SIZE) {
+            if (chunk->getBlock(lx, ly, lz).isWater()) {
+                glDisable(GL_DEPTH_TEST);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                
+                crosshairShader.use();
+                glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 1.0f)); // Full screen quad
+                crosshairShader.setMat4("uModel", model);
+                crosshairShader.setVec4("uColor", glm::vec4(0.0f, 0.2f, 0.8f, 0.4f)); // Blue tint
+                
+                // Use sun mesh (quad) for overlay
+                sunMesh->bind();
+                sunMesh->draw();
+                sunMesh->unbind();
+                
+                crosshairShader.unuse();
+                glEnable(GL_DEPTH_TEST);
+                glDisable(GL_BLEND);
+            }
+        }
+    }
+
     renderCrosshair(windowWidth, windowHeight);
 }
 
@@ -93,6 +173,7 @@ void Renderer::renderCrosshair(int windowWidth, int windowHeight) {
     glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO); // Invert colors
 
     crosshairShader.use();
+    crosshairShader.setVec4("uColor", glm::vec4(1.0f)); // White crosshair
     
     // Simple orthographic projection for 2D UI
     // Center is (0,0), range [-1, 1]
@@ -130,6 +211,11 @@ bool Renderer::loadShaders() {
         LOG_INFO("Block shader loaded successfully");
     }
     
+    if (!waterShader.loadFromFiles("shaders/water.vert", "shaders/water.frag")) {
+        LOG_ERROR("Failed to load water shader");
+        success = false;
+    }
+    
     if (!sunShader.loadFromFiles("shaders/sun.vert", "shaders/sun.frag")) {
         LOG_ERROR("Failed to load sun shader");
         success = false;
@@ -149,8 +235,9 @@ bool Renderer::loadShaders() {
     const char* crosshairFrag = R"(
         #version 450 core
         out vec4 FragColor;
+        uniform vec4 uColor;
         void main() {
-            FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+            FragColor = uColor;
         }
     )";
     
@@ -232,12 +319,26 @@ void Renderer::renderSun(const Camera& camera, int windowWidth, int windowHeight
     sunShader.unuse();
 }
 
-void Renderer::uploadChunkMesh(const ChunkPos& pos, const std::vector<Vertex>& vertices, const std::vector<u32>& indices) {
-    if (vertices.empty() || indices.empty()) {
-        return;
+void Renderer::uploadChunkMesh(const ChunkPos& pos, 
+                              const std::vector<Vertex>& vertices, 
+                              const std::vector<u32>& indices,
+                              const std::vector<Vertex>& waterVertices,
+                              const std::vector<u32>& waterIndices) {
+    // Opaque mesh
+    if (!vertices.empty() && !indices.empty()) {
+        auto mesh = std::make_unique<Mesh>();
+        mesh->upload(vertices, indices);
+        chunkMeshes[pos] = std::move(mesh);
+    } else {
+        chunkMeshes.erase(pos);
     }
     
-    auto mesh = std::make_unique<Mesh>();
-    mesh->upload(vertices, indices);
-    chunkMeshes[pos] = std::move(mesh);
+    // Water mesh
+    if (!waterVertices.empty() && !waterIndices.empty()) {
+        auto mesh = std::make_unique<Mesh>();
+        mesh->upload(waterVertices, waterIndices);
+        waterMeshes[pos] = std::move(mesh);
+    } else {
+        waterMeshes.erase(pos);
+    }
 }
