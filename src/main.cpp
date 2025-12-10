@@ -120,7 +120,7 @@ public:
         int meshedCount = 0;
         
         while (!initialLoadDone && !window->shouldClose()) {
-            auto chunksToMesh = chunkManager.getChunksToMesh(10);
+            auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), 10);
             
             if (chunksToMesh.empty()) {
                 initialLoadDone = true;
@@ -405,7 +405,7 @@ private:
         }
         
         // Build meshes
-        auto chunksToMesh = chunkManager.getChunksToMesh(MAX_MESHES_PER_FRAME);
+        auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), MAX_MESHES_PER_FRAME);
         for (auto chunk : chunksToMesh) {
             chunk->setState(ChunkState::READY);
             
@@ -418,8 +418,10 @@ private:
             auto chunkZPos = chunkManager.getChunk(pos + ChunkPos(0, 0, 1));
             auto chunkZNeg = chunkManager.getChunk(pos + ChunkPos(0, 0, -1));
             
-            threadPool.enqueue([this, chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg]() {
-                auto meshData = meshBuilder.buildChunkMesh(chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg);
+            int lod = chunk->getCurrentLOD();
+
+            threadPool.enqueue([this, chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg, lod]() {
+                auto meshData = meshBuilder.buildChunkMesh(chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg, lod);
                 
                 std::lock_guard<std::mutex> lock(meshMutex);
                 pendingMeshes.emplace_back(chunk->getPosition(), std::move(meshData));

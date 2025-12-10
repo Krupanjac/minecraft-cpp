@@ -36,7 +36,8 @@ public:
                            std::shared_ptr<Chunk> chunkYPos,
                            std::shared_ptr<Chunk> chunkYNeg,
                            std::shared_ptr<Chunk> chunkZPos,
-                           std::shared_ptr<Chunk> chunkZNeg);
+                           std::shared_ptr<Chunk> chunkZNeg,
+                           int lod = 0);
 
 private:
     struct Quad {
@@ -51,13 +52,14 @@ private:
     
     void greedyMesh(std::shared_ptr<Chunk> chunk,
                    std::shared_ptr<Chunk> neighbors[6],
-                   MeshData& meshData);
+                   MeshData& meshData,
+                   int lod);
     
     bool isBlockSolid(std::shared_ptr<Chunk> chunk, int x, int y, int z,
                      std::shared_ptr<Chunk> neighbors[6]);
                      
     u8 calculateVertexAO(std::shared_ptr<Chunk> chunk, int x, int y, int z, 
-                        const int* n, const int* u, const int* v,
+                        const int* u, const int* v,
                         std::shared_ptr<Chunk> neighbors[6]);
     
     void addQuad(const Quad& quad, MeshData& meshData);

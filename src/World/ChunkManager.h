@@ -27,10 +27,12 @@ public:
     void requestChunkGeneration(const ChunkPos& pos);
     
     std::vector<ChunkPos> getChunksToGenerate(const glm::vec3& cameraPos, int range, int maxChunks);
-    std::vector<std::shared_ptr<Chunk>> getChunksToMesh(int maxChunks);
+    std::vector<std::shared_ptr<Chunk>> getChunksToMesh(const glm::vec3& cameraPos, int maxChunks);
 
     static ChunkPos worldToChunk(const glm::vec3& worldPos);
     static glm::vec3 chunkToWorld(const ChunkPos& chunkPos);
+
+    int getDesiredLOD(const ChunkPos& chunkPos, const glm::vec3& cameraPos) const;
 
     struct RayCastResult {
         bool hit = false;

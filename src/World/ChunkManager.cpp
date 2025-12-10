@@ -71,16 +71,37 @@ std::vector<ChunkPos> ChunkManager::getChunksToGenerate(const glm::vec3& cameraP
     return result;
 }
 
-std::vector<std::shared_ptr<Chunk>> ChunkManager::getChunksToMesh(int maxChunks) {
+std::vector<std::shared_ptr<Chunk>> ChunkManager::getChunksToMesh(const glm::vec3& cameraPos, int maxChunks) {
     std::vector<std::shared_ptr<Chunk>> result;
     
     for (const auto& [pos, chunk] : chunks) {
-        if (chunk->getState() == ChunkState::MESH_BUILD && result.size() < static_cast<size_t>(maxChunks)) {
+        if (result.size() >= static_cast<size_t>(maxChunks)) break;
+
+        int desiredLOD = getDesiredLOD(pos, cameraPos);
+        bool lodChanged = (chunk->getCurrentLOD() != desiredLOD) && (chunk->getState() == ChunkState::READY || chunk->getState() == ChunkState::GPU_UPLOADED);
+
+        if ((chunk->getState() == ChunkState::MESH_BUILD || lodChanged) && chunk->getState() != ChunkState::UNLOADED && chunk->getState() != ChunkState::GENERATING) {
+            // If LOD changed, we need to update it and mark for meshing
+            if (lodChanged) {
+                chunk->setCurrentLOD(desiredLOD);
+                chunk->setState(ChunkState::MESH_BUILD);
+            }
             result.push_back(chunk);
         }
     }
     
     return result;
+}
+
+int ChunkManager::getDesiredLOD(const ChunkPos& chunkPos, const glm::vec3& cameraPos) const {
+    ChunkPos centerChunk = worldToChunk(cameraPos);
+    int dx = std::abs(chunkPos.x - centerChunk.x);
+    int dz = std::abs(chunkPos.z - centerChunk.z);
+    int dist = std::max(dx, dz);
+    
+    if (dist < 8) return 0;
+    if (dist < 16) return 1;
+    return 2;
 }
 
 ChunkPos ChunkManager::worldToChunk(const glm::vec3& worldPos) {

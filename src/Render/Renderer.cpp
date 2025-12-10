@@ -199,7 +199,7 @@ void Renderer::renderCrosshair(int windowWidth, int windowHeight) {
     glEnable(GL_DEPTH_TEST);
 }
 
-void Renderer::renderLoadingScreen(int windowWidth, int windowHeight, float progress) {
+void Renderer::renderLoadingScreen(int /*windowWidth*/, int /*windowHeight*/, float progress) {
     // Clear screen with dirt background color
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

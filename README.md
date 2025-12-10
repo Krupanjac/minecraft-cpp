@@ -148,7 +148,7 @@ Edit `src/Util/Config.h` to customize:
 
 - [x] Block placement/destruction
 - [ ] Advanced LOD system
-- [ ] Biomes and caves
+- [x] Biomes and caves
 - [x] Water rendering with transparency
 - [x] Lighting system (Ambient Occlusion)
 - [ ] Save/load world data

@@ -10,27 +10,33 @@ MeshData MeshBuilder::buildChunkMesh(std::shared_ptr<Chunk> chunk,
                                      std::shared_ptr<Chunk> chunkYPos,
                                      std::shared_ptr<Chunk> chunkYNeg,
                                      std::shared_ptr<Chunk> chunkZPos,
-                                     std::shared_ptr<Chunk> chunkZNeg) {
+                                     std::shared_ptr<Chunk> chunkZNeg,
+                                     int lod) {
     MeshData meshData;
     
     std::shared_ptr<Chunk> neighbors[6] = {
         chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg
     };
     
-    greedyMesh(chunk, neighbors, meshData);
+    greedyMesh(chunk, neighbors, meshData, lod);
     
     return meshData;
 }
 
 void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                              std::shared_ptr<Chunk> neighbors[6],
-                             MeshData& meshData) {
+                             MeshData& meshData,
+                             int lod) {
     // Greedy meshing for each axis and direction
     const int dirs[6][3] = {
         {1, 0, 0}, {-1, 0, 0},  // X+, X-
         {0, 1, 0}, {0, -1, 0},  // Y+, Y-
         {0, 0, 1}, {0, 0, -1}   // Z+, Z-
     };
+    
+    int step = 1 << lod;
+    int size = CHUNK_SIZE >> lod;
+    // int height = CHUNK_HEIGHT >> lod; // Unused
     
     for (int dir = 0; dir < 6; ++dir) {
         int nx = dirs[dir][0];
@@ -44,17 +50,17 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
         else { u_axis = 0; v_axis = 1; w_axis = 2; }
         
         // Create mask for this direction
-        std::array<u8, CHUNK_SIZE * CHUNK_SIZE> mask;
+        std::vector<u8> mask(size * size);
         
-        for (int d = 0; d < CHUNK_SIZE; ++d) {
-            mask.fill(0);
+        for (int d = 0; d < size; ++d) {
+            std::fill(mask.begin(), mask.end(), static_cast<u8>(0));
             
             // Build mask
-            for (int v = 0; v < CHUNK_SIZE; ++v) {
-                for (int u = 0; u < CHUNK_SIZE; ++u) {
-                    int x = (w_axis == 0) ? d : (u_axis == 0) ? u : v;
-                    int y = (w_axis == 1) ? d : (u_axis == 1) ? u : v;
-                    int z = (w_axis == 2) ? d : (u_axis == 2) ? u : v;
+            for (int v = 0; v < size; ++v) {
+                for (int u = 0; u < size; ++u) {
+                    int x = ((w_axis == 0) ? d : (u_axis == 0) ? u : v) * step;
+                    int y = ((w_axis == 1) ? d : (u_axis == 1) ? u : v) * step;
+                    int z = ((w_axis == 2) ? d : (u_axis == 2) ? u : v) * step;
                     
                     if (x >= CHUNK_SIZE || y >= CHUNK_HEIGHT || z >= CHUNK_SIZE) continue;
                     
@@ -62,9 +68,9 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     if (!block.isSolid() && !block.isWater()) continue;
                     
                     // Check if face should be rendered
-                    int adjX = x + nx;
-                    int adjY = y + ny;
-                    int adjZ = z + nz;
+                    int adjX = x + nx * step;
+                    int adjY = y + ny * step;
+                    int adjZ = z + nz * step;
                     
                     bool shouldRender = false;
                     Block adjBlock;
@@ -99,15 +105,15 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     }
                     
                     if (shouldRender) {
-                        mask[v * CHUNK_SIZE + u] = block.getMaterialID();
+                        mask[v * size + u] = block.getMaterialID();
                     }
                 }
             }
             
             // Generate mesh from mask using greedy algorithm
-            for (int v = 0; v < CHUNK_SIZE; ++v) {
-                for (int u = 0; u < CHUNK_SIZE; ) {
-                    u8 material = mask[v * CHUNK_SIZE + u];
+            for (int v = 0; v < size; ++v) {
+                for (int u = 0; u < size; ) {
+                    u8 material = mask[v * size + u];
                     if (material == 0) {
                         ++u;
                         continue;
@@ -117,7 +123,7 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     int w = 1;
                     // Disable greedy meshing for water and ice to prevent gaps with vertex displacement
                     if (material != static_cast<u8>(BlockType::WATER) && material != static_cast<u8>(BlockType::ICE)) {
-                        while (u + w < CHUNK_SIZE && mask[v * CHUNK_SIZE + u + w] == material) {
+                        while (u + w < size && mask[v * size + u + w] == material) {
                             ++w;
                         }
                     }
@@ -126,9 +132,9 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     int h = 1;
                     bool done = false;
                     if (material != static_cast<u8>(BlockType::WATER) && material != static_cast<u8>(BlockType::ICE)) {
-                        while (v + h < CHUNK_SIZE && !done) {
+                        while (v + h < size && !done) {
                             for (int k = 0; k < w; ++k) {
-                                if (mask[(v + h) * CHUNK_SIZE + u + k] != material) {
+                                if (mask[(v + h) * size + u + k] != material) {
                                     done = true;
                                     break;
                                 }
@@ -140,28 +146,28 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     // Clear mask
                     for (int l = 0; l < h; ++l) {
                         for (int k = 0; k < w; ++k) {
-                            mask[(v + l) * CHUNK_SIZE + u + k] = 0;
+                            mask[(v + l) * size + u + k] = 0;
                         }
                     }
                     
                     // Add quad
                     Quad quad;
                     if (w_axis == 0) {
-                        quad.x = (nx > 0) ? d + 1 : d; 
-                        quad.y = u; 
-                        quad.z = v;
+                        quad.x = ((nx > 0) ? d + 1 : d) * step; 
+                        quad.y = u * step; 
+                        quad.z = v * step;
                     } else if (w_axis == 1) {
-                        quad.x = u; 
-                        quad.y = (ny > 0) ? d + 1 : d; 
-                        quad.z = v;
+                        quad.x = u * step; 
+                        quad.y = ((ny > 0) ? d + 1 : d) * step; 
+                        quad.z = v * step;
                     } else {
-                        quad.x = u; 
-                        quad.y = v; 
-                        quad.z = (nz > 0) ? d + 1 : d;
+                        quad.x = u * step; 
+                        quad.y = v * step; 
+                        quad.z = ((nz > 0) ? d + 1 : d) * step;
                     }
                     
-                    quad.w = w; 
-                    quad.h = h;
+                    quad.w = w * step; 
+                    quad.h = h * step;
                     
                     quad.u_axis = u_axis;
                     quad.v_axis = v_axis;
@@ -174,32 +180,35 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     quad.material = material;
                     
                     // Calculate AO
-                    int u_vec[3] = {0}; u_vec[u_axis] = 1;
-                    int v_vec[3] = {0}; v_vec[v_axis] = 1;
-                    int n_vec[3] = {nx, ny, nz};
+                    // For LOD > 0, we can simplify AO or just sample at corners
+                    // We'll use the same logic but with 'step' for neighbor checks
+                    
+                    int u_vec[3] = {0}; u_vec[u_axis] = step;
+                    int v_vec[3] = {0}; v_vec[v_axis] = step;
+                    int n_vec[3] = {nx * step, ny * step, nz * step};
                     int neg_u[3] = {-u_vec[0], -u_vec[1], -u_vec[2]};
                     int neg_v[3] = {-v_vec[0], -v_vec[1], -v_vec[2]};
                     
                     // V0: (0, 0) -> Block (0, 0), check -u, -v
-                    quad.ao[0] = calculateVertexAO(chunk, quad.x, quad.y, quad.z, n_vec, neg_u, neg_v, neighbors);
+                    quad.ao[0] = calculateVertexAO(chunk, quad.x, quad.y, quad.z, neg_u, neg_v, neighbors);
                     
                     // V1: (w, 0) -> Block (w-1, 0), check +u, -v
-                    int bx = quad.x + (w-1)*u_vec[0];
-                    int by = quad.y + (w-1)*u_vec[1];
-                    int bz = quad.z + (w-1)*u_vec[2];
-                    quad.ao[1] = calculateVertexAO(chunk, bx, by, bz, n_vec, u_vec, neg_v, neighbors);
+                    int bx = quad.x + (quad.w - step)*u_vec[0]/step;
+                    int by = quad.y + (quad.w - step)*u_vec[1]/step;
+                    int bz = quad.z + (quad.w - step)*u_vec[2]/step;
+                    quad.ao[1] = calculateVertexAO(chunk, bx, by, bz, u_vec, neg_v, neighbors);
                     
                     // V2: (w, h) -> Block (w-1, h-1), check +u, +v
-                    bx = quad.x + (w-1)*u_vec[0] + (h-1)*v_vec[0];
-                    by = quad.y + (w-1)*u_vec[1] + (h-1)*v_vec[1];
-                    bz = quad.z + (w-1)*u_vec[2] + (h-1)*v_vec[2];
-                    quad.ao[2] = calculateVertexAO(chunk, bx, by, bz, n_vec, u_vec, v_vec, neighbors);
+                    bx = quad.x + (quad.w - step)*u_vec[0]/step + (quad.h - step)*v_vec[0]/step;
+                    by = quad.y + (quad.w - step)*u_vec[1]/step + (quad.h - step)*v_vec[1]/step;
+                    bz = quad.z + (quad.w - step)*u_vec[2]/step + (quad.h - step)*v_vec[2]/step;
+                    quad.ao[2] = calculateVertexAO(chunk, bx, by, bz, u_vec, v_vec, neighbors);
                     
                     // V3: (0, h) -> Block (0, h-1), check -u, +v
-                    bx = quad.x + (h-1)*v_vec[0];
-                    by = quad.y + (h-1)*v_vec[1];
-                    bz = quad.z + (h-1)*v_vec[2];
-                    quad.ao[3] = calculateVertexAO(chunk, bx, by, bz, n_vec, neg_u, v_vec, neighbors);
+                    bx = quad.x + (quad.h - step)*v_vec[0]/step;
+                    by = quad.y + (quad.h - step)*v_vec[1]/step;
+                    bz = quad.z + (quad.h - step)*v_vec[2]/step;
+                    quad.ao[3] = calculateVertexAO(chunk, bx, by, bz, neg_u, v_vec, neighbors);
                     
                     addQuad(quad, meshData);
                     
@@ -220,6 +229,10 @@ bool MeshBuilder::isBlockSolid(std::shared_ptr<Chunk> chunk, int x, int y, int z
     if (z < 0 && neighbors[5]) return neighbors[5]->getBlock(x, y, z + CHUNK_SIZE).isOpaque();
     if (z >= CHUNK_SIZE && neighbors[4]) return neighbors[4]->getBlock(x, y, z - CHUNK_SIZE).isOpaque();
     
+    if (x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_HEIGHT && z >= 0 && z < CHUNK_SIZE) {
+        return chunk->getBlock(x, y, z).isOpaque();
+    }
+
     return false;
 }
 
@@ -321,7 +334,7 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
 }
 
 u8 MeshBuilder::calculateVertexAO(std::shared_ptr<Chunk> chunk, int x, int y, int z, 
-                                 const int* n_vec, const int* u_vec, const int* v_vec,
+                                 const int* u_vec, const int* v_vec,
                                  std::shared_ptr<Chunk> neighbors[6]) {
     // Check 3 neighbors: Side1 (u), Side2 (v), Corner (u+v)
     // x,y,z is the block inside the quad.
