@@ -82,35 +82,44 @@ public:
         // Load a small radius around player first (e.g. 4 chunks)
         // This ensures player sees immediate surroundings quickly
         int initialRadius = 4;
-        auto chunksToGen = chunkManager.getChunksToGenerate(camera.getPosition(), initialRadius, 10000);
-        int totalChunks = static_cast<int>(chunksToGen.size());
-        int generated = 0;
         
-        for (const auto& pos : chunksToGen) {
-            chunkManager.requestChunkGeneration(pos);
-            auto chunk = chunkManager.getChunk(pos);
-            if (chunk) {
-                worldGenerator.generate(chunk);
-                chunk->setState(ChunkState::MESH_BUILD);
+        // Wait for generation of initial chunks
+        bool initialGenDone = false;
+        while (!initialGenDone && !window->shouldClose()) {
+            auto chunksToGen = chunkManager.getChunksToGenerate(camera.getPosition(), initialRadius, 10000);
+            
+            if (chunksToGen.empty()) {
+                initialGenDone = true;
+            } else {
+                int generated = 0;
+                int totalChunks = static_cast<int>(chunksToGen.size());
                 
-                // Mark neighbors for update to ensure no gaps
-                auto neighbors = chunkManager.getNeighbors(pos);
-                for (auto& n : neighbors) {
-                    if (n && n->getState() != ChunkState::UNLOADED) {
-                        n->setState(ChunkState::MESH_BUILD);
+                for (const auto& pos : chunksToGen) {
+                    chunkManager.requestChunkGeneration(pos);
+                    auto chunk = chunkManager.getChunk(pos);
+                    if (chunk) {
+                        worldGenerator.generate(chunk);
+                        chunk->setState(ChunkState::MESH_BUILD);
+                        
+                        // Mark neighbors for update to ensure no gaps
+                        auto neighbors = chunkManager.getNeighbors(pos);
+                        for (auto& n : neighbors) {
+                            if (n && n->getState() != ChunkState::UNLOADED) {
+                                n->setState(ChunkState::MESH_BUILD);
+                            }
+                        }
+                    }
+                    generated++;
+                    
+                    // Update loading screen
+                    if (generated % 5 == 0) {
+                        float progress = static_cast<float>(generated) / static_cast<float>(totalChunks) * 0.5f;
+                        renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
+                        window->swapBuffers();
+                        window->pollEvents();
+                        if (window->shouldClose()) return false;
                     }
                 }
-            }
-            
-            generated++;
-            
-            // Update loading screen
-            if (generated % 5 == 0) {
-                float progress = static_cast<float>(generated) / static_cast<float>(totalChunks) * 0.5f;
-                renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
-                window->swapBuffers();
-                window->pollEvents();
-                if (window->shouldClose()) return false;
             }
         }
         
@@ -118,9 +127,10 @@ public:
         LOG_INFO("Building initial meshes...");
         bool initialLoadDone = false;
         int meshedCount = 0;
+        int totalInitialChunks = (initialRadius * 2 + 1) * (initialRadius * 2 + 1) * 5; // Approx count
         
         while (!initialLoadDone && !window->shouldClose()) {
-            auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), 10);
+            auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), 100); // Mesh as many as possible
             
             if (chunksToMesh.empty()) {
                 initialLoadDone = true;
@@ -139,7 +149,7 @@ public:
                     meshedCount++;
                 }
                 
-                float progress = 0.5f + (static_cast<float>(meshedCount) / static_cast<float>(totalChunks)) * 0.5f;
+                float progress = 0.5f + (static_cast<float>(meshedCount) / static_cast<float>(totalInitialChunks)) * 0.5f;
                 if (progress > 1.0f) progress = 1.0f;
                 
                 renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);

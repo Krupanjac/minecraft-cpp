@@ -36,6 +36,10 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     glm::mat4 viewProj = projection * view;
     frustum.update(viewProj);
     
+    // Enable depth testing with LEQUAL for better precision
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    
     // Render sun first (behind everything)
     renderSun(camera, windowWidth, windowHeight);
 
@@ -50,6 +54,9 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     blockShader.setFloat("uAOStrength", Settings::instance().aoStrength);
     blockShader.setFloat("uGamma", Settings::instance().gamma);
     
+    // Disable face culling to prevent missing faces due to LOD/winding issues
+    glDisable(GL_CULL_FACE);
+    
     // Fog settings
     float fogDist = static_cast<float>(Settings::instance().renderDistance * CHUNK_SIZE);
     blockShader.setFloat("uFogDist", fogDist);
@@ -59,10 +66,22 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     const auto& chunks = chunkManager.getChunks();
     
     for (const auto& [pos, chunk] : chunks) {
-        if (chunk->getState() != ChunkState::GPU_UPLOADED && 
-            chunk->getState() != ChunkState::READY) {
-            continue;
+        // Render if uploaded, or if rebuilding (MESH_BUILD/READY) but we have a mesh
+        // This prevents flickering when LOD changes
+        bool shouldRender = (chunk->getState() == ChunkState::GPU_UPLOADED);
+        
+        if (!shouldRender) {
+            // Check if we have a valid mesh from previous state
+            auto it = chunkMeshes.find(pos);
+            if (it != chunkMeshes.end() && it->second->isUploaded()) {
+                // Allow rendering during rebuild
+                if (chunk->getState() == ChunkState::MESH_BUILD || chunk->getState() == ChunkState::READY) {
+                    shouldRender = true;
+                }
+            }
         }
+        
+        if (!shouldRender) continue;
         
         // Frustum culling
         glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
@@ -93,6 +112,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE); // Allow seeing water surface from below
+    glDepthMask(GL_FALSE); // Don't write to depth buffer for transparent objects
     
     waterShader.use();
     waterShader.setInt("uTexture", 0);
@@ -105,10 +125,21 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     waterShader.setVec3("uSkyColor", skyColor);
     
     for (const auto& [pos, chunk] : chunks) {
-        if (chunk->getState() != ChunkState::GPU_UPLOADED && 
-            chunk->getState() != ChunkState::READY) {
-            continue;
+        // Render if uploaded, or if rebuilding (MESH_BUILD/READY) but we have a mesh
+        bool shouldRender = (chunk->getState() == ChunkState::GPU_UPLOADED);
+        
+        if (!shouldRender) {
+            // Check if we have a valid mesh from previous state
+            auto it = waterMeshes.find(pos);
+            if (it != waterMeshes.end() && it->second->isUploaded()) {
+                // Allow rendering during rebuild
+                if (chunk->getState() == ChunkState::MESH_BUILD || chunk->getState() == ChunkState::READY) {
+                    shouldRender = true;
+                }
+            }
         }
+        
+        if (!shouldRender) continue;
         
         // Frustum culling
         glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
@@ -132,7 +163,8 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     }
     
     waterShader.unuse();
-    glEnable(GL_CULL_FACE);
+    glDepthMask(GL_TRUE); // Re-enable depth writing
+    glDisable(GL_CULL_FACE);
     glDisable(GL_BLEND);
 
     // Underwater overlay
