@@ -122,6 +122,14 @@ void UIManager::setupSettingsMenu() {
     elements.push_back({cx - btnW/2, startY, btnW, btnH, "AO STRENGTH: " + std::to_string(s.aoStrength).substr(0, 3), false, nullptr, true, &s.aoStrength, nullptr, 0.0f, 2.0f});
     startY += btnH + gap;
 
+    // Debug Toggle
+    std::string debugText = showDebug ? "DEBUG: ON" : "DEBUG: OFF";
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, debugText, false, [this]() {
+        toggleDebug();
+        setupSettingsMenu(); // Refresh to update text
+    }});
+    startY += btnH + gap;
+
     // Back
     startY += 20.0f;
     elements.push_back({cx - btnW/2, startY, btnW, btnH, "BACK", false, [this]() {
@@ -180,7 +188,7 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
 }
 
 void UIManager::render() {
-    if (!menuOpen) return;
+    if (!menuOpen && !showDebug) return;
 
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -190,29 +198,39 @@ void UIManager::render() {
     glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
     uiShader.setMat4("uProjection", projection);
 
-    // Draw semi-transparent background
-    drawRect(0, 0, (float)width, (float)height, glm::vec4(0.0f, 0.0f, 0.0f, 0.7f));
+    if (menuOpen) {
+        // Draw semi-transparent background
+        drawRect(0, 0, (float)width, (float)height, glm::vec4(0.0f, 0.0f, 0.0f, 0.7f));
 
-    for (const auto& el : elements) {
-        glm::vec4 color = el.isHovered ? glm::vec4(0.6f, 0.6f, 0.6f, 1.0f) : glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
-        drawRect(el.x, el.y, el.w, el.h, color);
-        
-        // Draw slider indicator
-        if (el.isSlider) {
-            float val = 0.0f;
-            if (el.intValueRef) val = (float)*el.intValueRef;
-            else if (el.valueRef) val = *el.valueRef;
+        for (const auto& el : elements) {
+            glm::vec4 color = el.isHovered ? glm::vec4(0.6f, 0.6f, 0.6f, 1.0f) : glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
+            drawRect(el.x, el.y, el.w, el.h, color);
             
-            float pct = (val - el.minVal) / (el.maxVal - el.minVal);
-            drawRect(el.x, el.y, el.w * pct, el.h, glm::vec4(0.2f, 0.8f, 0.2f, 1.0f));
-        }
+            // Draw slider indicator
+            if (el.isSlider) {
+                float val = 0.0f;
+                if (el.intValueRef) val = (float)*el.intValueRef;
+                else if (el.valueRef) val = *el.valueRef;
+                
+                float pct = (val - el.minVal) / (el.maxVal - el.minVal);
+                drawRect(el.x, el.y, el.w * pct, el.h, glm::vec4(0.2f, 0.8f, 0.2f, 1.0f));
+            }
 
-        // Draw text centered
-        float textScale = 2.0f;
-        float textW = el.text.length() * 8.0f * textScale; // Approx width
-        float textX = el.x + (el.w - textW) / 2.0f;
-        float textY = el.y + (el.h - 8.0f * textScale) / 2.0f;
-        drawText(textX, textY, textScale, el.text, glm::vec4(1.0f));
+            // Draw text centered
+            float textScale = 2.0f;
+            float textW = el.text.length() * 8.0f * textScale; // Approx width
+            float textX = el.x + (el.w - textW) / 2.0f;
+            float textY = el.y + (el.h - 8.0f * textScale) / 2.0f;
+            drawText(textX, textY, textScale, el.text, glm::vec4(1.0f));
+        }
+    }
+
+    if (showDebug) {
+        std::string fpsText = "FPS: " + std::to_string((int)currentFPS);
+        std::string blockText = "Block: " + currentBlockName;
+        
+        drawText(10.0f, 30.0f, 2.0f, fpsText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+        drawText(10.0f, 60.0f, 2.0f, blockText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
     }
 
     uiShader.unuse();
@@ -344,3 +362,9 @@ void UIManager::drawText(float x, float y, float scale, const std::string& text,
         cursorX += 6 * scale; // Advance cursor
     }
 }
+
+void UIManager::updateDebugInfo(float fps, const std::string& blockName) {
+    currentFPS = fps;
+    currentBlockName = blockName;
+}
+

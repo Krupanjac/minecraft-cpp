@@ -36,8 +36,15 @@ public:
 
     void setOnSettingsChanged(std::function<void()> callback) { onSettingsChanged = callback; }
 
+    void toggleDebug() { showDebug = !showDebug; }
+    void updateDebugInfo(float fps, const std::string& blockName);
+
 private:
     bool menuOpen = false;
+    bool showDebug = false;
+    float currentFPS = 0.0f;
+    std::string currentBlockName = "None";
+
     int width, height;
     Shader uiShader;
     GLuint vao, vbo;

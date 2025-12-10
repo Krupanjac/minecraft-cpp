@@ -163,6 +163,55 @@ public:
             
             processInput(deltaTime);
             update(deltaTime);
+
+            // Update Debug Info
+            // Use a smoothed FPS for display to avoid 0 or flickering
+            static float displayFPS = 0.0f;
+            static float fpsAccumulator = 0.0f;
+            static int frameAccumulator = 0;
+            static float fpsUpdateTimer = 0.0f;
+            
+            fpsAccumulator += Time::instance().getFPS();
+            frameAccumulator++;
+            fpsUpdateTimer += deltaTime;
+            
+            if (fpsUpdateTimer >= 0.5f) {
+                displayFPS = fpsAccumulator / frameAccumulator;
+                fpsAccumulator = 0.0f;
+                frameAccumulator = 0;
+                fpsUpdateTimer = 0.0f;
+            }
+
+            std::string blockName = "None";
+            
+            // Increase raycast distance to ensure we hit the ground even from high up
+            auto result = chunkManager.rayCast(camera.getPosition(), camera.getFront(), 100.0f);
+            if (result.hit) {
+                glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
+                int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
+                int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
+                int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
+                Block block = chunkManager.getBlockAt(x, y, z);
+                
+                switch (block.getType()) {
+                    case BlockType::AIR: blockName = "Air"; break;
+                    case BlockType::GRASS: blockName = "Grass"; break;
+                    case BlockType::DIRT: blockName = "Dirt"; break;
+                    case BlockType::STONE: blockName = "Stone"; break;
+                    case BlockType::SAND: blockName = "Sand"; break;
+                    case BlockType::WATER: blockName = "Water"; break;
+                    case BlockType::WOOD: blockName = "Wood"; break;
+                    case BlockType::LEAVES: blockName = "Leaves"; break;
+                    case BlockType::SNOW: blockName = "Snow"; break;
+                    case BlockType::ICE: blockName = "Ice"; break;
+                    case BlockType::GRAVEL: blockName = "Gravel"; break;
+                    case BlockType::SANDSTONE: blockName = "Sandstone"; break;
+                    default: blockName = "Unknown"; break;
+                }
+            }
+            
+            uiManager.updateDebugInfo(displayFPS, blockName);
+
             render();
             
             window->pollEvents();

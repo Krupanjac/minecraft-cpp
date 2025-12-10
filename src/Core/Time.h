@@ -12,6 +12,7 @@ public:
     void update() {
         auto currentTime = std::chrono::high_resolution_clock::now();
         deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+        if (deltaTime <= 0.0f) deltaTime = 0.000001f; // Prevent zero delta time
         lastTime = currentTime;
         totalTime += deltaTime;
         frameCount++;
