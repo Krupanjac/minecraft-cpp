@@ -7,7 +7,7 @@
 Renderer::Renderer() {
 }
 
-bool Renderer::initialize() {
+bool Renderer::initialize(int windowWidth, int windowHeight) {
     setupOpenGL();
     
     if (!loadShaders()) {
@@ -20,11 +20,23 @@ bool Renderer::initialize() {
 
     blockAtlas = std::make_unique<Texture>("assets/block_atlas.png");
 
+    // Initialize Post Processing
+    mainFBO = std::make_unique<FrameBuffer>(windowWidth, windowHeight);
+    postProcess = std::make_unique<PostProcess>(windowWidth, windowHeight);
+
     LOG_INFO("Renderer initialized");
     return true;
 }
 
+void Renderer::onResize(int width, int height) {
+    if (mainFBO) mainFBO->resize(width, height);
+    if (postProcess) postProcess->resize(width, height);
+}
+
 void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidth, int windowHeight) {
+    // 1. Render Scene to FBO
+    mainFBO->bind();
+    
     // Clear with sky color
     glClearColor(skyColor.r, skyColor.g, skyColor.b, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -32,6 +44,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     // Update frustum
     float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     glm::mat4 projection = camera.getProjectionMatrix(aspect);
+    
+    // Apply TAA Jitter
+    postProcess->updateJitter(windowWidth, windowHeight);
+    projection = postProcess->getJitterMatrix() * projection;
+
     glm::mat4 view = camera.getViewMatrix();
     glm::mat4 viewProj = projection * view;
     frustum.update(viewProj);
@@ -167,6 +184,17 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     glDisable(GL_CULL_FACE);
     glDisable(GL_BLEND);
 
+    mainFBO->unbind();
+
+    // 2. Post Processing Pass
+    // Clear default framebuffer
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), projection, view, camera.getPosition(), lightDirection);
+
+    // 3. UI / Overlays (Rendered directly to screen)
+    
     // Underwater overlay
     glm::vec3 camPos = camera.getPosition();
     // Simple check: get block at camera position

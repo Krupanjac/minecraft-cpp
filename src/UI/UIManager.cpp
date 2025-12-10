@@ -72,6 +72,7 @@ void UIManager::setMenuState(MenuState state) {
         case MenuState::MAIN_MENU: setupMainMenu(); break;
         case MenuState::IN_GAME_MENU: setupInGameMenu(); break;
         case MenuState::SETTINGS: setupSettingsMenu(); break;
+        case MenuState::VIDEO_SETTINGS: setupVideoSettingsMenu(); break;
         case MenuState::LOAD_GAME: setupLoadGameMenu(); break;
         case MenuState::NEW_GAME: setupNewGameMenu(); break;
         case MenuState::NONE: break;
@@ -148,6 +149,31 @@ void UIManager::setupSettingsMenu() {
     float cx = width / 2.0f;
     float cy = height / 2.0f;
     float btnW = 300.0f;
+    float btnH = 40.0f;
+    float gap = 10.0f;
+    float startY = cy - 100.0f;
+
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "VIDEO SETTINGS", false, [this]() { 
+        setMenuState(MenuState::VIDEO_SETTINGS); 
+    }});
+    startY += btnH + gap;
+
+    // Placeholder for Controls
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "CONTROLS (TODO)", false, nullptr});
+    startY += btnH + gap;
+
+    // Back
+    elements.push_back({cx - btnW/2, startY + 20, btnW, btnH, "BACK", false, [this]() { 
+        setMenuState(MenuState::MAIN_MENU); 
+    }});
+}
+
+void UIManager::setupVideoSettingsMenu() {
+    elements.clear();
+    
+    float cx = width / 2.0f;
+    float cy = height / 2.0f;
+    float btnW = 300.0f;
     float btnH = 30.0f;
     float gap = 10.0f;
     float startY = cy - 150.0f;
@@ -155,24 +181,30 @@ void UIManager::setupSettingsMenu() {
     auto& s = Settings::instance();
 
     // Render Distance
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "RENDER DIST: " + std::to_string(s.renderDistance), false, nullptr, true, nullptr, &s.renderDistance, 2.0f, 32.0f});
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "RENDER DIST: " + std::to_string(s.renderDistance), false, nullptr, true, nullptr, &s.renderDistance, nullptr, 2.0f, 32.0f});
     startY += btnH + gap;
 
     // FOV
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "FOV: " + std::to_string((int)s.fov), false, nullptr, true, &s.fov, nullptr, 30.0f, 110.0f});
-    startY += btnH + gap;
-
-    // Mouse Sensitivity
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "SENSITIVITY: " + std::to_string(s.mouseSensitivity).substr(0, 4), false, nullptr, true, &s.mouseSensitivity, nullptr, 0.01f, 1.0f});
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "FOV: " + std::to_string((int)s.fov), false, nullptr, true, &s.fov, nullptr, nullptr, 30.0f, 110.0f});
     startY += btnH + gap;
 
     // AO Strength
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "AO STRENGTH: " + std::to_string(s.aoStrength).substr(0, 3), false, nullptr, true, &s.aoStrength, nullptr, 0.0f, 2.0f});
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "AO STRENGTH: " + std::to_string(s.aoStrength).substr(0, 3), false, nullptr, true, &s.aoStrength, nullptr, nullptr, 0.0f, 2.0f});
+    startY += btnH + gap;
+
+    // Gamma
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "GAMMA: " + std::to_string(s.gamma).substr(0, 3), false, nullptr, true, &s.gamma, nullptr, nullptr, 1.0f, 3.0f});
+    startY += btnH + gap;
+
+    // VSync (Toggle)
+    std::string vsyncText = "VSYNC: " + std::string(s.vsync ? "ON" : "OFF");
+    // For toggle, we use onClick but also pass boolValueRef
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, vsyncText, false, [](){}, false, nullptr, nullptr, &s.vsync});
     startY += btnH + gap;
 
     // Back
-    elements.push_back({cx - btnW/2, startY + 20 + (btnH + gap) * 4, btnW, btnH, "BACK", false, [this]() { 
-        setMenuState(MenuState::MAIN_MENU); 
+    elements.push_back({cx - btnW/2, startY + 20, btnW, btnH, "BACK", false, [this]() { 
+        setMenuState(MenuState::SETTINGS); 
     }});
 }
 
@@ -211,10 +243,10 @@ void UIManager::setupNewGameMenu() {
     static std::string nameInput = "New World";
     static std::string seedInput = "12345";
 
-    UIElement nameField = {centerX - btnW/2, centerY - 100, btnW, btnH, "NAME: " + nameInput, false, nullptr, false, nullptr, nullptr, 0.0f, 0.0f, true, &nameInput};
+    UIElement nameField = {centerX - btnW/2, centerY - 100, btnW, btnH, "NAME: " + nameInput, false, nullptr, false, nullptr, nullptr, nullptr, 0.0f, 0.0f, true, &nameInput};
     elements.push_back(nameField);
 
-    UIElement seedField = {centerX - btnW/2, centerY - 100 + btnH + gap, btnW, btnH, "SEED: " + seedInput, false, nullptr, false, nullptr, nullptr, 0.0f, 0.0f, true, &seedInput};
+    UIElement seedField = {centerX - btnW/2, centerY - 100 + btnH + gap, btnW, btnH, "SEED: " + seedInput, false, nullptr, false, nullptr, nullptr, nullptr, 0.0f, 0.0f, true, &seedInput};
     elements.push_back(seedField);
 
     elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*2 + 20, btnW, btnH, "CREATE WORLD", false, [this]() { 
@@ -229,7 +261,7 @@ void UIManager::setupNewGameMenu() {
     }});
 }
 
-void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mousePressed) {
+void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool mousePressed) {
     if (!isMenuOpen()) {
         lastMousePressed = mousePressed;
         return;
@@ -263,14 +295,27 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             el.text = "SENSITIVITY: " + std::to_string(*el.valueRef).substr(0, 4);
                         else if (el.text.find("AO") != std::string::npos)
                             el.text = "AO STRENGTH: " + std::to_string(*el.valueRef).substr(0, 3);
+                        else if (el.text.find("GAMMA") != std::string::npos)
+                            el.text = "GAMMA: " + std::to_string(*el.valueRef).substr(0, 3);
                     }
                     
                     if (onSettingsChanged) onSettingsChanged();
                 } else if (el.onClick) {
                     // Only click on rising edge (first press)
                     if (!lastMousePressed) {
-                        pendingClick = el.onClick;
-                        break; // Stop processing to avoid issues with vector modification
+                        if (el.boolValueRef) {
+                            *el.boolValueRef = !(*el.boolValueRef);
+                            // Update text for toggle
+                            size_t colonPos = el.text.find(":");
+                            if (colonPos != std::string::npos) {
+                                std::string prefix = el.text.substr(0, colonPos + 1);
+                                el.text = prefix + (*el.boolValueRef ? " ON" : " OFF");
+                            }
+                            if (onSettingsChanged) onSettingsChanged();
+                        } else {
+                            pendingClick = el.onClick;
+                            break; // Stop processing to avoid issues with vector modification
+                        }
                     }
                 }
             }

@@ -84,6 +84,8 @@ set(SOURCES
     src/Render/Texture.cpp
     src/Render/GPUBufferAllocator.cpp
     src/Render/Frustum.cpp
+    src/Render/FrameBuffer.cpp
+    src/Render/PostProcess.cpp
     src/UI/UIManager.cpp
     ${GLAD_DIR}/src/glad.c
 )

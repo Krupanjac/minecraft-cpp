@@ -12,6 +12,7 @@ enum class MenuState {
     MAIN_MENU,
     IN_GAME_MENU,
     SETTINGS,
+    VIDEO_SETTINGS,
     LOAD_GAME,
     NEW_GAME
 };
@@ -26,6 +27,7 @@ struct UIElement {
     bool isSlider = false;
     float* valueRef = nullptr;
     int* intValueRef = nullptr; // Added for integer support
+    bool* boolValueRef = nullptr; // Added for toggle support
     float minVal = 0.0f;
     float maxVal = 1.0f;
     
@@ -83,6 +85,7 @@ private:
     void setupMainMenu();
     void setupInGameMenu();
     void setupSettingsMenu();
+    void setupVideoSettingsMenu();
     void setupLoadGameMenu();
     void setupNewGameMenu();
     

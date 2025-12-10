@@ -67,9 +67,10 @@ public:
         window->setFramebufferSizeCallback([this](int width, int height) {
             glViewport(0, 0, width, height);
             uiManager.handleResize(width, height);
+            renderer.onResize(width, height);
         });
 
-        if (!renderer.initialize()) {
+        if (!renderer.initialize(window->getWidth(), window->getHeight())) {
             LOG_ERROR("Failed to initialize renderer");
             return false;
         }
@@ -90,6 +91,10 @@ public:
             }
         });
         
+        uiManager.setOnSettingsChanged([this]() {
+            window->setVSync(Settings::instance().vsync);
+        });
+
         uiManager.setOnSave([this]() {
             WorldSerializer::saveWorld(currentWorldName, chunkManager, camera.getPosition(), currentSeed);
             LOG_INFO("Game Saved");
