@@ -77,8 +77,8 @@ public:
         uiManager.initialize(window->getWidth(), window->getHeight());
         
         // Setup UI Callbacks
-        uiManager.setOnNewGame([this](std::string /*name*/, long seed) {
-            createWorld(seed);
+        uiManager.setOnNewGame([this](std::string name, long seed) {
+            createWorld(name, seed);
             uiManager.setMenuState(MenuState::NONE);
             window->setCursorMode(GLFW_CURSOR_DISABLED);
         });
@@ -113,11 +113,11 @@ public:
         return true;
     }
 
-    void createWorld(long seed = 12345) {
-        LOG_INFO("Creating new world with seed: " + std::to_string(seed));
+    void createWorld(const std::string& name, long seed = 12345) {
+        LOG_INFO("Creating new world: " + name + " with seed: " + std::to_string(seed));
         
         currentSeed = seed;
-        currentWorldName = "World_" + std::to_string(seed); // Simple naming for now
+        currentWorldName = name.empty() ? "World_" + std::to_string(seed) : name;
         
         // Set seed
         worldGenerator.setSeed(static_cast<unsigned int>(seed));
