@@ -1,8 +1,10 @@
 #include "UIManager.h"
+#include "../World/WorldSerializer.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
+#include <algorithm>
 
-UIManager::UIManager() : vao(0), vbo(0), width(1280), height(720) {}
+UIManager::UIManager() : vao(0), vbo(0), width(1280), height(720), showDebug(false), currentFPS(0.0f), currentMenuState(MenuState::MAIN_MENU) {}
 
 void UIManager::initialize(int windowWidth, int windowHeight) {
     width = windowWidth;
@@ -59,38 +61,84 @@ void UIManager::handleResize(int w, int h) {
     width = w;
     height = h;
     // Re-setup menu to center elements
-    if (menuOpen) setupMainMenu(); 
+    if (isMenuOpen()) setMenuState(currentMenuState); 
 }
 
-void UIManager::setMenuState(bool isOpen) {
-    menuOpen = isOpen;
-    if (menuOpen) {
-        setupMainMenu();
+void UIManager::setMenuState(MenuState state) {
+    currentMenuState = state;
+    elements.clear();
+    
+    switch (state) {
+        case MenuState::MAIN_MENU: setupMainMenu(); break;
+        case MenuState::IN_GAME_MENU: setupInGameMenu(); break;
+        case MenuState::SETTINGS: setupSettingsMenu(); break;
+        case MenuState::LOAD_GAME: setupLoadGameMenu(); break;
+        case MenuState::NEW_GAME: setupNewGameMenu(); break;
+        case MenuState::NONE: break;
+    }
+}
+
+void UIManager::handleCharInput(unsigned int codepoint) {
+    if (!isMenuOpen()) return;
+    
+    for (auto& el : elements) {
+        if (el.isInput && el.isHovered && el.textRef) {
+            if (codepoint == 8) { // Backspace
+                if (!el.textRef->empty()) el.textRef->pop_back();
+            } else if (codepoint >= 32 && codepoint <= 126) {
+                *el.textRef += (char)codepoint;
+            }
+            // Update display text
+            if (el.text.find("NAME:") != std::string::npos) el.text = "NAME: " + *el.textRef;
+            if (el.text.find("SEED:") != std::string::npos) el.text = "SEED: " + *el.textRef;
+        }
     }
 }
 
 void UIManager::setupMainMenu() {
     elements.clear();
-    
-    float cx = width / 2.0f;
-    float cy = height / 2.0f;
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
     float btnW = 200.0f;
     float btnH = 40.0f;
     float gap = 10.0f;
 
-    // Resume
-    elements.push_back({cx - btnW/2, cy - btnH - gap, btnW, btnH, "RESUME", false, [this]() {
-        setMenuState(false);
+    elements.push_back({centerX - btnW/2, centerY - 100, btnW, btnH, "NEW GAME", false, [this]() { 
+        setMenuState(MenuState::NEW_GAME); 
+    }});
+    
+    elements.push_back({centerX - btnW/2, centerY - 100 + btnH + gap, btnW, btnH, "LOAD GAME", false, [this]() { 
+        setMenuState(MenuState::LOAD_GAME); 
     }});
 
-    // Settings
-    elements.push_back({cx - btnW/2, cy, btnW, btnH, "SETTINGS", false, [this]() {
-        setupSettingsMenu();
+    elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*2, btnW, btnH, "SETTINGS", false, [this]() { 
+        setMenuState(MenuState::SETTINGS); 
     }});
 
-    // Exit
-    elements.push_back({cx - btnW/2, cy + btnH + gap, btnW, btnH, "EXIT", false, []() {
-        exit(0);
+    elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*3, btnW, btnH, "EXIT", false, [this]() { 
+        if (onExit) onExit(); 
+    }});
+}
+
+void UIManager::setupInGameMenu() {
+    elements.clear();
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
+    float btnW = 200.0f;
+    float btnH = 40.0f;
+    float gap = 10.0f;
+
+    elements.push_back({centerX - btnW/2, centerY - 50, btnW, btnH, "RESUME", false, [this]() { 
+        setMenuState(MenuState::NONE); 
+    }});
+
+    elements.push_back({centerX - btnW/2, centerY - 50 + btnH + gap, btnW, btnH, "SAVE GAME", false, [this]() { 
+        if (onSave) onSave();
+    }});
+
+    elements.push_back({centerX - btnW/2, centerY - 50 + (btnH + gap)*2, btnW, btnH, "MAIN MENU", false, [this]() { 
+        if (onSave) onSave(); // Auto save on exit to menu
+        setMenuState(MenuState::MAIN_MENU); 
     }});
 }
 
@@ -122,24 +170,70 @@ void UIManager::setupSettingsMenu() {
     elements.push_back({cx - btnW/2, startY, btnW, btnH, "AO STRENGTH: " + std::to_string(s.aoStrength).substr(0, 3), false, nullptr, true, &s.aoStrength, nullptr, 0.0f, 2.0f});
     startY += btnH + gap;
 
-    // Debug Toggle
-    std::string debugText = showDebug ? "DEBUG: ON" : "DEBUG: OFF";
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, debugText, false, [this]() {
-        toggleDebug();
-        setupSettingsMenu(); // Refresh to update text
-    }});
-    startY += btnH + gap;
-
     // Back
-    startY += 20.0f;
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "BACK", false, [this]() {
-        Settings::instance().save();
-        setupMainMenu();
+    elements.push_back({cx - btnW/2, startY + 20 + (btnH + gap) * 4, btnW, btnH, "BACK", false, [this]() { 
+        setMenuState(MenuState::MAIN_MENU); 
+    }});
+}
+
+void UIManager::setupLoadGameMenu() {
+    elements.clear();
+    float centerX = width / 2.0f;
+    float startY = height / 2.0f - 150.0f;
+    float btnW = 300.0f;
+    float btnH = 40.0f;
+    float gap = 10.0f;
+
+    std::vector<std::string> worlds = WorldSerializer::getAvailableWorlds();
+    
+    for (size_t i = 0; i < worlds.size(); i++) {
+        std::string wName = worlds[i];
+        elements.push_back({centerX - btnW/2, startY + i * (btnH + gap), btnW, btnH, wName, false, [this, wName]() { 
+            if (onLoadGame) onLoadGame(wName);
+            setMenuState(MenuState::NONE);
+        }});
+    }
+
+    elements.push_back({centerX - btnW/2, startY + worlds.size() * (btnH + gap) + 20, btnW, btnH, "BACK", false, [this]() { 
+        setMenuState(MenuState::MAIN_MENU); 
+    }});
+}
+
+void UIManager::setupNewGameMenu() {
+    elements.clear();
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
+    float btnW = 300.0f;
+    float btnH = 40.0f;
+    float gap = 10.0f;
+
+    // Input fields
+    static std::string nameInput = "New World";
+    static std::string seedInput = "12345";
+
+    UIElement nameField = {centerX - btnW/2, centerY - 100, btnW, btnH, "NAME: " + nameInput, false, nullptr, false, nullptr, nullptr, 0.0f, 0.0f, true, &nameInput};
+    elements.push_back(nameField);
+
+    UIElement seedField = {centerX - btnW/2, centerY - 100 + btnH + gap, btnW, btnH, "SEED: " + seedInput, false, nullptr, false, nullptr, nullptr, 0.0f, 0.0f, true, &seedInput};
+    elements.push_back(seedField);
+
+    elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*2 + 20, btnW, btnH, "CREATE WORLD", false, [this]() { 
+        int seed = 0;
+        try { seed = std::stoi(*elements[1].textRef); } catch(...) { seed = 12345; }
+        if (onNewGame) onNewGame(*elements[0].textRef, seed);
+        setMenuState(MenuState::NONE);
+    }});
+
+    elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*3 + 20, btnW, btnH, "BACK", false, [this]() { 
+        setMenuState(MenuState::MAIN_MENU); 
     }});
 }
 
 void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mousePressed) {
-    if (!menuOpen) return;
+    if (!isMenuOpen()) {
+        lastMousePressed = mousePressed;
+        return;
+    }
 
     std::function<void()> pendingClick = nullptr;
 
@@ -173,8 +267,11 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                     
                     if (onSettingsChanged) onSettingsChanged();
                 } else if (el.onClick) {
-                    pendingClick = el.onClick;
-                    break; // Stop processing to avoid issues with vector modification
+                    // Only click on rising edge (first press)
+                    if (!lastMousePressed) {
+                        pendingClick = el.onClick;
+                        break; // Stop processing to avoid issues with vector modification
+                    }
                 }
             }
         } else {
@@ -185,10 +282,12 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
     if (pendingClick) {
         pendingClick();
     }
+    
+    lastMousePressed = mousePressed;
 }
 
 void UIManager::render() {
-    if (!menuOpen && !showDebug) return;
+    if (!isMenuOpen() && !showDebug) return;
 
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -198,7 +297,7 @@ void UIManager::render() {
     glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
     uiShader.setMat4("uProjection", projection);
 
-    if (menuOpen) {
+    if (isMenuOpen()) {
         // Draw semi-transparent background
         drawRect(0, 0, (float)width, (float)height, glm::vec4(0.0f, 0.0f, 0.0f, 0.7f));
 
@@ -218,9 +317,9 @@ void UIManager::render() {
 
             // Draw text centered
             float textScale = 2.0f;
-            float textW = el.text.length() * 8.0f * textScale; // Approx width
+            float textW = el.text.length() * 6.0f * textScale; // Approx width
             float textX = el.x + (el.w - textW) / 2.0f;
-            float textY = el.y + (el.h - 8.0f * textScale) / 2.0f;
+            float textY = el.y + (el.h - 7.0f * textScale) / 2.0f;
             drawText(textX, textY, textScale, el.text, glm::vec4(1.0f));
         }
     }
@@ -251,115 +350,78 @@ void UIManager::drawRect(float x, float y, float w, float h, const glm::vec4& co
     glBindVertexArray(0);
 }
 
-// Very basic vector font implementation
 void UIManager::drawText(float x, float y, float scale, const std::string& text, const glm::vec4& color) {
-    // We'll use GL_LINES for text
-    // This is inefficient (many draw calls) but fine for a simple menu
-    // Ideally we'd batch lines
-    
-    // For simplicity, let's just draw rects for now or implement a few chars
-    // Actually, let's try to use the existing drawRect to draw "pixels" of text? No, too slow.
-    // Let's just use a simple line drawer.
-    
-    // Since I can't easily add a line shader/buffer right now without more boilerplate,
-    // I'll skip the complex text and just rely on the button colors/shapes for now?
-    // NO, the user wants a menu. I MUST render text.
-    
-    // I'll use the same shader but with GL_LINES and a different VAO/VBO for lines?
-    // Or just use thin rectangles for lines! Yes.
-    
     float cursorX = x;
-    for (char c : text) {
-        // Draw char c at cursorX, y
-        // 5x7 pixel font style, using rectangles
-        
-        // Helper to draw a "pixel"
-        auto p = [&](float dx, float dy) {
-            drawRect(cursorX + dx*scale, y + dy*scale, scale, scale, color);
-        };
-        
-        // Very basic font map (A-Z, 0-9)
-        // This is tedious to write out fully, so I'll implement a minimal set
-        // or just use a "placeholder" text renderer that draws a box.
-        
-        // Actually, let's just implement a few key chars for the menu:
-        // R, E, S, U, M, T, I, N, G, X, O, V, D, A, L, B, C, K, F, :, 0-9, .
-        
-        // To save time/tokens, I will implement a "segment" style font.
-        // 7 segments + diagonals?
-        
-        // Let's try a different approach:
-        // Just draw the text string as a unique hash color box for now? No that's bad.
-        
-        // Okay, I will implement a very crude "bitmap" font where I define the bits in code.
-        static const uint8_t font[][5] = {
-            {0x7C, 0x12, 0x11, 0x12, 0x7C}, // A
-            {0x7F, 0x49, 0x49, 0x49, 0x36}, // B
-            {0x3E, 0x41, 0x41, 0x41, 0x22}, // C
-            {0x7F, 0x41, 0x41, 0x22, 0x1C}, // D
-            {0x7F, 0x49, 0x49, 0x49, 0x41}, // E
-            {0x7F, 0x09, 0x09, 0x09, 0x01}, // F
-            {0x3E, 0x41, 0x49, 0x49, 0x7A}, // G
-            {0x7F, 0x08, 0x08, 0x08, 0x7F}, // H
-            {0x00, 0x41, 0x7F, 0x41, 0x00}, // I
-            {0x20, 0x40, 0x41, 0x3F, 0x01}, // J
-            {0x7F, 0x08, 0x14, 0x22, 0x41}, // K
-            {0x7F, 0x40, 0x40, 0x40, 0x40}, // L
-            {0x7F, 0x02, 0x0C, 0x02, 0x7F}, // M
-            {0x7F, 0x04, 0x08, 0x10, 0x7F}, // N
-            {0x3E, 0x41, 0x41, 0x41, 0x3E}, // O
-            {0x7F, 0x09, 0x09, 0x09, 0x06}, // P
-            {0x3E, 0x41, 0x51, 0x21, 0x5E}, // Q
-            {0x7F, 0x09, 0x19, 0x29, 0x46}, // R
-            {0x46, 0x49, 0x49, 0x49, 0x31}, // S
-            {0x01, 0x01, 0x7F, 0x01, 0x01}, // T
-            {0x3F, 0x40, 0x40, 0x40, 0x3F}, // U
-            {0x1F, 0x20, 0x40, 0x20, 0x1F}, // V
-            {0x3F, 0x40, 0x38, 0x40, 0x3F}, // W
-            {0x63, 0x14, 0x08, 0x14, 0x63}, // X
-            {0x07, 0x08, 0x70, 0x08, 0x07}, // Y
-            {0x61, 0x51, 0x49, 0x45, 0x43}, // Z
-        };
-        
-        // Numbers 0-9
-        static const uint8_t nums[][5] = {
-            {0x3E, 0x51, 0x49, 0x45, 0x3E}, // 0
-            {0x00, 0x42, 0x7F, 0x40, 0x00}, // 1
-            {0x42, 0x61, 0x51, 0x49, 0x46}, // 2
-            {0x21, 0x41, 0x45, 0x4B, 0x31}, // 3
-            {0x18, 0x14, 0x12, 0x7F, 0x10}, // 4
-            {0x27, 0x45, 0x45, 0x45, 0x39}, // 5
-            {0x3C, 0x4A, 0x49, 0x49, 0x30}, // 6
-            {0x01, 0x71, 0x09, 0x05, 0x03}, // 7
-            {0x36, 0x49, 0x49, 0x49, 0x36}, // 8
-            {0x06, 0x49, 0x49, 0x29, 0x1E}, // 9
-        };
+    
+    // 5x7 pixel font style
+    static const uint8_t font[][5] = {
+        {0x7C, 0x12, 0x11, 0x12, 0x7C}, // A
+        {0x7F, 0x49, 0x49, 0x49, 0x36}, // B
+        {0x3E, 0x41, 0x41, 0x41, 0x22}, // C
+        {0x7F, 0x41, 0x41, 0x22, 0x1C}, // D
+        {0x7F, 0x49, 0x49, 0x49, 0x41}, // E
+        {0x7F, 0x09, 0x09, 0x09, 0x01}, // F
+        {0x3E, 0x41, 0x49, 0x49, 0x7A}, // G
+        {0x7F, 0x08, 0x08, 0x08, 0x7F}, // H
+        {0x00, 0x41, 0x7F, 0x41, 0x00}, // I
+        {0x20, 0x40, 0x41, 0x3F, 0x01}, // J
+        {0x7F, 0x08, 0x14, 0x22, 0x41}, // K
+        {0x7F, 0x40, 0x40, 0x40, 0x40}, // L
+        {0x7F, 0x02, 0x0C, 0x02, 0x7F}, // M
+        {0x7F, 0x04, 0x08, 0x10, 0x7F}, // N
+        {0x3E, 0x41, 0x41, 0x41, 0x3E}, // O
+        {0x7F, 0x09, 0x09, 0x09, 0x06}, // P
+        {0x3E, 0x41, 0x51, 0x21, 0x5E}, // Q
+        {0x7F, 0x09, 0x19, 0x29, 0x46}, // R
+        {0x46, 0x49, 0x49, 0x49, 0x31}, // S
+        {0x01, 0x01, 0x7F, 0x01, 0x01}, // T
+        {0x3F, 0x40, 0x40, 0x40, 0x3F}, // U
+        {0x1F, 0x20, 0x40, 0x20, 0x1F}, // V
+        {0x3F, 0x40, 0x38, 0x40, 0x3F}, // W
+        {0x63, 0x14, 0x08, 0x14, 0x63}, // X
+        {0x07, 0x08, 0x70, 0x08, 0x07}, // Y
+        {0x61, 0x51, 0x49, 0x45, 0x43}, // Z
+    };
+    
+    static const uint8_t nums[][5] = {
+        {0x3E, 0x51, 0x49, 0x45, 0x3E}, // 0
+        {0x00, 0x42, 0x7F, 0x40, 0x00}, // 1
+        {0x42, 0x61, 0x51, 0x49, 0x46}, // 2
+        {0x21, 0x41, 0x45, 0x4B, 0x31}, // 3
+        {0x18, 0x14, 0x12, 0x7F, 0x10}, // 4
+        {0x27, 0x45, 0x45, 0x45, 0x39}, // 5
+        {0x3C, 0x4A, 0x49, 0x49, 0x30}, // 6
+        {0x01, 0x71, 0x09, 0x05, 0x03}, // 7
+        {0x36, 0x49, 0x49, 0x49, 0x36}, // 8
+        {0x06, 0x49, 0x49, 0x29, 0x1E}, // 9
+    };
 
+    for (char c : text) {
         int idx = -1;
         bool isNum = false;
         
         if (c >= 'A' && c <= 'Z') idx = c - 'A';
         else if (c >= 'a' && c <= 'z') idx = c - 'a';
         else if (c >= '0' && c <= '9') { idx = c - '0'; isNum = true; }
-        else if (c == ':') {
-             p(2, 1); p(2, 3);
-        } else if (c == '.') {
-             p(2, 4);
-        }
         
         if (idx >= 0) {
             const uint8_t* glyph = isNum ? nums[idx] : font[idx];
             for (int col = 0; col < 5; col++) {
                 uint8_t colData = glyph[col];
-                for (int row = 0; row < 7; row++) { // 7 rows high
+                for (int row = 0; row < 7; row++) {
                     if ((colData >> row) & 1) {
-                        p(col, row); // Draw pixel
+                        drawRect(cursorX + col*scale, y + row*scale, scale, scale, color);
                     }
                 }
             }
+        } else if (c == ':') {
+             drawRect(cursorX + 2*scale, y + 1*scale, scale, scale, color);
+             drawRect(cursorX + 2*scale, y + 3*scale, scale, scale, color);
+        } else if (c == '.') {
+             drawRect(cursorX + 2*scale, y + 4*scale, scale, scale, color);
         }
         
-        cursorX += 6 * scale; // Advance cursor
+        cursorX += 6 * scale;
     }
 }
 
@@ -367,4 +429,3 @@ void UIManager::updateDebugInfo(float fps, const std::string& blockName) {
     currentFPS = fps;
     currentBlockName = blockName;
 }
-

@@ -21,6 +21,8 @@ public:
     const glm::vec3& getRight() const { return right; }
     
     void setPosition(const glm::vec3& pos) { position = pos; }
+    void setYaw(float y) { yaw = y; updateCameraVectors(); }
+    void setPitch(float p) { pitch = p; updateCameraVectors(); }
     void setSpeed(float speed) { movementSpeed = speed; }
     void setSensitivity(float sensitivity) { mouseSensitivity = sensitivity; }
     void setFov(float f) { fov = f; }

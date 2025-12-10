@@ -75,6 +75,7 @@ set(SOURCES
     src/World/Chunk.cpp
     src/World/ChunkManager.cpp
     src/World/WorldGenerator.cpp
+    src/World/WorldSerializer.cpp
     src/Mesh/MeshBuilder.cpp
     src/Mesh/Mesh.cpp
     src/Render/Shader.cpp

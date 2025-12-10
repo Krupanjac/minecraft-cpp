@@ -2,6 +2,8 @@
 #include "../Core/Settings.h"
 #include <cmath>
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 
 ChunkManager::ChunkManager() {
 }
@@ -282,4 +284,19 @@ std::vector<std::shared_ptr<Chunk>> ChunkManager::getNeighbors(const ChunkPos& p
     neighbors[4] = getChunk(pos + ChunkPos(0, 0, 1));  // Z+
     neighbors[5] = getChunk(pos + ChunkPos(0, 0, -1)); // Z-
     return neighbors;
+}
+
+void ChunkManager::preloadChunkData(const ChunkPos& pos, const std::vector<Block>& blocks) {
+    preloadedChunks[pos] = blocks;
+}
+
+bool ChunkManager::hasPreloadedData(const ChunkPos& pos) const {
+    return preloadedChunks.find(pos) != preloadedChunks.end();
+}
+
+std::vector<Block> ChunkManager::getPreloadedData(const ChunkPos& pos) {
+    if (hasPreloadedData(pos)) {
+        return preloadedChunks[pos];
+    }
+    return {};
 }

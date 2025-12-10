@@ -65,6 +65,14 @@ void Window::setKeyCallback(std::function<void(int, int, int, int)> callback) {
     });
 }
 
+void Window::setCharCallback(std::function<void(unsigned int)> callback) {
+    windowData.charCallback = callback;
+    glfwSetCharCallback(window, [](GLFWwindow* win, unsigned int codepoint) {
+        auto data = static_cast<WindowData*>(glfwGetWindowUserPointer(win));
+        if (data && data->charCallback) data->charCallback(codepoint);
+    });
+}
+
 void Window::setCursorPosCallback(std::function<void(double, double)> callback) {
     windowData.cursorPosCallback = callback;
     glfwSetCursorPosCallback(window, [](GLFWwindow* win, double x, double y) {

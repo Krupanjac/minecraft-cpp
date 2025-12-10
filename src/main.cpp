@@ -10,6 +10,7 @@
 #include "Mesh/MeshBuilder.h"
 #include "Util/Config.h"
 #include "UI/UIManager.h"
+#include "World/WorldSerializer.h"
 
 #include <memory>
 #include <iostream>
@@ -37,7 +38,8 @@ public:
             return false;
         }
         
-        window->setCursorMode(GLFW_CURSOR_DISABLED);
+        // Start with cursor visible for menu
+        window->setCursorMode(GLFW_CURSOR_NORMAL);
         
         window->setMouseButtonCallback([this](int button, int action, int mods) {
             onMouseButton(button, action, mods);
@@ -53,9 +55,13 @@ public:
             }
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
                 bool isMenuOpen = uiManager.isMenuOpen();
-                uiManager.setMenuState(!isMenuOpen);
+                uiManager.setMenuState(isMenuOpen ? MenuState::NONE : MenuState::IN_GAME_MENU);
                 window->setCursorMode(isMenuOpen ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
             }
+        });
+        
+        window->setCharCallback([this](unsigned int codepoint) {
+            uiManager.handleCharInput(codepoint);
         });
         
         window->setFramebufferSizeCallback([this](int width, int height) {
@@ -69,6 +75,30 @@ public:
         }
         
         uiManager.initialize(window->getWidth(), window->getHeight());
+        
+        // Setup UI Callbacks
+        uiManager.setOnNewGame([this](std::string /*name*/, long seed) {
+            createWorld(seed);
+            uiManager.setMenuState(MenuState::NONE);
+            window->setCursorMode(GLFW_CURSOR_DISABLED);
+        });
+        
+        uiManager.setOnLoadGame([this](std::string name) {
+            if (loadWorld(name)) {
+                uiManager.setMenuState(MenuState::NONE);
+                window->setCursorMode(GLFW_CURSOR_DISABLED);
+            }
+        });
+        
+        uiManager.setOnSave([this]() {
+            WorldSerializer::saveWorld(currentWorldName, chunkManager, camera.getPosition(), currentSeed);
+            LOG_INFO("Game Saved");
+        });
+        
+        uiManager.setOnExit([this]() {
+            window->close();
+        });
+        
         uiManager.setOnSettingsChanged([this]() {
             applySettings();
         });
@@ -76,11 +106,35 @@ public:
         // Apply initial settings
         applySettings();
         
+        // Start in Main Menu
+        uiManager.setMenuState(MenuState::MAIN_MENU);
+        
+        LOG_INFO("Application initialized successfully");
+        return true;
+    }
+
+    void createWorld(long seed = 12345) {
+        LOG_INFO("Creating new world with seed: " + std::to_string(seed));
+        
+        currentSeed = seed;
+        currentWorldName = "World_" + std::to_string(seed); // Simple naming for now
+        
+        // Set seed
+        worldGenerator.setSeed(static_cast<unsigned int>(seed));
+        
+        // Clear existing world
+        chunkManager.unloadAll();
+        chunkManager.clear(); // Clear preloaded data too
+        
+        // Reset camera
+        camera.setPosition(glm::vec3(0.0f, 80.0f, 0.0f));
+        camera.setYaw(-90.0f);
+        camera.setPitch(0.0f);
+        
         // Initial world generation loading screen
         LOG_INFO("Generating initial world...");
         
         // Load a small radius around player first (e.g. 4 chunks)
-        // This ensures player sees immediate surroundings quickly
         int initialRadius = 4;
         
         // Wait for generation of initial chunks
@@ -98,7 +152,15 @@ public:
                     chunkManager.requestChunkGeneration(pos);
                     auto chunk = chunkManager.getChunk(pos);
                     if (chunk) {
-                        worldGenerator.generate(chunk);
+                        // Check if we have preloaded data
+                        if (chunkManager.hasPreloadedData(pos)) {
+                            auto blocks = chunkManager.getPreloadedData(pos);
+                            std::copy(blocks.begin(), blocks.end(), chunk->getBlocks().begin());
+                            chunk->setModified(true); // Mark as modified so it saves again
+                        } else {
+                            worldGenerator.generate(chunk);
+                        }
+                        
                         chunk->setState(ChunkState::MESH_BUILD);
                         
                         // Mark neighbors for update to ensure no gaps
@@ -117,7 +179,6 @@ public:
                         renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
                         window->swapBuffers();
                         window->pollEvents();
-                        if (window->shouldClose()) return false;
                     }
                 }
             }
@@ -157,9 +218,30 @@ public:
                 window->pollEvents();
             }
         }
+    }
+    
+    bool loadWorld(const std::string& name = "world.dat") {
+        LOG_INFO("Loading world: " + name);
         
-        LOG_INFO("Application initialized successfully");
-        return true;
+        // Clear existing world
+        chunkManager.unloadAll();
+        chunkManager.clear();
+        
+        glm::vec3 playerPos;
+        long seed;
+        
+        if (WorldSerializer::loadWorld(name, chunkManager, playerPos, seed)) {
+            camera.setPosition(playerPos);
+            currentWorldName = name;
+            currentSeed = seed;
+            worldGenerator.setSeed(static_cast<unsigned int>(seed));
+            
+            LOG_INFO("World loaded successfully");
+            return true;
+        } else {
+            LOG_ERROR("Failed to load world");
+            return false;
+        }
     }
     
     void run() {
@@ -248,6 +330,7 @@ private:
     MeshBuilder meshBuilder;
     ThreadPool threadPool;
     UIManager uiManager;
+    WorldSerializer worldSerializer;
     
     std::mutex meshMutex;
     std::vector<std::pair<ChunkPos, MeshData>> pendingMeshes;
@@ -256,6 +339,10 @@ private:
     double lastSpaceTime = 0.0;
     bool firstMouse;
     bool running;
+    
+    // Game State
+    std::string currentWorldName = "New World";
+    long currentSeed = 12345;
     
     void applySettings() {
         auto& s = Settings::instance();
@@ -409,7 +496,14 @@ private:
                 
                 // Generate in thread pool
                 threadPool.enqueue([this, chunk]() {
-                    worldGenerator.generate(chunk);
+                    if (chunkManager.hasPreloadedData(chunk->getPosition())) {
+                        auto blocks = chunkManager.getPreloadedData(chunk->getPosition());
+                        std::copy(blocks.begin(), blocks.end(), chunk->getBlocks().begin());
+                        chunk->setModified(true);
+                    } else {
+                        worldGenerator.generate(chunk);
+                    }
+                    chunk->setState(ChunkState::MESH_BUILD);
                 });
             }
         }

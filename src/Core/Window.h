@@ -11,6 +11,7 @@ public:
     ~Window();
 
     bool shouldClose() const;
+    void close() { glfwSetWindowShouldClose(window, true); }
     void pollEvents();
     void swapBuffers();
     
@@ -19,6 +20,7 @@ public:
     int getHeight() const { return height; }
     
     void setKeyCallback(std::function<void(int, int, int, int)> callback);
+    void setCharCallback(std::function<void(unsigned int)> callback);
     void setCursorPosCallback(std::function<void(double, double)> callback);
     void setMouseButtonCallback(std::function<void(int, int, int)> callback);
     void setFramebufferSizeCallback(std::function<void(int, int)> callback);
@@ -37,6 +39,7 @@ private:
 
     struct WindowData {
         std::function<void(int, int, int, int)> keyCallback;
+        std::function<void(unsigned int)> charCallback;
         std::function<void(double, double)> cursorPosCallback;
         std::function<void(int, int, int)> mouseButtonCallback;
         std::function<void(int, int)> framebufferSizeCallback;

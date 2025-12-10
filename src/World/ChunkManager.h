@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <memory>
 #include <vector>
+#include <string>
 #include <glm/glm.hpp>
 
 class ChunkManager {
@@ -23,6 +24,7 @@ public:
         return chunks;
     }
     
+    void unloadAll() { chunks.clear(); }
     void unloadDistantChunks(const glm::vec3& cameraPos);
     void requestChunkGeneration(const ChunkPos& pos);
     
@@ -49,8 +51,21 @@ public:
     // Helper to get neighbors for meshing
     std::vector<std::shared_ptr<Chunk>> getNeighbors(const ChunkPos& pos);
 
+    void setWorldName(const std::string& name) { currentWorldName = name; }
+    void clear() { 
+        chunks.clear(); 
+        preloadedChunks.clear();
+    }
+    
+    // Modified chunk cache for single-file loading
+    void preloadChunkData(const ChunkPos& pos, const std::vector<Block>& blocks);
+    bool hasPreloadedData(const ChunkPos& pos) const;
+    std::vector<Block> getPreloadedData(const ChunkPos& pos);
+
 private:
     std::unordered_map<ChunkPos, std::shared_ptr<Chunk>> chunks;
+    std::unordered_map<ChunkPos, std::vector<Block>> preloadedChunks;
+    std::string currentWorldName;
     
     bool isChunkInRange(const ChunkPos& chunkPos, const ChunkPos& centerChunk, int range) const;
 };

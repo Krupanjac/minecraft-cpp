@@ -35,6 +35,9 @@ public:
     bool isDirty() const { return dirty; }
     void setDirty(bool value) { dirty = value; }
 
+    bool isModified() const { return modified; }
+    void setModified(bool value) { modified = value; }
+
     int getCurrentLOD() const { return currentLOD; }
     void setCurrentLOD(int lod) { currentLOD = lod; }
 
@@ -43,6 +46,7 @@ private:
     std::array<Block, CHUNK_VOLUME> blocks;
     std::atomic<ChunkState> state;
     bool dirty;
+    bool modified = false;
     int currentLOD = 0;
 
     static int getIndex(int x, int y, int z) {

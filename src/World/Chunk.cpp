@@ -16,8 +16,12 @@ void Chunk::setBlock(int x, int y, int z, Block block) {
     if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
         return;
     }
-    blocks[getIndex(x, y, z)] = block;
-    dirty = true;
+    int idx = getIndex(x, y, z);
+    if (blocks[idx].getType() != block.getType()) {
+        blocks[idx] = block;
+        dirty = true;
+        modified = true;
+    }
 }
 
 bool Chunk::isBlockOpaque(int x, int y, int z) const {

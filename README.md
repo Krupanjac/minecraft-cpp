@@ -147,7 +147,7 @@ Edit `src/Util/Config.h` to customize:
 ## Future Enhancements
 
 - [x] Block placement/destruction
-- [ ] Advanced LOD system
+- [x] Advanced LOD system
 - [x] Biomes and caves
 - [x] Water rendering with transparency
 - [x] Lighting system (Ambient Occlusion)

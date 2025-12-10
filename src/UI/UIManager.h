@@ -7,6 +7,15 @@
 #include <functional>
 #include <memory>
 
+enum class MenuState {
+    NONE,
+    MAIN_MENU,
+    IN_GAME_MENU,
+    SETTINGS,
+    LOAD_GAME,
+    NEW_GAME
+};
+
 struct UIElement {
     float x, y, w, h;
     std::string text;
@@ -19,6 +28,10 @@ struct UIElement {
     int* intValueRef = nullptr; // Added for integer support
     float minVal = 0.0f;
     float maxVal = 1.0f;
+    
+    // For text input
+    bool isInput = false;
+    std::string* textRef = nullptr;
 };
 
 class UIManager {
@@ -30,17 +43,23 @@ public:
     void render();
     void update(float deltaTime, double mouseX, double mouseY, bool mousePressed);
     void handleResize(int width, int height);
+    void handleCharInput(unsigned int codepoint); // For text input
 
-    void setMenuState(bool isOpen);
-    bool isMenuOpen() const { return menuOpen; }
+    void setMenuState(MenuState state);
+    MenuState getMenuState() const { return currentMenuState; }
+    bool isMenuOpen() const { return currentMenuState != MenuState::NONE; }
 
     void setOnSettingsChanged(std::function<void()> callback) { onSettingsChanged = callback; }
+    void setOnNewGame(std::function<void(std::string, long)> callback) { onNewGame = callback; }
+    void setOnLoadGame(std::function<void(std::string)> callback) { onLoadGame = callback; }
+    void setOnExit(std::function<void()> callback) { onExit = callback; }
+    void setOnSave(std::function<void()> callback) { onSave = callback; }
 
     void toggleDebug() { showDebug = !showDebug; }
     void updateDebugInfo(float fps, const std::string& blockName);
 
 private:
-    bool menuOpen = false;
+    MenuState currentMenuState = MenuState::MAIN_MENU;
     bool showDebug = false;
     float currentFPS = 0.0f;
     std::string currentBlockName = "None";
@@ -51,9 +70,21 @@ private:
     
     std::vector<UIElement> elements;
     std::function<void()> onSettingsChanged;
+    std::function<void(std::string, long)> onNewGame;
+    std::function<void(std::string)> onLoadGame;
+    std::function<void()> onExit;
+    std::function<void()> onSave;
+    
+    // Input state
+    std::string newWorldName = "New World";
+    std::string newWorldSeed = "12345";
+    bool lastMousePressed = false;
     
     void setupMainMenu();
+    void setupInGameMenu();
     void setupSettingsMenu();
+    void setupLoadGameMenu();
+    void setupNewGameMenu();
     
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
     void drawText(float x, float y, float scale, const std::string& text, const glm::vec4& color);

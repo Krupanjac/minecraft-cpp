@@ -25,9 +25,10 @@ struct BiomeInfo {
 
 class WorldGenerator {
 public:
-    WorldGenerator();
+    WorldGenerator(unsigned int seed = 12345);
     ~WorldGenerator() = default;
 
+    void setSeed(unsigned int s) { seed = s; }
     void generate(std::shared_ptr<Chunk> chunk);
     
     float getNoise(float x, float y, float z) const;

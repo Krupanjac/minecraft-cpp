@@ -5,9 +5,7 @@
 #include <random>
 #include <algorithm>
 
-WorldGenerator::WorldGenerator() : seed(12345) {
-    // TODO: Make seed configurable or random
-    // seed = std::random_device{}();
+WorldGenerator::WorldGenerator(unsigned int seed) : seed(seed) {
 }
 
 BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
