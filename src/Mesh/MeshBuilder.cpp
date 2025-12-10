@@ -87,13 +87,12 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     
                     if (block.isWater()) {
                         // Render water face if neighbor is NOT water and NOT opaque (so Air or Glass)
-                        // Actually, if neighbor is solid, we don't render.
-                        // If neighbor is Air, we render.
-                        // If neighbor is Water, we don't render.
-                        shouldRender = !adjBlock.isWater() && !adjBlock.isOpaque();
+                        // Also don't render against ICE to avoid Z-fighting
+                        shouldRender = !adjBlock.isWater() && !adjBlock.isOpaque() && (adjBlock.getType() != BlockType::ICE);
                     } else if (block.isTransparent()) {
                         // ICE and other transparent blocks
-                        shouldRender = !adjBlock.isOpaque() || adjBlock.isTransparent();
+                        // Don't render if neighbor is opaque OR if neighbor is the same type (e.g. Ice next to Ice)
+                        shouldRender = !adjBlock.isOpaque() && (adjBlock.getType() != block.getType());
                     } else {
                         // Solid block: Render if neighbor is NOT opaque
                         shouldRender = !adjBlock.isOpaque();
