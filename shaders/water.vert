@@ -30,6 +30,12 @@ void main() {
     float wave = sin(worldPos.x * 2.0 + uTime) * 0.05 + cos(worldPos.z * 1.5 + uTime) * 0.05;
     // Only apply wave if normal is pointing up?
     // if (aNormal == 2u) 
+    
+    // Disable waves for ICE (Material 9)
+    if (aMaterial == 9u) {
+        wave = 0.0;
+    }
+    
     worldPos.y += wave * 0.5; // Reduce amplitude
     
     vWorldPos = worldPos.xyz;
@@ -57,6 +63,10 @@ void main() {
     float cellSize = 1.0 / atlasSize;
     
     uint textureIndex = 205u; // Default water index
+    
+    if (aMaterial == 9u) { // ICE
+        textureIndex = 67u; // Ice texture
+    }
     
     float col = float(textureIndex % 16u);
     float row = float(textureIndex / 16u);

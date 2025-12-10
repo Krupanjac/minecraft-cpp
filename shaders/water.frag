@@ -21,12 +21,19 @@ void main() {
     
     // Animate water UVs
     vec2 animatedTexCoord = vTexCoord;
-    animatedTexCoord.y += uTime * 0.5; // Scroll vertically
+    
+    if (vMaterial != 9u) { // Not ICE
+        animatedTexCoord.y += uTime * 0.5; // Scroll vertically
+    }
     
     vec2 uv = vCellOrigin + fract(animatedTexCoord) * cellSize;
 
     vec4 texColor = textureLod(uTexture, uv, 0.0);
     vec3 baseColor = texColor.rgb * vec3(0.6, 0.8, 1.0); // Tint blue
+    
+    if (vMaterial == 9u) { // ICE
+        baseColor = texColor.rgb; // No tint
+    }
     
     // Simple lighting
     vec3 lightDir = normalize(uLightDir);
