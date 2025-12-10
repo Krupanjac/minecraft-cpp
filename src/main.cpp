@@ -129,7 +129,7 @@ public:
                     auto neighbors = chunkManager.getNeighbors(chunk->getPosition());
                     
                     MeshData meshData = meshBuilder.buildChunkMesh(chunk, 
-                        neighbors[0], neighbors[1], neighbors[2], neighbors[3], neighbors[4], neighbors[5]);
+                        neighbors[0], neighbors[1], neighbors[2], neighbors[3], neighbors[4], neighbors[5], chunk->getCurrentLOD());
                         
                     renderer.uploadChunkMesh(chunk->getPosition(), 
                         meshData.vertices, meshData.indices, 

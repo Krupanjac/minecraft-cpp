@@ -72,11 +72,11 @@ std::vector<ChunkPos> ChunkManager::getChunksToGenerate(const glm::vec3& cameraP
 }
 
 std::vector<std::shared_ptr<Chunk>> ChunkManager::getChunksToMesh(const glm::vec3& cameraPos, int maxChunks) {
-    std::vector<std::shared_ptr<Chunk>> result;
+    std::vector<std::shared_ptr<Chunk>> candidates;
+    ChunkPos centerChunk = worldToChunk(cameraPos);
     
+    // 1. Collect all chunks that need meshing
     for (const auto& [pos, chunk] : chunks) {
-        if (result.size() >= static_cast<size_t>(maxChunks)) break;
-
         int desiredLOD = getDesiredLOD(pos, cameraPos);
         bool lodChanged = (chunk->getCurrentLOD() != desiredLOD) && (chunk->getState() == ChunkState::READY || chunk->getState() == ChunkState::GPU_UPLOADED);
 
@@ -86,11 +86,29 @@ std::vector<std::shared_ptr<Chunk>> ChunkManager::getChunksToMesh(const glm::vec
                 chunk->setCurrentLOD(desiredLOD);
                 chunk->setState(ChunkState::MESH_BUILD);
             }
-            result.push_back(chunk);
+            candidates.push_back(chunk);
         }
     }
+
+    // 2. Sort by distance to player (closest first)
+    std::sort(candidates.begin(), candidates.end(), [centerChunk](const std::shared_ptr<Chunk>& a, const std::shared_ptr<Chunk>& b) {
+        ChunkPos posA = a->getPosition();
+        ChunkPos posB = b->getPosition();
+        
+        int distA = (posA.x - centerChunk.x) * (posA.x - centerChunk.x) + 
+                    (posA.z - centerChunk.z) * (posA.z - centerChunk.z);
+        int distB = (posB.x - centerChunk.x) * (posB.x - centerChunk.x) + 
+                    (posB.z - centerChunk.z) * (posB.z - centerChunk.z);
+                    
+        return distA < distB;
+    });
     
-    return result;
+    // 3. Return top maxChunks
+    if (candidates.size() > static_cast<size_t>(maxChunks)) {
+        candidates.resize(maxChunks);
+    }
+    
+    return candidates;
 }
 
 int ChunkManager::getDesiredLOD(const ChunkPos& chunkPos, const glm::vec3& cameraPos) const {
