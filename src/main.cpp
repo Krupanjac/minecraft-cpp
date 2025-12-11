@@ -77,9 +77,7 @@ public:
         
         // Apply initial settings
         window->setVSync(Settings::instance().vsync);
-        if (Settings::instance().fullscreen) {
-            window->setFullscreen(true);
-        }
+        window->setFullscreen(Settings::instance().fullscreen);
         
         // Get actual framebuffer size for initialization
         int fbW, fbH;

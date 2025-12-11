@@ -27,7 +27,7 @@ public:
     
     void setCursorMode(int mode);
     void setVSync(bool enabled);
-    void setFullscreen(bool enabled);
+    void setFullscreen(int mode); // 0: Windowed, 1: Fullscreen, 2: Borderless
     bool isKeyPressed(int key) const;
     bool isMouseButtonPressed(int button) const;
 

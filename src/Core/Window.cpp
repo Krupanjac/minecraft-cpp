@@ -110,30 +110,43 @@ void Window::setVSync(bool enabled) {
     glfwSwapInterval(enabled ? 1 : 0);
 }
 
-void Window::setFullscreen(bool enabled) {
-    bool isCurrentlyFullscreen = glfwGetWindowMonitor(window) != nullptr;
-    if (enabled == isCurrentlyFullscreen) return;
+void Window::setFullscreen(int mode) {
+    // mode: 0 = Windowed, 1 = Fullscreen, 2 = Borderless
+    
+    // Check current state to avoid redundant updates
+    bool isMonitor = (glfwGetWindowMonitor(window) != nullptr);
+    bool isDecorated = (glfwGetWindowAttrib(window, GLFW_DECORATED) == GLFW_TRUE);
+    
+    int currentMode = 0;
+    if (isMonitor) currentMode = 1;
+    else if (!isDecorated) currentMode = 2;
+    
+    if (mode == currentMode) return;
 
-    LOG_INFO("Setting Fullscreen: " + std::string(enabled ? "ON" : "OFF"));
-    if (enabled) {
-        // Store current window state
-        glfwGetWindowPos(window, &windowedX, &windowedY);
-        glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
-        
-        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-        if (!monitor) {
-            LOG_ERROR("Failed to get primary monitor");
-            return;
+    LOG_INFO("Setting Window Mode: " + std::to_string(mode));
+    
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* vidMode = glfwGetVideoMode(monitor);
+    
+    if (mode == 1) { // Fullscreen
+        // Store windowed state if coming from windowed
+        if (currentMode == 0) {
+            glfwGetWindowPos(window, &windowedX, &windowedY);
+            glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
         }
-        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-        if (!mode) {
-            LOG_ERROR("Failed to get video mode");
-            return;
+        glfwSetWindowMonitor(window, monitor, 0, 0, vidMode->width, vidMode->height, vidMode->refreshRate);
+    } 
+    else if (mode == 2) { // Borderless Windowed
+        if (currentMode == 0) {
+            glfwGetWindowPos(window, &windowedX, &windowedY);
+            glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
         }
-        
-        glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
-    } else {
-        // Restore windowed state
+        // Borderless is just a windowed mode with no decoration and size of monitor
+        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
+        glfwSetWindowMonitor(window, nullptr, 0, 0, vidMode->width, vidMode->height, vidMode->refreshRate);
+    }
+    else { // Windowed
+        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
         glfwSetWindowMonitor(window, nullptr, windowedX, windowedY, windowedWidth, windowedHeight, 0);
     }
 }

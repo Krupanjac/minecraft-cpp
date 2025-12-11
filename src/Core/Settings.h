@@ -25,7 +25,7 @@ public:
     bool enableSSAO = true;
     bool enableVolumetrics = true;
     bool enableTAA = true;
-    bool fullscreen = false;
+    int fullscreen = 0; // 0: Windowed, 1: Fullscreen, 2: Borderless
 
     void load() {
         std::ifstream file("settings.ini");
@@ -48,7 +48,7 @@ public:
                     else if (key == "enableSSAO") enableSSAO = (value == "1");
                     else if (key == "enableVolumetrics") enableVolumetrics = (value == "1");
                     else if (key == "enableTAA") enableTAA = (value == "1");
-                    else if (key == "fullscreen") fullscreen = (value == "1");
+                    else if (key == "fullscreen") fullscreen = std::stoi(value);
                 }
             }
         }
@@ -68,7 +68,7 @@ public:
         file << "enableSSAO=" << (enableSSAO ? "1" : "0") << "\n";
         file << "enableVolumetrics=" << (enableVolumetrics ? "1" : "0") << "\n";
         file << "enableTAA=" << (enableTAA ? "1" : "0") << "\n";
-        file << "fullscreen=" << (fullscreen ? "1" : "0") << "\n";
+        file << "fullscreen=" << fullscreen << "\n";
     }
 
 private:

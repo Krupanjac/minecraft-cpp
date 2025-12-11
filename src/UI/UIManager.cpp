@@ -220,9 +220,13 @@ void UIManager::setupVideoSettingsMenu() {
     elements.push_back({cx - btnW/2, startY, btnW, btnH, taaText, false, [](){}, false, nullptr, nullptr, &s.enableTAA});
     startY += btnH + gap;
 
-    // Fullscreen (Toggle) - Note: Requires restart or complex window handling
-    std::string fsText = "FULLSCREEN: " + std::string(s.fullscreen ? "ON" : "OFF");
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, fsText, false, [](){}, false, nullptr, nullptr, &s.fullscreen});
+    // Fullscreen (Cycle)
+    std::string fsText = "WINDOW MODE: ";
+    if (s.fullscreen == 0) fsText += "WINDOWED";
+    else if (s.fullscreen == 1) fsText += "FULLSCREEN";
+    else if (s.fullscreen == 2) fsText += "BORDERLESS";
+    
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, fsText, false, [](){}, false, nullptr, &s.fullscreen, nullptr, 0.0f, 2.0f});
     startY += btnH + gap;
 
     // Back
@@ -336,6 +340,20 @@ void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool m
                                 std::string prefix = el.text.substr(0, colonPos + 1);
                                 el.text = prefix + (*el.boolValueRef ? " ON" : " OFF");
                             }
+                            if (onSettingsChanged) onSettingsChanged();
+                        } else if (el.intValueRef) {
+                            // Cycle integer value
+                            *el.intValueRef = (*el.intValueRef + 1);
+                            if (*el.intValueRef > (int)el.maxVal) *el.intValueRef = (int)el.minVal;
+                            
+                            if (el.text.find("WINDOW MODE") != std::string::npos) {
+                                std::string modeStr;
+                                if (*el.intValueRef == 0) modeStr = "WINDOWED";
+                                else if (*el.intValueRef == 1) modeStr = "FULLSCREEN";
+                                else if (*el.intValueRef == 2) modeStr = "BORDERLESS";
+                                el.text = "WINDOW MODE: " + modeStr;
+                            }
+                            
                             if (onSettingsChanged) onSettingsChanged();
                         } else {
                             pendingClick = el.onClick;
