@@ -66,6 +66,12 @@ void main() {
     else if (aMaterial == 4u) textureIndex = 18u;  // Sand
     else if (aMaterial == 6u) textureIndex = 4u;   // Wood (Plank)
     else if (aMaterial == 7u) textureIndex = 52u;  // Leaves
+    else if (aMaterial == 12u) { // Log
+        if (aNormal == 2u || aNormal == 3u) textureIndex = 21u; // Top/Bottom
+        else textureIndex = 20u; // Side
+    }
+    else if (aMaterial == 13u) textureIndex = 39u; // Tall Grass
+    else if (aMaterial == 14u) textureIndex = 12u; // Rose
     
     float col = float(textureIndex % 16u);
     float row = float(textureIndex / 16u);

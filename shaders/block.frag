@@ -35,6 +35,8 @@ void main() {
         baseColor *= vec3(0.4, 0.8, 0.3);
     } else if (vMaterial == 7u) { // Leaves
         baseColor *= vec3(0.3, 0.7, 0.3);
+    } else if (vMaterial == 13u) { // Tall Grass
+        baseColor *= vec3(0.4, 0.8, 0.3);
     } else if (vMaterial == 4u) { // Sand
         baseColor = vec3(0.93, 0.87, 0.69);
     } else if (vMaterial == 8u) { // Snow

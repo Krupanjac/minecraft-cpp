@@ -33,6 +33,7 @@ public:
     
     float getNoise(float x, float y, float z) const;
     float getHeight(float x, float z) const;
+    int getSurfaceHeight(int x, int z) const;
     BiomeType getBiome(float x, float z) const;
     BiomeInfo getBiomeInfo(BiomeType biome) const;
 
@@ -51,4 +52,8 @@ private:
     
     // Cave generation
     bool isCave(float x, float y, float z) const;
+    
+    // Vegetation helpers
+    bool hasTree(int x, int z, BiomeType biome) const;
+    int getTreeHeight(int x, int z) const;
 };

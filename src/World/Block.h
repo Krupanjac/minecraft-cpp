@@ -14,7 +14,10 @@ enum class BlockType : u8 {
     SNOW = 8,
     ICE = 9,
     GRAVEL = 10,
-    SANDSTONE = 11
+    SANDSTONE = 11,
+    LOG = 12,
+    TALL_GRASS = 13,
+    ROSE = 14
 };
 
 struct Block {
@@ -28,12 +31,17 @@ struct Block {
     bool isOpaque() const {
         return type != BlockType::AIR && 
                type != BlockType::WATER && 
-               type != BlockType::ICE;
+               type != BlockType::ICE &&
+               type != BlockType::LEAVES &&
+               type != BlockType::TALL_GRASS &&
+               type != BlockType::ROSE;
     }
     
     bool isSolid() const {
         return type != BlockType::AIR && 
-               type != BlockType::WATER;
+               type != BlockType::WATER &&
+               type != BlockType::TALL_GRASS &&
+               type != BlockType::ROSE;
     }
     
     bool isWater() const {
@@ -42,7 +50,15 @@ struct Block {
     
     bool isTransparent() const {
         return type == BlockType::WATER || 
-               type == BlockType::ICE;
+               type == BlockType::ICE ||
+               type == BlockType::LEAVES ||
+               type == BlockType::TALL_GRASS ||
+               type == BlockType::ROSE;
+    }
+    
+    bool isCrossModel() const {
+        return type == BlockType::TALL_GRASS || 
+               type == BlockType::ROSE;
     }
     
     u8 getMaterialID() const {

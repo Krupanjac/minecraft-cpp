@@ -63,4 +63,6 @@ private:
                         std::shared_ptr<Chunk> neighbors[6]);
     
     void addQuad(const Quad& quad, MeshData& meshData);
+    
+    void addCross(int x, int y, int z, u8 material, u8 ao, MeshData& meshData);
 };

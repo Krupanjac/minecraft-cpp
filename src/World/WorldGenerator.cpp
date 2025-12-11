@@ -127,79 +127,239 @@ bool WorldGenerator::isCave(float x, float y, float z) const {
     return (std::abs(caveNoise1) < threshold && std::abs(caveNoise2) < threshold);
 }
 
+int WorldGenerator::getSurfaceHeight(int x, int z) const {
+    BiomeType biome = getBiome(static_cast<float>(x), static_cast<float>(z));
+    BiomeInfo biomeInfo = getBiomeInfo(biome);
+    
+    float baseHeight = getHeight(static_cast<float>(x), static_cast<float>(z));
+    float biomeHeightMod = (biomeInfo.heightVariation - 0.5f) * 20.0f;
+    int height = static_cast<int>(baseHeight + biomeHeightMod);
+    
+    if (biome == BiomeType::OCEAN) {
+        height = std::min(height, SEA_LEVEL - 5);
+    }
+    if (biome == BiomeType::MOUNTAINS) {
+        float mountainNoise = noise2D(x * 0.005f, z * 0.005f);
+        height += static_cast<int>(mountainNoise * 30.0f);
+    }
+    return height;
+}
+
+bool WorldGenerator::hasTree(int x, int z, BiomeType biome) const {
+    // 1. Check if this position is a candidate based on probability
+    unsigned int seedX = static_cast<unsigned int>(x);
+    unsigned int seedZ = static_cast<unsigned int>(z);
+    
+    unsigned int h = seed + seedX * 374761393 + seedZ * 668265263;
+    h = (h ^ (h >> 13)) * 1274126177;
+    float r = (h & 0xFFFF) / 65536.0f;
+    
+    float treeProb = 0.0f;
+    if (biome == BiomeType::FOREST) treeProb = 0.02f; 
+    else if (biome == BiomeType::PLAINS) treeProb = 0.001f;
+    else if (biome == BiomeType::MOUNTAINS) treeProb = 0.005f;
+    // No trees in DESERT, OCEAN, SNOWY_TUNDRA (unless we add spruce later)
+    
+    if (r >= treeProb) return false;
+
+    // 2. Spatial check: Suppress this tree if a "better" candidate is nearby
+    // This creates a Poisson-disk-like distribution
+    int radius = 3; // Minimum distance between trees
+    
+    for (int dx = -radius; dx <= radius; ++dx) {
+        for (int dz = -radius; dz <= radius; ++dz) {
+            if (dx == 0 && dz == 0) continue;
+            
+            int nx = x + dx;
+            int nz = z + dz;
+            
+            unsigned int nSeedX = static_cast<unsigned int>(nx);
+            unsigned int nSeedZ = static_cast<unsigned int>(nz);
+            unsigned int nh = seed + nSeedX * 374761393 + nSeedZ * 668265263;
+            nh = (nh ^ (nh >> 13)) * 1274126177;
+            float nr = (nh & 0xFFFF) / 65536.0f;
+            
+            // If neighbor is also a candidate
+            if (nr < treeProb) {
+                // If neighbor has a lower random value (or equal with coordinate tie-breaker), they win
+                if (nr < r || (nr == r && (nx < x || (nx == x && nz < z)))) {
+                    return false;
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+
+int WorldGenerator::getTreeHeight(int x, int z) const {
+    unsigned int h = seed + x * 123 + z * 456;
+    h = (h ^ (h >> 13)) * 1274126177;
+    // Height variation: 4 to 8
+    return 4 + (h % 5); 
+}
+
 void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
     const ChunkPos& chunkPos = chunk->getPosition();
     glm::vec3 worldPos = ChunkManager::chunkToWorld(chunkPos);
     
+    // 1. Terrain Pass
     for (int x = 0; x < CHUNK_SIZE; ++x) {
         for (int z = 0; z < CHUNK_SIZE; ++z) {
-            float worldX = worldPos.x + x;
-            float worldZ = worldPos.z + z;
+            int worldX = static_cast<int>(worldPos.x) + x;
+            int worldZ = static_cast<int>(worldPos.z) + z;
             
-            // Get biome for this column
-            BiomeType biome = getBiome(worldX, worldZ);
+            BiomeType biome = getBiome(static_cast<float>(worldX), static_cast<float>(worldZ));
             BiomeInfo biomeInfo = getBiomeInfo(biome);
             
-            // Calculate height based on biome
-            float baseHeight = getHeight(worldX, worldZ);
-            
-            // Apply biome-specific height variation
-            float biomeHeightMod = (biomeInfo.heightVariation - 0.5f) * 20.0f;
-            int height = static_cast<int>(baseHeight + biomeHeightMod);
-            
-            // Special case for ocean biome - keep it low
-            if (biome == BiomeType::OCEAN) {
-                height = std::min(height, SEA_LEVEL - 5);
-            }
-            
-            // Special case for mountains - make them tall
-            if (biome == BiomeType::MOUNTAINS) {
-                float mountainNoise = noise2D(worldX * 0.005f, worldZ * 0.005f);
-                height += static_cast<int>(mountainNoise * 30.0f);
-            }
+            int height = getSurfaceHeight(worldX, worldZ);
             
             for (int y = 0; y < CHUNK_HEIGHT; ++y) {
                 int worldY = static_cast<int>(worldPos.y) + y;
-                
                 BlockType blockType = BlockType::AIR;
                 
-                // Check if this position should be a cave
-                bool isInCave = isCave(worldX, static_cast<float>(worldY), worldZ);
+                bool isInCave = isCave(static_cast<float>(worldX), static_cast<float>(worldY), static_cast<float>(worldZ));
                 
                 if (!isInCave) {
-                    if (worldY < height - biomeInfo.surfaceDepth) {
-                        blockType = BlockType::STONE;
-                    } else if (worldY < height - 1) {
-                        blockType = biomeInfo.subsurfaceBlock;
-                    } else if (worldY < height) {
+                    if (worldY < height - biomeInfo.surfaceDepth) blockType = BlockType::STONE;
+                    else if (worldY < height - 1) blockType = biomeInfo.subsurfaceBlock;
+                    else if (worldY < height) {
                         blockType = biomeInfo.surfaceBlock;
-                        
-                        // Special case: replace snow with ice if underwater
-                        if (blockType == BlockType::SNOW && worldY < SEA_LEVEL) {
-                            blockType = BlockType::ICE;
-                        }
+                        if (blockType == BlockType::SNOW && worldY < SEA_LEVEL) blockType = BlockType::ICE;
                     } else if (worldY < SEA_LEVEL) {
-                        // Water or ice for frozen biomes
-                        if (biome == BiomeType::SNOWY_TUNDRA && worldY == SEA_LEVEL - 1) {
-                            blockType = BlockType::ICE;
-                        } else {
-                            blockType = BlockType::WATER;
-                        }
+                        if (biome == BiomeType::SNOWY_TUNDRA && worldY == SEA_LEVEL - 1) blockType = BlockType::ICE;
+                        else blockType = BlockType::WATER;
                     }
                 } else {
-                    // Cave - but still fill with water if below sea level
-                    if (worldY < SEA_LEVEL) {
-                        blockType = BlockType::WATER;
-                    }
+                    if (worldY < SEA_LEVEL) blockType = BlockType::WATER;
                 }
                 
                 chunk->setBlock(x, y, z, Block(blockType));
+            }
+            
+            // 2. Vegetation Pass (Plants)
+            // Only place plants if this column is the surface
+            int chunkBaseY = static_cast<int>(worldPos.y);
+            if (height >= chunkBaseY && height < chunkBaseY + CHUNK_HEIGHT) {
+                int localY = height - chunkBaseY;
+                // Check if block below is valid for plants (Grass)
+                Block below = chunk->getBlock(x, localY - 1, z);
+                if (below.getType() == BlockType::GRASS) {
+                    // Random plant placement
+                    unsigned int h = seed + worldX * 374761393 + worldZ * 668265263;
+                    h = (h ^ (h >> 13)) * 1274126177;
+                    float r = (h & 0xFFFF) / 65536.0f;
+                    
+                    float plantProb = 0.0f;
+                    if (biome == BiomeType::PLAINS) plantProb = 0.2f;
+                    else if (biome == BiomeType::FOREST) plantProb = 0.1f;
+                    else if (biome == BiomeType::MOUNTAINS) plantProb = 0.05f;
+                    
+                    if (r < plantProb) {
+                        BlockType plant = BlockType::TALL_GRASS;
+                        if (((h >> 16) & 0xFF) < 25) plant = BlockType::ROSE; // ~10% chance
+                        chunk->setBlock(x, localY, z, Block(plant));
+                    }
+                }
+            }
+        }
+    }
+    
+    // 3. Tree Pass (Neighborhood Search)
+    // Check a padded area around the chunk to allow trees from neighbors to spill over
+    int pad = 2; // Tree radius
+    for (int nx = -pad; nx < CHUNK_SIZE + pad; ++nx) {
+        for (int nz = -pad; nz < CHUNK_SIZE + pad; ++nz) {
+            int worldX = static_cast<int>(worldPos.x) + nx;
+            int worldZ = static_cast<int>(worldPos.z) + nz;
+            
+            BiomeType biome = getBiome(static_cast<float>(worldX), static_cast<float>(worldZ));
+            
+            if (hasTree(worldX, worldZ, biome)) {
+                int treeBaseY = getSurfaceHeight(worldX, worldZ);
+                
+                // VALIDITY CHECKS:
+                // 1. Water check: Trees can't grow in water
+                if (treeBaseY < SEA_LEVEL) continue;
+                
+                // 2. Cave check: Trees can't float over cave entrances
+                // Check the block immediately below the tree (treeBaseY - 1)
+                if (isCave(static_cast<float>(worldX), static_cast<float>(treeBaseY - 1), static_cast<float>(worldZ))) continue;
+
+                int treeH = getTreeHeight(worldX, worldZ);
+                
+                // Check if tree affects this chunk vertically
+                int chunkBaseY = static_cast<int>(worldPos.y);
+                int treeTopY = treeBaseY + treeH + 1; // +1 for leaves
+                
+                if (treeTopY < chunkBaseY || treeBaseY > chunkBaseY + CHUNK_HEIGHT) continue;
+                
+                // Draw Trunk
+                if (nx >= 0 && nx < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE) {
+                    for (int i = 0; i < treeH; ++i) {
+                        int wy = treeBaseY + i;
+                        if (wy >= chunkBaseY && wy < chunkBaseY + CHUNK_HEIGHT) {
+                            chunk->setBlock(nx, wy - chunkBaseY, nz, Block(BlockType::LOG));
+                        }
+                    }
+                }
+                
+                // Draw Leaves
+                // Standard Minecraft Oak shape with variation
+                // Use hash for leaf variation
+                unsigned int h = seed + worldX * 34123 + worldZ * 23123;
+                h = (h ^ (h >> 13)) * 1274126177;
+                bool extraLeaves = (h % 2) == 0; // 50% chance for slightly fuller leaves
+
+                for (int ly = treeBaseY + treeH - 3; ly <= treeBaseY + treeH; ++ly) {
+                    if (ly < chunkBaseY || ly >= chunkBaseY + CHUNK_HEIGHT) continue;
+                    
+                    int dy = ly - (treeBaseY + treeH); // 0 at top, -1, -2, -3
+                    int radius = (dy >= -1) ? 1 : 2;   // Top 2 layers radius 1, bottom 2 radius 2
+                    
+                    // Iterate leaf box relative to tree
+                    for (int lx = worldX - radius; lx <= worldX + radius; ++lx) {
+                        for (int lz = worldZ - radius; lz <= worldZ + radius; ++lz) {
+                            // Check if this leaf block is inside OUR chunk
+                            int localX = lx - static_cast<int>(worldPos.x);
+                            int localZ = lz - static_cast<int>(worldPos.z);
+                            
+                            if (localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE) {
+                                // Corner check
+                                bool isCorner = std::abs(lx - worldX) == radius && std::abs(lz - worldZ) == radius;
+                                
+                                if (isCorner) {
+                                    // Top layers (radius 1): always skip corners (cross shape)
+                                    if (radius == 1) continue;
+                                    
+                                    // Bottom layers (radius 2): skip corners unless "extraLeaves" is true and it's the 3rd layer down
+                                    if (radius == 2) {
+                                        // Standard oak: skip corners on radius 2 layers usually
+                                        // Let's make it random per tree or per layer
+                                        if (!extraLeaves || (h % 3 != 0)) continue; 
+                                    }
+                                }
+
+                                // Don't overwrite trunk
+                                if (lx == worldX && lz == worldZ) continue;
+                                
+                                // Don't overwrite solid blocks (terrain)
+                                Block existing = chunk->getBlock(localX, ly - chunkBaseY, localZ);
+                                if (existing.getType() == BlockType::AIR || existing.isCrossModel()) {
+                                    chunk->setBlock(localX, ly - chunkBaseY, localZ, Block(BlockType::LEAVES));
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
     
     chunk->setState(ChunkState::MESH_BUILD);
 }
+
+
 
 float WorldGenerator::getNoise(float x, float y, float z) const {
     return noise3D(x * NOISE_SCALE, y * NOISE_SCALE, z * NOISE_SCALE);

@@ -19,9 +19,67 @@ MeshData MeshBuilder::buildChunkMesh(std::shared_ptr<Chunk> chunk,
         chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg
     };
     
+    // Pass 1: Standard Greedy Meshing for solid blocks
     greedyMesh(chunk, neighbors, meshData, lod);
     
+    // Pass 2: Special models (Vegetation) - Only at LOD 0 for now to save perf
+    if (lod == 0) {
+        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
+            for (int z = 0; z < CHUNK_SIZE; ++z) {
+                for (int x = 0; x < CHUNK_SIZE; ++x) {
+                    Block block = chunk->getBlock(x, y, z);
+                    if (block.isCrossModel()) {
+                        // Simple AO for plant: check block below
+                        u8 ao = 3; // Default bright
+                        // If block below is solid, maybe darken slightly at bottom? 
+                        // For now, just flat lighting
+                        addCross(x, y, z, block.getMaterialID(), ao, meshData);
+                    }
+                }
+            }
+        }
+    }
+    
     return meshData;
+}
+
+void MeshBuilder::addCross(int x, int y, int z, u8 material, u8 ao, MeshData& meshData) {
+    // Two intersecting quads
+    // Quad 1: (0,0,0) to (1,1,1)
+    // Quad 2: (0,0,1) to (1,1,0)
+    
+    u16 uv00 = Vertex::packUV(0, 0);
+    u16 uv10 = Vertex::packUV(1, 0);
+    u16 uv11 = Vertex::packUV(1, 1);
+    u16 uv01 = Vertex::packUV(0, 1);
+    
+    u8 normalUp = Vertex::packNormal(0, 1, 0); // Fake normal up for lighting
+    
+    // Quad 1
+    meshData.vertices.emplace_back(x, y, z, normalUp, material, uv00, ao);
+    meshData.vertices.emplace_back(x + 1, y, z + 1, normalUp, material, uv10, ao);
+    meshData.vertices.emplace_back(x + 1, y + 1, z + 1, normalUp, material, uv11, ao);
+    meshData.vertices.emplace_back(x, y + 1, z, normalUp, material, uv01, ao);
+    
+    u32 baseIdx = static_cast<u32>(meshData.vertices.size()) - 4;
+    // Double sided
+    meshData.indices.push_back(baseIdx + 0); meshData.indices.push_back(baseIdx + 1); meshData.indices.push_back(baseIdx + 2);
+    meshData.indices.push_back(baseIdx + 0); meshData.indices.push_back(baseIdx + 2); meshData.indices.push_back(baseIdx + 3);
+    meshData.indices.push_back(baseIdx + 2); meshData.indices.push_back(baseIdx + 1); meshData.indices.push_back(baseIdx + 0);
+    meshData.indices.push_back(baseIdx + 3); meshData.indices.push_back(baseIdx + 2); meshData.indices.push_back(baseIdx + 0);
+
+    // Quad 2
+    meshData.vertices.emplace_back(x, y, z + 1, normalUp, material, uv00, ao);
+    meshData.vertices.emplace_back(x + 1, y, z, normalUp, material, uv10, ao);
+    meshData.vertices.emplace_back(x + 1, y + 1, z, normalUp, material, uv11, ao);
+    meshData.vertices.emplace_back(x, y + 1, z + 1, normalUp, material, uv01, ao);
+    
+    baseIdx = static_cast<u32>(meshData.vertices.size()) - 4;
+    // Double sided
+    meshData.indices.push_back(baseIdx + 0); meshData.indices.push_back(baseIdx + 1); meshData.indices.push_back(baseIdx + 2);
+    meshData.indices.push_back(baseIdx + 0); meshData.indices.push_back(baseIdx + 2); meshData.indices.push_back(baseIdx + 3);
+    meshData.indices.push_back(baseIdx + 2); meshData.indices.push_back(baseIdx + 1); meshData.indices.push_back(baseIdx + 0);
+    meshData.indices.push_back(baseIdx + 3); meshData.indices.push_back(baseIdx + 2); meshData.indices.push_back(baseIdx + 0);
 }
 
 void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
