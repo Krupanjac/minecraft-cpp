@@ -23,6 +23,13 @@ bool Renderer::initialize(int windowWidth, int windowHeight) {
     // Initialize Post Processing
     mainFBO = std::make_unique<FrameBuffer>(windowWidth, windowHeight);
     postProcess = std::make_unique<PostProcess>(windowWidth, windowHeight);
+    
+    // Initialize Shadow Map (High resolution for crisp shadows)
+    shadowMap = std::make_unique<ShadowMap>();
+    if (!shadowMap->init(4096, 4096)) {
+        LOG_ERROR("Failed to initialize Shadow Map");
+        return false;
+    }
 
     LOG_INFO("Renderer initialized");
     return true;
@@ -34,6 +41,58 @@ void Renderer::onResize(int width, int height) {
 }
 
 void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidth, int windowHeight) {
+    // Calculate Light Space Matrix
+    // Center on player
+    // We position the "sun" far away along the light direction
+    float shadowRange = 160.0f; // Covers visible area
+    glm::vec3 lightPos = camera.getPosition() + lightDirection * 100.0f;
+    glm::mat4 lightView = glm::lookAt(lightPos, camera.getPosition(), glm::vec3(0.0f, 1.0f, 0.0f));
+    
+    float near_plane = 1.0f, far_plane = 400.0f;
+    glm::mat4 lightProjection = glm::ortho(-shadowRange, shadowRange, -shadowRange, shadowRange, near_plane, far_plane);
+    glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
+    const auto& chunks = chunkManager.getChunks();
+
+    // 0. Shadow Pass
+    if (showShadows) {
+        shadowMap->bind();
+        
+        shadowShader.use();
+        shadowShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
+        
+        // Render chunks for shadow map
+        // We only need to render opaque chunks
+        for (const auto& [pos, chunk] : chunks) {
+            bool shouldRender = (chunk->getState() == ChunkState::GPU_UPLOADED);
+            if (!shouldRender) {
+                auto it = chunkMeshes.find(pos);
+                if (it != chunkMeshes.end() && it->second->isUploaded()) {
+                    if (chunk->getState() == ChunkState::MESH_BUILD || chunk->getState() == ChunkState::READY) {
+                        shouldRender = true;
+                    }
+                }
+            }
+            
+            if (shouldRender) {
+                auto it = chunkMeshes.find(pos);
+                if (it != chunkMeshes.end() && it->second->isUploaded()) {
+                    glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
+                    glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkWorldPos);
+                    shadowShader.setMat4("uModel", model);
+                    
+                    it->second->bind();
+                    it->second->draw();
+                    it->second->unbind();
+                }
+            }
+        }
+        
+        shadowMap->unbind();
+    }
+    
+    glViewport(0, 0, windowWidth, windowHeight);
+
     // 1. Render Scene to FBO
     mainFBO->bind();
     
@@ -64,11 +123,19 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     renderSun(camera, windowWidth, windowHeight);
 
     // Render chunks
+    glActiveTexture(GL_TEXTURE0);
     blockAtlas->bind(0);
+    
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, shadowMap->getDepthMap());
+    
     blockShader.use();
     blockShader.setInt("uTexture", 0);
+    blockShader.setInt("uShadowMap", 1);
+    blockShader.setInt("uUseShadows", showShadows ? 1 : 0);
     blockShader.setMat4("uProjection", projection);
     blockShader.setMat4("uView", view);
+    blockShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
     blockShader.setVec3("uCameraPos", camera.getPosition());
     blockShader.setVec3("uLightDir", lightDirection);
     blockShader.setFloat("uAOStrength", Settings::instance().aoStrength);
@@ -83,7 +150,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     blockShader.setVec3("uSkyColor", skyColor);
 
     int chunksRendered = 0;
-    const auto& chunks = chunkManager.getChunks();
+    // const auto& chunks = chunkManager.getChunks(); // Already got this above
     
     for (const auto& [pos, chunk] : chunks) {
         // Render if uploaded, or if rebuilding (MESH_BUILD/READY) but we have a mesh
@@ -340,8 +407,11 @@ bool Renderer::loadShaders() {
     if (!sunShader.loadFromFiles("shaders/sun.vert", "shaders/sun.frag")) {
         LOG_ERROR("Failed to load sun shader");
         success = false;
+    }    
+    if (!shadowShader.loadFromFiles("shaders/shadow.vert", "shaders/shadow.frag")) {
+        LOG_ERROR("Failed to load shadow shader");
+        success = false;
     }
-
     // Create simple shader for crosshair inline or load from file
     // For simplicity, we'll use a very basic shader source here
     const char* crosshairVert = R"(

@@ -519,17 +519,55 @@ private:
         if (uiManager.isMenuOpen()) return;
 
         // Day/Night Cycle
-        // Full cycle = 1200 seconds (20 minutes)
-        // 0 = Sunrise, 300 = Noon, 600 = Sunset, 900 = Midnight
-        static float timeOfDay = 0.0f;
-        constexpr float DAY_DURATION = 1200.0f; // 20 minutes in seconds
+        // Full cycle = 2400 seconds (40 minutes) - Drastically increased
+        // 0 = Sunrise, 600 = Noon, 1200 = Sunset, 1800 = Midnight
+        constexpr float DAY_DURATION = 2400.0f; 
         
-        // For testing, speed it up significantly (e.g., 1 minute cycle)
-        // Remove the multiplier for real-time
-        timeOfDay += deltaTime * 20.0f; 
-        if (timeOfDay >= DAY_DURATION) timeOfDay -= DAY_DURATION;
+        // Debug Controls
+        static bool f1Pressed = false;
+        if (window->isKeyPressed(GLFW_KEY_F1)) {
+            if (!f1Pressed) {
+                uiManager.toggleDebug();
+                f1Pressed = true;
+            }
+        } else {
+            f1Pressed = false;
+        }
+
+        static bool f2Pressed = false;
+        if (window->isKeyPressed(GLFW_KEY_F2)) {
+            if (!f2Pressed) {
+                uiManager.isDayNightPaused = !uiManager.isDayNightPaused;
+                f2Pressed = true;
+            }
+        } else {
+            f2Pressed = false;
+        }
         
-        float angle = (timeOfDay / DAY_DURATION) * glm::two_pi<float>();
+        static bool f3Pressed = false;
+        if (window->isKeyPressed(GLFW_KEY_F3)) {
+            if (!f3Pressed) {
+                uiManager.showShadows = !uiManager.showShadows;
+                f3Pressed = true;
+            }
+        } else {
+            f3Pressed = false;
+        }
+        
+        renderer.setShowShadows(uiManager.showShadows);
+
+        if (!uiManager.isDayNightPaused) {
+            uiManager.timeOfDay += deltaTime * 10.0f; // Still sped up slightly for gameplay, but slower than before
+        }
+        
+        // Manual Time Control
+        if (window->isKeyPressed(GLFW_KEY_RIGHT)) uiManager.timeOfDay += deltaTime * 100.0f;
+        if (window->isKeyPressed(GLFW_KEY_LEFT)) uiManager.timeOfDay -= deltaTime * 100.0f;
+        
+        if (uiManager.timeOfDay >= DAY_DURATION) uiManager.timeOfDay -= DAY_DURATION;
+        if (uiManager.timeOfDay < 0.0f) uiManager.timeOfDay += DAY_DURATION;
+        
+        float angle = (uiManager.timeOfDay / DAY_DURATION) * glm::two_pi<float>();
         
         // Sun moves East (X+) -> Up (Y+) -> West (X-) -> Down (Y-)
         // We start at sunrise (X+, Y=0)
@@ -538,7 +576,17 @@ private:
         float sunZ = 0.2f; // Slight tilt
         
         glm::vec3 sunDir = glm::normalize(glm::vec3(sunX, sunY, sunZ));
-        renderer.setLightDirection(sunDir);
+        
+        // Night Logic: If sun is below horizon, use Moon
+        if (sunY < -0.1f) {
+            // Moon is opposite to sun
+            glm::vec3 moonDir = -sunDir;
+            renderer.setLightDirection(moonDir);
+            // Moon is dimmer
+            // We handle intensity in shader or by color, but direction is key for shadows
+        } else {
+            renderer.setLightDirection(sunDir);
+        }
         
         // Calculate sky color based on sun height (sunY)
         glm::vec3 dayColor(0.53f, 0.81f, 0.92f);

@@ -60,6 +60,11 @@ public:
 
     void toggleDebug() { showDebug = !showDebug; }
     void updateDebugInfo(float fps, const std::string& blockName);
+    
+    // Debug controls
+    float timeOfDay = 0.0f; // 0-1200
+    bool isDayNightPaused = false;
+    bool showShadows = true;
 
 private:
     MenuState currentMenuState = MenuState::MAIN_MENU;

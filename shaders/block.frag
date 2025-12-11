@@ -12,8 +12,40 @@ uniform vec3 uLightDir;
 uniform float uFogDist;
 uniform vec3 uSkyColor;
 uniform sampler2D uTexture;
+uniform sampler2D uShadowMap;
+uniform int uUseShadows;
+
+in vec4 vFragPosLightSpace;
 
 out vec4 FragColor;
+
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
+    // perform perspective divide
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    // transform to [0,1] range
+    projCoords = projCoords * 0.5 + 0.5;
+    
+    // keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
+    if(projCoords.z > 1.0)
+        return 0.0;
+        
+    // calculate bias (based on depth map resolution and slope)
+    float bias = max(0.001 * (1.0 - dot(normal, lightDir)), 0.0001);
+    
+    // PCF
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(uShadowMap, 0);
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(uShadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+            float currentDepth = projCoords.z;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+        }    
+    }
+    shadow /= 9.0;
+    
+    return shadow;
+}
 
 void main() {
     // Tiling logic:
@@ -53,15 +85,28 @@ void main() {
     vec3 lightDir = normalize(uLightDir);
     vec3 normal = normalize(vNormal);
     
+    // Ensure light doesn't leak from below
+    // If lightDir.y is negative (sun below horizon), diffuse should be 0
+    // But we might want moonlight. For now, let's just clamp.
     float diffuse = max(dot(normal, lightDir), 0.0);
+    
+    // Ambient light
+    // Increase ambient slightly at night so it's not pitch black
     float ambient = 0.3;
+    
+    // Calculate Shadow
+    // Only calculate shadow if surface is facing the light
+    float shadow = 0.0;
+    if (uUseShadows != 0 && diffuse > 0.0) {
+        shadow = ShadowCalculation(vFragPosLightSpace, normal, lightDir);
+    }
     
     // Apply AO
     // Use smoothstep for non-linear AO curve
     float aoCurve = smoothstep(0.0, 1.0, vAO);
     float aoFactor = mix(0.25, 1.0, aoCurve);
     
-    vec3 lighting = vec3(ambient + diffuse * 0.7) * aoFactor;
+    vec3 lighting = vec3(ambient + (1.0 - shadow) * diffuse * 0.7) * aoFactor;
     vec3 color = baseColor * lighting;
     
     // Fog

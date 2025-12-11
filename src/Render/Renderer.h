@@ -5,6 +5,7 @@
 #include "Camera.h"
 #include "Frustum.h"
 #include "FrameBuffer.h"
+#include "ShadowMap.h"
 #include "PostProcess.h"
 #include "../World/ChunkManager.h"
 #include "../Mesh/Mesh.h"
@@ -24,6 +25,7 @@ public:
     glm::vec3 getLightDirection() const { return lightDirection; }
 
     void setSkyColor(const glm::vec3& color) { skyColor = color; }
+    void setShowShadows(bool show) { showShadows = show; }
 
     Shader& getBlockShader() { return blockShader; }
     
@@ -47,12 +49,15 @@ private:
     Shader waterShader;
     Shader crosshairShader;
     Shader sunShader;
+    Shader shadowShader;
+    
     std::unique_ptr<Mesh> crosshairMesh;
     std::unique_ptr<Mesh> sunMesh;
     std::unique_ptr<Texture> blockAtlas;
     
     // Post Processing
     std::unique_ptr<FrameBuffer> mainFBO;
+    std::unique_ptr<ShadowMap> shadowMap;
     std::unique_ptr<PostProcess> postProcess;
 
     Frustum frustum;
@@ -62,6 +67,7 @@ private:
     
     glm::vec3 lightDirection = glm::vec3(0.5f, 1.0f, 0.3f);
     glm::vec3 skyColor = glm::vec3(0.53f, 0.81f, 0.92f);
+    bool showShadows = true;
 
     void setupOpenGL();
     bool loadShaders();
