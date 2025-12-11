@@ -9,6 +9,8 @@
 #include <string>
 #include <glm/glm.hpp>
 
+#include <mutex>
+
 class ChunkManager {
 public:
     ChunkManager();
@@ -48,6 +50,10 @@ public:
     
     void setBlockAt(int x, int y, int z, Block block);
     
+    // Fluid simulation
+    void updateFluids();
+    void scheduleFluidUpdate(int x, int y, int z);
+
     // Helper to get neighbors for meshing
     std::vector<std::shared_ptr<Chunk>> getNeighbors(const ChunkPos& pos);
 
@@ -65,6 +71,8 @@ public:
 private:
     std::unordered_map<ChunkPos, std::shared_ptr<Chunk>> chunks;
     std::unordered_map<ChunkPos, std::vector<Block>> preloadedChunks;
+    std::vector<glm::ivec3> fluidQueue;
+    std::mutex fluidMutex;
     std::string currentWorldName;
     
     bool isChunkInRange(const ChunkPos& chunkPos, const ChunkPos& centerChunk, int range) const;

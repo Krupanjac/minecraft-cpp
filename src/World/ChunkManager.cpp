@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <cstdlib>
+#include <set>
 
 ChunkManager::ChunkManager() {
 }
@@ -11,6 +13,7 @@ ChunkManager::ChunkManager() {
 void ChunkManager::update(const glm::vec3& cameraPos) {
     // Unload distant chunks
     unloadDistantChunks(cameraPos);
+    updateFluids();
 }
 
 std::shared_ptr<Chunk> ChunkManager::getChunk(const ChunkPos& pos) {
@@ -249,9 +252,29 @@ void ChunkManager::setBlockAt(int x, int y, int z, Block block) {
         int lz = z - static_cast<int>(chunkOrigin.z);
         
         if (lx >= 0 && lx < CHUNK_SIZE && ly >= 0 && ly < CHUNK_HEIGHT && lz >= 0 && lz < CHUNK_SIZE) {
+            Block currentBlock = chunk->getBlock(lx, ly, lz);
+            if (currentBlock == block) return; // No change
+
             chunk->setBlock(lx, ly, lz, block);
             chunk->setDirty(true);
             chunk->setState(ChunkState::MESH_BUILD);
+
+            // Fluid updates
+            if (block.getType() == BlockType::WATER) {
+                scheduleFluidUpdate(x, y, z);
+            }
+            
+            // Wake up neighbors
+            int dx[] = {1, -1, 0, 0, 0, 0};
+            int dy[] = {0, 0, 1, -1, 0, 0};
+            int dz[] = {0, 0, 0, 0, 1, -1};
+            
+            for(int i=0; i<6; ++i) {
+                Block n = getBlockAt(x+dx[i], y+dy[i], z+dz[i]);
+                if (n.getType() == BlockType::WATER) {
+                    scheduleFluidUpdate(x+dx[i], y+dy[i], z+dz[i]);
+                }
+            }
             
             // Update neighbors if on boundary
             if (lx == 0) {
@@ -305,4 +328,110 @@ std::vector<Block> ChunkManager::getPreloadedData(const ChunkPos& pos) {
         return preloadedChunks[pos];
     }
     return {};
+}
+
+void ChunkManager::scheduleFluidUpdate(int x, int y, int z) {
+    std::lock_guard<std::mutex> lock(fluidMutex);
+    fluidQueue.push_back(glm::ivec3(x, y, z));
+}
+
+void ChunkManager::updateFluids() {
+    std::vector<glm::ivec3> currentQueue;
+    {
+        std::lock_guard<std::mutex> lock(fluidMutex);
+        if (fluidQueue.empty()) return;
+
+        // Limit updates per frame to prevent freezing
+        // If queue is huge, we process a chunk of it
+        size_t maxUpdates = 1000;
+        size_t count = std::min(fluidQueue.size(), maxUpdates);
+        
+        currentQueue.reserve(count);
+        
+        // Move 'count' elements to currentQueue
+        auto start = fluidQueue.begin();
+        auto end = fluidQueue.begin() + count;
+        currentQueue.assign(start, end);
+        fluidQueue.erase(start, end);
+    }
+    
+    // Deduplicate updates for this frame
+    // Use a custom comparator for glm::ivec3 since it doesn't have operator<
+    struct Vec3Less {
+        bool operator()(const glm::ivec3& a, const glm::ivec3& b) const {
+            if (a.x != b.x) return a.x < b.x;
+            if (a.y != b.y) return a.y < b.y;
+            return a.z < b.z;
+        }
+    };
+    
+    std::set<glm::ivec3, Vec3Less> processed;
+    
+    for (const auto& pos : currentQueue) {
+        if (processed.count(pos)) continue;
+        processed.insert(pos);
+
+        int x = pos.x;
+        int y = pos.y;
+        int z = pos.z;
+        
+        Block block = getBlockAt(x, y, z);
+        if (block.getType() != BlockType::WATER) continue;
+        
+        u8 level = block.getData();
+        
+        // Logic:
+        // 0. Infinite Water Source Logic
+        // If block is Air or Flowing Water, and has 2+ Source Water neighbors, become Source Water
+        if (block.getType() == BlockType::AIR || (block.getType() == BlockType::WATER && level > 0)) {
+            int sourceNeighbors = 0;
+            int dx[] = {1, -1, 0, 0};
+            int dz[] = {0, 0, 1, -1};
+            
+            for (int j = 0; j < 4; ++j) {
+                Block neighbor = getBlockAt(x + dx[j], y, z + dz[j]);
+                if (neighbor.getType() == BlockType::WATER && neighbor.getData() == 0) {
+                    sourceNeighbors++;
+                }
+            }
+            
+            if (sourceNeighbors >= 2) {
+                // Become source block
+                // Only if there is a solid block underneath (or water)
+                Block down = getBlockAt(x, y - 1, z);
+                if (down.isSolid() || down.getType() == BlockType::WATER) {
+                    setBlockAt(x, y, z, Block(BlockType::WATER, 0));
+                    continue; // Done with this block
+                }
+            }
+        }
+
+        if (block.getType() != BlockType::WATER) continue;
+        
+        // 1. Try to flow down
+        Block down = getBlockAt(x, y - 1, z);
+        if (down.getType() == BlockType::AIR || (down.getType() == BlockType::WATER && down.getData() != 0)) {
+            // Flow down (reset level to 1 for falling water)
+            setBlockAt(x, y - 1, z, Block(BlockType::WATER, 1));
+        } else if (down.isSolid() || (down.getType() == BlockType::WATER && down.getData() == 0)) {
+            // 2. If blocked below, flow sideways
+            // Only if current level < 7
+            if (level < 7) {
+                u8 nextLevel = level + 1;
+                if (level == 0) nextLevel = 1; // Source flows to level 1
+                
+                // Check 4 neighbors
+                int dx[] = {1, -1, 0, 0};
+                int dz[] = {0, 0, 1, -1};
+                
+                for (int j = 0; j < 4; ++j) {
+                    Block neighbor = getBlockAt(x + dx[j], y, z + dz[j]);
+                    if (neighbor.getType() == BlockType::AIR || (neighbor.getType() == BlockType::WATER && neighbor.getData() > nextLevel)) {
+                        // Flow into air OR into water that is "lower" (higher data value)
+                        setBlockAt(x + dx[j], y, z + dz[j], Block(BlockType::WATER, nextLevel));
+                    }
+                }
+            }
+        }
+    }
 }

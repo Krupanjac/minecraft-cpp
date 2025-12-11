@@ -47,6 +47,7 @@ private:
         int nx, ny, nz;
         u8 normal;
         u8 material;
+        u8 data; // Metadata
         u8 ao[4]; // AO for each vertex
     };
     

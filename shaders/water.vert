@@ -5,6 +5,7 @@ layout(location = 1) in uint aNormal;
 layout(location = 2) in uint aMaterial;
 layout(location = 3) in uint aUV;
 layout(location = 4) in uint aAO;
+layout(location = 5) in uint aData;
 
 uniform mat4 uModel;
 uniform mat4 uView;
@@ -16,6 +17,7 @@ out vec3 vNormal;
 out vec2 vTexCoord;
 flat out vec2 vCellOrigin;
 flat out uint vMaterial;
+flat out uint vLevel;
 out float vAO;
 
 void main() {
@@ -34,6 +36,27 @@ void main() {
     // Disable waves for ICE (Material 9)
     if (aMaterial == 9u) {
         wave = 0.0;
+    }
+    
+    // Disable waves for still water (Data == 0)
+    // Note: We use the lower 4 bits for level, bit 4 for "isTop"
+    uint level = aData & 0x0Fu;
+    bool isTop = (aData & 0x10u) != 0u;
+    
+    if (level == 0u) {
+        wave = 0.0;
+    }
+    
+    // Apply water level drop
+    // Level 0 = Source (Full)
+    // Level 1 = Highest flow (Drop small amount)
+    // Level 7 = Lowest flow (Drop large amount)
+    if (isTop && level > 0u) {
+        // Map level 1..7 to drop 0.1..0.9
+        // Minecraft logic: height = (8 - level) / 9.0
+        // So drop = 1.0 - height = 1.0 - (8 - level)/9.0 = (1 + level)/9.0
+        float drop = (float(level) + 1.0) / 9.0;
+        worldPos.y -= drop;
     }
     
     worldPos.y += wave * 0.5; // Reduce amplitude
@@ -76,4 +99,7 @@ void main() {
     
     vMaterial = aMaterial;
     vAO = float(aAO) / 3.0;
+    
+    // Pass level to fragment shader for animation control
+    vLevel = level;
 }

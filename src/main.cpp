@@ -16,6 +16,8 @@
 #include <iostream>
 #include <mutex>
 #include <vector>
+#include <ctime>
+#include <cstdlib>
 
 class Application {
 public:
@@ -651,6 +653,23 @@ private:
                     } else {
                         worldGenerator.generate(chunk);
                     }
+                    
+                    // Scan for water to initialize fluid simulation
+                    for (int x = 0; x < CHUNK_SIZE; ++x) {
+                        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
+                            for (int z = 0; z < CHUNK_SIZE; ++z) {
+                                if (chunk->getBlock(x, y, z).getType() == BlockType::WATER) {
+                                    glm::vec3 worldPos = ChunkManager::chunkToWorld(chunk->getPosition());
+                                    chunkManager.scheduleFluidUpdate(
+                                        static_cast<int>(worldPos.x) + x,
+                                        static_cast<int>(worldPos.y) + y,
+                                        static_cast<int>(worldPos.z) + z
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    
                     chunk->setState(ChunkState::MESH_BUILD);
                 });
             }
@@ -810,6 +829,7 @@ private:
 };
 
 int main() {
+    srand(static_cast<unsigned int>(time(nullptr)));
     try {
         Application app;
         

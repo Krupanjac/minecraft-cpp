@@ -46,6 +46,10 @@ void Mesh::upload(const std::vector<Vertex>& vertices, const std::vector<u32>& i
     // AO (1 x uint8)
     glEnableVertexAttribArray(4);
     glVertexAttribIPointer(4, 1, GL_UNSIGNED_BYTE, sizeof(Vertex), (void*)offsetof(Vertex, ao));
+
+    // Data (1 x uint8)
+    glEnableVertexAttribArray(5);
+    glVertexAttribIPointer(5, 1, GL_UNSIGNED_BYTE, sizeof(Vertex), (void*)offsetof(Vertex, data));
     
     glBindVertexArray(0);
     

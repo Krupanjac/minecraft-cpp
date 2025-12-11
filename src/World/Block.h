@@ -23,11 +23,22 @@ enum class BlockType : u8 {
 
 struct Block {
     BlockType type;
+    u8 data; // Metadata (e.g. water level 0-7)
     
-    Block() : type(BlockType::AIR) {}
-    Block(BlockType type) : type(type) {}
+    Block() : type(BlockType::AIR), data(0) {}
+    Block(BlockType type, u8 data = 0) : type(type), data(data) {}
+
+    bool operator==(const Block& other) const {
+        return type == other.type && data == other.data;
+    }
+
+    bool operator!=(const Block& other) const {
+        return !(*this == other);
+    }
 
     BlockType getType() const { return type; }
+    u8 getData() const { return data; }
+    void setData(u8 d) { data = d; }
     
     bool isOpaque() const {
         return type != BlockType::AIR && 

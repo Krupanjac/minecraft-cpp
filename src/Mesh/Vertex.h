@@ -10,11 +10,11 @@ struct Vertex {
     u8 material;        // Material/Block ID (1 byte)
     u16 uv;             // Packed UV coordinates (2 bytes)
     u8 ao;              // Ambient Occlusion (1 byte)
-    u8 padding;         // Padding to 12 bytes
+    u8 data;            // Extra data (e.g. water level/flags)
     
     Vertex() = default;
-    Vertex(i16 x, i16 y, i16 z, u8 normal, u8 material, u16 uv, u8 ao = 0)
-        : x(x), y(y), z(z), normal(normal), material(material), uv(uv), ao(ao), padding(0) {}
+    Vertex(i16 x, i16 y, i16 z, u8 normal, u8 material, u16 uv, u8 ao = 0, u8 data = 0)
+        : x(x), y(y), z(z), normal(normal), material(material), uv(uv), ao(ao), data(data) {}
     
     static u8 packNormal(int nx, int ny, int nz) {
         // Pack normal into 3 bits each (sign + axis)

@@ -56,10 +56,10 @@ void MeshBuilder::addCross(int x, int y, int z, u8 material, u8 ao, MeshData& me
     u8 normalUp = Vertex::packNormal(0, 1, 0); // Fake normal up for lighting
     
     // Quad 1
-    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z), normalUp, material, uv00, ao);
-    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y), static_cast<i16>(z + 1), normalUp, material, uv10, ao);
-    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y + 1), static_cast<i16>(z + 1), normalUp, material, uv11, ao);
-    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y + 1), static_cast<i16>(z), normalUp, material, uv01, ao);
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z), normalUp, material, uv00, ao, (u8)0);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y), static_cast<i16>(z + 1), normalUp, material, uv10, ao, (u8)0);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y + 1), static_cast<i16>(z + 1), normalUp, material, uv11, ao, (u8)0);
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y + 1), static_cast<i16>(z), normalUp, material, uv01, ao, (u8)0);
     
     u32 baseIdx = static_cast<u32>(meshData.vertices.size()) - 4;
     // Double sided
@@ -69,10 +69,10 @@ void MeshBuilder::addCross(int x, int y, int z, u8 material, u8 ao, MeshData& me
     meshData.indices.push_back(baseIdx + 3); meshData.indices.push_back(baseIdx + 2); meshData.indices.push_back(baseIdx + 0);
 
     // Quad 2
-    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z + 1), normalUp, material, uv00, ao);
-    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y), static_cast<i16>(z), normalUp, material, uv10, ao);
-    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y + 1), static_cast<i16>(z), normalUp, material, uv11, ao);
-    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y + 1), static_cast<i16>(z + 1), normalUp, material, uv01, ao);
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z + 1), normalUp, material, uv00, ao, (u8)0);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y), static_cast<i16>(z), normalUp, material, uv10, ao, (u8)0);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y + 1), static_cast<i16>(z), normalUp, material, uv11, ao, (u8)0);
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y + 1), static_cast<i16>(z + 1), normalUp, material, uv01, ao, (u8)0);
     
     baseIdx = static_cast<u32>(meshData.vertices.size()) - 4;
     // Double sided
@@ -128,10 +128,10 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
         else { u_axis = 0; v_axis = 1; w_axis = 2; }
         
         // Create mask for this direction
-        std::vector<u8> mask(size * size);
+        std::vector<u16> mask(size * size);
         
         for (int d = 0; d < size; ++d) {
-            std::fill(mask.begin(), mask.end(), static_cast<u8>(0));
+            std::fill(mask.begin(), mask.end(), static_cast<u16>(0));
             
             // Build mask
             for (int v = 0; v < size; ++v) {
@@ -154,9 +154,19 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     Block adjBlock = sampleBlock(adjX, adjY, adjZ);
                     
                     if (block.isWater()) {
-                        // Render water face if neighbor is NOT water and NOT opaque (so Air or Glass)
-                        // Also don't render against ICE to avoid Z-fighting
-                        shouldRender = !adjBlock.isWater() && !adjBlock.isOpaque() && (adjBlock.getType() != BlockType::ICE);
+                        if (adjBlock.isWater()) {
+                            // If neighbor is water, only render if we are "higher" (smaller data value)
+                            // and only for side faces (not top/bottom)
+                            if (ny != 0) {
+                                shouldRender = false;
+                            } else {
+                                shouldRender = block.getData() < adjBlock.getData();
+                            }
+                        } else {
+                            // Render water face if neighbor is NOT water and NOT opaque (so Air or Glass)
+                            // Also don't render against ICE to avoid Z-fighting
+                            shouldRender = !adjBlock.isOpaque() && (adjBlock.getType() != BlockType::ICE);
+                        }
                     } else if (block.isTransparent()) {
                         // ICE and other transparent blocks
                         // Don't render if neighbor is opaque OR if neighbor is the same type (e.g. Ice next to Ice)
@@ -167,7 +177,18 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     }
                     
                     if (shouldRender) {
-                        mask[v * size + u] = block.getMaterialID();
+                        u8 data = block.getData();
+                        
+                        // Check for water above to prevent "drop" logic for waterfalls
+                        if (block.isWater()) {
+                            Block above = sampleBlock(x, y + step, z);
+                            if (above.isWater()) {
+                                // Set bit 5 (0x20) to signal "hasWaterAbove"
+                                data |= 0x20;
+                            }
+                        }
+                        
+                        mask[v * size + u] = (static_cast<u16>(data) << 8) | block.getMaterialID();
                     }
                 }
             }
@@ -175,17 +196,20 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
             // Generate mesh from mask using greedy algorithm
             for (int v = 0; v < size; ++v) {
                 for (int u = 0; u < size; ) {
-                    u8 material = mask[v * size + u];
-                    if (material == 0) {
+                    u16 val = mask[v * size + u];
+                    if (val == 0) {
                         ++u;
                         continue;
                     }
+                    
+                    u8 material = static_cast<u8>(val & 0xFF);
+                    u8 data = static_cast<u8>((val >> 8) & 0xFF);
                     
                     // Compute width
                     int w = 1;
                     // Disable greedy meshing for water and ice to prevent gaps with vertex displacement
                     if (material != static_cast<u8>(BlockType::WATER) && material != static_cast<u8>(BlockType::ICE)) {
-                        while (u + w < size && mask[v * size + u + w] == material) {
+                        while (u + w < size && mask[v * size + u + w] == val) {
                             ++w;
                         }
                     }
@@ -196,7 +220,7 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     if (material != static_cast<u8>(BlockType::WATER) && material != static_cast<u8>(BlockType::ICE)) {
                         while (v + h < size && !done) {
                             for (int k = 0; k < w; ++k) {
-                                if (mask[(v + h) * size + u + k] != material) {
+                                if (mask[(v + h) * size + u + k] != val) {
                                     done = true;
                                     break;
                                 }
@@ -240,6 +264,7 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     
                     quad.normal = Vertex::packNormal(nx, ny, nz);
                     quad.material = material;
+                    quad.data = data;
                     
                     // Calculate AO
                     // For LOD > 0, we can simplify AO or just sample at corners
@@ -332,16 +357,45 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
     auto [x2, y2, z2] = getPos(quad.w, quad.h);
     auto [x3, y3, z3] = getPos(0, quad.h);
     
+    // Determine which vertices are "top" vertices for water height adjustment
+    u8 data0 = quad.data;
+    u8 data1 = quad.data;
+    u8 data2 = quad.data;
+    u8 data3 = quad.data;
+
+    if (isWater) {
+        // Check if this is a waterfall block (has water above)
+        // Bit 5 (0x20) is set in greedyMesh if so
+        bool isWaterfall = (quad.data & 0x20) != 0;
+        
+        if (!isWaterfall) {
+            // Find min/max Y to identify top vertices
+            i16 minY = std::min({y0, y1, y2, y3});
+            i16 maxY = std::max({y0, y1, y2, y3});
+            
+            auto isTop = [&](i16 y) {
+                if (minY == maxY) return quad.ny > 0; // Horizontal face: Top if normal is Up
+                return y == maxY; // Vertical face: Top if Y is max
+            };
+            
+            // Set bit 4 (0x10) if top vertex
+            if (isTop(y0)) data0 |= 0x10;
+            if (isTop(y1)) data1 |= 0x10;
+            if (isTop(y2)) data2 |= 0x10;
+            if (isTop(y3)) data3 |= 0x10;
+        }
+    }
+    
     // Pass dimensions (w, h) as UVs for tiling
     u16 uv00 = Vertex::packUV(0, 0);
     u16 uv10 = Vertex::packUV(quad.w, 0);
     u16 uv11 = Vertex::packUV(quad.w, quad.h);
     u16 uv01 = Vertex::packUV(0, quad.h);
     
-    vertices.emplace_back(x0, y0, z0, quad.normal, quad.material, uv00, quad.ao[0]);
-    vertices.emplace_back(x1, y1, z1, quad.normal, quad.material, uv10, quad.ao[1]);
-    vertices.emplace_back(x2, y2, z2, quad.normal, quad.material, uv11, quad.ao[2]);
-    vertices.emplace_back(x3, y3, z3, quad.normal, quad.material, uv01, quad.ao[3]);
+    vertices.emplace_back(x0, y0, z0, quad.normal, quad.material, uv00, quad.ao[0], data0);
+    vertices.emplace_back(x1, y1, z1, quad.normal, quad.material, uv10, quad.ao[1], data1);
+    vertices.emplace_back(x2, y2, z2, quad.normal, quad.material, uv11, quad.ao[2], data2);
+    vertices.emplace_back(x3, y3, z3, quad.normal, quad.material, uv01, quad.ao[3], data3);
     
     // Winding order
     // Determine winding order based on face normal

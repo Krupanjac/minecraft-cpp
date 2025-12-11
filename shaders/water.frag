@@ -5,6 +5,7 @@ in vec3 vNormal;
 in vec2 vTexCoord;
 flat in vec2 vCellOrigin;
 flat in uint vMaterial;
+flat in uint vLevel;
 in float vAO;
 
 uniform vec3 uCameraPos;
@@ -22,7 +23,7 @@ void main() {
     // Animate water UVs
     vec2 animatedTexCoord = vTexCoord;
     
-    if (vMaterial != 9u) { // Not ICE
+    if (vMaterial != 9u && vLevel > 0u) { // Not ICE and Not Source Block
         animatedTexCoord.y += uTime * 0.5; // Scroll vertically
     }
     
