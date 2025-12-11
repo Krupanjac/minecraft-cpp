@@ -287,7 +287,11 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                 
                 bool isInCave = isCave(static_cast<float>(worldX), static_cast<float>(worldY), static_cast<float>(worldZ));
                 
-                if (!isInCave) {
+                // Bedrock Layer at Y = -64
+                if (worldY <= -64) {
+                    blockType = BlockType::BEDROCK;
+                    isInCave = false; // No caves in bedrock
+                } else if (!isInCave) {
                     if (worldY < height - biomeInfo.surfaceDepth) blockType = BlockType::STONE;
                     else if (worldY < height - 1) blockType = biomeInfo.subsurfaceBlock;
                     else if (worldY < height) {

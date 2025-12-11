@@ -17,7 +17,8 @@ enum class BlockType : u8 {
     SANDSTONE = 11,
     LOG = 12,
     TALL_GRASS = 13,
-    ROSE = 14
+    ROSE = 14,
+    BEDROCK = 15
 };
 
 struct Block {

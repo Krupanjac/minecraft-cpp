@@ -36,14 +36,21 @@ void main() {
     for(int i = 0; i < STEPS; ++i) {
         currentPos += rayDir * stepSize;
         
-        // Simple height fog
-        float density = exp(-currentPos.y * 0.1) * 0.1;
+        // Uniform low density atmosphere
+        float density = 0.005;
+        
+        // Fade out underground to prevent light leaking
+        if (currentPos.y < 0.0) {
+            density = 0.0;
+        }
         
         // Directional light scattering (Mie scattering approximation)
         float scattering = max(dot(rayDir, lightDir), 0.0);
-        scattering = pow(scattering, 4.0); // Phase function
+        float phase = pow(scattering, 6.0); // Sharper forward scattering
         
-        accumulation += density * (0.5 + scattering) * stepSize;
+        // Accumulate light
+        // Mostly forward scattering (sun glow), very little ambient
+        accumulation += density * (0.05 + phase) * stepSize;
     }
     
     FragColor = vec4(vec3(1.0, 0.9, 0.7) * accumulation, 1.0);

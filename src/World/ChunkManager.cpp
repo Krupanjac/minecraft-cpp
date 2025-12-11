@@ -56,10 +56,11 @@ std::vector<ChunkPos> ChunkManager::getChunksToGenerate(const glm::vec3& cameraP
     for (int dist = 0; dist <= range && result.size() < static_cast<size_t>(maxChunks); ++dist) {
         for (int x = -dist; x <= dist && result.size() < static_cast<size_t>(maxChunks); ++x) {
             for (int z = -dist; z <= dist && result.size() < static_cast<size_t>(maxChunks); ++z) {
-                for (int y = -2; y <= 2 && result.size() < static_cast<size_t>(maxChunks); ++y) {
+                // Generate vertical column from bedrock (-4) to height limit (12)
+                for (int y = -4; y <= 12 && result.size() < static_cast<size_t>(maxChunks); ++y) {
                     if (std::abs(x) != dist && std::abs(z) != dist) continue;
                     
-                    ChunkPos pos = centerChunk + ChunkPos(x, y, z);
+                    ChunkPos pos(centerChunk.x + x, y, centerChunk.z + z);
                     auto chunk = getChunk(pos);
                     
                     if (!chunk || chunk->getState() == ChunkState::UNLOADED) {

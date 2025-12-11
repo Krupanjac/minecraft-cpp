@@ -79,6 +79,8 @@ void main() {
         baseColor = vec3(0.55, 0.52, 0.50);
     } else if (vMaterial == 11u) { // Sandstone
         baseColor = vec3(0.85, 0.75, 0.60);
+    } else if (vMaterial == 15u) { // Bedrock
+        baseColor = vec3(0.2, 0.2, 0.2);
     }
     
     // Simple lighting
@@ -87,8 +89,10 @@ void main() {
     
     // Ensure light doesn't leak from below
     // If lightDir.y is negative (sun below horizon), diffuse should be 0
-    // But we might want moonlight. For now, let's just clamp.
-    float diffuse = max(dot(normal, lightDir), 0.0);
+    float diffuse = 0.0;
+    if (lightDir.y >= 0.0) {
+        diffuse = max(dot(normal, lightDir), 0.0);
+    }
     
     // Ambient light
     // Increase ambient slightly at night so it's not pitch black

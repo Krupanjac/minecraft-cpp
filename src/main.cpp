@@ -373,7 +373,7 @@ public:
                 }
             }
             
-            uiManager.updateDebugInfo(displayFPS, blockName);
+            uiManager.updateDebugInfo(displayFPS, blockName, camera.getPosition());
 
             render();
             
@@ -620,6 +620,14 @@ private:
                 currentSkyColor = glm::mix(currentSkyColor, sunsetColor, glow * 0.5f);
             }
         }
+
+        // If player is deep underground, fade sky color to black
+        // This prevents seeing "bright sky" when looking into the void/unloaded chunks underground
+        if (camera.getPosition().y < 40.0f) {
+            float depthFactor = std::clamp((40.0f - camera.getPosition().y) / 20.0f, 0.0f, 1.0f);
+            currentSkyColor = glm::mix(currentSkyColor, glm::vec3(0.0f), depthFactor);
+        }
+
         renderer.setSkyColor(currentSkyColor);
 
         updatePhysics(deltaTime);

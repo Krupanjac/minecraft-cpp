@@ -59,7 +59,7 @@ public:
     void setOnSave(std::function<void()> callback) { onSave = callback; }
 
     void toggleDebug() { showDebug = !showDebug; }
-    void updateDebugInfo(float fps, const std::string& blockName);
+    void updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos);
     
     // Debug controls
     float timeOfDay = 0.0f; // 0-1200
@@ -70,6 +70,7 @@ private:
     bool showDebug = false;
     float currentFPS = 0.0f;
     std::string currentBlockName = "None";
+    glm::vec3 currentPlayerPos = glm::vec3(0.0f);
 
     int width, height;
     Shader uiShader;

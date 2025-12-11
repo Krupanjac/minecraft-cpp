@@ -462,14 +462,19 @@ void UIManager::render() {
         drawText(10.0f, 30.0f, 2.0f, fpsText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
         drawText(10.0f, 60.0f, 2.0f, blockText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
         
+        std::string posText = "XYZ: " + std::to_string((int)currentPlayerPos.x) + " " + 
+                              std::to_string((int)currentPlayerPos.y) + " " + 
+                              std::to_string((int)currentPlayerPos.z);
+        drawText(10.0f, 90.0f, 2.0f, posText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+
         std::string timeText = "TIME: " + std::to_string(static_cast<int>(timeOfDay));
-        drawText(10.0f, 90.0f, 2.0f, timeText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+        drawText(10.0f, 120.0f, 2.0f, timeText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
         
         // Debug Controls
-        drawText(10.0f, 120.0f, 2.0f, "[F1] TOGGLE DEBUG", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
-        drawText(10.0f, 150.0f, 2.0f, "[F2] PAUSE TIME: " + std::string(isDayNightPaused ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
-        drawText(10.0f, 180.0f, 2.0f, "[F3] SHADOWS: " + std::string(Settings::instance().enableShadows ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
-        drawText(10.0f, 210.0f, 2.0f, "[ARROWS] CHANGE TIME", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+        drawText(10.0f, 150.0f, 2.0f, "[F1] TOGGLE DEBUG", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+        drawText(10.0f, 180.0f, 2.0f, "[F2] PAUSE TIME: " + std::string(isDayNightPaused ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+        drawText(10.0f, 210.0f, 2.0f, "[F3] SHADOWS: " + std::string(Settings::instance().enableShadows ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+        drawText(10.0f, 240.0f, 2.0f, "[ARROWS] CHANGE TIME", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
     }
 
     uiShader.unuse();
@@ -559,6 +564,8 @@ void UIManager::drawText(float x, float y, float scale, const std::string& text,
              drawRect(cursorX + 2*scale, y + 3*scale, scale, scale, color);
         } else if (c == '.') {
              drawRect(cursorX + 2*scale, y + 4*scale, scale, scale, color);
+        } else if (c == '-') {
+             drawRect(cursorX + 1*scale, y + 3*scale, 3*scale, scale, color);
         } else if (c == '[') {
              drawRect(cursorX + 1*scale, y + 0*scale, scale, 7*scale, color);
              drawRect(cursorX + 2*scale, y + 0*scale, scale, scale, color);
@@ -573,9 +580,10 @@ void UIManager::drawText(float x, float y, float scale, const std::string& text,
     }
 }
 
-void UIManager::updateDebugInfo(float fps, const std::string& blockName) {
+void UIManager::updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos) {
     currentFPS = fps;
     currentBlockName = blockName;
+    currentPlayerPos = playerPos;
 }
 
 
