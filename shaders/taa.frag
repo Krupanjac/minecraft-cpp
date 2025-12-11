@@ -11,11 +11,6 @@ uniform mat4 invViewProj;
 uniform mat4 prevViewProj;
 
 void main() {
-    // DEBUG: Passthrough current frame to verify FBO chain
-    FragColor = texture(currentFrame, TexCoords);
-    return;
-
-    /*
     // 1. Get current depth
     float depth = texture(depthMap, TexCoords).r;
     
@@ -29,31 +24,33 @@ void main() {
     prevClip /= prevClip.w;
     vec2 prevUV = prevClip.xy * 0.5 + 0.5;
     
-    // 4. Sample history
-    vec3 historyColor = texture(historyFrame, prevUV).rgb;
-    vec3 currentColor = texture(currentFrame, TexCoords).rgb;
+    // 4. Sample current
+    vec3 current = texture(currentFrame, TexCoords).rgb;
     
-    // 5. Neighborhood clamping (to reduce ghosting)
-    vec3 minColor = currentColor;
-    vec3 maxColor = currentColor;
+    // 5. Neighborhood Clamping (Reduces Blur/Ghosting)
+    vec3 minColor = current;
+    vec3 maxColor = current;
+    
+    vec2 texSize = vec2(textureSize(currentFrame, 0));
     
     for(int x = -1; x <= 1; ++x) {
         for(int y = -1; y <= 1; ++y) {
-            vec3 sampleColor = texture(currentFrame, TexCoords + vec2(x, y) / vec2(textureSize(currentFrame, 0))).rgb;
+            vec3 sampleColor = texture(currentFrame, TexCoords + vec2(x, y) / texSize).rgb;
             minColor = min(minColor, sampleColor);
             maxColor = max(maxColor, sampleColor);
         }
     }
-    
-    historyColor = clamp(historyColor, minColor, maxColor);
-    
-    // 6. Blend
-    float blendFactor = 0.1; // 10% current, 90% history
-    // Check if history is valid
-    if(prevUV.x < 0.0 || prevUV.x > 1.0 || prevUV.y < 0.0 || prevUV.y > 1.0) {
-        blendFactor = 1.0;
+
+    // Check if reprojected UV is valid
+    if (prevUV.x >= 0.0 && prevUV.x <= 1.0 && prevUV.y >= 0.0 && prevUV.y <= 1.0) {
+        vec3 history = texture(historyFrame, prevUV).rgb;
+        
+        // Clamp history to current neighborhood
+        history = clamp(history, minColor, maxColor);
+        
+        // Blend: 0.15 current + 0.50 history
+        FragColor = vec4(mix(current, history, 0.50), 1.0);
+    } else {
+        FragColor = vec4(current, 1.0);
     }
-    
-    FragColor = vec4(mix(historyColor, currentColor, blendFactor), 1.0);
-    */
 }

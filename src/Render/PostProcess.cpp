@@ -131,52 +131,74 @@ void PostProcess::updateJitter(int w, int h) {
 void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir) {
     
     glDisable(GL_DEPTH_TEST); // Disable depth test for full screen quads
+    auto& settings = Settings::instance();
 
     // 1. SSAO Pass
     ssaoFBO->bind();
-    glClear(GL_COLOR_BUFFER_BIT);
-    ssaoShader.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, depthTexture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, noiseTexture);
-    ssaoShader.setInt("gPositionDepth", 0); // We reconstruct position from depth
-    ssaoShader.setInt("texNoise", 1);
-    ssaoShader.setMat4("projection", projection);
-    ssaoShader.setMat4("invProjection", glm::inverse(projection));
-    
-    for (unsigned int i = 0; i < 64; ++i)
-        ssaoShader.setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
+    if (settings.enableSSAO) {
+        glClear(GL_COLOR_BUFFER_BIT);
+        ssaoShader.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, depthTexture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, noiseTexture);
+        ssaoShader.setInt("gPositionDepth", 0); // We reconstruct position from depth
+        ssaoShader.setInt("texNoise", 1);
+        ssaoShader.setMat4("projection", projection);
+        ssaoShader.setMat4("invProjection", glm::inverse(projection));
         
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        for (unsigned int i = 0; i < 64; ++i)
+            ssaoShader.setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
+            
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    } else {
+        // Clear to white (no occlusion)
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
     ssaoFBO->unbind();
 
     // 2. SSAO Blur
     ssaoBlurFBO->bind();
-    glClear(GL_COLOR_BUFFER_BIT);
-    ssaoBlurShader.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, ssaoFBO->getTexture());
-    ssaoBlurShader.setInt("ssaoInput", 0);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    if (settings.enableSSAO) {
+        glClear(GL_COLOR_BUFFER_BIT);
+        ssaoBlurShader.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, ssaoFBO->getTexture());
+        ssaoBlurShader.setInt("ssaoInput", 0);
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    } else {
+        // Clear to white
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
     ssaoBlurFBO->unbind();
 
     // 3. Volumetric Lighting
     volumetricFBO->bind();
-    glClear(GL_COLOR_BUFFER_BIT);
-    volumetricShader.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, depthTexture);
-    volumetricShader.setInt("depthMap", 0);
-    volumetricShader.setMat4("invViewProj", glm::inverse(projection * view));
-    volumetricShader.setVec3("lightDir", lightDir);
-    volumetricShader.setVec3("cameraPos", cameraPos);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    if (settings.enableVolumetrics) {
+        glClear(GL_COLOR_BUFFER_BIT);
+        volumetricShader.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, depthTexture);
+        volumetricShader.setInt("depthMap", 0);
+        volumetricShader.setMat4("invViewProj", glm::inverse(projection * view));
+        volumetricShader.setVec3("lightDir", lightDir);
+        volumetricShader.setVec3("cameraPos", cameraPos);
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    } else {
+        // Clear to black (no light)
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
     volumetricFBO->unbind();
 
     // 4. Composite (Tone Mapping + Gamma + Combine)
     intermediateFBO->bind();
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Reset clear color
     glClear(GL_COLOR_BUFFER_BIT); // Ensure we start clean
     
     compositeShader.use();
@@ -190,43 +212,53 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::ma
     compositeShader.setInt("scene", 0);
     compositeShader.setInt("ssao", 1);
     compositeShader.setInt("volumetric", 2);
-    compositeShader.setFloat("exposure", 1.0f);
-    compositeShader.setFloat("gamma", Settings::instance().gamma);
+    compositeShader.setFloat("exposure", settings.exposure);
+    compositeShader.setFloat("gamma", settings.gamma);
     
     glBindVertexArray(quadVAO); // Ensure VAO is bound
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     intermediateFBO->unbind();
 
     // 5. TAA Resolve
-    int prevHistoryIndex = 1 - currentHistoryIndex;
-    historyFBO[currentHistoryIndex]->bind();
-    glClear(GL_COLOR_BUFFER_BIT);
-    
-    taaShader.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, intermediateFBO->getTexture());
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, historyFBO[prevHistoryIndex]->getTexture());
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, depthTexture);
-    
-    taaShader.setInt("currentFrame", 0);
-    taaShader.setInt("historyFrame", 1);
-    taaShader.setInt("depthMap", 2);
-    
-    taaShader.setMat4("invViewProj", glm::inverse(projection * view));
-    taaShader.setMat4("prevViewProj", prevViewProj);
-    
-    glBindVertexArray(quadVAO); // Ensure VAO is bound
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    historyFBO[currentHistoryIndex]->unbind();
-    
-    // 6. Blit to Screen
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, historyFBO[currentHistoryIndex]->getID());
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-    
-    // Update history
-    prevViewProj = projection * view;
-    currentHistoryIndex = 1 - currentHistoryIndex;
+    if (settings.enableTAA) {
+        int prevHistoryIndex = 1 - currentHistoryIndex;
+        historyFBO[currentHistoryIndex]->bind();
+        glClear(GL_COLOR_BUFFER_BIT);
+        
+        taaShader.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, intermediateFBO->getTexture());
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, historyFBO[prevHistoryIndex]->getTexture());
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, depthTexture);
+        
+        taaShader.setInt("currentFrame", 0);
+        taaShader.setInt("historyFrame", 1);
+        taaShader.setInt("depthMap", 2);
+        
+        taaShader.setMat4("invViewProj", glm::inverse(projection * view));
+        taaShader.setMat4("prevViewProj", prevViewProj);
+        
+        glBindVertexArray(quadVAO); // Ensure VAO is bound
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        historyFBO[currentHistoryIndex]->unbind();
+        
+        // 6. Blit to Screen
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, historyFBO[currentHistoryIndex]->getID());
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        
+        // Update history
+        prevViewProj = projection * view;
+        currentHistoryIndex = 1 - currentHistoryIndex;
+    } else {
+        // No TAA, just blit intermediate to screen
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, intermediateFBO->getID());
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        
+        // Keep history updated just in case we toggle it back on (prevents jump)
+        prevViewProj = projection * view;
+    }
 }

@@ -20,7 +20,12 @@ public:
     float mouseSensitivity = MOUSE_SENSITIVITY;
     float aoStrength = 1.0f; // Multiplier for AO
     float gamma = 2.2f;
+    float exposure = 1.0f;
     bool vsync = true;
+    bool enableSSAO = true;
+    bool enableVolumetrics = true;
+    bool enableTAA = true;
+    bool fullscreen = false;
 
     void load() {
         std::ifstream file("settings.ini");
@@ -38,7 +43,12 @@ public:
                     else if (key == "mouseSensitivity") mouseSensitivity = std::stof(value);
                     else if (key == "aoStrength") aoStrength = std::stof(value);
                     else if (key == "gamma") gamma = std::stof(value);
+                    else if (key == "exposure") exposure = std::stof(value);
                     else if (key == "vsync") vsync = (value == "1");
+                    else if (key == "enableSSAO") enableSSAO = (value == "1");
+                    else if (key == "enableVolumetrics") enableVolumetrics = (value == "1");
+                    else if (key == "enableTAA") enableTAA = (value == "1");
+                    else if (key == "fullscreen") fullscreen = (value == "1");
                 }
             }
         }
@@ -47,13 +57,18 @@ public:
     void save() {
         std::ofstream file("settings.ini");
         if (!file.is_open()) return;
-
+        
         file << "renderDistance=" << renderDistance << "\n";
         file << "fov=" << fov << "\n";
         file << "mouseSensitivity=" << mouseSensitivity << "\n";
         file << "aoStrength=" << aoStrength << "\n";
         file << "gamma=" << gamma << "\n";
-        file << "vsync=" << (vsync ? 1 : 0) << "\n";
+        file << "exposure=" << exposure << "\n";
+        file << "vsync=" << (vsync ? "1" : "0") << "\n";
+        file << "enableSSAO=" << (enableSSAO ? "1" : "0") << "\n";
+        file << "enableVolumetrics=" << (enableVolumetrics ? "1" : "0") << "\n";
+        file << "enableTAA=" << (enableTAA ? "1" : "0") << "\n";
+        file << "fullscreen=" << (fullscreen ? "1" : "0") << "\n";
     }
 
 private:

@@ -196,10 +196,33 @@ void UIManager::setupVideoSettingsMenu() {
     elements.push_back({cx - btnW/2, startY, btnW, btnH, "GAMMA: " + std::to_string(s.gamma).substr(0, 3), false, nullptr, true, &s.gamma, nullptr, nullptr, 1.0f, 3.0f});
     startY += btnH + gap;
 
+    // Exposure (Brightness)
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "BRIGHTNESS: " + std::to_string(s.exposure).substr(0, 3), false, nullptr, true, &s.exposure, nullptr, nullptr, 0.1f, 5.0f});
+    startY += btnH + gap;
+
     // VSync (Toggle)
     std::string vsyncText = "VSYNC: " + std::string(s.vsync ? "ON" : "OFF");
-    // For toggle, we use onClick but also pass boolValueRef
     elements.push_back({cx - btnW/2, startY, btnW, btnH, vsyncText, false, [](){}, false, nullptr, nullptr, &s.vsync});
+    startY += btnH + gap;
+
+    // SSAO (Toggle)
+    std::string ssaoText = "SSAO: " + std::string(s.enableSSAO ? "ON" : "OFF");
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, ssaoText, false, [](){}, false, nullptr, nullptr, &s.enableSSAO});
+    startY += btnH + gap;
+
+    // Volumetrics (Toggle)
+    std::string volText = "VOLUMETRICS: " + std::string(s.enableVolumetrics ? "ON" : "OFF");
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, volText, false, [](){}, false, nullptr, nullptr, &s.enableVolumetrics});
+    startY += btnH + gap;
+
+    // TAA (Toggle)
+    std::string taaText = "TAA: " + std::string(s.enableTAA ? "ON" : "OFF");
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, taaText, false, [](){}, false, nullptr, nullptr, &s.enableTAA});
+    startY += btnH + gap;
+
+    // Fullscreen (Toggle) - Note: Requires restart or complex window handling
+    std::string fsText = "FULLSCREEN: " + std::string(s.fullscreen ? "ON" : "OFF");
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, fsText, false, [](){}, false, nullptr, nullptr, &s.fullscreen});
     startY += btnH + gap;
 
     // Back
@@ -297,6 +320,8 @@ void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool m
                             el.text = "AO STRENGTH: " + std::to_string(*el.valueRef).substr(0, 3);
                         else if (el.text.find("GAMMA") != std::string::npos)
                             el.text = "GAMMA: " + std::to_string(*el.valueRef).substr(0, 3);
+                        else if (el.text.find("BRIGHTNESS") != std::string::npos)
+                            el.text = "BRIGHTNESS: " + std::to_string(*el.valueRef).substr(0, 3);
                     }
                     
                     if (onSettingsChanged) onSettingsChanged();
