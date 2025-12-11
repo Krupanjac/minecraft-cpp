@@ -46,6 +46,10 @@ public:
         });
         
         window->setKeyCallback([this](int key, int /*scancode*/, int action, int /*mods*/) {
+            if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+                uiManager.handleKeyInput(key);
+            }
+
             if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
                 double currentTime = glfwGetTime();
                 if (currentTime - lastSpaceTime < 0.3) {
@@ -133,9 +137,42 @@ public:
         // Clear existing world
         chunkManager.unloadAll();
         chunkManager.clear(); // Clear preloaded data too
+        renderer.clear(); // Clear GPU buffers from previous world
         
+        // Find a safe spawn location (Land)
+        // If (0,0) is ocean, search outwards until we find land.
+        int spawnX = 0;
+        int spawnZ = 0;
+        int searchRadius = 0;
+        bool foundLand = false;
+        
+        // Check origin first
+        if (worldGenerator.getSurfaceHeight(0, 0) >= SEA_LEVEL) {
+            foundLand = true;
+        }
+        
+        while (!foundLand && searchRadius < 10000) {
+            searchRadius += 64; // Step by 4 chunks
+            
+            // Check 4 cardinal directions
+            if (worldGenerator.getSurfaceHeight(searchRadius, 0) >= SEA_LEVEL) { spawnX = searchRadius; spawnZ = 0; foundLand = true; break; }
+            if (worldGenerator.getSurfaceHeight(-searchRadius, 0) >= SEA_LEVEL) { spawnX = -searchRadius; spawnZ = 0; foundLand = true; break; }
+            if (worldGenerator.getSurfaceHeight(0, searchRadius) >= SEA_LEVEL) { spawnX = 0; spawnZ = searchRadius; foundLand = true; break; }
+            if (worldGenerator.getSurfaceHeight(0, -searchRadius) >= SEA_LEVEL) { spawnX = 0; spawnZ = -searchRadius; foundLand = true; break; }
+        }
+        
+        if (foundLand && (spawnX != 0 || spawnZ != 0)) {
+            LOG_INFO("Spawn moved to (" + std::to_string(spawnX) + ", " + std::to_string(spawnZ) + ") to avoid ocean.");
+        }
+
+        // Determine safe spawn height at the new coordinates
+        int terrainHeight = worldGenerator.getSurfaceHeight(spawnX, spawnZ);
+        // Start the camera high above the terrain to ensure we load the chunks *above* the ground
+        // and to avoid being inside a mountain before chunks load.
+        float initialSpawnY = static_cast<float>(terrainHeight) + 30.0f;
+
         // Reset camera
-        camera.setPosition(glm::vec3(0.0f, 80.0f, 0.0f));
+        camera.setPosition(glm::vec3(static_cast<float>(spawnX), initialSpawnY, static_cast<float>(spawnZ)));
         camera.setYaw(-90.0f);
         camera.setPitch(0.0f);
         
@@ -192,6 +229,32 @@ public:
             }
         }
         
+        // Refine spawn position to ensure we are not inside a block (e.g. tree or mountain peak)
+        // We scan downwards from our high vantage point to find the first solid block.
+        // Since we started high (terrain + 30), we should be in air.
+        // We look for the first non-air block below us.
+        int scanStartY = static_cast<int>(camera.getPosition().y);
+        int currentSpawnX = static_cast<int>(camera.getPosition().x);
+        int currentSpawnZ = static_cast<int>(camera.getPosition().z);
+        
+        bool foundGround = false;
+        for (int y = scanStartY; y > 0; --y) {
+            Block block = chunkManager.getBlockAt(currentSpawnX, y, currentSpawnZ);
+            if (block.getType() != BlockType::AIR) {
+                // Found the highest block (could be leaves, wood, or ground)
+                // Set spawn point 2 blocks above it
+                camera.setPosition(glm::vec3(static_cast<float>(currentSpawnX), static_cast<float>(y) + 2.5f, static_cast<float>(currentSpawnZ)));
+                LOG_INFO("Spawn position refined to Y=" + std::to_string(y + 2.5f));
+                foundGround = true;
+                break;
+            }
+        }
+        
+        // Fallback if something went wrong (e.g. chunks not loaded), though unlikely
+        if (!foundGround) {
+             LOG_INFO("Could not find ground via raycast, using default height.");
+        }
+
         // Now wait for initial meshing of this small radius
         LOG_INFO("Building initial meshes...");
         bool initialLoadDone = false;

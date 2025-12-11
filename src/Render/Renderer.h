@@ -34,6 +34,11 @@ public:
                         const std::vector<Vertex>& waterVertices,
                         const std::vector<u32>& waterIndices);
 
+    void clear() {
+        chunkMeshes.clear();
+        waterMeshes.clear();
+    }
+
     void renderCrosshair(int windowWidth, int windowHeight);
     void renderLoadingScreen(int windowWidth, int windowHeight, float progress);
 

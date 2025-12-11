@@ -46,6 +46,7 @@ public:
     void update(float deltaTime, double mouseX, double mouseY, bool mousePressed);
     void handleResize(int width, int height);
     void handleCharInput(unsigned int codepoint); // For text input
+    void handleKeyInput(int key); // For special keys like Backspace
 
     void setMenuState(MenuState state);
     MenuState getMenuState() const { return currentMenuState; }

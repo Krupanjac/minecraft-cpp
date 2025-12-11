@@ -6,6 +6,44 @@
 #include <algorithm>
 
 WorldGenerator::WorldGenerator(unsigned int seed) : seed(seed) {
+    setSeed(seed);
+}
+
+void WorldGenerator::setSeed(unsigned int s) {
+    seed = s;
+    std::mt19937 gen(seed);
+    std::uniform_real_distribution<float> disOffset(-100000.0f, 100000.0f);
+    std::uniform_real_distribution<float> disBias(-0.15f, 0.15f);
+    std::uniform_real_distribution<float> disScale(0.8f, 1.2f);
+
+    // Independent offsets for each feature to break correlation
+    offsetContinentX = disOffset(gen);
+    offsetContinentZ = disOffset(gen);
+    
+    offsetTempX = disOffset(gen);
+    offsetTempZ = disOffset(gen);
+    
+    offsetHumidX = disOffset(gen);
+    offsetHumidZ = disOffset(gen);
+    
+    offsetErosionX = disOffset(gen);
+    offsetErosionZ = disOffset(gen);
+    
+    offsetPVX = disOffset(gen);
+    offsetPVZ = disOffset(gen);
+
+    // Global biases to vary world "feel" (e.g. Ice Age vs Desert World)
+    globalTempBias = disBias(gen);
+    globalHumidBias = disBias(gen);
+    mountainScaleBias = disScale(gen);
+    
+    std::uniform_real_distribution<float> disCaveDensity(-0.05f, 0.05f);
+    std::uniform_real_distribution<float> disCaveWater(-1.0f, 1.0f);
+    std::uniform_real_distribution<float> disFreq(0.8f, 1.2f); // +/- 20% scale variation
+    
+    globalCaveDensityBias = disCaveDensity(gen);
+    globalCaveWaterBias = disCaveWater(gen);
+    globalFrequencyBias = disFreq(gen);
 }
 
 BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
@@ -72,50 +110,70 @@ BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
 }
 
 float WorldGenerator::getTemperature(float x, float z) const {
-    float tempNoise = noise2D(x * 0.003f + 1000.0f, z * 0.003f + 1000.0f);
-    return (tempNoise + 1.0f) * 0.5f; // Map to [0, 1]
+    // Use specific offset for temperature
+    // Scale reduced to 0.0005f for much larger biomes (approx 6x larger)
+    float tempNoise = noise2D(x * 0.0005f + offsetTempX, z * 0.0005f + offsetTempZ);
+    float t = (tempNoise + 1.0f) * 0.5f; // Map to [0, 1]
+    return std::clamp(t + globalTempBias, 0.0f, 1.0f);
 }
 
 float WorldGenerator::getHumidity(float x, float z) const {
-    float humidNoise = noise2D(x * 0.003f + 2000.0f, z * 0.003f + 2000.0f);
-    return (humidNoise + 1.0f) * 0.5f; // Map to [0, 1]
+    // Use specific offset for humidity
+    // Scale reduced to 0.0005f for much larger biomes
+    float humidNoise = noise2D(x * 0.0005f + offsetHumidX, z * 0.0005f + offsetHumidZ);
+    float h = (humidNoise + 1.0f) * 0.5f; // Map to [0, 1]
+    return std::clamp(h + globalHumidBias, 0.0f, 1.0f);
 }
 
 BiomeType WorldGenerator::getBiome(float x, float z) const {
-    // Override biome based on height (Continentalness)
-    // We need to calculate height here, but avoid infinite recursion.
-    // getHeight() uses noise2D, which is safe.
-    float h = getHeight(x, z);
+    // Advanced Biome Selection based on Continentalness, Erosion, Temperature, and Humidity
     
-    if (h > 85.0f) return BiomeType::SNOWY_TUNDRA; // Peaks
-    if (h > 60.0f) return BiomeType::MOUNTAINS;    // Highlands
+    // 1. Re-calculate Terrain Parameters (Must match getHeight logic)
+    float contX = x * NOISE_SCALE * 0.04f * globalFrequencyBias + offsetContinentX;
+    float contZ = z * NOISE_SCALE * 0.04f * globalFrequencyBias + offsetContinentZ;
+    float warpedContX = contX; float warpedContZ = contZ;
+    domainWarp(warpedContX, warpedContZ); 
+    float continentalness = fbm(warpedContX, warpedContZ, 2);
+    
+    float eroX = x * NOISE_SCALE * 0.1f * globalFrequencyBias + offsetErosionX;
+    float eroZ = z * NOISE_SCALE * 0.1f * globalFrequencyBias + offsetErosionZ;
+    float erosion = fbm(eroX, eroZ, 2);
     
     float temp = getTemperature(x, z);
     float humid = getHumidity(x, z);
     
-    // Simple biome selection based on temperature and humidity
-    // Cold biomes
-    if (temp < 0.25f) {
-        return BiomeType::SNOWY_TUNDRA;
+    // 2. Biome Determination Logic
+    
+    // OCEAN / COAST
+    // Match the spline points: < -0.15 is Ocean/Shore
+    if (continentalness < -0.15f) return BiomeType::OCEAN;
+    
+    // MOUNTAINS (High Erosion)
+    // Match the spline points: > 0.5 is Mountain Base
+    if (erosion > 0.5f) {
+        if (temp < 0.4f) return BiomeType::SNOWY_TUNDRA; // Snowy Peaks
+        return BiomeType::MOUNTAINS; // Stone Mountains
     }
     
-    // Hot biomes
-    if (temp > 0.75f) {
-        if (humid < 0.3f) {
-            return BiomeType::DESERT;
-        }
+    // HILLS / HIGHLANDS (Mid Erosion)
+    // Match the spline points: > 0.2 is Highlands
+    if (erosion > 0.2f) {
+        if (temp < 0.25f) return BiomeType::SNOWY_TUNDRA;
+        if (humid < 0.3f) return BiomeType::DESERT; // Desert Hills
+        return BiomeType::FOREST; // Forested Hills
     }
     
-    // Medium temperature biomes
-    if (humid > 0.6f) {
-        return BiomeType::FOREST;
+    // FLAT LANDS (Low Erosion)
+    // Temperature/Humidity driven
+    if (temp < 0.2f) return BiomeType::SNOWY_TUNDRA;
+    
+    if (temp > 0.7f) {
+        if (humid < 0.4f) return BiomeType::DESERT;
+        return BiomeType::PLAINS; // Savanna-like
     }
     
-    if (humid < 0.3f && temp > 0.5f) {
-        return BiomeType::DESERT;
-    }
+    if (humid > 0.6f) return BiomeType::FOREST;
     
-    // Default to plains
     return BiomeType::PLAINS;
 }
 
@@ -125,14 +183,27 @@ bool WorldGenerator::isCave(float x, float y, float z) const {
         return false;
     }
     
-    // Use 3D noise for cave generation
-    float caveNoise1 = noise3D(x * 0.02f, y * 0.02f, z * 0.02f);
-    float caveNoise2 = noise3D(x * 0.02f + 100.0f, y * 0.02f + 100.0f, z * 0.02f + 100.0f);
+    // 1. Cheese Caves (Large Rooms)
+    // Use lower frequency noise for large open areas
+    float cheese = noise3D(x * 0.015f, y * 0.015f, z * 0.015f);
+    float cheeseThreshold = -0.6f + globalCaveDensityBias; // Only very low values become air
     
-    // Caves exist where both noise values are in a certain range
-    // This creates worm-like cave systems
-    float threshold = 0.15f;
-    return (std::abs(caveNoise1) < threshold && std::abs(caveNoise2) < threshold);
+    // 2. Spaghetti Caves (Tunnels)
+    // Use ridged noise (abs value close to 0)
+    // We need two noise values to create 3D worms (intersection of two "sheets")
+    // Add large offsets to ensure independence from other noise maps
+    float worm1 = noise3D(x * 0.02f + 123.4f, y * 0.02f + 521.2f, z * 0.02f + 921.1f);
+    float worm2 = noise3D(x * 0.02f + 921.4f, y * 0.02f + 123.2f, z * 0.02f + 521.1f);
+    
+    // Vary tunnel width based on depth
+    // Deeper caves are slightly wider
+    float depthFactor = std::clamp((SEA_LEVEL - y) / 60.0f, 0.0f, 1.0f);
+    float tunnelWidth = 0.06f + depthFactor * 0.04f; 
+    
+    bool isTunnel = (std::abs(worm1) < tunnelWidth && std::abs(worm2) < tunnelWidth);
+    bool isRoom = (cheese < cheeseThreshold);
+    
+    return isTunnel || isRoom;
 }
 
 int WorldGenerator::getSurfaceHeight(int x, int z) const {
@@ -227,7 +298,11 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                         else blockType = BlockType::WATER;
                     }
                 } else {
-                    if (worldY < SEA_LEVEL) blockType = BlockType::WATER;
+                    // Cave generation
+                    // If below sea level, check if this world has flooded caves
+                    if (worldY < SEA_LEVEL && globalCaveWaterBias > 0.0f) {
+                        blockType = BlockType::WATER;
+                    }
                 }
                 
                 chunk->setBlock(x, y, z, Block(blockType));
@@ -366,83 +441,60 @@ float WorldGenerator::getNoise(float x, float y, float z) const {
 
 float WorldGenerator::getHeight(float x, float z) const {
     // 1. Continentalness (Macro-scale geography)
-    // Low frequency noise to define Oceans vs Land vs Mountains
-    // Scale * 0.05 makes it 20x larger features than the detail noise
-    float continent = noise2D(x * NOISE_SCALE * 0.05f, z * NOISE_SCALE * 0.05f);
+    // Determines Oceans vs Land.
+    // We use Domain Warping here to create more natural, less grid-aligned coastlines.
+    // SCALE: 0.0004 (Massive features, ~2500 blocks) - Reduced to fix "too many oceans"
+    float contX = x * NOISE_SCALE * 0.04f * globalFrequencyBias + offsetContinentX;
+    float contZ = z * NOISE_SCALE * 0.04f * globalFrequencyBias + offsetContinentZ;
     
-    // 2. Erosion/Detail (Micro-scale details)
-    // 8-octave FBM
-    int octaves = 8;
-    float amplitude = 1.0f;
-    float frequency = 1.0f;
-    float persistence = 0.5f;
-    float lacunarity = 2.0f;
+    // Apply domain warp to coordinates
+    // This makes the noise "swirl" slightly
+    float warpedContX = contX;
+    float warpedContZ = contZ;
+    domainWarp(warpedContX, warpedContZ); 
     
-    float detailNoise = 0.0f;
-    float maxAmplitude = 0.0f;
+    // Use FBM for continentalness to avoid "egg" shapes
+    float continentalness = fbm(warpedContX, warpedContZ, 2);
     
-    float offsets[] = {
-        0.0f, 123.45f, 678.90f, 321.54f,
-        987.65f, 456.78f, 135.79f, 246.80f
-    };
-
-    for (int i = 0; i < octaves; ++i) {
-        float n = noise2D((x + offsets[i]) * NOISE_SCALE * frequency, (z + offsets[i]) * NOISE_SCALE * frequency);
-        detailNoise += n * amplitude;
-        maxAmplitude += amplitude;
-        
-        amplitude *= persistence;
-        frequency *= lacunarity;
-    }
-    detailNoise /= maxAmplitude; // [-1, 1]
+    // 2. Erosion (Mid-scale)
+    // Determines if area is flat (Plains) or mountainous.
+    // Independent from continentalness.
+    // SCALE: 0.001 (~1000 blocks) - Reduced to make mountain ranges larger
+    float eroX = x * NOISE_SCALE * 0.1f * globalFrequencyBias + offsetErosionX;
+    float eroZ = z * NOISE_SCALE * 0.1f * globalFrequencyBias + offsetErosionZ;
+    float erosion = fbm(eroX, eroZ, 2);
     
-    // 3. Terrain Shaping
-    // Map continentalness to base height and roughness
+    // 3. Peaks & Valleys (Micro-scale / Detail)
+    // Adds local roughness.
+    // SCALE: 0.005 (~200 blocks) - Reduced significantly for gradual slopes
+    float pvX = x * NOISE_SCALE * 0.5f + offsetPVX; 
+    float pvZ = z * NOISE_SCALE * 0.5f + offsetPVZ;
     
-    // Bias towards land: Shift continent up slightly
-    // continent range is approx [-0.7, 0.7] with gradient noise
-    // Let's treat anything < -0.1 as water, > -0.1 as land
+    // Use FBM (Fractal Brownian Motion) for detail
+    // Mix smooth noise and ridge noise based on erosion
+    // If erosion is low (mountains), we want sharp ridges.
+    float smoothPV = noise2D(pvX, pvZ);
+    smoothPV += 0.25f * noise2D(pvX * 2.0f, pvZ * 2.0f); // Reduced high freq influence
+    smoothPV /= 1.25f;
     
-    float baseHeight = SEA_LEVEL;
-    float roughness = 0.0f;
+    float sharpPV = ridgeNoise(pvX, pvZ);
+    sharpPV += 0.25f * ridgeNoise(pvX * 2.0f, pvZ * 2.0f); // Reduced high freq influence
+    sharpPV /= 1.25f;
     
-    if (continent < -0.1f) {
-        // Ocean
-        // Map [-0.7, -0.1] to [10, 30]
-        float t = (continent + 0.7f) / 0.6f; // 0 to 1
-        baseHeight = 10.0f + t * 20.0f;
-        roughness = 2.0f;
-    } else {
-        // Land
-        // Map [-0.1, 0.7] to [32, 100+]
-        float t = (continent + 0.1f) / 0.8f; // 0 to 1
-        
-        // Non-linear height curve
-        // Plains (low t): 32-45
-        // Mountains (high t): 45-120
-        if (t < 0.45f) {
-            // Plains / Low Hills (Flatter)
-            float pt = t / 0.45f;
-            baseHeight = SEA_LEVEL + 2.0f + pt * 8.0f; // 34 to 42
-            roughness = 3.0f + pt * 4.0f;
-        } else {
-            // Mountains (Steeper and rougher)
-            float mt = (t - 0.45f) / 0.55f; // 0 to 1
-            
-            // Use a square root curve to make mountains rise IMMEDIATELY and dramatically
-            // This creates a sharp transition (foothills -> cliffs) rather than a slow ramp
-            baseHeight = 42.0f + std::sqrt(mt) * 180.0f; 
-            
-            // High roughness for jagged peaks
-            roughness = 20.0f + mt * 60.0f;
-        }
-    }
+    // Blend: If erosion > 0.0 (Flat), use smooth. If erosion < 0.0 (Mountain), blend to sharp.
+    float ridgeFactor = std::clamp((0.2f - erosion) * 2.0f, 0.0f, 1.0f); // 0 if erosion > 0.2, 1 if erosion < -0.3
+    float pv = lerp(smoothPV, sharpPV, ridgeFactor);
     
-    return baseHeight + detailNoise * roughness;
+    // 4. Combine using Spline logic
+    return getSplineHeight(continentalness, erosion, pv);
 }
 
 float WorldGenerator::noise3D(float x, float y, float z) const {
     // Improved Perlin Noise (Gradient Noise)
+    // Note: We removed the global seedOffsetX/Z here because we now apply specific offsets
+    // in the caller functions (getHeight, getTemperature, etc.) to ensure independence.
+    // This function now returns pure noise for the given coordinates.
+    
     int xi = static_cast<int>(std::floor(x)) & 255;
     int yi = static_cast<int>(std::floor(y)) & 255;
     int zi = static_cast<int>(std::floor(z)) & 255;
@@ -457,8 +509,17 @@ float WorldGenerator::noise3D(float x, float y, float z) const {
     
     // Hash coordinates to get gradients
     // We use the same large primes for hashing to avoid a lookup table
+    // Mix seed into the hash more thoroughly to ensure different seeds produce different patterns
     auto hash = [&](int i, int j, int k) {
-        return ((i + seed) * 374761393 + (j + seed) * 668265263 + (k + seed) * 1274126177) & 0xFFFFFF;
+        // Use a more robust mixing function (MurmurHash3-like or similar simple mixer)
+        unsigned int h = seed;
+        h ^= i * 374761393;
+        h ^= j * 668265263;
+        h ^= k * 1274126177;
+        h ^= h >> 13;
+        h *= 0x5bd1e995;
+        h ^= h >> 15;
+        return h & 0xFFFFFF;
     };
 
     int aaa = hash(xi, yi, zi);
@@ -504,10 +565,139 @@ float WorldGenerator::noise2D(float x, float z) const {
     return noise3D(x, 0, z);
 }
 
+float WorldGenerator::fbm(float x, float z, int octaves) const {
+    float total = 0.0f;
+    float frequency = 1.0f;
+    float amplitude = 1.0f;
+    float maxValue = 0.0f;  // Used for normalizing result to 0.0 - 1.0
+    
+    for(int i=0; i<octaves; i++) {
+        total += noise2D(x * frequency, z * frequency) * amplitude;
+        
+        maxValue += amplitude;
+        
+        amplitude *= 0.5f;
+        frequency *= 2.0f;
+    }
+    
+    return total / maxValue;
+}
+
 float WorldGenerator::lerp(float a, float b, float t) const {
     return a + t * (b - a);
 }
 
 float WorldGenerator::fade(float t) const {
     return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
+}
+
+float WorldGenerator::ridgeNoise(float x, float z) const {
+    // Ridged multifractal noise
+    // 1.0 - abs(noise) creates sharp peaks
+    float n = noise2D(x, z);
+    return 1.0f - std::abs(n);
+}
+
+float WorldGenerator::domainWarp(float& x, float& z) const {
+    float qx = noise2D(x + 5.2f, z + 1.3f);
+    float qz = noise2D(x + 1.3f, z + 5.2f);
+    
+    float rx = noise2D(x + 4.0f * qx + 1.7f, z + 4.0f * qz + 9.2f);
+    float rz = noise2D(x + 4.0f * qx + 8.3f, z + 4.0f * qz + 2.8f);
+    
+    x += 4.0f * rx;
+    z += 4.0f * rz;
+    
+    return noise2D(x, z);
+}
+
+float WorldGenerator::getSplineHeight(float continentalness, float erosion, float pv) const {
+    // Minecraft-like Spline Logic with Interpolation
+    
+    // 1. Calculate Base Height from Continentalness (Smooth transition from Ocean to Land)
+    float baseHeight = 0.0f;
+    
+    // Control points: {Continentalness, TargetHeight}
+    // Must be sorted by Continentalness
+    struct Point { float c; float h; };
+    Point points[] = {
+        {-1.0f, 10.0f},   // Deep Ocean
+        {-0.5f, 20.0f},   // Ocean
+        {-0.15f, 30.0f},  // Shallow Ocean / Shore Start
+        {0.15f, 38.0f},   // Beach/Coastal Plains (Slightly higher start)
+        {0.4f, 50.0f},    // Inland
+        {1.0f, 70.0f}     // Deep Inland
+    };
+    
+    // Interpolate Base Height
+    if (continentalness <= points[0].c) baseHeight = points[0].h;
+    else if (continentalness >= points[5].c) baseHeight = points[5].h;
+    else {
+        for (int i = 0; i < 5; ++i) {
+            if (continentalness >= points[i].c && continentalness < points[i+1].c) {
+                float t = (continentalness - points[i].c) / (points[i+1].c - points[i].c);
+                // Smoothstep for nicer curves
+                t = t * t * (3.0f - 2.0f * t); 
+                baseHeight = lerp(points[i].h, points[i+1].h, t);
+                break;
+            }
+        }
+    }
+
+    // 2. Calculate Terrain Offset from Erosion (Mountains vs Plains)
+    // Only apply terrain offset if we are on land (continentalness > 0)
+    // Or blend it in as we get closer to land to avoid underwater mountains sticking out weirdly
+    
+    float terrainOffset = 0.0f;
+    // Start blending land features earlier (-0.15) to match the new shore line
+    float landFactor = std::clamp((continentalness + 0.15f) * 4.0f, 0.0f, 1.0f); 
+    
+    if (landFactor > 0.0f) {
+        // Erosion Spline with Interpolation to prevent cliffs at biome borders
+        // Control points: {Erosion, BaseOffset, Roughness}
+        // Adjusted for "Flat Valleys" and "Pointy Peaks"
+        struct ErosionPoint { float e; float offset; float roughness; };
+        ErosionPoint ePoints[] = {
+            {-1.0f, 0.0f, 1.0f},    // Flat Plains (Very smooth)
+            {-0.5f, 2.0f, 2.0f},    // Gentle Slopes
+            {-0.2f, 5.0f, 4.0f},    // Low Hills / Valley Edges
+            {0.2f, 15.0f, 6.0f},    // Highlands / Plateaus
+            {0.5f, 40.0f, 10.0f},   // Mountain Base
+            {0.8f, 90.0f, 15.0f},   // High Mountains
+            {1.0f, 160.0f, 20.0f}   // Sharp Peaks
+        };
+
+        float baseOffset = 0.0f;
+        float roughness = 0.0f;
+
+        // Interpolate
+        if (erosion <= ePoints[0].e) {
+            baseOffset = ePoints[0].offset;
+            roughness = ePoints[0].roughness;
+        } else if (erosion >= ePoints[6].e) {
+            baseOffset = ePoints[6].offset;
+            roughness = ePoints[6].roughness;
+        } else {
+            for (int i = 0; i < 6; ++i) {
+                if (erosion >= ePoints[i].e && erosion < ePoints[i+1].e) {
+                    float t = (erosion - ePoints[i].e) / (ePoints[i+1].e - ePoints[i].e);
+                    // Use smoothstep for height to make it gradual
+                    float heightT = t * t * (3.0f - 2.0f * t);
+                    baseOffset = lerp(ePoints[i].offset, ePoints[i+1].offset, heightT);
+                    // Linear for roughness is fine
+                    roughness = lerp(ePoints[i].roughness, ePoints[i+1].roughness, t);
+                    break;
+                }
+            }
+        }
+        
+        // Apply mountain scale bias to the offset part (height)
+        if (baseOffset > 25.0f) {
+             baseOffset = 25.0f + (baseOffset - 25.0f) * mountainScaleBias;
+        }
+
+        terrainOffset = baseOffset + pv * roughness;
+    }
+    
+    return baseHeight + terrainOffset * landFactor;
 }

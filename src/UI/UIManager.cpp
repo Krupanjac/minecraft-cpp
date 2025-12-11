@@ -3,6 +3,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <algorithm>
+#include <random>
+#include <climits>
 
 UIManager::UIManager() : vao(0), vbo(0), width(1280), height(720), showDebug(false), currentFPS(0.0f), currentMenuState(MenuState::MAIN_MENU) {}
 
@@ -84,14 +86,27 @@ void UIManager::handleCharInput(unsigned int codepoint) {
     
     for (auto& el : elements) {
         if (el.isInput && el.isHovered && el.textRef) {
-            if (codepoint == 8) { // Backspace
-                if (!el.textRef->empty()) el.textRef->pop_back();
-            } else if (codepoint >= 32 && codepoint <= 126) {
+            if (codepoint >= 32 && codepoint <= 126) {
                 *el.textRef += (char)codepoint;
             }
             // Update display text
             if (el.text.find("NAME:") != std::string::npos) el.text = "NAME: " + *el.textRef;
             if (el.text.find("SEED:") != std::string::npos) el.text = "SEED: " + *el.textRef;
+        }
+    }
+}
+
+void UIManager::handleKeyInput(int key) {
+    if (!isMenuOpen()) return;
+    
+    for (auto& el : elements) {
+        if (el.isInput && el.isHovered && el.textRef) {
+            if (key == 259) { // GLFW_KEY_BACKSPACE
+                if (!el.textRef->empty()) el.textRef->pop_back();
+                // Update display text
+                if (el.text.find("NAME:") != std::string::npos) el.text = "NAME: " + *el.textRef;
+                if (el.text.find("SEED:") != std::string::npos) el.text = "SEED: " + *el.textRef;
+            }
         }
     }
 }
@@ -268,7 +283,15 @@ void UIManager::setupNewGameMenu() {
 
     // Input fields
     static std::string nameInput = "New World";
-    static std::string seedInput = "12345";
+    
+    // Generate a random seed immediately for display
+    static std::string seedInput = "";
+    if (seedInput.empty()) {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<int> dis(INT_MIN, INT_MAX);
+        seedInput = std::to_string(dis(gen));
+    }
 
     UIElement nameField = {centerX - btnW/2, centerY - 100, btnW, btnH, "NAME: " + nameInput, false, nullptr, false, nullptr, nullptr, nullptr, 0.0f, 0.0f, true, &nameInput};
     elements.push_back(nameField);
@@ -278,7 +301,18 @@ void UIManager::setupNewGameMenu() {
 
     elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*2 + 20, btnW, btnH, "CREATE WORLD", false, [this]() { 
         int seed = 0;
-        try { seed = std::stoi(*elements[1].textRef); } catch(...) { seed = 12345; }
+        std::string seedStr = *elements[1].textRef;
+        
+        try { 
+            seed = std::stoi(seedStr); 
+        } catch(...) { 
+            // Fallback if user entered garbage, though we pre-filled it
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<int> dis(INT_MIN, INT_MAX);
+            seed = dis(gen);
+        }
+        
         if (onNewGame) onNewGame(*elements[0].textRef, seed);
         setMenuState(MenuState::NONE);
     }});

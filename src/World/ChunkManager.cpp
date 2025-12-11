@@ -80,14 +80,19 @@ std::vector<std::shared_ptr<Chunk>> ChunkManager::getChunksToMesh(const glm::vec
     // 1. Collect all chunks that need meshing
     for (const auto& [pos, chunk] : chunks) {
         int desiredLOD = getDesiredLOD(pos, cameraPos);
-        bool lodChanged = (chunk->getCurrentLOD() != desiredLOD) && (chunk->getState() == ChunkState::READY || chunk->getState() == ChunkState::GPU_UPLOADED);
+        
+        // Force update if LOD is wrong, even if state is "stable" (READY/GPU_UPLOADED)
+        bool lodChanged = (chunk->getCurrentLOD() != desiredLOD);
 
-        if ((chunk->getState() == ChunkState::MESH_BUILD || lodChanged) && chunk->getState() != ChunkState::UNLOADED && chunk->getState() != ChunkState::GENERATING) {
-            // If LOD changed, we need to update it and mark for meshing
-            if (lodChanged) {
-                chunk->setCurrentLOD(desiredLOD);
-                chunk->setState(ChunkState::MESH_BUILD);
-            }
+        if (lodChanged) {
+             // If LOD changed, we MUST rebuild, regardless of current state (unless already generating)
+             if (chunk->getState() != ChunkState::GENERATING && chunk->getState() != ChunkState::UNLOADED) {
+                 chunk->setCurrentLOD(desiredLOD);
+                 chunk->setState(ChunkState::MESH_BUILD);
+             }
+        }
+
+        if (chunk->getState() == ChunkState::MESH_BUILD) {
             candidates.push_back(chunk);
         }
     }
