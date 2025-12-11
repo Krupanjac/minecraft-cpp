@@ -25,7 +25,7 @@ public:
     glm::vec3 getLightDirection() const { return lightDirection; }
 
     void setSkyColor(const glm::vec3& color) { skyColor = color; }
-    void setShowShadows(bool show) { showShadows = show; }
+    // void setShowShadows(bool show) { showShadows = show; } // Removed, uses Settings
 
     Shader& getBlockShader() { return blockShader; }
     
@@ -61,13 +61,14 @@ private:
     std::unique_ptr<PostProcess> postProcess;
 
     Frustum frustum;
+    Frustum shadowFrustum;
     
     std::unordered_map<ChunkPos, std::unique_ptr<Mesh>> chunkMeshes;
     std::unordered_map<ChunkPos, std::unique_ptr<Mesh>> waterMeshes;
     
     glm::vec3 lightDirection = glm::vec3(0.5f, 1.0f, 0.3f);
     glm::vec3 skyColor = glm::vec3(0.53f, 0.81f, 0.92f);
-    bool showShadows = true;
+    // bool showShadows = true; // Removed
 
     void setupOpenGL();
     bool loadShaders();

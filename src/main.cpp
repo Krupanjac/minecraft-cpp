@@ -547,14 +547,14 @@ private:
         static bool f3Pressed = false;
         if (window->isKeyPressed(GLFW_KEY_F3)) {
             if (!f3Pressed) {
-                uiManager.showShadows = !uiManager.showShadows;
+                Settings::instance().enableShadows = !Settings::instance().enableShadows;
                 f3Pressed = true;
             }
         } else {
             f3Pressed = false;
         }
         
-        renderer.setShowShadows(uiManager.showShadows);
+        // renderer.setShowShadows(uiManager.showShadows); // Removed, Renderer uses Settings directly
 
         if (!uiManager.isDayNightPaused) {
             uiManager.timeOfDay += deltaTime * 10.0f; // Still sped up slightly for gameplay, but slower than before

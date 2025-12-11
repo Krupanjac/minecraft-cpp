@@ -44,7 +44,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     // Calculate Light Space Matrix
     // Center on player
     // We position the "sun" far away along the light direction
-    float shadowRange = 160.0f; // Covers visible area
+    float shadowRange = Settings::instance().shadowDistance; // Covers visible area
     glm::vec3 lightPos = camera.getPosition() + lightDirection * 100.0f;
     glm::mat4 lightView = glm::lookAt(lightPos, camera.getPosition(), glm::vec3(0.0f, 1.0f, 0.0f));
     
@@ -55,9 +55,12 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     const auto& chunks = chunkManager.getChunks();
 
     // 0. Shadow Pass
-    if (showShadows) {
+    if (Settings::instance().enableShadows) {
         shadowMap->bind();
         
+        // Update shadow frustum for culling
+        shadowFrustum.update(lightSpaceMatrix);
+
         // Fix shadow acne by rendering back faces
         glEnable(GL_CULL_FACE);
         glCullFace(GL_FRONT);
@@ -79,9 +82,17 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
             }
             
             if (shouldRender) {
+                // Frustum Culling for Shadows
+                glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
+                glm::vec3 chunkMin = chunkWorldPos;
+                glm::vec3 chunkMax = chunkWorldPos + glm::vec3(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE);
+                
+                if (!shadowFrustum.isBoxVisible(chunkMin, chunkMax)) {
+                    continue;
+                }
+
                 auto it = chunkMeshes.find(pos);
                 if (it != chunkMeshes.end() && it->second->isUploaded()) {
-                    glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
                     glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkWorldPos);
                     shadowShader.setMat4("uModel", model);
                     
@@ -138,7 +149,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     blockShader.use();
     blockShader.setInt("uTexture", 0);
     blockShader.setInt("uShadowMap", 1);
-    blockShader.setInt("uUseShadows", showShadows ? 1 : 0);
+    blockShader.setInt("uUseShadows", Settings::instance().enableShadows ? 1 : 0);
     blockShader.setMat4("uProjection", projection);
     blockShader.setMat4("uView", view);
     blockShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);

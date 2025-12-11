@@ -25,6 +25,8 @@ public:
     bool enableSSAO = true;
     bool enableVolumetrics = true;
     bool enableTAA = false; // Disabled by default due to potential jitter/shaking artifacts
+    bool enableShadows = true;
+    float shadowDistance = 160.0f;
     int fullscreen = 0; // 0: Windowed, 1: Fullscreen, 2: Borderless
 
     void load() {
@@ -48,6 +50,8 @@ public:
                     else if (key == "enableSSAO") enableSSAO = (value == "1");
                     else if (key == "enableVolumetrics") enableVolumetrics = (value == "1");
                     else if (key == "enableTAA") enableTAA = (value == "1");
+                    else if (key == "enableShadows") enableShadows = (value == "1");
+                    else if (key == "shadowDistance") shadowDistance = std::stof(value);
                     else if (key == "fullscreen") fullscreen = std::stoi(value);
                 }
             }
@@ -68,6 +72,8 @@ public:
         file << "enableSSAO=" << (enableSSAO ? "1" : "0") << "\n";
         file << "enableVolumetrics=" << (enableVolumetrics ? "1" : "0") << "\n";
         file << "enableTAA=" << (enableTAA ? "1" : "0") << "\n";
+        file << "enableShadows=" << (enableShadows ? "1" : "0") << "\n";
+        file << "shadowDistance=" << shadowDistance << "\n";
         file << "fullscreen=" << fullscreen << "\n";
     }
 

@@ -235,6 +235,15 @@ void UIManager::setupVideoSettingsMenu() {
     elements.push_back({cx - btnW/2, startY, btnW, btnH, taaText, false, [](){}, false, nullptr, nullptr, &s.enableTAA});
     startY += btnH + gap;
 
+    // Shadows (Toggle)
+    std::string shadowText = "SHADOWS: " + std::string(s.enableShadows ? "ON" : "OFF");
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, shadowText, false, [](){}, false, nullptr, nullptr, &s.enableShadows});
+    startY += btnH + gap;
+
+    // Shadow Distance
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "SHADOW DIST: " + std::to_string((int)s.shadowDistance), false, nullptr, true, &s.shadowDistance, nullptr, nullptr, 50.0f, 300.0f});
+    startY += btnH + gap;
+
     // Fullscreen (Cycle)
     std::string fsText = "WINDOW MODE: ";
     if (s.fullscreen == 0) fsText += "WINDOWED";
@@ -459,7 +468,7 @@ void UIManager::render() {
         // Debug Controls
         drawText(10.0f, 120.0f, 2.0f, "[F1] TOGGLE DEBUG", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
         drawText(10.0f, 150.0f, 2.0f, "[F2] PAUSE TIME: " + std::string(isDayNightPaused ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
-        drawText(10.0f, 180.0f, 2.0f, "[F3] SHADOWS: " + std::string(showShadows ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+        drawText(10.0f, 180.0f, 2.0f, "[F3] SHADOWS: " + std::string(Settings::instance().enableShadows ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
         drawText(10.0f, 210.0f, 2.0f, "[ARROWS] CHANGE TIME", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
     }
 

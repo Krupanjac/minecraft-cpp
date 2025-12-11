@@ -64,7 +64,6 @@ public:
     // Debug controls
     float timeOfDay = 0.0f; // 0-1200
     bool isDayNightPaused = false;
-    bool showShadows = true;
 
 private:
     MenuState currentMenuState = MenuState::MAIN_MENU;
