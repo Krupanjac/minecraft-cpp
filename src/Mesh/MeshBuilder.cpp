@@ -3,6 +3,7 @@
 #include <array>
 #include <cstring>
 #include <tuple>
+#include <unordered_map>
 
 MeshData MeshBuilder::buildChunkMesh(std::shared_ptr<Chunk> chunk,
                                      std::shared_ptr<Chunk> chunkXPos,
@@ -38,6 +39,25 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
     int size = CHUNK_SIZE >> lod;
     // int height = CHUNK_HEIGHT >> lod; // Unused
     
+    auto getBlockGlobal = [&](int gx, int gy, int gz) -> Block {
+        if (gx < 0 || gx >= CHUNK_SIZE || gy < 0 || gy >= CHUNK_HEIGHT || gz < 0 || gz >= CHUNK_SIZE) {
+            if (gx < 0 && neighbors[1]) return neighbors[1]->getBlock(gx + CHUNK_SIZE, gy, gz);
+            if (gx >= CHUNK_SIZE && neighbors[0]) return neighbors[0]->getBlock(gx - CHUNK_SIZE, gy, gz);
+            if (gy < 0 && neighbors[3]) return neighbors[3]->getBlock(gx, gy + CHUNK_HEIGHT, gz);
+            if (gy >= CHUNK_HEIGHT && neighbors[2]) return neighbors[2]->getBlock(gx, gy - CHUNK_HEIGHT, gz);
+            if (gz < 0 && neighbors[5]) return neighbors[5]->getBlock(gx, gy, gz + CHUNK_SIZE);
+            if (gz >= CHUNK_SIZE && neighbors[4]) return neighbors[4]->getBlock(gx, gy, gz - CHUNK_SIZE);
+            return Block(BlockType::AIR);
+        }
+        return chunk->getBlock(gx, gy, gz);
+    };
+
+    // Simple sampling for performance (O(1))
+    // We rely on increased LOD distance to hide the block alignment artifacts.
+    auto sampleBlock = [&](int baseX, int baseY, int baseZ) -> Block {
+        return getBlockGlobal(baseX, baseY, baseZ);
+    };
+
     for (int dir = 0; dir < 6; ++dir) {
         int nx = dirs[dir][0];
         int ny = dirs[dir][1];
@@ -64,7 +84,7 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     
                     if (x >= CHUNK_SIZE || y >= CHUNK_HEIGHT || z >= CHUNK_SIZE) continue;
                     
-                    Block block = chunk->getBlock(x, y, z);
+                    Block block = sampleBlock(x, y, z);
                     if (!block.isSolid() && !block.isWater()) continue;
                     
                     // Check if face should be rendered
@@ -73,23 +93,7 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     int adjZ = z + nz * step;
                     
                     bool shouldRender = false;
-                    Block adjBlock;
-                    
-                    if (adjX < 0 || adjX >= CHUNK_SIZE || 
-                        adjY < 0 || adjY >= CHUNK_HEIGHT || 
-                        adjZ < 0 || adjZ >= CHUNK_SIZE) {
-                        // Check neighbor chunk
-                        // Simple helper to get block from neighbors
-                        if (adjX < 0 && neighbors[1]) adjBlock = neighbors[1]->getBlock(adjX + CHUNK_SIZE, adjY, adjZ);
-                        else if (adjX >= CHUNK_SIZE && neighbors[0]) adjBlock = neighbors[0]->getBlock(adjX - CHUNK_SIZE, adjY, adjZ);
-                        else if (adjY < 0 && neighbors[3]) adjBlock = neighbors[3]->getBlock(adjX, adjY + CHUNK_HEIGHT, adjZ);
-                        else if (adjY >= CHUNK_HEIGHT && neighbors[2]) adjBlock = neighbors[2]->getBlock(adjX, adjY - CHUNK_HEIGHT, adjZ);
-                        else if (adjZ < 0 && neighbors[5]) adjBlock = neighbors[5]->getBlock(adjX, adjY, adjZ + CHUNK_SIZE);
-                        else if (adjZ >= CHUNK_SIZE && neighbors[4]) adjBlock = neighbors[4]->getBlock(adjX, adjY, adjZ - CHUNK_SIZE);
-                        else adjBlock = Block(BlockType::AIR); // Default if neighbor chunk missing
-                    } else {
-                        adjBlock = chunk->getBlock(adjX, adjY, adjZ);
-                    }
+                    Block adjBlock = sampleBlock(adjX, adjY, adjZ);
                     
                     if (block.isWater()) {
                         // Render water face if neighbor is NOT water and NOT opaque (so Air or Glass)

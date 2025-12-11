@@ -119,8 +119,8 @@ int ChunkManager::getDesiredLOD(const ChunkPos& chunkPos, const glm::vec3& camer
     int dz = std::abs(chunkPos.z - centerChunk.z);
     int dist = std::max(dx, dz);
     
-    if (dist < 8) return 0;
-    if (dist < 16) return 1;
+    if (dist < 16) return 0;
+    if (dist < 32) return 1;
     return 2;
 }
 
