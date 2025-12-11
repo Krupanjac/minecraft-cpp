@@ -369,20 +369,57 @@ float WorldGenerator::getNoise(float x, float y, float z) const {
 }
 
 float WorldGenerator::getHeight(float x, float z) const {
-    float noise = noise2D(x * NOISE_SCALE, z * NOISE_SCALE);
-    noise = (noise + 1.0f) * 0.5f;  // Map from [-1,1] to [0,1]
+    // Fractal Brownian Motion (FBM)
+    // Adding multiple layers of noise (octaves) with increasing frequency and decreasing amplitude
+    int octaves = 8;
+    float amplitude = 1.0f;
+    float frequency = 1.0f;
+    float persistence = 0.5f; // How much amplitude decreases per octave
+    float lacunarity = 2.0f;  // How much frequency increases per octave
     
-    float baseHeight = SEA_LEVEL + noise * 32.0f;
+    float totalNoise = 0.0f;
+    float maxAmplitude = 0.0f;
     
-    // Add some variation
-    float detailNoise = noise2D(x * NOISE_SCALE * 4.0f, z * NOISE_SCALE * 4.0f);
-    baseHeight += detailNoise * 4.0f;
+    // Use different offsets for each octave to avoid artifacts
+    float offsets[] = {
+        0.0f, 123.45f, 678.90f, 321.54f,
+        987.65f, 456.78f, 135.79f, 246.80f
+    };
+
+    for (int i = 0; i < octaves; ++i) {
+        float n = noise2D((x + offsets[i]) * NOISE_SCALE * frequency, (z + offsets[i]) * NOISE_SCALE * frequency);
+        totalNoise += n * amplitude;
+        maxAmplitude += amplitude;
+        
+        amplitude *= persistence;
+        frequency *= lacunarity;
+    }
     
-    return baseHeight;
+    // Normalize to [-1, 1]
+    // Gradient noise typically has a range smaller than [-1, 1] (approx [-0.7, 0.7])
+    // We multiply by 1.5 to stretch the contrast and utilize the full range
+    totalNoise = (totalNoise / maxAmplitude) * 1.5f;
+    totalNoise = std::clamp(totalNoise, -1.0f, 1.0f);
+    
+    // Map to [0, 1]
+    float normalizedNoise = (totalNoise + 1.0f) * 0.5f;
+    
+    // Exponential scaling: 2 ^ (noise * power)
+    // Increased power to 8.0 for taller mountains
+    float power = 8.0f;
+    float heightFactor = std::pow(2.0f, normalizedNoise * power);
+    
+    // Base height calculation
+    // At noise=0.5 (average), heightFactor is 2^4 = 16.
+    // Base 20 + 16 = 36 (Just above SEA_LEVEL 32)
+    // Max height: 20 + 256 = 276 (Very high peaks)
+    // Min height: 20 + 1 = 21 (Deep ocean)
+    
+    return 20.0f + heightFactor;
 }
 
 float WorldGenerator::noise3D(float x, float y, float z) const {
-    // Simple pseudo-random 3D noise
+    // Improved Perlin Noise (Gradient Noise)
     int xi = static_cast<int>(std::floor(x)) & 255;
     int yi = static_cast<int>(std::floor(y)) & 255;
     int zi = static_cast<int>(std::floor(z)) & 255;
@@ -395,25 +432,30 @@ float WorldGenerator::noise3D(float x, float y, float z) const {
     float v = fade(yf);
     float w = fade(zf);
     
-    // Hash coordinates
-    int aaa = ((xi + seed) * 374761393 + (yi + seed) * 668265263 + (zi + seed) * 1274126177) & 0xFFFFFF;
-    int aba = ((xi + seed) * 374761393 + ((yi + 1) + seed) * 668265263 + (zi + seed) * 1274126177) & 0xFFFFFF;
-    int aab = ((xi + seed) * 374761393 + (yi + seed) * 668265263 + ((zi + 1) + seed) * 1274126177) & 0xFFFFFF;
-    int abb = ((xi + seed) * 374761393 + ((yi + 1) + seed) * 668265263 + ((zi + 1) + seed) * 1274126177) & 0xFFFFFF;
-    int baa = (((xi + 1) + seed) * 374761393 + (yi + seed) * 668265263 + (zi + seed) * 1274126177) & 0xFFFFFF;
-    int bba = (((xi + 1) + seed) * 374761393 + ((yi + 1) + seed) * 668265263 + (zi + seed) * 1274126177) & 0xFFFFFF;
-    int bab = (((xi + 1) + seed) * 374761393 + (yi + seed) * 668265263 + ((zi + 1) + seed) * 1274126177) & 0xFFFFFF;
-    int bbb = (((xi + 1) + seed) * 374761393 + ((yi + 1) + seed) * 668265263 + ((zi + 1) + seed) * 1274126177) & 0xFFFFFF;
+    // Hash coordinates to get gradients
+    // We use the same large primes for hashing to avoid a lookup table
+    auto hash = [&](int i, int j, int k) {
+        return ((i + seed) * 374761393 + (j + seed) * 668265263 + (k + seed) * 1274126177) & 0xFFFFFF;
+    };
+
+    int aaa = hash(xi, yi, zi);
+    int aba = hash(xi, yi + 1, zi);
+    int aab = hash(xi, yi, zi + 1);
+    int abb = hash(xi, yi + 1, zi + 1);
+    int baa = hash(xi + 1, yi, zi);
+    int bba = hash(xi + 1, yi + 1, zi);
+    int bab = hash(xi + 1, yi, zi + 1);
+    int bbb = hash(xi + 1, yi + 1, zi + 1);
     
-    // Convert to [-1, 1]
-    float val_aaa = (aaa / 8388607.5f) - 1.0f;
-    float val_aba = (aba / 8388607.5f) - 1.0f;
-    float val_aab = (aab / 8388607.5f) - 1.0f;
-    float val_abb = (abb / 8388607.5f) - 1.0f;
-    float val_baa = (baa / 8388607.5f) - 1.0f;
-    float val_bba = (bba / 8388607.5f) - 1.0f;
-    float val_bab = (bab / 8388607.5f) - 1.0f;
-    float val_bbb = (bbb / 8388607.5f) - 1.0f;
+    // Calculate dot products
+    float val_aaa = grad(aaa, xf, yf, zf);
+    float val_aba = grad(aba, xf, yf - 1, zf);
+    float val_aab = grad(aab, xf, yf, zf - 1);
+    float val_abb = grad(abb, xf, yf - 1, zf - 1);
+    float val_baa = grad(baa, xf - 1, yf, zf);
+    float val_bba = grad(bba, xf - 1, yf - 1, zf);
+    float val_bab = grad(bab, xf - 1, yf, zf - 1);
+    float val_bbb = grad(bbb, xf - 1, yf - 1, zf - 1);
     
     // Trilinear interpolation
     float x1 = lerp(val_aaa, val_baa, u);
@@ -425,6 +467,14 @@ float WorldGenerator::noise3D(float x, float y, float z) const {
     float y2 = lerp(x3, x4, v);
     
     return lerp(y1, y2, w);
+}
+
+float WorldGenerator::grad(int hash, float x, float y, float z) const {
+    // Convert low 4 bits of hash code into 12 gradient directions
+    int h = hash & 15;
+    float u = h < 8 ? x : y;
+    float v = h < 4 ? y : h == 12 || h == 14 ? x : z;
+    return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
 }
 
 float WorldGenerator::noise2D(float x, float z) const {

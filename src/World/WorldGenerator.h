@@ -45,6 +45,7 @@ private:
     float noise2D(float x, float z) const;
     float lerp(float a, float b, float t) const;
     float fade(float t) const;
+    float grad(int hash, float x, float y, float z) const;
     
     // Biome-related
     float getTemperature(float x, float z) const;
