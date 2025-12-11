@@ -227,6 +227,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     waterShader.setVec3("uLightDir", lightDirection);
     waterShader.setFloat("uFogDist", fogDist);
     waterShader.setVec3("uSkyColor", skyColor);
+    waterShader.setFloat("uAOStrength", Settings::instance().aoStrength);
     
     for (const auto& [pos, chunk] : chunks) {
         // Render if uploaded, or if rebuilding (MESH_BUILD/READY) but we have a mesh

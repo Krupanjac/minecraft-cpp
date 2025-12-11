@@ -14,6 +14,7 @@ uniform vec3 uSkyColor;
 uniform sampler2D uTexture;
 uniform sampler2D uShadowMap;
 uniform int uUseShadows;
+uniform float uAOStrength;
 
 in vec4 vFragPosLightSpace;
 
@@ -108,7 +109,8 @@ void main() {
     // Apply AO
     // Use smoothstep for non-linear AO curve
     float aoCurve = smoothstep(0.0, 1.0, vAO);
-    float aoFactor = mix(0.25, 1.0, aoCurve);
+    float minAO = max(0.0, mix(1.0, 0.25, uAOStrength));
+    float aoFactor = mix(minAO, 1.0, aoCurve);
     
     vec3 lighting = vec3(ambient + (1.0 - shadow) * diffuse * 0.7) * aoFactor;
     vec3 color = baseColor * lighting;

@@ -14,6 +14,7 @@ uniform float uFogDist;
 uniform vec3 uSkyColor;
 uniform float uTime;
 uniform sampler2D uTexture;
+uniform float uAOStrength;
 
 out vec4 FragColor;
 
@@ -51,7 +52,8 @@ void main() {
     
     // Apply AO
     float aoCurve = smoothstep(0.0, 1.0, vAO);
-    float aoFactor = mix(0.5, 1.0, aoCurve); // Less AO on water
+    float minAO = max(0.0, mix(1.0, 0.5, uAOStrength));
+    float aoFactor = mix(minAO, 1.0, aoCurve); // Less AO on water
     
     vec3 lighting = vec3(ambient + diffuse * 0.8) * aoFactor;
     vec3 color = baseColor * lighting + specular;

@@ -160,6 +160,8 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                             if (ny != 0) {
                                 shouldRender = false;
                             } else {
+                                // Only render if there is a significant drop
+                                // And ensure we don't render internal faces for flat water
                                 shouldRender = block.getData() < adjBlock.getData();
                             }
                         } else {
@@ -404,7 +406,11 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
     
     // Determine triangulation split based on AO
     // Connect vertices with highest AO (brightest) to avoid dark creases
-    bool flipSplit = (quad.ao[1] + quad.ao[3]) > (quad.ao[0] + quad.ao[2]);
+    // AO values: 0 (darkest) to 3 (brightest)
+    // We want to split along the diagonal that connects the two vertices with the most similar AO?
+    // Or the diagonal that avoids cutting through a shadow?
+    // Standard voxel AO trick: if (ao0 + ao2 < ao1 + ao3) flip
+    bool flipSplit = (quad.ao[0] + quad.ao[2]) < (quad.ao[1] + quad.ao[3]);
     
     if (reverseWinding) {
         if (flipSplit) {
