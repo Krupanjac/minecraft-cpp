@@ -7,6 +7,8 @@ uniform sampler2D depthMap;
 uniform mat4 invViewProj;
 uniform vec3 lightDir;
 uniform vec3 cameraPos;
+uniform float uIntensity;
+uniform vec3 uLightColor;
 
 const int STEPS = 32;
 const float MAX_DIST = 100.0;
@@ -53,5 +55,5 @@ void main() {
         accumulation += density * (0.05 + phase) * stepSize;
     }
     
-    FragColor = vec4(vec3(1.0, 0.9, 0.7) * accumulation, 1.0);
+    FragColor = vec4(uLightColor * accumulation * uIntensity, 1.0);
 }

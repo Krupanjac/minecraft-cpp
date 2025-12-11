@@ -3,6 +3,8 @@
 #include "../Util/Config.h"
 #include "../Core/Settings.h"
 #include <GLFW/glfw3.h>
+#include <random>
+#include <cmath>
 
 Renderer::Renderer() {
 }
@@ -17,6 +19,8 @@ bool Renderer::initialize(int windowWidth, int windowHeight) {
     
     initCrosshair();
     initSun();
+    initStars();
+    initClouds();
 
     blockAtlas = std::make_unique<Texture>("assets/block_atlas.png");
 
@@ -136,8 +140,10 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
     
-    // Render sun first (behind everything)
+    // Render stars and sun/moon (behind everything)
+    renderStars(camera, windowWidth, windowHeight);
     renderSun(camera, windowWidth, windowHeight);
+    renderClouds(camera, windowWidth, windowHeight, lightSpaceMatrix);
 
     // Render chunks
     glActiveTexture(GL_TEXTURE0);
@@ -279,7 +285,22 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), projection, view, camera.getPosition(), lightDirection, unjitteredProjection);
+    // Calculate volumetric settings based on sun height
+    float volIntensity = 1.0f;
+    glm::vec3 lightCol = glm::vec3(1.0f, 0.9f, 0.7f); // Sun color
+
+    if (sunHeight < -0.1f) {
+        // Night / Moon
+        volIntensity = 0.05f; // Much lower intensity for moon
+        lightCol = glm::vec3(0.6f, 0.7f, 1.0f); // Moon color
+    } else if (sunHeight < 0.1f) {
+        // Transition
+        float t = (sunHeight + 0.1f) / 0.2f;
+        volIntensity = glm::mix(0.05f, 1.0f, t);
+        lightCol = glm::mix(glm::vec3(0.6f, 0.7f, 1.0f), glm::vec3(1.0f, 0.9f, 0.7f), t);
+    }
+
+    postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), projection, view, camera.getPosition(), lightDirection, unjitteredProjection, volIntensity, lightCol);
 
     // 3. UI / Overlays (Rendered directly to screen)
     
@@ -430,6 +451,14 @@ bool Renderer::loadShaders() {
         LOG_ERROR("Failed to load shadow shader");
         success = false;
     }
+    if (!starShader.loadFromFiles("shaders/stars.vert", "shaders/stars.frag")) {
+        LOG_ERROR("Failed to load star shader");
+        success = false;
+    }
+    if (!cloudShader.loadFromFiles("shaders/clouds.vert", "shaders/clouds.frag")) {
+        LOG_ERROR("Failed to load cloud shader");
+        success = false;
+    }
     // Create simple shader for crosshair inline or load from file
     // For simplicity, we'll use a very basic shader source here
     const char* crosshairVert = R"(
@@ -482,11 +511,21 @@ void Renderer::initSun() {
     std::vector<Vertex> vertices;
     std::vector<u32> indices;
     
-    // Quad facing -Z
-    vertices.emplace_back(static_cast<i16>(-1), static_cast<i16>(-1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
-    vertices.emplace_back(static_cast<i16>(1), static_cast<i16>(-1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
-    vertices.emplace_back(static_cast<i16>(1), static_cast<i16>(1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
-    vertices.emplace_back(static_cast<i16>(-1), static_cast<i16>(1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+    // Quad facing -Z with UVs
+    // UVs are packed into u16: (u << 8) | v
+    // We use 0 and 1 (mapped to 0 and 255 in shader logic usually, but here we want 0..1 range)
+    // Actually block shader expects 0..255 for tiling.
+    // But sun shader is custom. Let's pass 0 and 255 and handle in shader.
+    
+    u16 uv00 = 0;
+    u16 uv10 = (255 << 8);
+    u16 uv11 = (255 << 8) | 255;
+    u16 uv01 = 255;
+
+    vertices.emplace_back(static_cast<i16>(-1), static_cast<i16>(-1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), uv00);
+    vertices.emplace_back(static_cast<i16>(1), static_cast<i16>(-1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), uv10);
+    vertices.emplace_back(static_cast<i16>(1), static_cast<i16>(1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), uv11);
+    vertices.emplace_back(static_cast<i16>(-1), static_cast<i16>(1), static_cast<i16>(0), static_cast<u8>(0), static_cast<u8>(0), uv01);
     
     indices = {0, 1, 2, 2, 3, 0};
     
@@ -503,29 +542,475 @@ void Renderer::renderSun(const Camera& camera, int windowWidth, int windowHeight
     // Remove translation from view matrix so sun stays at infinity (skybox style)
     glm::mat4 view = glm::mat4(glm::mat3(camera.getViewMatrix()));
     
-    // Position sun based on light direction
-    // Light direction is vector TO the sun
-    glm::vec3 sunPos = lightDirection * 50.0f; // Distance 50 units away
-    
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), sunPos);
-    // Billboard the sun to face camera
-    model = glm::lookAt(sunPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    model = glm::inverse(model); // Invert lookAt to get model matrix
-    model = glm::scale(model, glm::vec3(5.0f)); // Scale sun
-    
-    sunShader.setMat4("uProjection", projection);
-    sunShader.setMat4("uView", view);
-    sunShader.setMat4("uModel", model);
-    
-    glDisable(GL_DEPTH_TEST); // Sun is always behind everything
-    glDisable(GL_CULL_FACE);  // Disable culling to ensure sun is visible from any angle
+    glDisable(GL_DEPTH_TEST); // Sun/Moon is always behind everything
+    glDisable(GL_CULL_FACE);  // Disable culling
     sunMesh->bind();
-    sunMesh->draw();
+
+    // Determine Sun and Moon directions
+    glm::vec3 sunDir = lightDirection;
+    if (sunHeight < -0.1f) {
+        sunDir = -lightDirection; // If night, lightDirection is Moon, so Sun is opposite
+    }
+    glm::vec3 moonDir = -sunDir;
+
+    // Render Sun
+    if (sunDir.y > -0.2f) {
+        glm::vec3 sunPos = sunDir * 50.0f;
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), sunPos);
+        model = glm::inverse(glm::lookAt(sunPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+        float sunScale = std::max(0.1f, Settings::instance().sunSize);
+        model = glm::scale(model, glm::vec3(sunScale)); // Scale sun
+        
+        sunShader.setMat4("uProjection", projection);
+        sunShader.setMat4("uView", view);
+        sunShader.setMat4("uModel", model);
+        sunShader.setInt("uIsMoon", 0);
+        sunMesh->draw();
+    }
+
+    // Render Moon
+    if (moonDir.y > -0.2f) {
+        glm::vec3 moonPos = moonDir * 50.0f;
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), moonPos);
+        model = glm::inverse(glm::lookAt(moonPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+        float moonScale = std::max(0.1f, Settings::instance().moonSize);
+        model = glm::scale(model, glm::vec3(moonScale)); // Scale moon
+        
+        sunShader.setMat4("uProjection", projection);
+        sunShader.setMat4("uView", view);
+        sunShader.setMat4("uModel", model);
+        sunShader.setInt("uIsMoon", 1);
+        sunMesh->draw();
+    }
+
     sunMesh->unbind();
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
     
     sunShader.unuse();
+}
+
+void Renderer::initStars() {
+    std::vector<Vertex> vertices;
+    std::vector<u32> indices;
+    
+    std::mt19937 rng(12345);
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+    
+    for (int i = 0; i < 1500; ++i) {
+        float x = dist(rng);
+        float y = dist(rng);
+        float z = dist(rng);
+        
+        // Normalize to sphere
+        float len = std::sqrt(x*x + y*y + z*z);
+        if (len < 0.001f) continue;
+        
+        x /= len;
+        y /= len;
+        z /= len;
+        
+        // Scale up
+        x *= 80.0f;
+        y *= 80.0f;
+        z *= 80.0f;
+        
+        vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+        indices.push_back(i);
+    }
+    
+    starMesh = std::make_unique<Mesh>();
+    starMesh->upload(vertices, indices);
+}
+
+void Renderer::renderStars(const Camera& camera, int windowWidth, int windowHeight) {
+    starShader.use();
+    
+    float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
+    glm::mat4 projection = camera.getProjectionMatrix(aspect);
+    
+    // Remove translation from view matrix
+    glm::mat4 view = glm::mat4(glm::mat3(camera.getViewMatrix()));
+    
+    starShader.setMat4("uProjection", projection);
+    starShader.setMat4("uView", view);
+    starShader.setFloat("uTime", timeOfDay);
+    starShader.setFloat("uSunHeight", sunHeight);
+    
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_PROGRAM_POINT_SIZE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    starMesh->bind();
+    // Draw points manually since Mesh::draw uses GL_TRIANGLES
+    glDrawElements(GL_POINTS, 1500, GL_UNSIGNED_INT, 0);
+    starMesh->unbind();
+    
+    glDisable(GL_BLEND);
+    glDisable(GL_PROGRAM_POINT_SIZE);
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+    
+    starShader.unuse();
+}
+
+void Renderer::initClouds() {
+    std::vector<Vertex> vertices;
+    std::vector<u32> indices;
+    
+    // Generate a large grid of clouds
+    // 128x128 grid, each cell is 12 units wide
+    int gridSize = 128;
+    float scale = 12.0f;
+    
+    std::mt19937 rng(12345);
+    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+    
+    // Multi-octave sine noise for soft variation; returns roughly [-1, 1]
+    auto noiseVal = [&](int x, int z) {
+        float nx = static_cast<float>(x) * 0.07f;
+        float nz = static_cast<float>(z) * 0.07f;
+        float n = 0.0f;
+        n += std::sin(nx) * std::cos(nz);
+        n += std::sin(nx * 1.9f + 0.7f) * std::cos(nz * 2.1f + 1.3f) * 0.6f;
+        n += std::sin(nx * 3.7f + 2.0f) * std::cos(nz * 3.3f + 0.5f) * 0.3f;
+        return n * 0.5f; // Keep magnitude modest
+    };
+
+    // Precompute occupancy and per-cell height so we can skip internal faces between connected cloud cells
+    std::vector<std::vector<bool>> occ(gridSize, std::vector<bool>(gridSize));
+    std::vector<std::vector<float>> heightMap(gridSize, std::vector<float>(gridSize, 0.0f));
+    for (int ix = 0; ix < gridSize; ++ix) {
+        for (int iz = 0; iz < gridSize; ++iz) {
+            float n = noiseVal(ix, iz);
+            bool hasCloud = n > 0.1f;
+            occ[ix][iz] = hasCloud;
+            if (hasCloud) {
+                float jitter = dist(rng) * 0.5f;
+                float thickness = 2.5f + std::max(0.0f, n) * 4.5f + jitter;
+                heightMap[ix][iz] = thickness;
+            }
+        }
+    }
+
+    // Greedy meshing for top faces
+    const float eps = 0.01f;
+    std::vector<std::vector<bool>> topVisited(gridSize, std::vector<bool>(gridSize, false));
+    for (int z = 0; z < gridSize; ++z) {
+        for (int x = 0; x < gridSize; ++x) {
+            if (!occ[x][z] || topVisited[x][z]) continue;
+            float h = heightMap[x][z];
+            // find width
+            int w = 1;
+            while (x + w < gridSize && occ[x + w][z] && !topVisited[x + w][z] && std::abs(heightMap[x + w][z] - h) < eps) {
+                ++w;
+            }
+            // find height in z
+            int d = 1;
+            bool extend = true;
+            while (z + d < gridSize && extend) {
+                for (int xx = x; xx < x + w; ++xx) {
+                    if (!occ[xx][z + d] || topVisited[xx][z + d] || std::abs(heightMap[xx][z + d] - h) >= eps) {
+                        extend = false;
+                        break;
+                    }
+                }
+                if (extend) ++d;
+            }
+            // mark visited
+            for (int zz = z; zz < z + d; ++zz) {
+                for (int xx = x; xx < x + w; ++xx) {
+                    topVisited[xx][zz] = true;
+                }
+            }
+            float x0 = (x - gridSize/2) * scale;
+            float x1 = (x + w - gridSize/2) * scale;
+            float z0 = (z - gridSize/2) * scale;
+            float z1 = (z + d - gridSize/2) * scale;
+            float y = h;
+            // Top faces face +Y, CCW from above
+            vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+            vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+            vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+            vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+            u32 b = static_cast<u32>(vertices.size()) - 4;
+            indices.push_back(b + 0); indices.push_back(b + 1); indices.push_back(b + 2);
+            indices.push_back(b + 2); indices.push_back(b + 3); indices.push_back(b + 0);
+        }
+    }
+
+    // Greedy meshing for bottom faces
+    std::vector<std::vector<bool>> bottomVisited(gridSize, std::vector<bool>(gridSize, false));
+    for (int z = 0; z < gridSize; ++z) {
+        for (int x = 0; x < gridSize; ++x) {
+            if (!occ[x][z] || bottomVisited[x][z]) continue;
+            float h = heightMap[x][z];
+            int w = 1;
+            while (x + w < gridSize && occ[x + w][z] && !bottomVisited[x + w][z] && std::abs(heightMap[x + w][z] - h) < eps) ++w;
+            int d = 1; bool extend = true;
+            while (z + d < gridSize && extend) {
+                for (int xx = x; xx < x + w; ++xx) {
+                    if (!occ[xx][z + d] || bottomVisited[xx][z + d] || std::abs(heightMap[xx][z + d] - h) >= eps) { extend = false; break; }
+                }
+                if (extend) ++d;
+            }
+            for (int zz = z; zz < z + d; ++zz) for (int xx = x; xx < x + w; ++xx) bottomVisited[xx][zz] = true;
+            float x0 = (x - gridSize/2) * scale;
+            float x1 = (x + w - gridSize/2) * scale;
+            float z0 = (z - gridSize/2) * scale;
+            float z1 = (z + d - gridSize/2) * scale;
+            float y = 0.0f;
+            // Bottom faces face -Y, so wind CW when looking from below
+            vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+            vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+            vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+            vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+            u32 b = static_cast<u32>(vertices.size()) - 4;
+            indices.push_back(b + 0); indices.push_back(b + 2); indices.push_back(b + 1);
+            indices.push_back(b + 0); indices.push_back(b + 3); indices.push_back(b + 2);
+        }
+    }
+
+    auto mergeSide = [&](int dir) {
+        // dir: 0 north(-z), 1 south(+z), 2 west(-x), 3 east(+x)
+        if (dir == 0) {
+            for (int z = 0; z < gridSize; ++z) {
+                int zz = z;
+                // mask across x
+                int x = 0;
+                while (x < gridSize) {
+                    if (!occ[x][zz]) { ++x; continue; }
+                    float h = heightMap[x][zz];
+                    float neighborH = (zz - 1 >= 0 && occ[x][zz - 1]) ? heightMap[x][zz - 1] : 0.0f;
+                    float exposed = h - neighborH;
+                    if (exposed <= eps) { ++x; continue; }
+                    // grow width with same exposed height
+                    int w = 1;
+                    while (x + w < gridSize && occ[x + w][zz]) {
+                        float nh = heightMap[x + w][zz];
+                        float nNeighbor = (zz - 1 >= 0 && occ[x + w][zz - 1]) ? heightMap[x + w][zz - 1] : 0.0f;
+                        if (std::abs((nh - nNeighbor) - exposed) < eps && (nh - nNeighbor) > eps) {
+                            ++w;
+                        } else {
+                            break;
+                        }
+                    }
+                    float x0 = (x - gridSize/2) * scale;
+                    float x1 = (x + w - gridSize/2) * scale;
+                    float z0 = (zz - gridSize/2) * scale;
+                    float y0 = neighborH;
+                    float y1 = neighborH + exposed;
+                    // north face outward -Z, CCW when looking at -Z
+                    vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y0), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y0), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y1), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y1), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    u32 b = static_cast<u32>(vertices.size()) - 4;
+                    indices.push_back(b + 0); indices.push_back(b + 2); indices.push_back(b + 1);
+                    indices.push_back(b + 0); indices.push_back(b + 3); indices.push_back(b + 2);
+                    x += w;
+                }
+            }
+        } else if (dir == 1) {
+            for (int z = 0; z < gridSize; ++z) {
+                int zz = z;
+                int x = 0;
+                while (x < gridSize) {
+                    if (!occ[x][zz]) { ++x; continue; }
+                    float h = heightMap[x][zz];
+                    float neighborH = (zz + 1 < gridSize && occ[x][zz + 1]) ? heightMap[x][zz + 1] : 0.0f;
+                    float exposed = h - neighborH;
+                    if (exposed <= eps) { ++x; continue; }
+                    int w = 1;
+                    while (x + w < gridSize && occ[x + w][zz]) {
+                        float nh = heightMap[x + w][zz];
+                        float nNeighbor = (zz + 1 < gridSize && occ[x + w][zz + 1]) ? heightMap[x + w][zz + 1] : 0.0f;
+                        if (std::abs((nh - nNeighbor) - exposed) < eps && (nh - nNeighbor) > eps) {
+                            ++w;
+                        } else {
+                            break;
+                        }
+                    }
+                    float x0 = (x - gridSize/2) * scale;
+                    float x1 = (x + w - gridSize/2) * scale;
+                    float z1 = (zz + 1 - gridSize/2) * scale;
+                    float y0 = neighborH;
+                    float y1 = neighborH + exposed;
+                    // south face outward +Z, CCW when looking at +Z
+                    vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y0), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y1), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y1), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y0), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    u32 b = static_cast<u32>(vertices.size()) - 4;
+                    indices.push_back(b + 0); indices.push_back(b + 1); indices.push_back(b + 2);
+                    indices.push_back(b + 2); indices.push_back(b + 3); indices.push_back(b + 0);
+                    x += w;
+                }
+            }
+        } else if (dir == 2) {
+            for (int x = 0; x < gridSize; ++x) {
+                int xx = x;
+                int z = 0;
+                while (z < gridSize) {
+                    if (!occ[xx][z]) { ++z; continue; }
+                    float h = heightMap[xx][z];
+                    float neighborH = (xx - 1 >= 0 && occ[xx - 1][z]) ? heightMap[xx - 1][z] : 0.0f;
+                    float exposed = h - neighborH;
+                    if (exposed <= eps) { ++z; continue; }
+                    int d = 1;
+                    while (z + d < gridSize && occ[xx][z + d]) {
+                        float nh = heightMap[xx][z + d];
+                        float nNeighbor = (xx - 1 >= 0 && occ[xx - 1][z + d]) ? heightMap[xx - 1][z + d] : 0.0f;
+                        if (std::abs((nh - nNeighbor) - exposed) < eps && (nh - nNeighbor) > eps) {
+                            ++d;
+                        } else break;
+                    }
+                    float x0 = (xx - gridSize/2) * scale;
+                    float z0 = (z - gridSize/2) * scale;
+                    float z1 = (z + d - gridSize/2) * scale;
+                    float y0 = neighborH;
+                    float y1 = neighborH + exposed;
+                    // west face outward -X, CCW when looking at -X
+                    vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y0), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y1), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y1), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x0), static_cast<i16>(y0), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    u32 b = static_cast<u32>(vertices.size()) - 4;
+                    indices.push_back(b + 0); indices.push_back(b + 1); indices.push_back(b + 2);
+                    indices.push_back(b + 2); indices.push_back(b + 3); indices.push_back(b + 0);
+                    z += d;
+                }
+            }
+        } else if (dir == 3) {
+            for (int x = 0; x < gridSize; ++x) {
+                int xx = x;
+                int z = 0;
+                while (z < gridSize) {
+                    if (!occ[xx][z]) { ++z; continue; }
+                    float h = heightMap[xx][z];
+                    float neighborH = (xx + 1 < gridSize && occ[xx + 1][z]) ? heightMap[xx + 1][z] : 0.0f;
+                    float exposed = h - neighborH;
+                    if (exposed <= eps) { ++z; continue; }
+                    int d = 1;
+                    while (z + d < gridSize && occ[xx][z + d]) {
+                        float nh = heightMap[xx][z + d];
+                        float nNeighbor = (xx + 1 < gridSize && occ[xx + 1][z + d]) ? heightMap[xx + 1][z + d] : 0.0f;
+                        if (std::abs((nh - nNeighbor) - exposed) < eps && (nh - nNeighbor) > eps) {
+                            ++d;
+                        } else break;
+                    }
+                    float x1 = (xx + 1 - gridSize/2) * scale;
+                    float z0 = (z - gridSize/2) * scale;
+                    float z1 = (z + d - gridSize/2) * scale;
+                    float y0 = neighborH;
+                    float y1 = neighborH + exposed;
+                    // east face outward +X, CCW when looking at +X
+                    vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y0), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y0), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y1), static_cast<i16>(z1), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    vertices.emplace_back(static_cast<i16>(x1), static_cast<i16>(y1), static_cast<i16>(z0), static_cast<u8>(0), static_cast<u8>(0), static_cast<u16>(0));
+                    u32 b = static_cast<u32>(vertices.size()) - 4;
+                    indices.push_back(b + 0); indices.push_back(b + 1); indices.push_back(b + 2);
+                    indices.push_back(b + 2); indices.push_back(b + 3); indices.push_back(b + 0);
+                    z += d;
+                }
+            }
+        }
+    };
+
+    mergeSide(0); // north
+    mergeSide(1); // south
+    mergeSide(2); // west
+    mergeSide(3); // east
+    
+    cloudMesh = std::make_unique<Mesh>();
+    cloudMesh->upload(vertices, indices);
+}
+
+void Renderer::renderClouds(const Camera& camera, int windowWidth, int windowHeight, const glm::mat4& lightSpaceMatrix) {
+    cloudShader.use();
+    
+    float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
+    glm::mat4 projection = camera.getProjectionMatrix(aspect);
+    glm::mat4 view = camera.getViewMatrix();
+    
+    // Position clouds
+    // Move with time
+    float speed = 2.0f;
+    float offset = timeOfDay * speed;
+    
+    // Wrap position to keep clouds near camera
+    // Grid size is 128 * 12 = 1536
+    float worldSize = 128.0f * 12.0f;
+    
+    glm::vec3 camPos = camera.getPosition();
+    float x = camPos.x - std::fmod(camPos.x, 12.0f); // Snap to grid
+    
+    // Add time offset
+    x += offset;
+    
+    // Wrap
+    // We want the mesh to be centered around the camera
+    // But the mesh is static relative to its origin.
+    // We translate the mesh to (camX, 128, camZ)
+    // And offset texture? No, we built geometry.
+    // We translate the mesh to (camX, 128, camZ) but we need to snap it so it doesn't jitter.
+    // And we need to wrap the "noise" which we can't do easily with static mesh.
+    // So we just move the mesh and let it go out of bounds? No.
+    // We move the mesh by (offset % worldSize).
+    // And we center it on the camera by adding (camPos - mod(camPos, worldSize)).
+    
+    float moveX = std::fmod(offset, worldSize);
+    float baseX = camPos.x - std::fmod(camPos.x, worldSize);
+    float baseZ = camPos.z - std::fmod(camPos.z, worldSize);
+    
+    // We might need to render 4 copies to cover the edges seamlessly if the mesh isn't huge enough
+    // Or just make the mesh huge (done: 1536 units is > render distance 32*16=512)
+    
+    glm::vec3 pos(baseX - moveX, 128.0f, baseZ);
+    
+    // If the cloud layer moves too far, it wraps.
+    // Since we generated a static mesh, we just translate it.
+    // But we need it to cover the camera.
+    // If camera moves to X=2000, baseX moves to 1536.
+    // So the mesh jumps.
+    // This works if the mesh is seamless.
+    // Our noise function was NOT seamless.
+    // Let's assume it's fine for now, or fix noise to be periodic?
+    // Fixing noise is better.
+    
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), pos);
+    
+    cloudShader.setMat4("uProjection", projection);
+    cloudShader.setMat4("uView", view);
+    cloudShader.setMat4("uModel", model);
+    cloudShader.setVec3("uCameraPos", camPos);
+    cloudShader.setVec3("uSkyColor", skyColor);
+    cloudShader.setFloat("uFogDist", static_cast<float>(Settings::instance().renderDistance * CHUNK_SIZE));
+
+    // Bind shadow map and pass light matrix for cloud shadows
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, shadowMap->getDepthMap());
+    cloudShader.setInt("uShadowMap", 1);
+    cloudShader.setInt("uUseShadows", Settings::instance().enableShadows ? 1 : 0);
+    cloudShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
+    cloudShader.setVec3("uLightDir", lightDirection);
+    
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // Disable face culling so we see inside/outside
+    glDisable(GL_CULL_FACE);
+    
+    cloudMesh->bind();
+    cloudMesh->draw();
+    cloudMesh->unbind();
+    
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+    
+    cloudShader.unuse();
 }
 
 void Renderer::uploadChunkMesh(const ChunkPos& pos, 

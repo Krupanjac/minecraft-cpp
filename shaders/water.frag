@@ -48,7 +48,10 @@ void main() {
     vec3 specular = vec3(0.5) * spec;
     
     float diffuse = max(dot(normal, lightDir), 0.0);
-    float ambient = 0.4;
+    
+    // Ambient light based on sky color
+    float skyBrightness = dot(uSkyColor, vec3(0.299, 0.587, 0.114));
+    float ambient = clamp(skyBrightness * 0.6, 0.1, 0.5);
     
     // Apply AO
     float aoCurve = smoothstep(0.0, 1.0, vAO);

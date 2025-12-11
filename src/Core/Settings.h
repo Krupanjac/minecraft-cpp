@@ -21,6 +21,9 @@ public:
     float aoStrength = 1.0f; // Multiplier for AO
     float gamma = 2.2f;
     float exposure = 1.0f;
+    // Sizes for celestial bodies (in world units)
+    float sunSize = 5.0f;
+    float moonSize = 4.0f;
     bool vsync = true;
     bool enableSSAO = true;
     bool enableVolumetrics = true;
@@ -46,6 +49,8 @@ public:
                     else if (key == "aoStrength") aoStrength = std::stof(value);
                     else if (key == "gamma") gamma = std::stof(value);
                     else if (key == "exposure") exposure = std::stof(value);
+                    else if (key == "sunSize") sunSize = std::stof(value);
+                    else if (key == "moonSize") moonSize = std::stof(value);
                     else if (key == "vsync") vsync = (value == "1");
                     else if (key == "enableSSAO") enableSSAO = (value == "1");
                     else if (key == "enableVolumetrics") enableVolumetrics = (value == "1");
@@ -68,6 +73,8 @@ public:
         file << "aoStrength=" << aoStrength << "\n";
         file << "gamma=" << gamma << "\n";
         file << "exposure=" << exposure << "\n";
+        file << "sunSize=" << sunSize << "\n";
+        file << "moonSize=" << moonSize << "\n";
         file << "vsync=" << (vsync ? "1" : "0") << "\n";
         file << "enableSSAO=" << (enableSSAO ? "1" : "0") << "\n";
         file << "enableVolumetrics=" << (enableVolumetrics ? "1" : "0") << "\n";

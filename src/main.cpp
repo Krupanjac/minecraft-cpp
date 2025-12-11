@@ -631,6 +631,8 @@ private:
         }
 
         renderer.setSkyColor(currentSkyColor);
+        renderer.setSunHeight(sunY);
+        renderer.setTimeOfDay(uiManager.timeOfDay);
 
         updatePhysics(deltaTime);
         camera.update(deltaTime);

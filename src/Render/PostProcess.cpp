@@ -130,7 +130,7 @@ void PostProcess::updateJitter(int w, int h) {
     jitterMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(jitterX, jitterY, 0.0f));
 }
 
-void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection) {
+void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection, float volumetricIntensity, const glm::vec3& lightColor) {
     
     glDisable(GL_DEPTH_TEST); // Disable depth test for full screen quads
     auto& settings = Settings::instance();
@@ -189,6 +189,8 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::ma
         volumetricShader.setMat4("invViewProj", glm::inverse(projection * view));
         volumetricShader.setVec3("lightDir", lightDir);
         volumetricShader.setVec3("cameraPos", cameraPos);
+        volumetricShader.setFloat("uIntensity", volumetricIntensity);
+        volumetricShader.setVec3("uLightColor", lightColor);
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     } else {

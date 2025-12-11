@@ -96,8 +96,9 @@ void main() {
     }
     
     // Ambient light
-    // Increase ambient slightly at night so it's not pitch black
-    float ambient = 0.3;
+    // Use sky color brightness as ambient intensity
+    float skyBrightness = dot(uSkyColor, vec3(0.299, 0.587, 0.114)); // Luminance
+    float ambient = clamp(skyBrightness * 0.6, 0.05, 0.4);
     
     // Calculate Shadow
     // Only calculate shadow if surface is facing the light

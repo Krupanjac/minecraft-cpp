@@ -215,6 +215,14 @@ void UIManager::setupVideoSettingsMenu() {
     elements.push_back({cx - btnW/2, startY, btnW, btnH, "BRIGHTNESS: " + std::to_string(s.exposure).substr(0, 3), false, nullptr, true, &s.exposure, nullptr, nullptr, 0.1f, 5.0f});
     startY += btnH + gap;
 
+    // Sun Size
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "SUN SIZE: " + std::to_string(s.sunSize).substr(0, 3), false, nullptr, true, &s.sunSize, nullptr, nullptr, 0.5f, 10.0f});
+    startY += btnH + gap;
+
+    // Moon Size
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "MOON SIZE: " + std::to_string(s.moonSize).substr(0, 3), false, nullptr, true, &s.moonSize, nullptr, nullptr, 0.5f, 10.0f});
+    startY += btnH + gap;
+
     // VSync (Toggle)
     std::string vsyncText = "VSYNC: " + std::string(s.vsync ? "ON" : "OFF");
     elements.push_back({cx - btnW/2, startY, btnW, btnH, vsyncText, false, [](){}, false, nullptr, nullptr, &s.vsync});

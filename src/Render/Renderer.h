@@ -24,6 +24,9 @@ public:
     void setLightDirection(const glm::vec3& direction) { lightDirection = direction; }
     glm::vec3 getLightDirection() const { return lightDirection; }
 
+    void setSunHeight(float height) { sunHeight = height; }
+    void setTimeOfDay(float time) { timeOfDay = time; }
+
     void setSkyColor(const glm::vec3& color) { skyColor = color; }
     // void setShowShadows(bool show) { showShadows = show; } // Removed, uses Settings
 
@@ -50,9 +53,13 @@ private:
     Shader crosshairShader;
     Shader sunShader;
     Shader shadowShader;
+    Shader starShader;
+    Shader cloudShader;
     
     std::unique_ptr<Mesh> crosshairMesh;
     std::unique_ptr<Mesh> sunMesh;
+    std::unique_ptr<Mesh> starMesh;
+    std::unique_ptr<Mesh> cloudMesh;
     std::unique_ptr<Texture> blockAtlas;
     
     // Post Processing
@@ -68,6 +75,8 @@ private:
     
     glm::vec3 lightDirection = glm::vec3(0.5f, 1.0f, 0.3f);
     glm::vec3 skyColor = glm::vec3(0.53f, 0.81f, 0.92f);
+    float sunHeight = 1.0f;
+    float timeOfDay = 0.0f;
     // bool showShadows = true; // Removed
 
     void setupOpenGL();
@@ -75,4 +84,8 @@ private:
     void initCrosshair();
     void initSun();
     void renderSun(const Camera& camera, int windowWidth, int windowHeight);
+    void initStars();
+    void renderStars(const Camera& camera, int windowWidth, int windowHeight);
+    void initClouds();
+    void renderClouds(const Camera& camera, int windowWidth, int windowHeight, const glm::mat4& lightSpaceMatrix);
 };
