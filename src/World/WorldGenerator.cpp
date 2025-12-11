@@ -241,6 +241,9 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             // Only place plants if this column is the surface
             int chunkBaseY = static_cast<int>(worldPos.y);
             if (height >= chunkBaseY && height < chunkBaseY + CHUNK_HEIGHT) {
+                // Ensure we are not underwater
+                if (height < SEA_LEVEL) continue;
+
                 int localY = height - chunkBaseY;
                 // Check if block below is valid for plants (Grass)
                 Block below = chunk->getBlock(x, localY - 1, z);
