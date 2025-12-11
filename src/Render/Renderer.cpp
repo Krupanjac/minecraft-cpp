@@ -58,6 +58,10 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     if (showShadows) {
         shadowMap->bind();
         
+        // Fix shadow acne by rendering back faces
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
+
         shadowShader.use();
         shadowShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
         
@@ -88,6 +92,8 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
             }
         }
         
+        glCullFace(GL_BACK);
+        glDisable(GL_CULL_FACE);
         shadowMap->unbind();
     }
     
