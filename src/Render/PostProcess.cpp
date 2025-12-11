@@ -122,13 +122,15 @@ void PostProcess::updateJitter(int w, int h) {
     frameCount++;
     int index = frameCount % 8;
     
-    float jitterX = (halton23[index][0] * 2.0f - 1.0f) / (float)w;
-    float jitterY = (halton23[index][1] * 2.0f - 1.0f) / (float)h;
+    // Scale to [-0.5, 0.5] pixels (Standard TAA jitter range)
+    // Previous [-1, 1] was too aggressive
+    float jitterX = (halton23[index][0] - 0.5f) / (float)w;
+    float jitterY = (halton23[index][1] - 0.5f) / (float)h;
     
     jitterMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(jitterX, jitterY, 0.0f));
 }
 
-void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir) {
+void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection) {
     
     glDisable(GL_DEPTH_TEST); // Disable depth test for full screen quads
     auto& settings = Settings::instance();
@@ -250,7 +252,7 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::ma
         glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         
         // Update history
-        prevViewProj = projection * view;
+        prevViewProj = unjitteredProjection * view;
         currentHistoryIndex = 1 - currentHistoryIndex;
     } else {
         // No TAA, just blit intermediate to screen
@@ -259,6 +261,6 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::ma
         glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         
         // Keep history updated just in case we toggle it back on (prevents jump)
-        prevViewProj = projection * view;
+        prevViewProj = unjitteredProjection * view;
     }
 }

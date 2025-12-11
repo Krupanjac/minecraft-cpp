@@ -48,8 +48,8 @@ void main() {
         // Clamp history to current neighborhood
         history = clamp(history, minColor, maxColor);
         
-        // Blend: 0.15 current + 0.50 history
-        FragColor = vec4(mix(current, history, 0.50), 1.0);
+        // Blend: 0.2 current + 0.8 history (Reduced from 0.9 to reduce blur)
+        FragColor = vec4(mix(current, history, 0.8), 1.0);
     } else {
         FragColor = vec4(current, 1.0);
     }

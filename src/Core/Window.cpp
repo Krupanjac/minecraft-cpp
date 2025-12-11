@@ -92,11 +92,6 @@ void Window::setMouseButtonCallback(std::function<void(int, int, int)> callback)
 void Window::setFramebufferSizeCallback(std::function<void(int, int)> callback) {
     windowData.framebufferSizeCallback = callback;
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow* win, int w, int h) {
-        // Update internal size
-        Window* self = static_cast<Window*>(glfwGetWindowUserPointer(win)); // This is actually WindowData*, wait.
-        // We can't easily get 'this' from here unless we store it in WindowData or use a different user pointer strategy.
-        // But we can just rely on the callback to update the app.
-        
         auto data = static_cast<WindowData*>(glfwGetWindowUserPointer(win));
         if (data && data->framebufferSizeCallback) data->framebufferSizeCallback(w, h);
     });

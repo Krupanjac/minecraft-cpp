@@ -43,11 +43,14 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     
     // Update frustum
     float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
-    glm::mat4 projection = camera.getProjectionMatrix(aspect);
+    glm::mat4 unjitteredProjection = camera.getProjectionMatrix(aspect);
+    glm::mat4 projection = unjitteredProjection;
     
-    // Apply TAA Jitter
-    postProcess->updateJitter(windowWidth, windowHeight);
-    projection = postProcess->getJitterMatrix() * projection;
+    // Apply TAA Jitter only if TAA is enabled
+    if (Settings::instance().enableTAA) {
+        postProcess->updateJitter(windowWidth, windowHeight);
+        projection = postProcess->getJitterMatrix() * unjitteredProjection;
+    }
 
     glm::mat4 view = camera.getViewMatrix();
     glm::mat4 viewProj = projection * view;
@@ -191,7 +194,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), projection, view, camera.getPosition(), lightDirection);
+    postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), projection, view, camera.getPosition(), lightDirection, unjitteredProjection);
 
     // 3. UI / Overlays (Rendered directly to screen)
     

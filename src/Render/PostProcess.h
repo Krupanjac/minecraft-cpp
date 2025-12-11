@@ -14,7 +14,7 @@ public:
     void resize(int width, int height);
     
     // Main render function
-    void render(GLuint colorTexture, GLuint depthTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir);
+    void render(GLuint colorTexture, GLuint depthTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection);
 
     // TAA specific
     const glm::mat4& getJitterMatrix() const { return jitterMatrix; }

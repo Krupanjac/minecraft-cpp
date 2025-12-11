@@ -66,6 +66,10 @@ void Camera::processMouseMovement(float xoffset, float yoffset) {
     yaw += xoffset;
     pitch += yoffset;
     
+    // Wrap yaw to avoid floating point precision issues with large values
+    if (yaw > 180.0f) yaw -= 360.0f;
+    if (yaw < -180.0f) yaw += 360.0f;
+    
     // Constrain pitch
     if (pitch > 89.0f)
         pitch = 89.0f;

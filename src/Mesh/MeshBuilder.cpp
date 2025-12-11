@@ -56,10 +56,10 @@ void MeshBuilder::addCross(int x, int y, int z, u8 material, u8 ao, MeshData& me
     u8 normalUp = Vertex::packNormal(0, 1, 0); // Fake normal up for lighting
     
     // Quad 1
-    meshData.vertices.emplace_back(x, y, z, normalUp, material, uv00, ao);
-    meshData.vertices.emplace_back(x + 1, y, z + 1, normalUp, material, uv10, ao);
-    meshData.vertices.emplace_back(x + 1, y + 1, z + 1, normalUp, material, uv11, ao);
-    meshData.vertices.emplace_back(x, y + 1, z, normalUp, material, uv01, ao);
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z), normalUp, material, uv00, ao);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y), static_cast<i16>(z + 1), normalUp, material, uv10, ao);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y + 1), static_cast<i16>(z + 1), normalUp, material, uv11, ao);
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y + 1), static_cast<i16>(z), normalUp, material, uv01, ao);
     
     u32 baseIdx = static_cast<u32>(meshData.vertices.size()) - 4;
     // Double sided
@@ -69,10 +69,10 @@ void MeshBuilder::addCross(int x, int y, int z, u8 material, u8 ao, MeshData& me
     meshData.indices.push_back(baseIdx + 3); meshData.indices.push_back(baseIdx + 2); meshData.indices.push_back(baseIdx + 0);
 
     // Quad 2
-    meshData.vertices.emplace_back(x, y, z + 1, normalUp, material, uv00, ao);
-    meshData.vertices.emplace_back(x + 1, y, z, normalUp, material, uv10, ao);
-    meshData.vertices.emplace_back(x + 1, y + 1, z, normalUp, material, uv11, ao);
-    meshData.vertices.emplace_back(x, y + 1, z + 1, normalUp, material, uv01, ao);
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z + 1), normalUp, material, uv00, ao);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y), static_cast<i16>(z), normalUp, material, uv10, ao);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y + 1), static_cast<i16>(z), normalUp, material, uv11, ao);
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y + 1), static_cast<i16>(z + 1), normalUp, material, uv01, ao);
     
     baseIdx = static_cast<u32>(meshData.vertices.size()) - 4;
     // Double sided

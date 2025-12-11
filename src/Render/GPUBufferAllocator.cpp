@@ -63,7 +63,7 @@ GPUBufferAllocator::Allocation GPUBufferAllocator::allocate(size_t size) {
     return alloc;
 }
 
-void GPUBufferAllocator::free(const Allocation& allocation) {
+void GPUBufferAllocator::free(const Allocation& /*allocation*/) {
     // Simple allocator doesn't support individual frees
     // In production, use a proper memory allocator
 }

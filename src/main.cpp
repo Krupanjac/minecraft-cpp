@@ -397,25 +397,28 @@ private:
     }
 
     void processInput(float deltaTime) {
-        // Mouse input for UI
+        // Mouse input
         double xpos, ypos;
         glfwGetCursorPos(window->getNative(), &xpos, &ypos);
         
-        // Handle DPI scaling / Fullscreen coordinate mapping
+        // Handle DPI scaling for UI only
         int winW, winH;
         glfwGetWindowSize(window->getNative(), &winW, &winH);
         int fbW, fbH;
         glfwGetFramebufferSize(window->getNative(), &fbW, &fbH);
         
+        double uiX = xpos;
+        double uiY = ypos;
+        
         if (winW > 0 && winH > 0) {
-            xpos *= (double)fbW / winW;
-            ypos *= (double)fbH / winH;
+            uiX *= (double)fbW / winW;
+            uiY *= (double)fbH / winH;
         }
 
         bool mousePressed = glfwGetMouseButton(window->getNative(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
         
         if (uiManager.isMenuOpen()) {
-            uiManager.update(deltaTime, xpos, ypos, mousePressed);
+            uiManager.update(deltaTime, uiX, uiY, mousePressed);
             firstMouse = true; // Reset mouse look when returning to game
             return;
         }
@@ -435,12 +438,17 @@ private:
             firstMouse = false;
         }
         
+        // Use raw coordinates for camera movement to avoid DPI scaling artifacts
         float xoffset = static_cast<float>(xpos - lastX);
         float yoffset = static_cast<float>(lastY - ypos); // Reversed
         
         lastX = xpos;
         lastY = ypos;
         
+        // Ignore micro-movements (jitter) from high-DPI mice or sensor noise
+        if (std::abs(xoffset) < 0.1f) xoffset = 0.0f;
+        if (std::abs(yoffset) < 0.1f) yoffset = 0.0f;
+
         camera.processMouseMovement(xoffset, yoffset);
     }
     

@@ -24,7 +24,7 @@ public:
     bool vsync = true;
     bool enableSSAO = true;
     bool enableVolumetrics = true;
-    bool enableTAA = true;
+    bool enableTAA = false; // Disabled by default due to potential jitter/shaking artifacts
     int fullscreen = 0; // 0: Windowed, 1: Fullscreen, 2: Borderless
 
     void load() {
