@@ -75,7 +75,16 @@ public:
             return false;
         }
         
-        uiManager.initialize(window->getWidth(), window->getHeight());
+        // Apply initial settings
+        window->setVSync(Settings::instance().vsync);
+        if (Settings::instance().fullscreen) {
+            window->setFullscreen(true);
+        }
+        
+        // Get actual framebuffer size for initialization
+        int fbW, fbH;
+        glfwGetFramebufferSize(window->getNative(), &fbW, &fbH);
+        uiManager.initialize(fbW, fbH);
         
         // Setup UI Callbacks
         uiManager.setOnNewGame([this](std::string name, long seed) {
@@ -93,6 +102,7 @@ public:
         
         uiManager.setOnSettingsChanged([this]() {
             window->setVSync(Settings::instance().vsync);
+            window->setFullscreen(Settings::instance().fullscreen);
         });
 
         uiManager.setOnSave([this]() {
@@ -396,6 +406,18 @@ private:
         // Mouse input for UI
         double xpos, ypos;
         glfwGetCursorPos(window->getNative(), &xpos, &ypos);
+        
+        // Handle DPI scaling / Fullscreen coordinate mapping
+        int winW, winH;
+        glfwGetWindowSize(window->getNative(), &winW, &winH);
+        int fbW, fbH;
+        glfwGetFramebufferSize(window->getNative(), &fbW, &fbH);
+        
+        if (winW > 0 && winH > 0) {
+            xpos *= (double)fbW / winW;
+            ypos *= (double)fbH / winH;
+        }
+
         bool mousePressed = glfwGetMouseButton(window->getNative(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
         
         if (uiManager.isMenuOpen()) {

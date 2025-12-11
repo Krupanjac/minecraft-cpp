@@ -27,6 +27,7 @@ public:
     
     void setCursorMode(int mode);
     void setVSync(bool enabled);
+    void setFullscreen(bool enabled);
     bool isKeyPressed(int key) const;
     bool isMouseButtonPressed(int button) const;
 
@@ -34,6 +35,7 @@ private:
     GLFWwindow* window;
     int width;
     int height;
+    int windowedX = 100, windowedY = 100, windowedWidth = 1280, windowedHeight = 720;
     
     static void errorCallback(int error, const char* description);
 

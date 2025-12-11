@@ -17,10 +17,10 @@ void main()
     vec3 vol = texture(volumetric, TexCoords).rgb;
     
     // Apply AO
-    // hdrColor *= ao; // DEBUG: Disable AO to check if it's causing black screen
+    hdrColor *= ao; 
     
     // Add Volumetric Lighting
-    // hdrColor += vol; // DEBUG: Disable Volumetric
+    hdrColor += vol; 
     
     // Tone mapping (Reinhard)
     vec3 mapped = vec3(1.0) - exp(-hdrColor * exposure);

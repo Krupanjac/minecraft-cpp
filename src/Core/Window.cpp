@@ -92,6 +92,11 @@ void Window::setMouseButtonCallback(std::function<void(int, int, int)> callback)
 void Window::setFramebufferSizeCallback(std::function<void(int, int)> callback) {
     windowData.framebufferSizeCallback = callback;
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow* win, int w, int h) {
+        // Update internal size
+        Window* self = static_cast<Window*>(glfwGetWindowUserPointer(win)); // This is actually WindowData*, wait.
+        // We can't easily get 'this' from here unless we store it in WindowData or use a different user pointer strategy.
+        // But we can just rely on the callback to update the app.
+        
         auto data = static_cast<WindowData*>(glfwGetWindowUserPointer(win));
         if (data && data->framebufferSizeCallback) data->framebufferSizeCallback(w, h);
     });
@@ -103,6 +108,34 @@ void Window::setCursorMode(int mode) {
 
 void Window::setVSync(bool enabled) {
     glfwSwapInterval(enabled ? 1 : 0);
+}
+
+void Window::setFullscreen(bool enabled) {
+    bool isCurrentlyFullscreen = glfwGetWindowMonitor(window) != nullptr;
+    if (enabled == isCurrentlyFullscreen) return;
+
+    LOG_INFO("Setting Fullscreen: " + std::string(enabled ? "ON" : "OFF"));
+    if (enabled) {
+        // Store current window state
+        glfwGetWindowPos(window, &windowedX, &windowedY);
+        glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
+        
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        if (!monitor) {
+            LOG_ERROR("Failed to get primary monitor");
+            return;
+        }
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+        if (!mode) {
+            LOG_ERROR("Failed to get video mode");
+            return;
+        }
+        
+        glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+    } else {
+        // Restore windowed state
+        glfwSetWindowMonitor(window, nullptr, windowedX, windowedY, windowedWidth, windowedHeight, 0);
+    }
 }
 
 bool Window::isKeyPressed(int key) const {
