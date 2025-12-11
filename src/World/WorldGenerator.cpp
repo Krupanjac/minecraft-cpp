@@ -82,6 +82,14 @@ float WorldGenerator::getHumidity(float x, float z) const {
 }
 
 BiomeType WorldGenerator::getBiome(float x, float z) const {
+    // Override biome based on height (Continentalness)
+    // We need to calculate height here, but avoid infinite recursion.
+    // getHeight() uses noise2D, which is safe.
+    float h = getHeight(x, z);
+    
+    if (h > 85.0f) return BiomeType::SNOWY_TUNDRA; // Peaks
+    if (h > 60.0f) return BiomeType::MOUNTAINS;    // Highlands
+    
     float temp = getTemperature(x, z);
     float humid = getHumidity(x, z);
     
@@ -128,21 +136,9 @@ bool WorldGenerator::isCave(float x, float y, float z) const {
 }
 
 int WorldGenerator::getSurfaceHeight(int x, int z) const {
-    BiomeType biome = getBiome(static_cast<float>(x), static_cast<float>(z));
-    BiomeInfo biomeInfo = getBiomeInfo(biome);
-    
+    // Trust the height map directly as it now incorporates continentalness and roughness
     float baseHeight = getHeight(static_cast<float>(x), static_cast<float>(z));
-    float biomeHeightMod = (biomeInfo.heightVariation - 0.5f) * 20.0f;
-    int height = static_cast<int>(baseHeight + biomeHeightMod);
-    
-    if (biome == BiomeType::OCEAN) {
-        height = std::min(height, SEA_LEVEL - 5);
-    }
-    if (biome == BiomeType::MOUNTAINS) {
-        float mountainNoise = noise2D(x * 0.005f, z * 0.005f);
-        height += static_cast<int>(mountainNoise * 30.0f);
-    }
-    return height;
+    return static_cast<int>(baseHeight);
 }
 
 bool WorldGenerator::hasTree(int x, int z, BiomeType biome) const {
@@ -369,18 +365,22 @@ float WorldGenerator::getNoise(float x, float y, float z) const {
 }
 
 float WorldGenerator::getHeight(float x, float z) const {
-    // Fractal Brownian Motion (FBM)
-    // Adding multiple layers of noise (octaves) with increasing frequency and decreasing amplitude
+    // 1. Continentalness (Macro-scale geography)
+    // Low frequency noise to define Oceans vs Land vs Mountains
+    // Scale * 0.05 makes it 20x larger features than the detail noise
+    float continent = noise2D(x * NOISE_SCALE * 0.05f, z * NOISE_SCALE * 0.05f);
+    
+    // 2. Erosion/Detail (Micro-scale details)
+    // 8-octave FBM
     int octaves = 8;
     float amplitude = 1.0f;
     float frequency = 1.0f;
-    float persistence = 0.5f; // How much amplitude decreases per octave
-    float lacunarity = 2.0f;  // How much frequency increases per octave
+    float persistence = 0.5f;
+    float lacunarity = 2.0f;
     
-    float totalNoise = 0.0f;
+    float detailNoise = 0.0f;
     float maxAmplitude = 0.0f;
     
-    // Use different offsets for each octave to avoid artifacts
     float offsets[] = {
         0.0f, 123.45f, 678.90f, 321.54f,
         987.65f, 456.78f, 135.79f, 246.80f
@@ -388,34 +388,57 @@ float WorldGenerator::getHeight(float x, float z) const {
 
     for (int i = 0; i < octaves; ++i) {
         float n = noise2D((x + offsets[i]) * NOISE_SCALE * frequency, (z + offsets[i]) * NOISE_SCALE * frequency);
-        totalNoise += n * amplitude;
+        detailNoise += n * amplitude;
         maxAmplitude += amplitude;
         
         amplitude *= persistence;
         frequency *= lacunarity;
     }
+    detailNoise /= maxAmplitude; // [-1, 1]
     
-    // Normalize to [-1, 1]
-    // Gradient noise typically has a range smaller than [-1, 1] (approx [-0.7, 0.7])
-    // We multiply by 1.5 to stretch the contrast and utilize the full range
-    totalNoise = (totalNoise / maxAmplitude) * 1.5f;
-    totalNoise = std::clamp(totalNoise, -1.0f, 1.0f);
+    // 3. Terrain Shaping
+    // Map continentalness to base height and roughness
     
-    // Map to [0, 1]
-    float normalizedNoise = (totalNoise + 1.0f) * 0.5f;
+    // Bias towards land: Shift continent up slightly
+    // continent range is approx [-0.7, 0.7] with gradient noise
+    // Let's treat anything < -0.1 as water, > -0.1 as land
     
-    // Exponential scaling: 2 ^ (noise * power)
-    // Increased power to 8.0 for taller mountains
-    float power = 8.0f;
-    float heightFactor = std::pow(2.0f, normalizedNoise * power);
+    float baseHeight = SEA_LEVEL;
+    float roughness = 0.0f;
     
-    // Base height calculation
-    // At noise=0.5 (average), heightFactor is 2^4 = 16.
-    // Base 20 + 16 = 36 (Just above SEA_LEVEL 32)
-    // Max height: 20 + 256 = 276 (Very high peaks)
-    // Min height: 20 + 1 = 21 (Deep ocean)
+    if (continent < -0.1f) {
+        // Ocean
+        // Map [-0.7, -0.1] to [10, 30]
+        float t = (continent + 0.7f) / 0.6f; // 0 to 1
+        baseHeight = 10.0f + t * 20.0f;
+        roughness = 2.0f;
+    } else {
+        // Land
+        // Map [-0.1, 0.7] to [32, 100+]
+        float t = (continent + 0.1f) / 0.8f; // 0 to 1
+        
+        // Non-linear height curve
+        // Plains (low t): 32-45
+        // Mountains (high t): 45-120
+        if (t < 0.45f) {
+            // Plains / Low Hills (Flatter)
+            float pt = t / 0.45f;
+            baseHeight = SEA_LEVEL + 2.0f + pt * 8.0f; // 34 to 42
+            roughness = 3.0f + pt * 4.0f;
+        } else {
+            // Mountains (Steeper and rougher)
+            float mt = (t - 0.45f) / 0.55f; // 0 to 1
+            
+            // Use a square root curve to make mountains rise IMMEDIATELY and dramatically
+            // This creates a sharp transition (foothills -> cliffs) rather than a slow ramp
+            baseHeight = 42.0f + std::sqrt(mt) * 180.0f; 
+            
+            // High roughness for jagged peaks
+            roughness = 20.0f + mt * 60.0f;
+        }
+    }
     
-    return 20.0f + heightFactor;
+    return baseHeight + detailNoise * roughness;
 }
 
 float WorldGenerator::noise3D(float x, float y, float z) const {
