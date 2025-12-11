@@ -98,11 +98,6 @@ public:
             }
         });
         
-        uiManager.setOnSettingsChanged([this]() {
-            window->setVSync(Settings::instance().vsync);
-            window->setFullscreen(Settings::instance().fullscreen);
-        });
-
         uiManager.setOnSave([this]() {
             WorldSerializer::saveWorld(currentWorldName, chunkManager, camera.getPosition(), currentSeed);
             LOG_INFO("Game Saved");
@@ -362,6 +357,7 @@ private:
         camera.setFov(s.fov);
         camera.setSensitivity(s.mouseSensitivity);
         window->setVSync(s.vsync);
+        window->setFullscreen(s.fullscreen);
         // Render distance is handled in ChunkManager::update
         // AO and Gamma are handled in Renderer::render
     }
