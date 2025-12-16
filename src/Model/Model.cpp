@@ -77,35 +77,37 @@ void Model::loadModel(const std::string& path) {
     const tinygltf::Scene& scene = impl->model.scenes[impl->model.defaultScene > -1 ? impl->model.defaultScene : 0];
     
     // Build the full tree
+    // Build the full tree
+    nodeMap.resize(impl->model.nodes.size());
+    
     std::function<std::unique_ptr<Node>(int)> processNode = [&](int nodeIndex) -> std::unique_ptr<Node> {
         const tinygltf::Node& inputNode = impl->model.nodes[nodeIndex];
         auto newNode = std::make_unique<Node>();
+        newNode->index = nodeIndex;
+        // Check array bounds before assignment
+        if (nodeIndex >= 0 && static_cast<size_t>(nodeIndex) < nodeMap.size()) {
+            nodeMap[nodeIndex] = newNode.get();
+        }
         
         // Transform
         if (inputNode.matrix.size() == 16) {
-            newNode->localTransform = glm::make_mat4(inputNode.matrix.data());
+            newNode->matrix = glm::make_mat4(inputNode.matrix.data());
+            newNode->useTRS = false;
         } else {
-            // TRS
-            glm::vec3 t(0.0f), s(1.0f);
-            glm::quat r(1.0f, 0.0f, 0.0f, 0.0f);
-            
+            newNode->useTRS = true;
             if (inputNode.translation.size() == 3) {
-                t = glm::make_vec3(inputNode.translation.data());
+                newNode->translation = glm::make_vec3(inputNode.translation.data());
             }
             if (inputNode.rotation.size() == 4) {
-                r = glm::make_quat(inputNode.rotation.data());
+                newNode->rotation = glm::make_quat(inputNode.rotation.data());
             }
             if (inputNode.scale.size() == 3) {
-                s = glm::make_vec3(inputNode.scale.data());
+                newNode->scale = glm::make_vec3(inputNode.scale.data());
             }
-
-            glm::mat4 m = glm::mat4(1.0f);
-            m = glm::translate(m, t);
-            m = glm::rotate(m, glm::angle(r), glm::axis(r)); // This might need verification of axis/angle vs quat mat cast
-            m = m * glm::mat4_cast(r); // Safest
-            m = glm::scale(m, s);
-            newNode->localTransform = m;
         }
+        // Calculate initial local transform
+        // (Moved to getLocalMatrix or updateGlobalTransforms)
+        // Check getLocalMatrix() in Node struct definition (Model.h)
 
         // Mesh
         if (inputNode.mesh > -1) {
@@ -181,7 +183,9 @@ void Model::loadModel(const std::string& path) {
 
         // Children
         for (int childIdx : inputNode.children) {
-            newNode->children.push_back(processNode(childIdx));
+            auto childNode = processNode(childIdx);
+            childNode->parent = newNode.get();
+            newNode->children.push_back(std::move(childNode));
         }
 
         return newNode;
@@ -189,6 +193,35 @@ void Model::loadModel(const std::string& path) {
 
     for (int nodeIdx : scene.nodes) {
         nodes.push_back(processNode(nodeIdx));
+    }
+    
+    loadSkins();
+    // Initial update to set global transforms
+    updateAnimation(0.0f);
+}
+
+void Model::loadSkins() {
+    for (const auto& sourceSkin : impl->model.skins) {
+        Skin skin;
+        skin.name = sourceSkin.name;
+        skin.skeletonRoot = sourceSkin.skeleton;
+        
+        for (int jointIndex : sourceSkin.joints) {
+            skin.joints.push_back(jointIndex);
+        }
+        
+        if (sourceSkin.inverseBindMatrices > -1) {
+            const auto& accessor = impl->model.accessors[sourceSkin.inverseBindMatrices];
+            const auto& bufferView = impl->model.bufferViews[accessor.bufferView];
+            const auto& buffer = impl->model.buffers[bufferView.buffer];
+            
+            skin.inverseBindMatrices.resize(accessor.count);
+            memcpy(skin.inverseBindMatrices.data(), 
+                   &buffer.data[accessor.byteOffset + bufferView.byteOffset], 
+                   accessor.count * sizeof(glm::mat4));
+        }
+        
+        skins.push_back(skin);
     }
 }
 
@@ -198,13 +231,43 @@ void Model::draw(Shader& shader, const glm::mat4& modelMatrix) {
     }
 }
 
-void Model::drawNode(Node* node, Shader& shader, const glm::mat4& parentTransform) {
-    glm::mat4 globalTransform = parentTransform * node->localTransform;
+void Model::updateGlobalTransforms(Node* node, const glm::mat4& parentTransform) {
+    glm::mat4 local = node->matrix;
+    if (node->useTRS) {
+        local = glm::mat4(1.0f);
+        local = glm::translate(local, node->translation);
+        local = local * glm::mat4_cast(node->rotation);
+        local = glm::scale(local, node->scale);
+    }
+    node->localTransform = local;
+    node->globalTransform = parentTransform * local;
+    
+    for (auto& child : node->children) {
+        updateGlobalTransforms(child.get(), node->globalTransform);
+    }
+}
+
+void Model::drawNode(Node* node, Shader& shader, const glm::mat4& modelMatrix) {
+    if (!node) return;
+
+    // Current node's world transform
+    glm::mat4 worldTransform = modelMatrix * node->globalTransform;
+    shader.setMat4("uModel", worldTransform);
+
+    // Skinning
+    if (!skins.empty() && activeSkin >= 0 && static_cast<size_t>(activeSkin) < skins.size() && !jointMatrices.empty()) {
+        shader.setBool("uHasSkin", true);
+        // Using getProgram() as ID is private
+        glUniformMatrix4fv(glGetUniformLocation(shader.getProgram(), "uJoints"), static_cast<GLsizei>(jointMatrices.size()), GL_FALSE, glm::value_ptr(jointMatrices[0]));
+    } else {
+        shader.setBool("uHasSkin", false);
+    }
 
     for (const auto& primitive : node->primitives) {
         // Material binding
         if (primitive.materialIndex >= 0 && static_cast<size_t>(primitive.materialIndex) < impl->model.materials.size()) {
             const auto& mat = impl->model.materials[primitive.materialIndex];
+            
             // Base Color Texture
             int texIndex = mat.pbrMetallicRoughness.baseColorTexture.index;
             if (texIndex >= 0 && static_cast<size_t>(texIndex) < textures.size()) {
@@ -238,31 +301,135 @@ void Model::drawNode(Node* node, Shader& shader, const glm::mat4& parentTransfor
             shader.setVec4("uBaseColor", glm::vec4(1.0f));
         }
         
-        shader.setMat4("uModel", globalTransform); // Override model matrix passed by Entity if needed, or multiply? 
-        // Wait, Entity calls draw() after setting uModel with its own transform.
-        // If we set uModel here, we overwrite Entity's transform!
-        // We should pass Entity transform into draw() or multiply.
-        // Actually, drawNode should probably take a "baseTransform" which is the Entity's transform.
-        // BUT, shader.setMat4("uModel", globalTransform) sets exact world space matrix.
-        // Ideally we assume `parentTransform` passed to `draw` IS the Entity transform.
-        
         glBindVertexArray(primitive.VAO);
         if (primitive.indexCount > 0) {
             glDrawElements(primitive.mode, primitive.indexCount, primitive.indexType, 0); 
         } else {
-            // Draw arrays? GLTF usually indexed.
+            // Arrays not supported yet
         }
         glBindVertexArray(0);
     }
 
     for (const auto& child : node->children) {
-        drawNode(child.get(), shader, globalTransform);
+        drawNode(child.get(), shader, modelMatrix);
     }
 }
 
+void Model::playAnimation(const std::string& name, bool loop) {
+    for (size_t i = 0; i < impl->model.animations.size(); i++) {
+        if (impl->model.animations[i].name == name) {
+            currentAnimation = i;
+            currentAnimationName = name;
+            animationLoop = loop;
+            animationTime = 0.0f;
+            
+            // Calculate duration
+            animationDuration = 0.0f;
+            for (const auto& sampler : impl->model.animations[i].samplers) {
+                const auto& accessor = impl->model.accessors[sampler.input];
+                animationDuration = std::max(animationDuration, static_cast<float>(accessor.maxValues[0]));
+            }
+            LOG_INFO("Playing animation: " + name + " (Duration: " + std::to_string(animationDuration) + "s)");
+            return;
+        }
+    }
+    LOG_WARNING("Animation not found: " + name);
+}
+
+void Model::stopAnimation() {
+    currentAnimation = -1;
+}
+
 void Model::updateAnimation(float deltaTime) {
-    animationTime += deltaTime;
-    // Placeholder for implementing skeletal animation later
+    if (currentAnimation >= 0) {
+        animationTime += deltaTime;
+        if (animationTime > animationDuration) {
+            if (animationLoop) {
+                animationTime = fmod(animationTime, animationDuration);
+            } else {
+                animationTime = animationDuration;
+            }
+        }
+        
+        const auto& anim = impl->model.animations[currentAnimation];
+        for (const auto& channel : anim.channels) {
+            Node* node = nodeMap[channel.target_node];
+            if (!node) continue;
+            
+            const auto& sampler = anim.samplers[channel.sampler];
+            const auto& inputAccessor = impl->model.accessors[sampler.input];
+            const auto& outputAccessor = impl->model.accessors[sampler.output];
+            const auto& bufferView = impl->model.bufferViews[inputAccessor.bufferView];
+            const auto& buffer = impl->model.buffers[bufferView.buffer];
+            
+            const float* times = reinterpret_cast<const float*>(&buffer.data[inputAccessor.byteOffset + bufferView.byteOffset]);
+            
+            // Find keyframe
+            // Simple linear search or binary search
+            size_t count = inputAccessor.count;
+            size_t prevKey = 0;
+            size_t nextKey = 0;
+            for (size_t i = 0; i < count - 1; i++) {
+                if (animationTime >= times[i] && animationTime <= times[i+1]) {
+                    prevKey = i;
+                    nextKey = i + 1;
+                    break;
+                }
+            }
+            float t = (animationTime - times[prevKey]) / (times[nextKey] - times[prevKey]);
+            if (nextKey == 0) t = 0.0f; // Start or End
+            
+            const auto& outBufferView = impl->model.bufferViews[outputAccessor.bufferView];
+            const auto& outBuffer = impl->model.buffers[outBufferView.buffer];
+            const unsigned char* outData = &outBuffer.data[outputAccessor.byteOffset + outBufferView.byteOffset];
+            
+            if (channel.target_path == "translation") {
+                const glm::vec3* values = reinterpret_cast<const glm::vec3*>(outData);
+                node->translation = glm::mix(values[prevKey], values[nextKey], t);
+                node->useTRS = true;
+            } else if (channel.target_path == "rotation") {
+                const glm::vec4* values = reinterpret_cast<const glm::vec4*>(outData); // vec4 xyzw
+                glm::quat q1 = glm::make_quat(&values[prevKey].x); // GLM make_quat might expect wxyz? standard glTF is xyzw. glm::quat constructor is w,x,y,z usually!
+                // glm::make_quat from float ptr assumes memory layout. GLM quat memory is x,y,z,w by default?
+                // GLTF is x,y,z,w.
+                // glm::quat is x,y,z,w in memory if using GLM_FORCE_QUAT_DATA_XYZW (which might be default).
+                // But let's be safe.
+                glm::quat qA = glm::quat(values[prevKey].w, values[prevKey].x, values[prevKey].y, values[prevKey].z);
+                glm::quat qB = glm::quat(values[nextKey].w, values[nextKey].x, values[nextKey].y, values[nextKey].z);
+                node->rotation = glm::slerp(qA, qB, t);
+                node->useTRS = true;
+            } else if (channel.target_path == "scale") {
+                const glm::vec3* values = reinterpret_cast<const glm::vec3*>(outData);
+                node->scale = glm::mix(values[prevKey], values[nextKey], t);
+                node->useTRS = true;
+            }
+        }
+    }
+    
+    // Update transforms hierarchy
+    for (auto& node : nodes) {
+        updateGlobalTransforms(node.get(), glm::mat4(1.0f));
+    }
+    
+    // Compute joints
+    if (!skins.empty()) {
+        const auto& skin = skins[activeSkin];
+        jointMatrices.resize(skin.joints.size());
+        for (size_t i = 0; i < skin.joints.size(); i++) {
+            int jointNodeIdx = skin.joints[i];
+            Node* jointNode = nodeMap[jointNodeIdx];
+            if (jointNode) {
+                glm::mat4 inverseBind = (i < skin.inverseBindMatrices.size()) ? skin.inverseBindMatrices[i] : glm::mat4(1.0f);
+                glm::mat4 global = jointNode->globalTransform;
+                
+                // If skeleton root is specified, we might need to multiply by inverse of skeleton root?
+                // But generally glTF global transforms are enough if we use inverseBindMatrix properly.
+                // The formula is: JointMatrix = GlobalTransform * InverseBindMatrix
+                // But GlobalTransform is model space.
+                jointMatrices[i] = global * inverseBind;
+            }
+        }
+    }
 }
 
 }

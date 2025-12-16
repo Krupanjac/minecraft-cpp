@@ -373,6 +373,11 @@ public:
             frameAccumulator++;
             fpsUpdateTimer += deltaTime;
             
+            if (playerEntity) {
+                // Sync velocity from camera before update so animation state machine can use it
+                playerEntity->setVelocity(camera.velocity);
+                playerEntity->update(deltaTime);
+            }
             if (fpsUpdateTimer >= 0.5f) {
                 displayFPS = fpsAccumulator / frameAccumulator;
                 fpsAccumulator = 0.0f;
@@ -786,6 +791,7 @@ private:
             // Let's try matching camera yaw + 180 or 90. 
             // Camera::yaw is in degrees.
             playerEntity->setRotation(glm::vec3(0.0f, -camera.getYaw() + 90.0f, 0.0f));
+            playerEntity->setVelocity(camera.velocity);
 
             // Only render if we are in third person OR we want to see body parts (requires careful culling)
             // User requested toggle.

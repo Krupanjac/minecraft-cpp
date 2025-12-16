@@ -19,4 +19,26 @@ PlayerEntity::PlayerEntity(const glm::vec3& startPos) : Entity(startPos) {
 
 void PlayerEntity::update(float deltaTime) {
     Entity::update(deltaTime);
+    
+    if (model) {
+        float speed = glm::length(glm::vec2(velocity.x, velocity.z));
+        std::string currentAnim = model->getCurrentAnimation();
+        
+        // Simple state machine
+        if (speed > 0.1f) {
+            // Check if we are already playing a walk/run animation
+            if (currentAnim != "walk" && currentAnim != "run" && currentAnim.find("walk") == std::string::npos) {
+                // Try to find a walk animation. 
+                // Using "walk" as a guess, assuming the model has one.
+                model->playAnimation("walk", true);
+            }
+        } else {
+             // Idle
+             if (currentAnim != "idle" && currentAnim.find("idle") == std::string::npos) {
+                  model->playAnimation("idle", true);
+                  // If "idle" not found, try "idle1" based on user list
+                  if (model->getCurrentAnimation() != "idle") model->playAnimation("idle1", true);
+             }
+        }
+    }
 }
