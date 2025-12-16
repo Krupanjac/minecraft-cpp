@@ -153,11 +153,49 @@ public:
         
         // Setup teleport callback for map
         uiManager.setOnTeleport([this](float x, float z) {
-            // Get height at target location
+            // Get height at target location (from generator which is deterministic)
             float height = worldGenerator.getHeight(x, z);
-            // Teleport player to that location (slightly above ground)
-            camera.setPosition(glm::vec3(x, height + 2.0f, z));
+            // Teleport camera high above the target so we can safely prefetch chunks below
+            camera.setPosition(glm::vec3(x, height + 30.0f, z));
+            // Reset velocity to avoid immediate fall-through on teleports
+            camera.velocity = glm::vec3(0.0f);
             LOG_INFO("Teleported to: " + std::to_string(x) + ", " + std::to_string(z));
+
+            // Immediately generate & mesh nearby chunks synchronously to avoid falling through and missing water/shadows
+            const int teleportPrefetchRadius = 4; // chunks
+            // Generate
+            auto chunksToGen = chunkManager.getChunksToGenerate(camera.getPosition(), teleportPrefetchRadius, 10000);
+            for (const auto& pos : chunksToGen) {
+                chunkManager.requestChunkGeneration(pos);
+                auto chunk = chunkManager.getChunk(pos);
+                if (chunk) {
+                    if (chunkManager.hasPreloadedData(pos)) {
+                        auto blocks = chunkManager.getPreloadedData(pos);
+                        std::copy(blocks.begin(), blocks.end(), chunk->getBlocks().begin());
+                        chunk->setModified(true);
+                    } else {
+                        worldGenerator.generate(chunk);
+                    }
+                    chunk->setState(ChunkState::MESH_BUILD);
+                }
+            }
+            // Mesh synchronously (avoid large freeze by limiting count)
+            auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), 1000);
+            int meshed = 0;
+            for (auto& chunk : chunksToMesh) {
+                if (meshed > 200) break; // cap work this frame to avoid massive hitch; still much faster than falling through
+                auto neighbors = chunkManager.getNeighbors(chunk->getPosition());
+                MeshData meshData = meshBuilder.buildChunkMesh(chunk,
+                    neighbors[0], neighbors[1], neighbors[2], neighbors[3], neighbors[4], neighbors[5], chunk->getCurrentLOD());
+
+                renderer.uploadChunkMesh(chunk->getPosition(), meshData.vertices, meshData.indices, meshData.waterVertices, meshData.waterIndices);
+                chunk->setState(ChunkState::GPU_UPLOADED);
+                meshed++;
+            }
+
+            // After some synchronous meshing, lower camera to safe spawn height based on blocks now present
+            int terrainY = chunkManager.getHeightAt(static_cast<int>(x), static_cast<int>(z));
+            camera.setPosition(glm::vec3(x, static_cast<float>(terrainY) + 2.0f, z));
         });
         
         // Give UIManager access to world generator for map
@@ -223,9 +261,8 @@ public:
         camera.setPosition(glm::vec3(static_cast<float>(spawnX), initialSpawnY, static_cast<float>(spawnZ)));
         camera.setYaw(-90.0f);
         camera.setPitch(0.0f);
-        
-        // Initial world generation loading screen
-        LOG_INFO("Generating initial world...");
+                // Reset velocities when spawning
+                camera.velocity = glm::vec3(0.0f);
         
         // Load a small radius around player first (e.g. 4 chunks)
         int initialRadius = 4;
@@ -334,6 +371,8 @@ public:
                 // Found the highest block (could be leaves, wood, or ground)
                 // Set spawn point 2 blocks above it
                 camera.setPosition(glm::vec3(static_cast<float>(currentSpawnX), static_cast<float>(y) + 2.5f, static_cast<float>(currentSpawnZ)));
+                // Reset velocity to avoid falling when refinement happened during a long frame
+                camera.velocity = glm::vec3(0.0f);
                 LOG_INFO("Spawn position refined to Y=" + std::to_string(y + 2.5f));
                 foundGround = true;
                 break;
@@ -381,9 +420,12 @@ public:
         while (!window->shouldClose() && running) {
             Time::instance().update();
             float deltaTime = Time::instance().getDeltaTime();
+            // Clamp physics/update delta to avoid large stalls causing physics explosions (teleport/new world)
+            const float MAX_PHYSICS_DELTA = 0.1f; // 100 ms
+            float clampedDelta = std::min(deltaTime, MAX_PHYSICS_DELTA);
             
-            processInput(deltaTime);
-            update(deltaTime);
+            processInput(deltaTime); // Input/GUI can use full frame delta
+            update(clampedDelta); // Physics/render updates use clamped delta
 
             // Update Debug Info
             // Use a smoothed FPS for display to avoid 0 or flickering
