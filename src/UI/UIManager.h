@@ -2,6 +2,7 @@
 
 #include "../Render/Shader.h"
 #include "../Core/Settings.h"
+#include "../World/Block.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -14,7 +15,8 @@ enum class MenuState {
     SETTINGS,
     VIDEO_SETTINGS,
     LOAD_GAME,
-    NEW_GAME
+    NEW_GAME,
+    INVENTORY
 };
 
 struct UIElement {
@@ -34,6 +36,10 @@ struct UIElement {
     // For text input
     bool isInput = false;
     std::string* textRef = nullptr;
+
+    // For Inventory
+    BlockType blockType = BlockType::AIR;
+    bool isInventoryItem = false;
 };
 
 class UIManager {
@@ -60,6 +66,9 @@ public:
 
     void toggleDebug() { showDebug = !showDebug; }
     void updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos);
+
+    BlockType getSelectedBlock() const { return selectedBlock; }
+    void setSelectedBlock(BlockType type) { selectedBlock = type; }
     
     // Debug controls
     float timeOfDay = 0.0f; // 0-1200
@@ -71,6 +80,8 @@ private:
     float currentFPS = 0.0f;
     std::string currentBlockName = "None";
     glm::vec3 currentPlayerPos = glm::vec3(0.0f);
+
+    BlockType selectedBlock = BlockType::STONE; // Default selected block
 
     int width, height;
     Shader uiShader;
@@ -94,10 +105,14 @@ private:
     void setupVideoSettingsMenu();
     void setupLoadGameMenu();
     void setupNewGameMenu();
+    void setupInventoryMenu();
     
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
     void drawText(float x, float y, float scale, const std::string& text, const glm::vec4& color);
     
     // Helper for vector font
     void drawLine(float x1, float y1, float x2, float y2, const glm::vec4& color);
+    
+    // Helper to get color for block preview
+    glm::vec4 getBlockColor(BlockType type);
 };

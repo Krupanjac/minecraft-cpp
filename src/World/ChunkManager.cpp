@@ -323,16 +323,27 @@ bool ChunkManager::hasPreloadedData(const ChunkPos& pos) const {
     return preloadedChunks.find(pos) != preloadedChunks.end();
 }
 
-std::vector<Block> ChunkManager::getPreloadedData(const ChunkPos& pos) {
-    if (hasPreloadedData(pos)) {
-        return preloadedChunks[pos];
+std::vector<Block> ChunkManager::consumePreloadedData(const ChunkPos& pos) {
+    auto it = preloadedChunks.find(pos);
+    if (it != preloadedChunks.end()) {
+        std::vector<Block> blocks = std::move(it->second);
+        preloadedChunks.erase(it);
+        return blocks;
     }
     return {};
 }
 
+std::vector<Block> ChunkManager::getPreloadedData(const ChunkPos& pos) {
+    return consumePreloadedData(pos);
+}
+
 void ChunkManager::scheduleFluidUpdate(int x, int y, int z) {
     std::lock_guard<std::mutex> lock(fluidMutex);
-    fluidQueue.push_back(glm::ivec3(x, y, z));
+    glm::ivec3 pos(x, y, z);
+    if (pendingFluidUpdates.find(pos) == pendingFluidUpdates.end()) {
+        fluidQueue.push_back(pos);
+        pendingFluidUpdates.insert(pos);
+    }
 }
 
 void ChunkManager::updateFluids() {
@@ -348,11 +359,12 @@ void ChunkManager::updateFluids() {
         
         currentQueue.reserve(count);
         
-        // Move 'count' elements to currentQueue
-        auto start = fluidQueue.begin();
-        auto end = fluidQueue.begin() + count;
-        currentQueue.assign(start, end);
-        fluidQueue.erase(start, end);
+        for (size_t i = 0; i < count; ++i) {
+            glm::ivec3 pos = fluidQueue.front();
+            fluidQueue.pop_front();
+            currentQueue.push_back(pos);
+            pendingFluidUpdates.erase(pos);
+        }
     }
     
     // Deduplicate updates for this frame

@@ -64,6 +64,16 @@ public:
                 uiManager.setMenuState(isMenuOpen ? MenuState::NONE : MenuState::IN_GAME_MENU);
                 window->setCursorMode(isMenuOpen ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
             }
+            
+            if (key == GLFW_KEY_E && action == GLFW_PRESS) {
+                if (uiManager.getMenuState() == MenuState::NONE) {
+                    uiManager.setMenuState(MenuState::INVENTORY);
+                    window->setCursorMode(GLFW_CURSOR_NORMAL);
+                } else if (uiManager.getMenuState() == MenuState::INVENTORY) {
+                    uiManager.setMenuState(MenuState::NONE);
+                    window->setCursorMode(GLFW_CURSOR_DISABLED);
+                }
+            }
         });
         
         window->setCharCallback([this](unsigned int codepoint) {
@@ -454,7 +464,7 @@ private:
                     glm::vec3 playerPos = camera.getPosition();
                     glm::vec3 blockPos(x + 0.5f, y + 0.5f, z + 0.5f);
                     if (glm::distance(playerPos, blockPos) > 1.0f) { 
-                        chunkManager.setBlockAt(x, y, z, Block(BlockType::STONE));
+                        chunkManager.setBlockAt(x, y, z, Block(uiManager.getSelectedBlock()));
                     }
                 }
             }
@@ -637,6 +647,7 @@ private:
         updatePhysics(deltaTime);
         camera.update(deltaTime);
         chunkManager.update(camera.getPosition());
+        renderer.cleanUnusedMeshes(chunkManager);
         
         // Generate chunks
         auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), Settings::instance().renderDistance, 10);

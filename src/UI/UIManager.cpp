@@ -77,6 +77,7 @@ void UIManager::setMenuState(MenuState state) {
         case MenuState::VIDEO_SETTINGS: setupVideoSettingsMenu(); break;
         case MenuState::LOAD_GAME: setupLoadGameMenu(); break;
         case MenuState::NEW_GAME: setupNewGameMenu(); break;
+        case MenuState::INVENTORY: setupInventoryMenu(); break;
         case MenuState::NONE: break;
     }
 }
@@ -339,6 +340,76 @@ void UIManager::setupNewGameMenu() {
     }});
 }
 
+void UIManager::setupInventoryMenu() {
+    elements.clear();
+    
+    // Inventory Grid similar to Minecraft
+    float slotSize = 60.0f;
+    float gap = 10.0f;
+    int cols = 9; 
+    
+    std::vector<BlockType> blocks = {
+        BlockType::GRASS, BlockType::DIRT, BlockType::STONE, BlockType::SAND, 
+        BlockType::WOOD, BlockType::LOG, BlockType::LEAVES, BlockType::GRAVEL, 
+        BlockType::SANDSTONE, BlockType::SNOW, BlockType::ICE, BlockType::WATER,
+        BlockType::TALL_GRASS, BlockType::ROSE, BlockType::BEDROCK
+    };
+    
+    float totalW = cols * slotSize + (cols - 1) * gap;
+    // float startX = (width - totalW) / 2.0f;
+    // Align with Minecraft style, usually centered
+    float startX = (width - totalW) / 2.0f;
+    float startY = height / 2.0f - slotSize - 20.0f; 
+    
+    // Draw "Survival Inventory" label
+    elements.push_back({width/2.0f - 150, startY - 60, 300, 30, "INVENTORY", false, nullptr});
+
+    for (size_t i = 0; i < blocks.size(); i++) {
+        int col = i % cols;
+        int row = i / cols;
+        
+        float x = startX + col * (slotSize + gap);
+        float y = startY + row * (slotSize + gap);
+        
+        UIElement el;
+        el.x = x;
+        el.y = y;
+        el.w = slotSize;
+        el.h = slotSize;
+        el.text = ""; 
+        el.isInventoryItem = true;
+        el.blockType = blocks[i];
+        el.onClick = [this, type = blocks[i]]() {
+            selectedBlock = type;
+        };
+        elements.push_back(el);
+    }
+    
+    // Add close instruction
+    elements.push_back({width/2.0f - 100, height - 100.0f, 200, 30, "PRESS [E] TO CLOSE", false, nullptr});
+}
+
+glm::vec4 UIManager::getBlockColor(BlockType type) {
+    switch (type) {
+        case BlockType::GRASS: return glm::vec4(0.3f, 0.8f, 0.3f, 1.0f);
+        case BlockType::DIRT: return glm::vec4(0.5f, 0.3f, 0.1f, 1.0f);
+        case BlockType::STONE: return glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+        case BlockType::SAND: return glm::vec4(0.9f, 0.8f, 0.5f, 1.0f);
+        case BlockType::WOOD: return glm::vec4(0.6f, 0.4f, 0.2f, 1.0f);
+        case BlockType::LEAVES: return glm::vec4(0.1f, 0.5f, 0.1f, 1.0f);
+        case BlockType::SNOW: return glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
+        case BlockType::ICE: return glm::vec4(0.6f, 0.8f, 1.0f, 0.8f);
+        case BlockType::WATER: return glm::vec4(0.2f, 0.4f, 0.8f, 0.6f);
+        case BlockType::GRAVEL: return glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
+        case BlockType::SANDSTONE: return glm::vec4(0.8f, 0.7f, 0.5f, 1.0f);
+        case BlockType::LOG: return glm::vec4(0.4f, 0.3f, 0.1f, 1.0f);
+        case BlockType::TALL_GRASS: return glm::vec4(0.2f, 0.6f, 0.2f, 1.0f);
+        case BlockType::ROSE: return glm::vec4(0.9f, 0.1f, 0.1f, 1.0f);
+        case BlockType::BEDROCK: return glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
+        default: return glm::vec4(1.0f, 0.0f, 1.0f, 1.0f); 
+    }
+}
+
 void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool mousePressed) {
     if (!isMenuOpen()) {
         lastMousePressed = mousePressed;
@@ -442,6 +513,28 @@ void UIManager::render() {
 
         for (const auto& el : elements) {
             glm::vec4 color = el.isHovered ? glm::vec4(0.6f, 0.6f, 0.6f, 1.0f) : glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
+            
+            if (el.isInventoryItem) {
+                // Draw slot background (darker)
+                 color = el.isHovered ? glm::vec4(0.5f, 0.5f, 0.5f, 0.9f) : glm::vec4(0.2f, 0.2f, 0.2f, 0.8f);
+                 drawRect(el.x, el.y, el.w, el.h, color);
+                 
+                 // Draw block color
+                 glm::vec4 blkColor = getBlockColor(el.blockType);
+                 drawRect(el.x + 6, el.y + 6, el.w - 12, el.h - 12, blkColor);
+                 
+                 // Draw selection highlight
+                 if (el.blockType == selectedBlock) {
+                     glm::vec4 hl(1.0f, 1.0f, 1.0f, 1.0f);
+                     float t = 4.0f;
+                     drawRect(el.x, el.y, el.w, t, hl); // Top
+                     drawRect(el.x, el.y + el.h - t, el.w, t, hl); // Bottom
+                     drawRect(el.x, el.y, t, el.h, hl); // Left
+                     drawRect(el.x + el.w - t, el.y, t, el.h, hl); // Right
+                 }
+                 continue;
+            }
+
             drawRect(el.x, el.y, el.w, el.h, color);
             
             // Draw slider indicator

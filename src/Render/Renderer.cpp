@@ -1013,6 +1013,28 @@ void Renderer::renderClouds(const Camera& camera, int windowWidth, int windowHei
     cloudShader.unuse();
 }
 
+void Renderer::cleanUnusedMeshes(const ChunkManager& chunkManager) {
+    const auto& chunks = chunkManager.getChunks();
+    
+    // Clean chunk meshes
+    for (auto it = chunkMeshes.begin(); it != chunkMeshes.end(); ) {
+        if (chunks.find(it->first) == chunks.end()) {
+            it = chunkMeshes.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    
+    // Clean water meshes
+    for (auto it = waterMeshes.begin(); it != waterMeshes.end(); ) {
+        if (chunks.find(it->first) == chunks.end()) {
+            it = waterMeshes.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
 void Renderer::uploadChunkMesh(const ChunkPos& pos, 
                               const std::vector<Vertex>& vertices, 
                               const std::vector<u32>& indices,

@@ -4,10 +4,14 @@
 #include "../Util/Config.h"
 #include "Chunk.h"
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
 #include <vector>
+#include <deque>
 #include <string>
 #include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 
 #include <mutex>
 
@@ -61,17 +65,22 @@ public:
     void clear() { 
         chunks.clear(); 
         preloadedChunks.clear();
+        std::lock_guard<std::mutex> lock(fluidMutex);
+        fluidQueue.clear();
+        pendingFluidUpdates.clear();
     }
     
     // Modified chunk cache for single-file loading
     void preloadChunkData(const ChunkPos& pos, const std::vector<Block>& blocks);
     bool hasPreloadedData(const ChunkPos& pos) const;
+    std::vector<Block> consumePreloadedData(const ChunkPos& pos);
     std::vector<Block> getPreloadedData(const ChunkPos& pos);
 
 private:
     std::unordered_map<ChunkPos, std::shared_ptr<Chunk>> chunks;
     std::unordered_map<ChunkPos, std::vector<Block>> preloadedChunks;
-    std::vector<glm::ivec3> fluidQueue;
+    std::deque<glm::ivec3> fluidQueue;
+    std::unordered_set<glm::ivec3> pendingFluidUpdates;
     std::mutex fluidMutex;
     std::string currentWorldName;
     

@@ -39,6 +39,9 @@ public:
                         const std::vector<Vertex>& waterVertices,
                         const std::vector<u32>& waterIndices);
 
+    // Clean up meshes for chunks that are no longer in the ChunkManager
+    void cleanUnusedMeshes(const ChunkManager& chunkManager);
+
     void clear() {
         chunkMeshes.clear();
         waterMeshes.clear();
