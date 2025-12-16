@@ -1,9 +1,12 @@
 #version 450 core
-out vec4 FragColor;
+layout(location = 0) out vec4 FragColor;
+layout(location = 1) out vec2 Velocity;
 
 in vec3 FragPos;
 in vec3 Normal;
 in vec2 TexCoord;
+in vec4 vCurrentClip;
+in vec4 vPrevClip;
 
 uniform sampler2D uAlbedoMap;
 uniform bool uHasTexture;
@@ -41,4 +44,8 @@ void main() {
     vec3 finalColor = ambient + diffuse + emission;
     
     FragColor = vec4(finalColor, albedo.a);
+    
+    vec2 a = (vCurrentClip.xy / vCurrentClip.w) * 0.5 + 0.5;
+    vec2 b = (vPrevClip.xy / vPrevClip.w) * 0.5 + 0.5;
+    Velocity = a - b;
 }

@@ -14,7 +14,7 @@ public:
     void resize(int width, int height);
     
     // Main render function
-    void render(GLuint colorTexture, GLuint depthTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection, float volumetricIntensity = 1.0f, const glm::vec3& lightColor = glm::vec3(1.0f, 0.9f, 0.7f));
+    void render(GLuint colorTexture, GLuint depthTexture, GLuint velocityTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection, float volumetricIntensity = 1.0f, const glm::vec3& lightColor = glm::vec3(1.0f, 0.9f, 0.7f));
 
     // TAA specific
     const glm::mat4& getJitterMatrix() const { return jitterMatrix; }
@@ -42,7 +42,13 @@ private:
     int currentHistoryIndex = 0;
     glm::mat4 jitterMatrix;
     glm::mat4 prevViewProj;
+    glm::vec3 prevCameraPos = glm::vec3(0.0f); // Track camera movement for history rejection
     int frameCount = 0;
+    bool invalidateHistory = true; // Start with history invalidated
+
+public:
+    // Call to invalidate TAA history (on chunk load, origin rebase, etc.)
+    void invalidateTAAHistory() { invalidateHistory = true; }
 
     // SSAO Kernel
     std::vector<glm::vec3> ssaoKernel;

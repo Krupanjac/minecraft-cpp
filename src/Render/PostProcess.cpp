@@ -130,7 +130,7 @@ void PostProcess::updateJitter(int w, int h) {
     jitterMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(jitterX, jitterY, 0.0f));
 }
 
-void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection, float volumetricIntensity, const glm::vec3& lightColor) {
+void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint velocityTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection, float volumetricIntensity, const glm::vec3& lightColor) {
     
     glDisable(GL_DEPTH_TEST); // Disable depth test for full screen quads
     auto& settings = Settings::instance();
@@ -233,16 +233,40 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::ma
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, intermediateFBO->getTexture());
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, historyFBO[prevHistoryIndex]->getTexture());
+        
+        // If history is invalidated, use current frame as "history" to prevent ghosting
+        if (invalidateHistory) {
+            glBindTexture(GL_TEXTURE_2D, intermediateFBO->getTexture()); // Use current as history
+        } else {
+            glBindTexture(GL_TEXTURE_2D, historyFBO[prevHistoryIndex]->getTexture());
+        }
+        
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, depthTexture);
+
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, velocityTexture);
+
+        // Bind previous-frame depth texture for proper depth rejection
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, historyFBO[prevHistoryIndex]->getDepthTexture());
         
         taaShader.setInt("currentFrame", 0);
         taaShader.setInt("historyFrame", 1);
         taaShader.setInt("depthMap", 2);
+        taaShader.setInt("velocityMap", 3);
+        taaShader.setInt("historyDepthMap", 4);
         
         taaShader.setMat4("invViewProj", glm::inverse(projection * view));
         taaShader.setMat4("prevViewProj", prevViewProj);
+        
+        // Camera delta for motion-based rejection
+        glm::vec3 cameraDelta = cameraPos - prevCameraPos;
+        taaShader.setVec3("cameraDelta", cameraDelta);
+        
+        // Depth linearization parameters
+        taaShader.setFloat("nearPlane", 0.1f);  // Should match your camera near plane
+        taaShader.setFloat("farPlane", 1000.0f); // Should match your camera far plane
         
         glBindVertexArray(quadVAO); // Ensure VAO is bound
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -255,7 +279,9 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::ma
         
         // Update history
         prevViewProj = unjitteredProjection * view;
+        prevCameraPos = cameraPos;
         currentHistoryIndex = 1 - currentHistoryIndex;
+        invalidateHistory = false; // Reset after this frame
     } else {
         // No TAA, just blit intermediate to screen
         glBindFramebuffer(GL_READ_FRAMEBUFFER, intermediateFBO->getID());
@@ -264,5 +290,6 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, const glm::ma
         
         // Keep history updated just in case we toggle it back on (prevents jump)
         prevViewProj = unjitteredProjection * view;
+        prevCameraPos = cameraPos;
     }
 }

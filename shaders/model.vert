@@ -13,6 +13,13 @@ uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
 
+uniform mat4 uPrevView;
+uniform mat4 uPrevProjection;
+uniform vec3 uOriginDelta;
+
+out vec4 vCurrentClip;
+out vec4 vPrevClip;
+
 const int MAX_JOINTS = 100;
 uniform mat4 uJoints[MAX_JOINTS];
 uniform bool uHasSkin;
@@ -51,4 +58,9 @@ void main() {
     TexCoord = aTexCoord;
     
     gl_Position = uProjection * uView * vec4(FragPos, 1.0);
+    
+    vCurrentClip = gl_Position;
+    // Previous position (assuming static model relative to world for now)
+    vec4 prevWorldPos = vec4(FragPos + uOriginDelta, 1.0);
+    vPrevClip = uPrevProjection * uPrevView * prevWorldPos;
 }

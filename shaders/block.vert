@@ -11,6 +11,11 @@ uniform mat4 uView;
 uniform mat4 uProjection;
 uniform mat4 uLightSpaceMatrix;
 
+// TAA / Velocity Buffer uniforms
+uniform mat4 uPrevView;
+uniform mat4 uPrevProjection;
+uniform vec3 uOriginDelta;
+
 out vec3 vWorldPos;
 out vec3 vNormal;
 out vec2 vTexCoord;
@@ -18,12 +23,20 @@ flat out vec2 vCellOrigin;
 flat out uint vMaterial;
 out float vAO;
 out vec4 vFragPosLightSpace;
+out vec4 vCurrentClip;
+out vec4 vPrevClip;
 
 void main() {
     vec4 worldPos = uModel * vec4(aPos, 1.0);
     vWorldPos = worldPos.xyz;
     vFragPosLightSpace = uLightSpaceMatrix * worldPos;
     gl_Position = uProjection * uView * worldPos;
+    
+    // Velocity Calculation
+    vCurrentClip = gl_Position;
+    // Previous position relative to previous origin
+    vec4 prevWorldPos = vec4(worldPos.xyz + uOriginDelta, 1.0);
+    vPrevClip = uPrevProjection * uPrevView * prevWorldPos;
     
     // Unpack normal
     vec3 normal = vec3(0.0);

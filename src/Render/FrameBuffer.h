@@ -13,6 +13,7 @@ public:
     void resize(int width, int height);
 
     GLuint getTexture() const { return textureColorBuffer; }
+    GLuint getVelocityTexture() const { return textureVelocityBuffer; }
     GLuint getDepthTexture() const { return depthTexture; }
     GLuint getID() const { return fbo; }
     
@@ -22,6 +23,7 @@ public:
 private:
     GLuint fbo;
     GLuint textureColorBuffer;
+    GLuint textureVelocityBuffer;
     GLuint depthTexture; // Using texture for depth to allow sampling
     int width;
     int height;

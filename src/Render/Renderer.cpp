@@ -46,18 +46,52 @@ void Renderer::onResize(int width, int height) {
 }
 
 void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, int windowWidth, int windowHeight) {
+    // === CAMERA-RELATIVE RENDERING SETUP ===
+    // This prevents floating-point precision issues when far from world origin
+    
+    glm::dvec3 cameraPos = glm::dvec3(camera.getPosition());
+    
+    // Check if we need to rebase the render origin
+    glm::dvec3 offsetFromOrigin = cameraPos - renderOrigin;
+    if (glm::length(offsetFromOrigin) > ORIGIN_REBASE_THRESHOLD) {
+        // Snap origin to camera position (snapped to reduce jitter)
+        renderOrigin = glm::dvec3(
+            std::floor(cameraPos.x / 16.0) * 16.0,
+            0.0, // Keep Y at 0 to avoid vertical rebasing issues
+            std::floor(cameraPos.z / 16.0) * 16.0
+        );
+        // Origin changed — invalidate TAA history to avoid ghosting from large snaps
+        if (postProcess) postProcess->invalidateTAAHistory();
+    }
+    
+    // Camera position relative to render origin (for stable float precision)
+    glm::vec3 cameraRelative = glm::vec3(cameraPos - renderOrigin);
+    
+    // Render origin offset for chunk position calculation
+    glm::vec3 originOffset = glm::vec3(renderOrigin);
+    
+    // Calculate Origin Delta for Velocity Buffer
+    glm::vec3 originDelta = glm::vec3(renderOrigin - prevRenderOrigin);
+    
+    // === TAA HISTORY INVALIDATION ON CHUNK LOAD ===
+    const auto& chunks = chunkManager.getChunks();
+    size_t currentChunkCount = chunks.size();
+    if (currentChunkCount != lastChunkCount) {
+        // Chunks loaded/unloaded - invalidate TAA history to avoid ghosts from new geometry
+        if (postProcess) postProcess->invalidateTAAHistory();
+        lastChunkCount = currentChunkCount;
+    }
+
     // Calculate Light Space Matrix
     // Center on player
     // We position the "sun" far away along the light direction
     float shadowRange = Settings::instance().shadowDistance; // Covers visible area
-    glm::vec3 lightPos = camera.getPosition() + lightDirection * 100.0f;
-    glm::mat4 lightView = glm::lookAt(lightPos, camera.getPosition(), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::vec3 lightPos = cameraRelative + lightDirection * 100.0f;
+    glm::mat4 lightView = glm::lookAt(lightPos, cameraRelative, glm::vec3(0.0f, 1.0f, 0.0f));
     
     float near_plane = 1.0f, far_plane = 400.0f;
     glm::mat4 lightProjection = glm::ortho(-shadowRange, shadowRange, -shadowRange, shadowRange, near_plane, far_plane);
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-    const auto& chunks = chunkManager.getChunks();
 
     // 0. Shadow Pass
     if (Settings::instance().enableShadows) {
@@ -118,22 +152,38 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     // 1. Render Scene to FBO
     mainFBO->bind();
     
-    // Clear with sky color
-    glClearColor(skyColor.r, skyColor.g, skyColor.b, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Clear Color Buffer (0) with Sky Color
+    float sky[4] = {skyColor.r, skyColor.g, skyColor.b, 1.0f};
+    glClearBufferfv(GL_COLOR, 0, sky);
+    
+    // Clear Velocity Buffer (1) with 0
+    float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    glClearBufferfv(GL_COLOR, 1, zero);
+    
+    // Clear Depth Buffer
+    glClear(GL_DEPTH_BUFFER_BIT);
     
     // Update frustum
     float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     glm::mat4 unjitteredProjection = camera.getProjectionMatrix(aspect);
     glm::mat4 projection = unjitteredProjection;
+
+    // Create camera-relative view matrix
+    // Instead of camera.getViewMatrix() which uses absolute position,
+    // we construct a view matrix using the camera-relative position
+    glm::mat4 view = glm::lookAt(
+        cameraRelative,                           // Eye position (relative to render origin)
+        cameraRelative + camera.getFront(),       // Look target
+        camera.getUp()                            // Up vector
+    );
     
-    // Apply TAA Jitter only if TAA is enabled
-    if (Settings::instance().enableTAA) {
-        postProcess->updateJitter(windowWidth, windowHeight);
-        projection = postProcess->getJitterMatrix() * unjitteredProjection;
+    if (isFirstFrame) {
+        prevView = view;
+        prevProjection = unjitteredProjection;
+        prevRenderOrigin = renderOrigin;
+        isFirstFrame = false;
     }
 
-    glm::mat4 view = camera.getViewMatrix();
     glm::mat4 viewProj = projection * view;
     frustum.update(viewProj);
     
@@ -159,8 +209,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     blockShader.setInt("uUseShadows", Settings::instance().enableShadows ? 1 : 0);
     blockShader.setMat4("uProjection", projection);
     blockShader.setMat4("uView", view);
+    blockShader.setMat4("uPrevView", prevView);
+    blockShader.setMat4("uPrevProjection", prevProjection);
+    blockShader.setVec3("uOriginDelta", originDelta);
     blockShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
-    blockShader.setVec3("uCameraPos", camera.getPosition());
+    blockShader.setVec3("uCameraPos", cameraRelative); // Use camera-relative position
     blockShader.setVec3("uLightDir", lightDirection);
     blockShader.setFloat("uAOStrength", Settings::instance().aoStrength);
     blockShader.setFloat("uGamma", Settings::instance().gamma);
@@ -194,10 +247,13 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         
         if (!shouldRender) continue;
         
-        // Frustum culling
+        // Calculate chunk position relative to render origin
         glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
-        glm::vec3 chunkMin = chunkWorldPos;
-        glm::vec3 chunkMax = chunkWorldPos + glm::vec3(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE);
+        glm::vec3 chunkRelativePos = chunkWorldPos - originOffset; // Camera-relative chunk position
+        
+        // Frustum culling (use relative positions for consistency with view matrix)
+        glm::vec3 chunkMin = chunkRelativePos;
+        glm::vec3 chunkMax = chunkRelativePos + glm::vec3(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE);
         
         if (!frustum.isBoxVisible(chunkMin, chunkMax)) {
             continue;
@@ -206,7 +262,8 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         // Get or create mesh
         auto it = chunkMeshes.find(pos);
         if (it != chunkMeshes.end() && it->second->isUploaded()) {
-            glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkWorldPos);
+            // Use camera-relative position for model matrix
+            glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkRelativePos);
             blockShader.setMat4("uModel", model);
             
             it->second->bind();
@@ -224,8 +281,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         modelShader.use();
         modelShader.setMat4("uProjection", projection);
         modelShader.setMat4("uView", view);
+        modelShader.setMat4("uPrevView", prevView);
+        modelShader.setMat4("uPrevProjection", prevProjection);
+        modelShader.setVec3("uOriginDelta", originDelta);
         modelShader.setVec3("uLightDir", lightDirection);
-        modelShader.setVec3("uCameraPos", camera.getPosition());
+        modelShader.setVec3("uCameraPos", cameraRelative);
         modelShader.setVec4("uBaseColor", glm::vec4(1.0f)); // Default white
 
         for (auto* entity : entities) {
@@ -245,7 +305,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     waterShader.setMat4("uProjection", projection);
     waterShader.setMat4("uView", view);
     waterShader.setFloat("uTime", static_cast<float>(glfwGetTime()));
-    waterShader.setVec3("uCameraPos", camera.getPosition());
+    waterShader.setVec3("uCameraPos", cameraRelative);
     waterShader.setVec3("uLightDir", lightDirection);
     waterShader.setFloat("uFogDist", fogDist);
     waterShader.setVec3("uSkyColor", skyColor);
@@ -316,7 +376,12 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         lightCol = glm::mix(glm::vec3(0.6f, 0.7f, 1.0f), glm::vec3(1.0f, 0.9f, 0.7f), t);
     }
 
-    postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), projection, view, camera.getPosition(), lightDirection, unjitteredProjection, volIntensity, lightCol);
+    postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), mainFBO->getVelocityTexture(), projection, view, cameraRelative, lightDirection, unjitteredProjection, volIntensity, lightCol);
+
+    // Update History
+    prevView = view;
+    prevProjection = unjitteredProjection;
+    prevRenderOrigin = renderOrigin;
 
     // 3. UI / Overlays (Rendered directly to screen)
     

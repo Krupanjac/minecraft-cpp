@@ -23,6 +23,20 @@ void FrameBuffer::init() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
 
+    // Velocity attachment texture (RG16F)
+    glGenTextures(1, &textureVelocityBuffer);
+    glBindTexture(GL_TEXTURE_2D, textureVelocityBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, width, height, 0, GL_RG, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, textureVelocityBuffer, 0);
+
+    // Tell OpenGL which color attachments we'll use (of this framebuffer) for rendering 
+    GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, attachments);
+
     // Depth attachment texture (for SSAO/Volumetrics)
     glGenTextures(1, &depthTexture);
     glBindTexture(GL_TEXTURE_2D, depthTexture);
@@ -45,6 +59,7 @@ void FrameBuffer::init() {
 void FrameBuffer::cleanup() {
     glDeleteFramebuffers(1, &fbo);
     glDeleteTextures(1, &textureColorBuffer);
+    glDeleteTextures(1, &textureVelocityBuffer);
     glDeleteTextures(1, &depthTexture);
 }
 

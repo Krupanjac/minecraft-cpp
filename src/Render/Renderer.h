@@ -86,6 +86,16 @@ private:
     float sunHeight = 1.0f;
     float timeOfDay = 0.0f;
     // bool showShadows = true; // Removed
+    
+    // Camera-Relative Rendering for TAA stability
+    glm::dvec3 renderOrigin = glm::dvec3(0.0); // Origin for rendering (rebased periodically)
+    glm::dvec3 prevRenderOrigin = glm::dvec3(0.0); // Previous origin for velocity calculation
+    glm::mat4 prevView = glm::mat4(1.0f);
+    glm::mat4 prevProjection = glm::mat4(1.0f);
+    bool isFirstFrame = true;
+    
+    static constexpr double ORIGIN_REBASE_THRESHOLD = 256.0; // Rebase when camera is this far from origin
+    size_t lastChunkCount = 0; // Track chunk loading for TAA history invalidation
 
     void setupOpenGL();
     bool loadShaders();

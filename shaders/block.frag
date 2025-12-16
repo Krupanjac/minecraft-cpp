@@ -17,8 +17,11 @@ uniform int uUseShadows;
 uniform float uAOStrength;
 
 in vec4 vFragPosLightSpace;
+in vec4 vCurrentClip;
+in vec4 vPrevClip;
 
-out vec4 FragColor;
+layout(location = 0) out vec4 FragColor;
+layout(location = 1) out vec2 Velocity;
 
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
     // perform perspective divide
@@ -125,4 +128,9 @@ void main() {
     color = mix(uSkyColor, color, fogFactor);
     
     FragColor = vec4(color, 1.0);
+    
+    // Velocity Calculation
+    vec2 a = (vCurrentClip.xy / vCurrentClip.w) * 0.5 + 0.5;
+    vec2 b = (vPrevClip.xy / vPrevClip.w) * 0.5 + 0.5;
+    Velocity = a - b;
 }
