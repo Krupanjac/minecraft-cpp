@@ -149,6 +149,15 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         ssaoShader.setMat4("projection", projection);
         ssaoShader.setMat4("invProjection", glm::inverse(projection));
         
+        // Noise tiling and SSAO params
+        ssaoShader.setVec2("noiseScale", glm::vec2((float)width / 4.0f, (float)height / 4.0f));
+
+        // Base radius scaled by AO strength so stronger AO increases radius visually
+        float baseRadius = 0.5f * (1.0f + settings.aoStrength * 0.8f);
+        ssaoShader.setFloat("radius", baseRadius);
+        ssaoShader.setFloat("bias", 0.025f);
+        ssaoShader.setFloat("radiusScaleFactor", glm::clamp(settings.aoStrength * 1.2f, 0.0f, 3.0f));
+        
         for (unsigned int i = 0; i < 64; ++i)
             ssaoShader.setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
             
@@ -168,7 +177,12 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         ssaoBlurShader.use();
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, ssaoFBO->getTexture());
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, depthTexture); // Provide depth for bilateral blur
         ssaoBlurShader.setInt("ssaoInput", 0);
+        ssaoBlurShader.setInt("gPositionDepth", 1);
+        float blurFalloff = glm::clamp(30.0f + settings.aoStrength * 40.0f, 5.0f, 200.0f);
+        ssaoBlurShader.setFloat("blurDepthFalloff", blurFalloff);
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     } else {
@@ -218,6 +232,7 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
     compositeShader.setInt("volumetric", 2);
     compositeShader.setFloat("exposure", settings.exposure);
     compositeShader.setFloat("gamma", settings.gamma);
+    compositeShader.setFloat("uAOStrength", settings.aoStrength);
     
     glBindVertexArray(quadVAO); // Ensure VAO is bound
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
