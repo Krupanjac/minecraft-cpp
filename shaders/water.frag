@@ -16,7 +16,11 @@ uniform float uTime;
 uniform sampler2D uTexture;
 uniform float uAOStrength;
 
-out vec4 FragColor;
+layout(location = 0) out vec4 FragColor;
+layout(location = 1) out vec2 Velocity;
+
+in vec4 vCurrentClip;
+in vec4 vPrevClip;
 
 void main() {
     float cellSize = 1.0 / 16.0;
@@ -73,4 +77,9 @@ void main() {
     float alpha = 0.7;
     
     FragColor = vec4(color, alpha);
+
+    // Velocity output (screen space UV movement)
+    vec2 a = (vCurrentClip.xy / vCurrentClip.w) * 0.5 + 0.5;
+    vec2 b = (vPrevClip.xy / vPrevClip.w) * 0.5 + 0.5;
+    Velocity = a - b;
 }

@@ -16,6 +16,8 @@ Camera::Camera(const glm::vec3& position)
       onGround(false),
       isSprinting(false),
       isSneaking(false) {
+    // Default camera local Y offset (player eye height)
+    defaultY = 1.6f;
     updateCameraVectors();
 }
 
@@ -144,20 +146,20 @@ void Camera::processMouseMovement(float xoffset, float yoffset) {
 glm::mat4 Camera::getViewMatrix() const {
     // Apply bobbing to view matrix only (visual)
     glm::vec3 viewPos = position;
-    
+    // Apply default local Y offset (player eye height)
+    viewPos.y += defaultY;
+
     if (!isFlying) {
          float bobY = sin(bobbingTimer) * 0.15f; 
-         // MC also does some X bobbing
-         // float bobX = cos(bobbingTimer) * 0.05f; 
          viewPos.y += bobY;
-         // We could also rotate view slightly for head tilt
     }
-    
+
     if (thirdPerson) {
-        glm::vec3 eye = viewPos - front * thirdPersonDistance;
+        // Offset camera backwards from the player's eye position. Add a small vertical raise so the camera sits slightly above the player's center.
+        glm::vec3 eye = viewPos - front * thirdPersonDistance + glm::vec3(0.0f, 0.2f, 0.0f);
         return glm::lookAt(eye, viewPos, up);
     }
-    
+
     return glm::lookAt(viewPos, viewPos + front, up);
 }
 

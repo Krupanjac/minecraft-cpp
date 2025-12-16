@@ -10,6 +10,12 @@ layout(location = 5) in uint aData;
 uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
+
+// For velocity buffer
+uniform mat4 uPrevView;
+uniform mat4 uPrevProjection;
+uniform vec3 uOriginDelta;
+
 uniform float uTime;
 
 out vec3 vWorldPos;
@@ -19,6 +25,8 @@ flat out vec2 vCellOrigin;
 flat out uint vMaterial;
 flat out uint vLevel;
 out float vAO;
+out vec4 vCurrentClip;
+out vec4 vPrevClip;
 
 void main() {
     vec4 worldPos = uModel * vec4(aPos, 1.0);
@@ -63,6 +71,11 @@ void main() {
     
     vWorldPos = worldPos.xyz;
     gl_Position = uProjection * uView * worldPos;
+
+    // Velocity / motion vectors (screen-space clips)
+    vCurrentClip = gl_Position;
+    vec4 prevWorldPos = vec4(worldPos.xyz + uOriginDelta, 1.0);
+    vPrevClip = uPrevProjection * uPrevView * prevWorldPos;
     
     // Unpack normal
     vec3 normal = vec3(0.0);

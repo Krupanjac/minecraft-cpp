@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 #include <random>
 #include <cmath>
+#include <fstream> // For debug shadow dump
 
 Renderer::Renderer() {
 }
@@ -107,6 +108,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         shadowShader.use();
         shadowShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
         
+        int shadowDrawCalls = 0;
         // Render chunks for shadow map
         // We only need to render opaque chunks
         for (const auto& [pos, chunk] : chunks) {
@@ -138,6 +140,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
                     it->second->bind();
                     it->second->draw();
                     it->second->unbind();
+                    ++shadowDrawCalls;
                 }
             }
         }
@@ -168,14 +171,61 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     glm::mat4 unjitteredProjection = camera.getProjectionMatrix(aspect);
     glm::mat4 projection = unjitteredProjection;
 
-    // Create camera-relative view matrix
-    // Instead of camera.getViewMatrix() which uses absolute position,
-    // we construct a view matrix using the camera-relative position
-    glm::mat4 view = glm::lookAt(
-        cameraRelative,                           // Eye position (relative to render origin)
-        cameraRelative + camera.getFront(),       // Look target
-        camera.getUp()                            // Up vector
-    );
+    // Create view matrix. For third-person we compute a collision-safe eye position
+    glm::mat4 view;
+    if (camera.isThirdPerson()) {
+        // Compute target (player eye position in world space)
+        float bobY = 0.0f;
+        if (!camera.getFlightMode()) {
+            bobY = sin(camera.bobbingTimer) * 0.15f;
+        }
+        glm::vec3 targetWorld = camera.getPosition() + glm::vec3(0.0f, camera.defaultY + bobY, 0.0f);
+        glm::vec3 forward = camera.getFront();
+        glm::vec3 up = camera.getUp();
+
+        // Desired camera world position behind the player
+        glm::vec3 desiredEyeWorld = targetWorld - forward * camera.thirdPersonDistance + glm::vec3(0.0f, 0.2f, 0.0f);
+
+        // Collision test: sample along the line from target to desired eye and clamp at first opaque block
+        const int samples = 32;
+        glm::vec3 lastSafe = desiredEyeWorld; // fallback
+        bool foundCollision = false;
+        for (int i = 0; i <= samples; ++i) {
+            float t = static_cast<float>(i) / static_cast<float>(samples);
+            glm::vec3 samplePos = glm::mix(targetWorld, desiredEyeWorld, t);
+
+            auto chunk = chunkManager.getChunkAt(samplePos);
+            if (chunk) {
+                glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(chunk->getPosition());
+                int lx = static_cast<int>(floor(samplePos.x)) - static_cast<int>(chunkOrigin.x);
+                int ly = static_cast<int>(floor(samplePos.y)) - static_cast<int>(chunkOrigin.y);
+                int lz = static_cast<int>(floor(samplePos.z)) - static_cast<int>(chunkOrigin.z);
+                if (lx >= 0 && lx < CHUNK_SIZE && ly >= 0 && ly < CHUNK_HEIGHT && lz >= 0 && lz < CHUNK_SIZE) {
+                    if (chunk->getBlock(lx, ly, lz).isOpaque()) {
+                        foundCollision = true;
+                        if (i == 0) {
+                            // Direct collision at target: push camera slightly forward instead
+                            lastSafe = targetWorld - forward * 0.5f + glm::vec3(0.0f, 0.2f, 0.0f);
+                        }
+                        break;
+                    }
+                }
+            }
+            // No opaque block here; mark as safe
+            lastSafe = samplePos;
+        }
+
+        glm::vec3 eyeWorld = lastSafe;
+        glm::vec3 targetRel = glm::vec3(targetWorld) - glm::vec3(renderOrigin);
+        glm::vec3 eyeRel = glm::vec3(eyeWorld) - glm::vec3(renderOrigin);
+        view = glm::lookAt(eyeRel, targetRel, up);
+    } else {
+        view = glm::lookAt(
+            cameraRelative,                           // Eye position (relative to render origin)
+            cameraRelative + camera.getFront(),       // Look target
+            camera.getUp()                            // Up vector
+        );
+    }
     
     if (isFirstFrame) {
         prevView = view;
@@ -304,6 +354,9 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     waterShader.setInt("uTexture", 0);
     waterShader.setMat4("uProjection", projection);
     waterShader.setMat4("uView", view);
+    waterShader.setMat4("uPrevView", prevView);
+    waterShader.setMat4("uPrevProjection", prevProjection);
+    waterShader.setVec3("uOriginDelta", glm::vec3(renderOrigin - prevRenderOrigin));
     waterShader.setFloat("uTime", static_cast<float>(glfwGetTime()));
     waterShader.setVec3("uCameraPos", cameraRelative);
     waterShader.setVec3("uLightDir", lightDirection);
