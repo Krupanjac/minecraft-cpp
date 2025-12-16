@@ -9,7 +9,7 @@ public:
     ~Camera() = default;
 
     void update(float deltaTime);
-    void processInput(bool forward, bool backward, bool left, bool right, bool up, bool down, float deltaTime);
+    void processInput(bool forward, bool backward, bool left, bool right, bool up, bool down, bool sprint, bool sneak, float deltaTime);
     void processMouseMovement(float xoffset, float yoffset);
     
     glm::mat4 getViewMatrix() const;
@@ -35,6 +35,13 @@ public:
     glm::vec3 velocity;
     bool isFlying;
     bool onGround;
+    bool isSprinting = false;
+    bool isSneaking = false;
+    
+    // View Bobbing
+    float bobbingTimer = 0.0f;
+    float defaultY = 0.0f; // Stores the local Y offset for the camera relative to player position
+
 
 private:
     glm::vec3 position;
@@ -49,6 +56,18 @@ private:
     float movementSpeed;
     float mouseSensitivity;
     float fov;
+    float baseFov;
+    
+    // Physics constants
+    // Physics constants
+    const float ACCELERATION = 60.0f; // Snappy ground movement
+    const float AIR_ACCELERATION = 100.0f; // Very high air acceleration for CS-style strafing (limited by max speed projection)
+    const float FRICTION = 14.0f; // Quick stopping
+    const float AIR_FRICTION = 0.0f; // No air friction (drag) in CS/Quake usually, control comes from player input
+    const float MAX_SPEED = 5.0f;  // ~4.3m/s (MC Walk)
+    const float SPRINT_SPEED = 7.0f; // ~5.6m/s (MC Sprint)
+    const float SNEAK_SPEED = 1.3f; // ~1.3m/s (MC Sneak)
+
     
     void updateCameraVectors();
 };

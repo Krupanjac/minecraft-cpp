@@ -31,6 +31,17 @@ public:
     bool enableShadows = true;
     float shadowDistance = 160.0f;
     int fullscreen = 0; // 0: Windowed, 1: Fullscreen, 2: Borderless
+    
+    struct KeyBindings {
+        int forward = 87;  // W
+        int backward = 83; // S
+        int left = 65;     // A
+        int right = 68;    // D
+        int jump = 32;     // Space
+        int sprint = 340;  // Left Shift (GLFW)
+        int sneak = 341;   // Left Ctrl (GLFW)
+        int inventory = 69;// E
+    } keys;
 
     void load() {
         std::ifstream file("settings.ini");
@@ -57,7 +68,17 @@ public:
                     else if (key == "enableTAA") enableTAA = (value == "1");
                     else if (key == "enableShadows") enableShadows = (value == "1");
                     else if (key == "shadowDistance") shadowDistance = std::stof(value);
+                    else if (key == "shadowDistance") shadowDistance = std::stof(value);
                     else if (key == "fullscreen") fullscreen = std::stoi(value);
+                    // Keys
+                    else if (key == "key_forward") keys.forward = std::stoi(value);
+                    else if (key == "key_backward") keys.backward = std::stoi(value);
+                    else if (key == "key_left") keys.left = std::stoi(value);
+                    else if (key == "key_right") keys.right = std::stoi(value);
+                    else if (key == "key_jump") keys.jump = std::stoi(value);
+                    else if (key == "key_sprint") keys.sprint = std::stoi(value);
+                    else if (key == "key_sneak") keys.sneak = std::stoi(value);
+                    else if (key == "key_inventory") keys.inventory = std::stoi(value);
                 }
             }
         }
@@ -82,6 +103,15 @@ public:
         file << "enableShadows=" << (enableShadows ? "1" : "0") << "\n";
         file << "shadowDistance=" << shadowDistance << "\n";
         file << "fullscreen=" << fullscreen << "\n";
+        
+        file << "key_forward=" << keys.forward << "\n";
+        file << "key_backward=" << keys.backward << "\n";
+        file << "key_left=" << keys.left << "\n";
+        file << "key_right=" << keys.right << "\n";
+        file << "key_jump=" << keys.jump << "\n";
+        file << "key_sprint=" << keys.sprint << "\n";
+        file << "key_sneak=" << keys.sneak << "\n";
+        file << "key_inventory=" << keys.inventory << "\n";
     }
 
 private:

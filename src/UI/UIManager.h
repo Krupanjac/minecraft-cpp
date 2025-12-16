@@ -16,7 +16,8 @@ enum class MenuState {
     VIDEO_SETTINGS,
     LOAD_GAME,
     NEW_GAME,
-    INVENTORY
+    INVENTORY,
+    CONTROLS
 };
 
 struct UIElement {
@@ -41,6 +42,10 @@ struct UIElement {
     BlockType blockType = BlockType::AIR;
     bool isInventoryItem = false;
     std::function<void()> onRightClick;
+
+    // For Keybinding
+    bool isKeybind = false;
+    int* keyBindRef = nullptr;
 };
 
 class UIManager {
@@ -66,7 +71,8 @@ public:
     void setOnSave(std::function<void()> callback) { onSave = callback; }
 
     void toggleDebug() { showDebug = !showDebug; }
-    void updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos);
+
+    void updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos, const glm::vec3& playerVel);
 
     BlockType getSelectedBlock() const { return hotbar[selectedSlot]; }
     void selectHotbarSlot(int slot) { if (slot >= 0 && slot < 9) selectedSlot = slot; }
@@ -94,6 +100,10 @@ private:
     float currentFPS = 0.0f;
     std::string currentBlockName = "None";
     glm::vec3 currentPlayerPos = glm::vec3(0.0f);
+    glm::vec3 currentPlayerVel = glm::vec3(0.0f);
+
+    bool waitingForKeyBind = false;
+    int* keyBindPtr = nullptr;
 
     BlockType selectedBlock = BlockType::STONE; // Deprecated by hotbar, keeping for internal ref if needed, but hotbar[selectedSlot] is primary.
     
@@ -120,6 +130,7 @@ private:
     void setupInGameMenu();
     void setupSettingsMenu();
     void setupVideoSettingsMenu();
+    void setupControlsMenu();
     void setupLoadGameMenu();
     void setupNewGameMenu();
     void setupInventoryMenu();

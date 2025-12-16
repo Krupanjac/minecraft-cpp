@@ -64,14 +64,15 @@ public:
                 uiManager.setMenuState(isMenuOpen ? MenuState::NONE : MenuState::IN_GAME_MENU);
                 window->setCursorMode(isMenuOpen ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
             }
-            
-            if (key == GLFW_KEY_E && action == GLFW_PRESS) {
-                if (uiManager.getMenuState() == MenuState::NONE) {
-                    uiManager.setMenuState(MenuState::INVENTORY);
-                    window->setCursorMode(GLFW_CURSOR_NORMAL);
-                } else if (uiManager.getMenuState() == MenuState::INVENTORY) {
-                    uiManager.setMenuState(MenuState::NONE);
-                    window->setCursorMode(GLFW_CURSOR_DISABLED);
+            if (action == GLFW_PRESS) {
+                if (key == Settings::instance().keys.inventory) {
+                    if (uiManager.getMenuState() == MenuState::INVENTORY) {
+                        uiManager.setMenuState(MenuState::NONE);
+                        window->setCursorMode(GLFW_CURSOR_DISABLED);
+                    } else if (uiManager.getMenuState() == MenuState::NONE) {
+                        uiManager.setMenuState(MenuState::INVENTORY);
+                        window->setCursorMode(GLFW_CURSOR_NORMAL);
+                    }
                 }
             }
             
@@ -392,7 +393,7 @@ public:
                 }
             }
             
-            uiManager.updateDebugInfo(displayFPS, blockName, camera.getPosition());
+            uiManager.updateDebugInfo(displayFPS, blockName, camera.getPosition(), camera.velocity);
 
             render();
             
@@ -506,14 +507,18 @@ private:
             return;
         }
 
-        bool forward = window->isKeyPressed(GLFW_KEY_W);
-        bool backward = window->isKeyPressed(GLFW_KEY_S);
-        bool left = window->isKeyPressed(GLFW_KEY_A);
-        bool right = window->isKeyPressed(GLFW_KEY_D);
-        bool up = window->isKeyPressed(GLFW_KEY_SPACE);
-        bool down = window->isKeyPressed(GLFW_KEY_LEFT_SHIFT);
+        const auto& keys = Settings::instance().keys;
+        bool forward = window->isKeyPressed(keys.forward);
+        bool backward = window->isKeyPressed(keys.backward);
+        bool left = window->isKeyPressed(keys.left);
+        bool right = window->isKeyPressed(keys.right);
+        bool up = window->isKeyPressed(keys.jump);
         
-        camera.processInput(forward, backward, left, right, up, down, deltaTime);
+        bool sprint = window->isKeyPressed(keys.sprint);
+        bool sneak = window->isKeyPressed(keys.sneak);
+        bool down = sneak; // Use sneak key for flying down
+
+        camera.processInput(forward, backward, left, right, up, down, sprint, sneak, deltaTime);
         
         if (firstMouse) {
             lastX = xpos;
@@ -789,7 +794,11 @@ private:
             
         } else {
             // Normal gravity
-            camera.velocity.y -= 18.0f * deltaTime;
+            // Minecraft gravity is roughly 32 m/s^2
+            camera.velocity.y -= 32.0f * deltaTime;
+            
+            // Terminal velocity
+            camera.velocity.y = std::max(-78.4f, camera.velocity.y);
         }
         
         // Apply velocity
@@ -822,11 +831,9 @@ private:
         
         camera.setPosition(pos);
         
-        // Friction
-        float friction = camera.onGround ? 10.0f : 2.0f;
-        float damping = 1.0f / (1.0f + friction * deltaTime);
-        camera.velocity.x *= damping;
-        camera.velocity.z *= damping;
+        // Friction is now handled in Camera::update() for better control
+        // float friction = camera.onGround ? 10.0f : 2.0f;
+        // ...
     }
     
     bool checkCollision(const glm::vec3& pos) {

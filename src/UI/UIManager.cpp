@@ -75,6 +75,7 @@ void UIManager::setMenuState(MenuState state) {
         case MenuState::IN_GAME_MENU: setupInGameMenu(); break;
         case MenuState::SETTINGS: setupSettingsMenu(); break;
         case MenuState::VIDEO_SETTINGS: setupVideoSettingsMenu(); break;
+        case MenuState::CONTROLS: setupControlsMenu(); break;
         case MenuState::LOAD_GAME: setupLoadGameMenu(); break;
         case MenuState::NEW_GAME: setupNewGameMenu(); break;
         case MenuState::INVENTORY: setupInventoryMenu(); break;
@@ -100,15 +101,37 @@ void UIManager::handleCharInput(unsigned int codepoint) {
 void UIManager::handleKeyInput(int key) {
     if (!isMenuOpen()) return;
     
-    for (auto& el : elements) {
-        if (el.isInput && el.isHovered && el.textRef) {
-            if (key == 259) { // GLFW_KEY_BACKSPACE
-                if (!el.textRef->empty()) el.textRef->pop_back();
-                // Update display text
-                if (el.text.find("NAME:") != std::string::npos) el.text = "NAME: " + *el.textRef;
-                if (el.text.find("SEED:") != std::string::npos) el.text = "SEED: " + *el.textRef;
+    // For text input
+    if (currentMenuState == MenuState::NEW_GAME) {
+       for (auto& el : elements) {
+           if (el.isInput && el.isHovered) {
+               if (key == 259 && el.textRef && !el.textRef->empty()) { // Backspace
+                   el.textRef->pop_back();
+                   if (el.textRef == &newWorldName) el.text = "World Name: " + *el.textRef;
+                   else if (el.textRef == &newWorldSeed) el.text = "Seed: " + *el.textRef;
+               }
+           }
+       }
+    } else { // Original text input handling for other menus if applicable
+        for (auto& el : elements) {
+            if (el.isInput && el.isHovered && el.textRef) {
+                if (key == 259) { // GLFW_KEY_BACKSPACE
+                    if (!el.textRef->empty()) el.textRef->pop_back();
+                    // Update display text
+                    if (el.text.find("NAME:") != std::string::npos) el.text = "NAME: " + *el.textRef;
+                    if (el.text.find("SEED:") != std::string::npos) el.text = "SEED: " + *el.textRef;
+                }
             }
         }
+    }
+    
+    // For Keybinding
+    if (waitingForKeyBind && keyBindPtr) {
+        *keyBindPtr = key;
+        waitingForKeyBind = false;
+        keyBindPtr = nullptr;
+        setupControlsMenu(); // Refresh text
+        if (onSettingsChanged) onSettingsChanged();
     }
 }
 
@@ -153,7 +176,11 @@ void UIManager::setupInGameMenu() {
         if (onSave) onSave();
     }});
 
-    elements.push_back({centerX - btnW/2, centerY - 50 + (btnH + gap)*2, btnW, btnH, "MAIN MENU", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 50 + (btnH + gap)*2, btnW, btnH, "SETTINGS", false, [this]() { 
+        setMenuState(MenuState::SETTINGS); 
+    }});
+
+    elements.push_back({centerX - btnW/2, centerY - 50 + (btnH + gap)*3, btnW, btnH, "MAIN MENU", false, [this]() { 
         if (onSave) onSave(); // Auto save on exit to menu
         setMenuState(MenuState::MAIN_MENU); 
     }});
@@ -174,8 +201,10 @@ void UIManager::setupSettingsMenu() {
     }});
     startY += btnH + gap;
 
-    // Placeholder for Controls
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "CONTROLS (TODO)", false, nullptr});
+    // Controls
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "CONTROLS", false, [this]() {
+         setMenuState(MenuState::CONTROLS);
+    }});
     startY += btnH + gap;
 
     // Back
@@ -264,6 +293,99 @@ void UIManager::setupVideoSettingsMenu() {
 
     // Back
     elements.push_back({cx - btnW/2, startY + 20, btnW, btnH, "BACK", false, [this]() { 
+        setMenuState(MenuState::SETTINGS); 
+    }});
+}
+
+std::string getKeyName(int key) {
+    if (key >= 32 && key <= 126) {
+        return std::string(1, (char)key);
+    }
+    switch (key) {
+        case 32: return "SPACE";
+        case 256: return "ESC";
+        case 257: return "ENTER";
+        case 258: return "TAB";
+        case 259: return "BACKSPACE";
+        case 260: return "INSERT";
+        case 261: return "DELETE";
+        case 262: return "RIGHT";
+        case 263: return "LEFT";
+        case 264: return "DOWN";
+        case 265: return "UP";
+        case 266: return "PAGE UP";
+        case 267: return "PAGE DOWN";
+        case 268: return "HOME";
+        case 269: return "END";
+        case 280: return "CAPS LOCK";
+        case 281: return "SCROLL LOCK";
+        case 282: return "NUM LOCK";
+        case 283: return "PRINT SCREEN";
+        case 284: return "PAUSE";
+        case 290: return "F1";
+        case 291: return "F2";
+        case 292: return "F3";
+        case 293: return "F4";
+        case 294: return "F5";
+        case 295: return "F6";
+        case 296: return "F7";
+        case 297: return "F8";
+        case 298: return "F9";
+        case 299: return "F10";
+        case 300: return "F11";
+        case 301: return "F12";
+        case 340: return "L-SHIFT";
+        case 341: return "L-CTRL";
+        case 342: return "L-ALT";
+        case 343: return "L-SUPER";
+        case 344: return "R-SHIFT";
+        case 345: return "R-CTRL";
+        case 346: return "R-ALT";
+        case 347: return "R-SUPER";
+        case 348: return "MENU";
+        default: return "KEY " + std::to_string(key);
+    }
+}
+
+void UIManager::setupControlsMenu() {
+    elements.clear();
+    
+    float cx = width / 2.0f;
+    float cy = height / 2.0f;
+    float btnW = 300.0f;
+    float btnH = 30.0f;
+    float gap = 5.0f;
+    float startY = cy - 200.0f;
+
+    auto& k = Settings::instance().keys;
+    
+    auto addKeyBtn = [&](const std::string& label, int* keyRef) {
+        std::string text = label + ": " + getKeyName(*keyRef);
+        UIElement el;
+        el.x = cx - btnW/2;
+        el.y = startY;
+        el.w = btnW;
+        el.h = btnH;
+        el.text = text;
+        el.isKeybind = true;
+        el.keyBindRef = keyRef;
+        // onClick handled in update loop for keybinds
+        elements.push_back(el);
+        startY += btnH + gap;
+    };
+
+    addKeyBtn("FORWARD", &k.forward);
+    addKeyBtn("BACKWARD", &k.backward);
+    addKeyBtn("LEFT", &k.left);
+    addKeyBtn("RIGHT", &k.right);
+    addKeyBtn("JUMP", &k.jump);
+    addKeyBtn("SPRINT", &k.sprint);
+    addKeyBtn("SNEAK", &k.sneak);
+    addKeyBtn("INVENTORY", &k.inventory);
+
+    // Back
+    startY += 10;
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "BACK", false, [this]() { 
         setMenuState(MenuState::SETTINGS); 
     }});
 }
@@ -424,6 +546,9 @@ void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool m
 
     std::function<void()> pendingClick = nullptr;
 
+    // Block clicks if waiting for keybind
+    if (waitingForKeyBind) return;
+
     for (auto& el : elements) {
         // Hit test
         if (mouseX >= el.x && mouseX <= el.x + el.w &&
@@ -457,9 +582,13 @@ void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool m
                     }
                     
                     if (onSettingsChanged) onSettingsChanged();
-                } else if (el.onClick) {
-                    // Only click on rising edge (first press)
-                    if (!lastMousePressed) {
+                } else if (!lastMousePressed) {
+                    // Button clicks (Rising Edge)
+                    if (el.isKeybind) {
+                        waitingForKeyBind = true;
+                        keyBindPtr = el.keyBindRef;
+                        el.text = "PRESS ANY KEY...";
+                    } else if (el.onClick) {
                         if (el.boolValueRef) {
                             *el.boolValueRef = !(*el.boolValueRef);
                             // Update text for toggle
@@ -581,19 +710,25 @@ void UIManager::render() {
             drawText(10.0f, 30.0f, 2.0f, fpsText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
             drawText(10.0f, 60.0f, 2.0f, blockText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
             
+            
             std::string posText = "XYZ: " + std::to_string((int)currentPlayerPos.x) + " " + 
                                   std::to_string((int)currentPlayerPos.y) + " " + 
                                   std::to_string((int)currentPlayerPos.z);
             drawText(10.0f, 90.0f, 2.0f, posText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 
+            std::string velText = "VEL: " + std::to_string(currentPlayerVel.x).substr(0,4) + " " + 
+                                  std::to_string(currentPlayerVel.y).substr(0,4) + " " + 
+                                  std::to_string(currentPlayerVel.z).substr(0,4);
+            drawText(10.0f, 120.0f, 2.0f, velText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+
             std::string timeText = "TIME: " + std::to_string(static_cast<int>(timeOfDay));
-            drawText(10.0f, 120.0f, 2.0f, timeText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            drawText(10.0f, 150.0f, 2.0f, timeText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
             
             // Debug Controls
-            drawText(10.0f, 150.0f, 2.0f, "[F1] TOGGLE DEBUG", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
-            drawText(10.0f, 180.0f, 2.0f, "[F2] PAUSE TIME: " + std::string(isDayNightPaused ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
-            drawText(10.0f, 210.0f, 2.0f, "[F3] SHADOWS: " + std::string(Settings::instance().enableShadows ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
-            drawText(10.0f, 240.0f, 2.0f, "[ARROWS] CHANGE TIME", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+            drawText(10.0f, 180.0f, 2.0f, "[F1] TOGGLE DEBUG", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+            drawText(10.0f, 210.0f, 2.0f, "[F2] PAUSE TIME: " + std::string(isDayNightPaused ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+            drawText(10.0f, 240.0f, 2.0f, "[F3] SHADOWS: " + std::string(Settings::instance().enableShadows ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+            drawText(10.0f, 270.0f, 2.0f, "[ARROWS] CHANGE TIME", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
         }
 
         uiShader.unuse();
@@ -800,10 +935,11 @@ void UIManager::drawText(float x, float y, float scale, const std::string& text,
     }
 }
 
-void UIManager::updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos) {
+void UIManager::updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos, const glm::vec3& playerVel) {
     currentFPS = fps;
     currentBlockName = blockName;
     currentPlayerPos = playerPos;
+    currentPlayerVel = playerVel;
 }
 
 
