@@ -298,7 +298,7 @@ void UIManager::setupVideoSettingsMenu() {
 }
 
 std::string getKeyName(int key) {
-    if (key >= 32 && key <= 126) {
+    if (key > 32 && key <= 126) {
         return std::string(1, (char)key);
     }
     switch (key) {
@@ -716,9 +716,9 @@ void UIManager::render() {
                                   std::to_string((int)currentPlayerPos.z);
             drawText(10.0f, 90.0f, 2.0f, posText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 
-            std::string velText = "VEL: " + std::to_string(currentPlayerVel.x).substr(0,4) + " " + 
-                                  std::to_string(currentPlayerVel.y).substr(0,4) + " " + 
-                                  std::to_string(currentPlayerVel.z).substr(0,4);
+            float speed = glm::length(currentPlayerVel);
+            float hSpeed = glm::length(glm::vec2(currentPlayerVel.x, currentPlayerVel.z));
+            std::string velText = "SPEED: " + std::to_string(speed).substr(0,4) + " (H: " + std::to_string(hSpeed).substr(0,4) + ")";
             drawText(10.0f, 120.0f, 2.0f, velText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 
             std::string timeText = "TIME: " + std::to_string(static_cast<int>(timeOfDay));
