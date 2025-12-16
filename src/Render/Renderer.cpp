@@ -283,7 +283,15 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     blockShader.setVec3("uLightDir", lightDirection);
     blockShader.setFloat("uAOStrength", Settings::instance().aoStrength);
     blockShader.setFloat("uGamma", Settings::instance().gamma);
-    
+
+    // Debug uniforms
+    blockShader.setInt("uDebugNoTexture", Settings::instance().debugNoTexture ? 1 : 0);
+    blockShader.setInt("uDebugShowNormals", Settings::instance().debugShowNormals ? 1 : 0);
+
+    // Wireframe toggle applied around draw loop to only affect chunk rendering
+    if (Settings::instance().debugWireframe) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }    
     // Disable face culling to prevent missing faces due to LOD/winding issues
     glDisable(GL_CULL_FACE);
     
@@ -340,6 +348,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         }
     }
     
+    // Reset polygon mode back to fill if we switched to wireframe
+    if (Settings::instance().debugWireframe) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
+    
     blockShader.unuse();
 
     // Render Entities
@@ -353,7 +366,9 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         modelShader.setVec3("uLightDir", lightDirection);
         modelShader.setVec3("uCameraPos", cameraRelative);
         modelShader.setVec4("uBaseColor", glm::vec4(1.0f)); // Default white
-
+        // Debug flags
+        modelShader.setInt("uDebugNoTexture", Settings::instance().debugNoTexture ? 1 : 0);
+        modelShader.setInt("uDebugShowNormals", Settings::instance().debugShowNormals ? 1 : 0);
         for (auto* entity : entities) {
             if (!entity) continue;
             // Render entity using camera-relative coordinates so rebasing doesn't move the model unexpectedly
@@ -387,7 +402,9 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     waterShader.setFloat("uFogDist", fogDist);
     waterShader.setVec3("uSkyColor", skyColor);
     waterShader.setFloat("uAOStrength", Settings::instance().aoStrength);
-    
+    // Debug flags
+    waterShader.setInt("uDebugNoTexture", Settings::instance().debugNoTexture ? 1 : 0);
+    waterShader.setInt("uDebugShowNormals", Settings::instance().debugShowNormals ? 1 : 0);    
     for (const auto& [pos, chunk] : chunks) {
         // Render if uploaded, or if rebuilding (MESH_BUILD/READY) but we have a mesh
         bool shouldRender = (chunk->getState() == ChunkState::GPU_UPLOADED);

@@ -865,6 +865,20 @@ void UIManager::render() {
             drawText(10.0f, 210.0f, 2.0f, "[F2] PAUSE TIME: " + std::string(isDayNightPaused ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
             drawText(10.0f, 240.0f, 2.0f, "[F3] SHADOWS: " + std::string(Settings::instance().enableShadows ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
             drawText(10.0f, 270.0f, 2.0f, "[ARROWS] CHANGE TIME", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+
+            // New debug toggles
+            drawText(10.0f, 300.0f, 2.0f, "[F4] SHOW TAA METRICS: " + std::string(Settings::instance().debugShowTAA ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+            drawText(10.0f, 330.0f, 2.0f, "[F8] NO TEXTURES: " + std::string(Settings::instance().debugNoTexture ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+            drawText(10.0f, 360.0f, 2.0f, "[F6] WIREFRAME: " + std::string(Settings::instance().debugWireframe ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+            drawText(10.0f, 390.0f, 2.0f, "[F7] SHOW NORMALS: " + std::string(Settings::instance().debugShowNormals ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+
+            // Show TAA metrics if enabled
+            if (Settings::instance().debugShowTAA) {
+                std::string taaMotion = "TAA Motion: " + std::to_string(lastTaaMotion).substr(0,6);
+                std::string taaHistory = "TAA HistWeight: " + std::to_string(lastTaaHistoryWeight).substr(0,6);
+                drawText(10.0f, 420.0f, 2.0f, taaMotion, glm::vec4(0.9f, 0.6f, 0.2f, 1.0f));
+                drawText(10.0f, 450.0f, 2.0f, taaHistory, glm::vec4(0.9f, 0.6f, 0.2f, 1.0f));
+            }
         }
 
         uiShader.unuse();
@@ -1071,11 +1085,14 @@ void UIManager::drawText(float x, float y, float scale, const std::string& text,
     }
 }
 
-void UIManager::updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos, const glm::vec3& playerVel) {
+void UIManager::updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos, const glm::vec3& playerVel, float taaMotion, float taaHistoryWeight) {
     currentFPS = fps;
     currentBlockName = blockName;
     currentPlayerPos = playerPos;
     currentPlayerVel = playerVel;
+    // TAA debug metrics
+    lastTaaMotion = taaMotion;
+    lastTaaHistoryWeight = taaHistoryWeight;
 }
 
 void UIManager::generateMapTexture() {

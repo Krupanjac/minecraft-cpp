@@ -54,6 +54,9 @@ public:
     void renderCrosshair(int windowWidth, int windowHeight);
     void renderLoadingScreen(int windowWidth, int windowHeight, float progress);
 
+    // Access PostProcess for debug/metrics
+    PostProcess* getPostProcess() { return postProcess.get(); }
+
 private:
     Shader blockShader;
     Shader waterShader;

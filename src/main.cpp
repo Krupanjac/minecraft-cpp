@@ -478,7 +478,13 @@ public:
                 }
             }
             
-            uiManager.updateDebugInfo(displayFPS, blockName, camera.getPosition(), camera.velocity);
+            // Pass estimated TAA metrics to UI for debugging
+            float taaMotion = 0.0f, taaHistoryWeight = 0.0f;
+            if (renderer.getPostProcess()) {
+                taaMotion = renderer.getPostProcess()->getLastTaaMotionMag();
+                taaHistoryWeight = renderer.getPostProcess()->getLastTaaBlendEstimate();
+            }
+            uiManager.updateDebugInfo(displayFPS, blockName, camera.getPosition(), camera.velocity, taaMotion, taaHistoryWeight);
 
             render();
             
@@ -664,6 +670,46 @@ private:
             }
         } else {
             f3Pressed = false;
+        }
+
+        static bool f4Pressed = false;
+        if (window->isKeyPressed(GLFW_KEY_F4)) {
+            if (!f4Pressed) {
+                Settings::instance().debugShowTAA = !Settings::instance().debugShowTAA;
+                f4Pressed = true;
+            }
+        } else {
+            f4Pressed = false;
+        }
+
+        static bool f8Pressed = false;
+        if (window->isKeyPressed(GLFW_KEY_F8)) {
+            if (!f8Pressed) {
+                Settings::instance().debugNoTexture = !Settings::instance().debugNoTexture;
+                f8Pressed = true;
+            }
+        } else {
+            f8Pressed = false;
+        }
+
+        static bool f6Pressed = false;
+        if (window->isKeyPressed(GLFW_KEY_F6)) {
+            if (!f6Pressed) {
+                Settings::instance().debugWireframe = !Settings::instance().debugWireframe;
+                f6Pressed = true;
+            }
+        } else {
+            f6Pressed = false;
+        }
+
+        static bool f7Pressed = false;
+        if (window->isKeyPressed(GLFW_KEY_F7)) {
+            if (!f7Pressed) {
+                Settings::instance().debugShowNormals = !Settings::instance().debugShowNormals;
+                f7Pressed = true;
+            }
+        } else {
+            f7Pressed = false;
         }
         
         // renderer.setShowShadows(uiManager.showShadows); // Removed, Renderer uses Settings directly

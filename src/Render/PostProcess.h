@@ -20,6 +20,10 @@ public:
     const glm::mat4& getJitterMatrix() const { return jitterMatrix; }
     void updateJitter(int w, int h);
 
+    // Debug accessors for TAA
+    float getLastTaaMotionMag() const;
+    float getLastTaaBlendEstimate() const;
+
 private:
     int width, height;
     GLuint quadVAO, quadVBO;
@@ -43,6 +47,9 @@ private:
     glm::mat4 jitterMatrix;
     glm::mat4 prevViewProj;
     glm::vec3 prevCameraPos = glm::vec3(0.0f); // Track camera movement for history rejection
+    // For debugging TAA
+    float lastTaaMotionMag = 0.0f;
+    float lastTaaBlendEstimate = 0.0f;
     int frameCount = 0;
     bool invalidateHistory = true; // Start with history invalidated
 

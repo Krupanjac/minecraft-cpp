@@ -70,6 +70,9 @@ void PostProcess::initSSAO() {
     generateSSAONoise();
 }
 
+float PostProcess::getLastTaaMotionMag() const { return lastTaaMotionMag; }
+float PostProcess::getLastTaaBlendEstimate() const { return lastTaaBlendEstimate; }
+
 void PostProcess::generateSSAOKernel() {
     std::uniform_real_distribution<float> randomFloats(0.0, 1.0);
     std::default_random_engine generator;
@@ -264,7 +267,12 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
 
         // Bind previous-frame depth texture for proper depth rejection
         glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, historyFBO[prevHistoryIndex]->getDepthTexture());
+        if (invalidateHistory) {
+            // Use current depth as history depth when history is invalidated
+            glBindTexture(GL_TEXTURE_2D, depthTexture);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, historyFBO[prevHistoryIndex]->getDepthTexture());
+        }
         
         taaShader.setInt("currentFrame", 0);
         taaShader.setInt("historyFrame", 1);
@@ -279,6 +287,14 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         glm::vec3 cameraDelta = cameraPos - prevCameraPos;
         taaShader.setVec3("cameraDelta", cameraDelta);
         
+        // Record debug metrics (approximate motion magnitude and estimated history blend used)
+        float motionMag = glm::length(cameraDelta);
+        lastTaaMotionMag = motionMag;
+        float baseBlend = 0.9f;
+        float estBlend = glm::mix(baseBlend, 0.3f, glm::smoothstep(0.001f, 0.02f, motionMag));
+        if (invalidateHistory) estBlend = 0.0f; // No history
+        lastTaaBlendEstimate = estBlend;
+
         // Depth linearization parameters
         taaShader.setFloat("nearPlane", 0.1f);  // Should match your camera near plane
         taaShader.setFloat("farPlane", 1000.0f); // Should match your camera far plane

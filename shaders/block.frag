@@ -16,6 +16,10 @@ uniform sampler2D uShadowMap;
 uniform int uUseShadows;
 uniform float uAOStrength;
 
+// Debug uniforms
+uniform int uDebugNoTexture;
+uniform int uDebugShowNormals;
+
 in vec4 vFragPosLightSpace;
 in vec4 vCurrentClip;
 in vec4 vPrevClip;
@@ -61,9 +65,18 @@ void main() {
     vec2 uv = vCellOrigin + fract(vTexCoord) * cellSize;
     
     vec4 texColor = textureLod(uTexture, uv, 0.0);
-    if (texColor.a < 0.1) discard;
-    
-    vec3 baseColor = texColor.rgb;
+    if (uDebugNoTexture == 0) {
+        if (texColor.a < 0.1) discard;
+    }
+
+    vec3 baseColor = (uDebugNoTexture == 1) ? vec3(1.0, 1.0, 1.0) : texColor.rgb;
+
+    // If debugging normals, visualize normal and return immediately
+    if (uDebugShowNormals == 1) {
+        vec3 normalColor = normalize(vNormal) * 0.5 + 0.5;
+        FragColor = vec4(normalColor, 1.0);
+        return;
+    }
     
     // Material-based coloring for blocks without textures
     // GRASS = 1, SAND = 4, SNOW = 8, ICE = 9, GRAVEL = 10, SANDSTONE = 11

@@ -15,15 +15,25 @@ uniform vec4 uBaseColor;
 uniform sampler2D uEmissiveMap;
 uniform bool uHasEmissive;
 
+// Debug uniforms
+uniform int uDebugNoTexture;
+uniform int uDebugShowNormals;
+
 uniform vec3 uLightDir;
 uniform vec3 uCameraPos;
 
 void main() {
     vec4 albedo = uBaseColor;
-    if (uHasTexture) {
-        vec4 texColor = texture(uAlbedoMap, TexCoord);
-        if (texColor.a < 0.1) discard;
-        albedo *= texColor;
+    if (uDebugNoTexture == 0) {
+        if (uHasTexture) {
+            vec4 texColor = texture(uAlbedoMap, TexCoord);
+            if (texColor.a < 0.1) discard;
+            albedo *= texColor;
+        }
+    }
+    else {
+        // override albedo to base color when no-texture debug is active
+        albedo = uBaseColor;
     }
     
     vec3 emission = vec3(0.0);
@@ -32,6 +42,16 @@ void main() {
         emission = emColor.rgb;
         // If the main texture is missing but we have emission, use emission alpha for discard
         if (!uHasTexture && emColor.a < 0.1) discard;
+    }
+
+    // If showing normals, output normal color and skip lighting
+    if (uDebugShowNormals == 1) {
+        vec3 normalColor = normalize(Normal) * 0.5 + 0.5;
+        FragColor = vec4(normalColor, 1.0);
+        vec2 a = (vCurrentClip.xy / vCurrentClip.w) * 0.5 + 0.5;
+        vec2 b = (vPrevClip.xy / vPrevClip.w) * 0.5 + 0.5;
+        Velocity = a - b;
+        return;
     }
 
     vec3 norm = normalize(Normal);

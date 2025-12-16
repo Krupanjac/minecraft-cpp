@@ -75,7 +75,7 @@ public:
 
     void toggleDebug() { showDebug = !showDebug; }
 
-    void updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos, const glm::vec3& playerVel);
+    void updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos, const glm::vec3& playerVel, float taaMotion = 0.0f, float taaHistoryWeight = 0.0f);
 
     BlockType getSelectedBlock() const { return hotbar[selectedSlot]; }
     void selectHotbarSlot(int slot) { if (slot >= 0 && slot < 9) selectedSlot = slot; }
@@ -100,6 +100,9 @@ public:
 private:
     MenuState currentMenuState = MenuState::MAIN_MENU;
     bool showDebug = false;
+    // TAA debug metrics
+    float lastTaaMotion = 0.0f;
+    float lastTaaHistoryWeight = 0.0f;
     float currentFPS = 0.0f;
     std::string currentBlockName = "None";
     glm::vec3 currentPlayerPos = glm::vec3(0.0f);

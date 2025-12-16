@@ -31,6 +31,11 @@ public:
     bool enableShadows = true;
     float shadowDistance = 160.0f;
     int fullscreen = 0; // 0: Windowed, 1: Fullscreen, 2: Borderless
+    // Debug visualization options
+    bool debugShowTAA = false; // Show TAA motion/weight overlay
+    bool debugNoTexture = false; // Render geometry without textures (flat color)
+    bool debugWireframe = false; // Render in wireframe
+    bool debugShowNormals = false; // Visualize normals as colors
     
     struct KeyBindings {
         int forward = 87;  // W
@@ -68,6 +73,10 @@ public:
                     else if (key == "enableTAA") enableTAA = (value == "1");
                     else if (key == "enableShadows") enableShadows = (value == "1");
                     else if (key == "shadowDistance") shadowDistance = std::stof(value);
+                    else if (key == "debugShowTAA") debugShowTAA = (value == "1");
+                    else if (key == "debugNoTexture") debugNoTexture = (value == "1");
+                    else if (key == "debugWireframe") debugWireframe = (value == "1");
+                    else if (key == "debugShowNormals") debugShowNormals = (value == "1");
                     else if (key == "shadowDistance") shadowDistance = std::stof(value);
                     else if (key == "fullscreen") fullscreen = std::stoi(value);
                     // Keys
@@ -102,6 +111,10 @@ public:
         file << "enableTAA=" << (enableTAA ? "1" : "0") << "\n";
         file << "enableShadows=" << (enableShadows ? "1" : "0") << "\n";
         file << "shadowDistance=" << shadowDistance << "\n";
+        file << "debugShowTAA=" << (debugShowTAA ? "1" : "0") << "\n";
+        file << "debugNoTexture=" << (debugNoTexture ? "1" : "0") << "\n";
+        file << "debugWireframe=" << (debugWireframe ? "1" : "0") << "\n";
+        file << "debugShowNormals=" << (debugShowNormals ? "1" : "0") << "\n";
         file << "fullscreen=" << fullscreen << "\n";
         
         file << "key_forward=" << keys.forward << "\n";

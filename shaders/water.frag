@@ -16,6 +16,10 @@ uniform float uTime;
 uniform sampler2D uTexture;
 uniform float uAOStrength;
 
+// Debug
+uniform int uDebugNoTexture;
+uniform int uDebugShowNormals;
+
 layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec2 Velocity;
 
@@ -40,12 +44,25 @@ void main() {
     if (vMaterial == 9u) { // ICE
         baseColor = texColor.rgb; // No tint
     }
-    
-    // Simple lighting
+
+    // Debug overrides
+    if (uDebugNoTexture == 1) {
+        baseColor = vec3(0.2, 0.4, 0.8); // solid debug tint
+    }
+
+    if (uDebugShowNormals == 1) {
+        vec3 normalColor = normalize(vNormal) * 0.5 + 0.5;
+        FragColor = vec4(normalColor, 1.0);
+        vec2 a = (vCurrentClip.xy / vCurrentClip.w) * 0.5 + 0.5;
+        vec2 b = (vPrevClip.xy / vPrevClip.w) * 0.5 + 0.5;
+        Velocity = a - b;
+        return;
+    }
+
+    // Restore normal and light direction (required for lighting computations)
     vec3 lightDir = normalize(uLightDir);
     vec3 normal = normalize(vNormal);
-    
-    // Specular highlight
+
     vec3 viewDir = normalize(uCameraPos - vWorldPos);
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
