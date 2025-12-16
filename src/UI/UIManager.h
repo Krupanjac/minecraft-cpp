@@ -40,6 +40,7 @@ struct UIElement {
     // For Inventory
     BlockType blockType = BlockType::AIR;
     bool isInventoryItem = false;
+    std::function<void()> onRightClick;
 };
 
 class UIManager {
@@ -49,7 +50,7 @@ public:
 
     void initialize(int windowWidth, int windowHeight);
     void render();
-    void update(float deltaTime, double mouseX, double mouseY, bool mousePressed);
+    void update(float deltaTime, double mouseX, double mouseY, bool mousePressed, bool rightMousePressed = false);
     void handleResize(int width, int height);
     void handleCharInput(unsigned int codepoint); // For text input
     void handleKeyInput(int key); // For special keys like Backspace
@@ -67,8 +68,21 @@ public:
     void toggleDebug() { showDebug = !showDebug; }
     void updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos);
 
-    BlockType getSelectedBlock() const { return selectedBlock; }
-    void setSelectedBlock(BlockType type) { selectedBlock = type; }
+    BlockType getSelectedBlock() const { return hotbar[selectedSlot]; }
+    void selectHotbarSlot(int slot) { if (slot >= 0 && slot < 9) selectedSlot = slot; }
+
+    // HUD Stats
+    int playerHealth = 20; // 0-20 (10 hearts)
+    int playerFood = 20;   // 0-20 (10 shanks)
+    float playerXP = 0.0f; // 0.0 - 1.0
+    int playerLevel = 0;
+    
+    // Hotbar
+    BlockType hotbar[9] = { 
+        BlockType::STONE, BlockType::DIRT, BlockType::WOOD, BlockType::LEAVES, 
+        BlockType::SAND, BlockType::GRAVEL, BlockType::GRASS, BlockType::WATER, BlockType::AIR 
+    };
+    int selectedSlot = 0;
     
     // Debug controls
     float timeOfDay = 0.0f; // 0-1200
@@ -81,7 +95,9 @@ private:
     std::string currentBlockName = "None";
     glm::vec3 currentPlayerPos = glm::vec3(0.0f);
 
-    BlockType selectedBlock = BlockType::STONE; // Default selected block
+    BlockType selectedBlock = BlockType::STONE; // Deprecated by hotbar, keeping for internal ref if needed, but hotbar[selectedSlot] is primary.
+    
+    void renderHUD();
 
     int width, height;
     Shader uiShader;
@@ -98,6 +114,7 @@ private:
     std::string newWorldName = "New World";
     std::string newWorldSeed = "12345";
     bool lastMousePressed = false;
+    bool lastRightMousePressed = false;
     
     void setupMainMenu();
     void setupInGameMenu();

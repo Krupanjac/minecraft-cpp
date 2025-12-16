@@ -74,6 +74,13 @@ public:
                     window->setCursorMode(GLFW_CURSOR_DISABLED);
                 }
             }
+            
+            // Hotbar Keys (1-9)
+            if (action == GLFW_PRESS) {
+                if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
+                    uiManager.selectHotbarSlot(key - GLFW_KEY_1);
+                }
+            }
         });
         
         window->setCharCallback([this](unsigned int codepoint) {
@@ -491,9 +498,10 @@ private:
         }
 
         bool mousePressed = glfwGetMouseButton(window->getNative(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+        bool rightMousePressed = glfwGetMouseButton(window->getNative(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
         
         if (uiManager.isMenuOpen()) {
-            uiManager.update(deltaTime, uiX, uiY, mousePressed);
+            uiManager.update(deltaTime, uiX, uiY, mousePressed, rightMousePressed);
             firstMouse = true; // Reset mouse look when returning to game
             return;
         }

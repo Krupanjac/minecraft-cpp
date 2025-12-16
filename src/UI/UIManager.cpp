@@ -380,7 +380,13 @@ void UIManager::setupInventoryMenu() {
         el.isInventoryItem = true;
         el.blockType = blocks[i];
         el.onClick = [this, type = blocks[i]]() {
-            selectedBlock = type;
+            // Left click selects slot for placement (legacy) or maybe primary functionality?
+            // Actually, let's keep it simple: Left click just does nothing special or maybe selects for later drag/drop if we implemented it.
+            // But per plan, we rely on Right Click for assignment.
+        };
+        el.onRightClick = [this, type = blocks[i]]() {
+             // Assign to current hotbar slot
+             hotbar[selectedSlot] = type;
         };
         elements.push_back(el);
     }
@@ -410,7 +416,7 @@ glm::vec4 UIManager::getBlockColor(BlockType type) {
     }
 }
 
-void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool mousePressed) {
+void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool mousePressed, bool rightMousePressed) {
     if (!isMenuOpen()) {
         lastMousePressed = mousePressed;
         return;
@@ -489,16 +495,120 @@ void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool m
         }
     }
 
+
+    
+    // Right Click Handling
+    if (rightMousePressed && !lastRightMousePressed) {
+        for (auto& el : elements) {
+            if (el.isHovered && el.isInventoryItem && el.onRightClick) {
+                el.onRightClick();
+            }
+        }
+    }
+
     if (pendingClick) {
         pendingClick();
     }
     
     lastMousePressed = mousePressed;
+    lastRightMousePressed = rightMousePressed;
 }
 
 void UIManager::render() {
-    if (!isMenuOpen() && !showDebug) return;
+    // Menu and Debug rendering
+    if (isMenuOpen() || showDebug) {
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+        uiShader.use();
+        glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
+        uiShader.setMat4("uProjection", projection);
+
+        if (isMenuOpen()) {
+            // Draw semi-transparent background
+            drawRect(0, 0, (float)width, (float)height, glm::vec4(0.0f, 0.0f, 0.0f, 0.7f));
+
+            for (const auto& el : elements) {
+                glm::vec4 color = el.isHovered ? glm::vec4(0.6f, 0.6f, 0.6f, 1.0f) : glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
+                
+                if (el.isInventoryItem) {
+                    // Draw slot background (darker)
+                     color = el.isHovered ? glm::vec4(0.5f, 0.5f, 0.5f, 0.9f) : glm::vec4(0.2f, 0.2f, 0.2f, 0.8f);
+                     drawRect(el.x, el.y, el.w, el.h, color);
+                     
+                     // Draw block color
+                     glm::vec4 blkColor = getBlockColor(el.blockType);
+                     drawRect(el.x + 6, el.y + 6, el.w - 12, el.h - 12, blkColor);
+                     
+                     // Draw selection highlight
+                     if (el.blockType == selectedBlock) {
+                         glm::vec4 hl(1.0f, 1.0f, 1.0f, 1.0f);
+                         float t = 4.0f;
+                         drawRect(el.x, el.y, el.w, t, hl); // Top
+                         drawRect(el.x, el.y + el.h - t, el.w, t, hl); // Bottom
+                         drawRect(el.x, el.y, t, el.h, hl); // Left
+                         drawRect(el.x + el.w - t, el.y, t, el.h, hl); // Right
+                     }
+                     continue;
+                }
+
+                drawRect(el.x, el.y, el.w, el.h, color);
+                
+                // Draw slider indicator
+                if (el.isSlider) {
+                    float val = 0.0f;
+                    if (el.intValueRef) val = (float)*el.intValueRef;
+                    else if (el.valueRef) val = *el.valueRef;
+                    
+                    float pct = (val - el.minVal) / (el.maxVal - el.minVal);
+                    drawRect(el.x, el.y, el.w * pct, el.h, glm::vec4(0.2f, 0.8f, 0.2f, 1.0f));
+                }
+
+                // Draw text centered
+                float textScale = 2.0f;
+                float textW = el.text.length() * 6.0f * textScale; // Approx width
+                float textX = el.x + (el.w - textW) / 2.0f;
+                float textY = el.y + (el.h - 7.0f * textScale) / 2.0f;
+                drawText(textX, textY, textScale, el.text, glm::vec4(1.0f));
+            }
+        }
+
+        if (showDebug) {
+            std::string fpsText = "FPS: " + std::to_string((int)currentFPS);
+            std::string blockText = "Block: " + currentBlockName;
+            
+            drawText(10.0f, 30.0f, 2.0f, fpsText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            drawText(10.0f, 60.0f, 2.0f, blockText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            
+            std::string posText = "XYZ: " + std::to_string((int)currentPlayerPos.x) + " " + 
+                                  std::to_string((int)currentPlayerPos.y) + " " + 
+                                  std::to_string((int)currentPlayerPos.z);
+            drawText(10.0f, 90.0f, 2.0f, posText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+
+            std::string timeText = "TIME: " + std::to_string(static_cast<int>(timeOfDay));
+            drawText(10.0f, 120.0f, 2.0f, timeText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            
+            // Debug Controls
+            drawText(10.0f, 150.0f, 2.0f, "[F1] TOGGLE DEBUG", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+            drawText(10.0f, 180.0f, 2.0f, "[F2] PAUSE TIME: " + std::string(isDayNightPaused ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+            drawText(10.0f, 210.0f, 2.0f, "[F3] SHADOWS: " + std::string(Settings::instance().enableShadows ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+            drawText(10.0f, 240.0f, 2.0f, "[ARROWS] CHANGE TIME", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+        }
+
+        uiShader.unuse();
+        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_BLEND);
+    }
+    
+    // Always render HUD unless in Main Menu / Settings / Load Game (basically if we are 'in game' or 'inventory')
+    // Specifically: NONE (playing) or INVENTORY. Not IN_GAME_MENU (pause).
+    if (currentMenuState == MenuState::NONE || currentMenuState == MenuState::INVENTORY) {
+        renderHUD();
+    }
+}
+
+void UIManager::renderHUD() {
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -506,78 +616,87 @@ void UIManager::render() {
     uiShader.use();
     glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
     uiShader.setMat4("uProjection", projection);
-
-    if (isMenuOpen()) {
-        // Draw semi-transparent background
-        drawRect(0, 0, (float)width, (float)height, glm::vec4(0.0f, 0.0f, 0.0f, 0.7f));
-
-        for (const auto& el : elements) {
-            glm::vec4 color = el.isHovered ? glm::vec4(0.6f, 0.6f, 0.6f, 1.0f) : glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
-            
-            if (el.isInventoryItem) {
-                // Draw slot background (darker)
-                 color = el.isHovered ? glm::vec4(0.5f, 0.5f, 0.5f, 0.9f) : glm::vec4(0.2f, 0.2f, 0.2f, 0.8f);
-                 drawRect(el.x, el.y, el.w, el.h, color);
-                 
-                 // Draw block color
-                 glm::vec4 blkColor = getBlockColor(el.blockType);
-                 drawRect(el.x + 6, el.y + 6, el.w - 12, el.h - 12, blkColor);
-                 
-                 // Draw selection highlight
-                 if (el.blockType == selectedBlock) {
-                     glm::vec4 hl(1.0f, 1.0f, 1.0f, 1.0f);
-                     float t = 4.0f;
-                     drawRect(el.x, el.y, el.w, t, hl); // Top
-                     drawRect(el.x, el.y + el.h - t, el.w, t, hl); // Bottom
-                     drawRect(el.x, el.y, t, el.h, hl); // Left
-                     drawRect(el.x + el.w - t, el.y, t, el.h, hl); // Right
-                 }
-                 continue;
-            }
-
-            drawRect(el.x, el.y, el.w, el.h, color);
-            
-            // Draw slider indicator
-            if (el.isSlider) {
-                float val = 0.0f;
-                if (el.intValueRef) val = (float)*el.intValueRef;
-                else if (el.valueRef) val = *el.valueRef;
-                
-                float pct = (val - el.minVal) / (el.maxVal - el.minVal);
-                drawRect(el.x, el.y, el.w * pct, el.h, glm::vec4(0.2f, 0.8f, 0.2f, 1.0f));
-            }
-
-            // Draw text centered
-            float textScale = 2.0f;
-            float textW = el.text.length() * 6.0f * textScale; // Approx width
-            float textX = el.x + (el.w - textW) / 2.0f;
-            float textY = el.y + (el.h - 7.0f * textScale) / 2.0f;
-            drawText(textX, textY, textScale, el.text, glm::vec4(1.0f));
+    
+    // Hotbar Settings
+    float slotSize = 40.0f;
+    float gap = 4.0f;
+    int slots = 9;
+    float totalW = slots * slotSize + (slots - 1) * gap;
+    float startX = (width - totalW) / 2.0f;
+    float startY = height - slotSize - 10.0f;
+    
+    // 1. Hotbar Background
+    for (int i = 0; i < slots; ++i) {
+        float x = startX + i * (slotSize + gap);
+        float y = startY;
+        
+        // Selection highlight
+        if (i == selectedSlot) {
+            drawRect(x - 2, y - 2, slotSize + 4, slotSize + 4, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+        }
+        
+        // Slot background
+        drawRect(x, y, slotSize, slotSize, glm::vec4(0.2f, 0.2f, 0.2f, 0.8f));
+        
+        // Item
+        BlockType type = hotbar[i];
+        if (type != BlockType::AIR) {
+            drawRect(x + 4, y + 4, slotSize - 8, slotSize - 8, getBlockColor(type));
         }
     }
-
-    if (showDebug) {
-        std::string fpsText = "FPS: " + std::to_string((int)currentFPS);
-        std::string blockText = "Block: " + currentBlockName;
+    
+    // 2. Health Bar (Hearts) - Left above hotbar
+    // 10 hearts, 2 health per heart
+    float heartSize = 16.0f;
+    float heartGap = 2.0f;
+    float healthStartX = startX;
+    float healthStartY = startY - heartSize - 15.0f; // Above XP bar usually, but simplifying layer
+    
+    // Draw max health background? Maybe just current health for now
+    for (int i = 0; i < 10; ++i) {
+        float x = healthStartX + i * (heartSize + heartGap);
+        // Background (empty heart - dark red)
+        drawRect(x, healthStartY, heartSize, heartSize, glm::vec4(0.3f, 0.0f, 0.0f, 1.0f));
         
-        drawText(10.0f, 30.0f, 2.0f, fpsText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-        drawText(10.0f, 60.0f, 2.0f, blockText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-        
-        std::string posText = "XYZ: " + std::to_string((int)currentPlayerPos.x) + " " + 
-                              std::to_string((int)currentPlayerPos.y) + " " + 
-                              std::to_string((int)currentPlayerPos.z);
-        drawText(10.0f, 90.0f, 2.0f, posText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-
-        std::string timeText = "TIME: " + std::to_string(static_cast<int>(timeOfDay));
-        drawText(10.0f, 120.0f, 2.0f, timeText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-        
-        // Debug Controls
-        drawText(10.0f, 150.0f, 2.0f, "[F1] TOGGLE DEBUG", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
-        drawText(10.0f, 180.0f, 2.0f, "[F2] PAUSE TIME: " + std::string(isDayNightPaused ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
-        drawText(10.0f, 210.0f, 2.0f, "[F3] SHADOWS: " + std::string(Settings::instance().enableShadows ? "ON" : "OFF"), glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
-        drawText(10.0f, 240.0f, 2.0f, "[ARROWS] CHANGE TIME", glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+        // Filled based on health
+        int heartHealth = (i + 1) * 2;
+        if (playerHealth >= heartHealth) {
+            // Full heart
+            drawRect(x, healthStartY, heartSize, heartSize, glm::vec4(0.9f, 0.1f, 0.1f, 1.0f));
+        } else if (playerHealth == heartHealth - 1) {
+            // Half heart
+            drawRect(x, healthStartY, heartSize / 2, heartSize, glm::vec4(0.9f, 0.1f, 0.1f, 1.0f));
+        }
     }
-
+    
+    // 3. Food Bar (Hunger) - Right above hotbar
+    float foodStartX = startX + totalW - (10 * (heartSize + heartGap)) + heartGap; // Align right
+    for (int i = 0; i < 10; ++i) {
+        // Draw reverse order to align right? Or just draw left-to-right from calculated start
+        // Minecraft draws right-to-left usually but visual result is same 
+        float x = foodStartX + i * (heartSize + heartGap);
+        
+         // Background (empty food - dark brown)
+        drawRect(x, healthStartY, heartSize, heartSize, glm::vec4(0.3f, 0.2f, 0.1f, 1.0f));
+        
+        // Filled
+        int foodLevel = (i + 1) * 2; // Logic is tricky if we want right-alignment visual but usually simple enough
+        // Actually, MC fills from right to left? No, usually 0 is left. 
+        // Let's just draw 0..9 left to right.
+        
+        if (playerFood >= foodLevel) {
+            drawRect(x, healthStartY, heartSize, heartSize, glm::vec4(0.6f, 0.4f, 0.2f, 1.0f));
+        }
+    }
+    
+    // 4. XP Bar - Between hotbar and stats
+    float xpH = 5.0f;
+    float xpY = startY - xpH - 4.0f;
+    // Background
+    drawRect(startX, xpY, totalW, xpH, glm::vec4(0.3f, 0.3f, 0.3f, 1.0f));
+    // Progress
+    drawRect(startX, xpY, totalW * playerXP, xpH, glm::vec4(0.2f, 0.9f, 0.2f, 1.0f));
+    
     uiShader.unuse();
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
