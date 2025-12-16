@@ -64,6 +64,9 @@ private:
     float noise2D(float x, float z) const;
     float fbm(float x, float z, int octaves) const; // Fractal Brownian Motion
     float ridgeNoise(float x, float z) const;
+    float ridgedMultifractal(float x, float z, int octaves, float lacunarity, float gain, float offset) const; // Alpine mountains
+    float billowNoise(float x, float z) const; // Billow noise (abs of noise)
+    float turbulence(float x, float z, int octaves) const; // Turbulent noise
     float domainWarp(float& x, float& z) const;
     float lerp(float a, float b, float t) const;
     float fade(float t) const;

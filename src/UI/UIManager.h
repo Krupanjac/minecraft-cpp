@@ -17,7 +17,8 @@ enum class MenuState {
     LOAD_GAME,
     NEW_GAME,
     INVENTORY,
-    CONTROLS
+    CONTROLS,
+    MAP
 };
 
 struct UIElement {
@@ -69,6 +70,8 @@ public:
     void setOnLoadGame(std::function<void(std::string)> callback) { onLoadGame = callback; }
     void setOnExit(std::function<void()> callback) { onExit = callback; }
     void setOnSave(std::function<void()> callback) { onSave = callback; }
+    void setOnTeleport(std::function<void(float, float)> callback) { onTeleport = callback; }
+    void setWorldGenerator(class WorldGenerator* gen) { worldGenerator = gen; }
 
     void toggleDebug() { showDebug = !showDebug; }
 
@@ -134,6 +137,17 @@ private:
     void setupLoadGameMenu();
     void setupNewGameMenu();
     void setupInventoryMenu();
+    void setupMapMenu();
+    void generateMapTexture();
+    
+    // Map data
+    class WorldGenerator* worldGenerator = nullptr;
+    GLuint mapTexture = 0;
+    int mapTextureSize = 512; // Size of the map texture
+    float mapCenterX = 0.0f;  // World X coordinate at map center
+    float mapCenterZ = 0.0f;  // World Z coordinate at map center
+    float mapScale = 8.0f;    // Blocks per pixel
+    std::function<void(float, float)> onTeleport;
     
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
     void drawText(float x, float y, float scale, const std::string& text, const glm::vec4& color);

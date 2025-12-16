@@ -1,5 +1,6 @@
 #include "UIManager.h"
 #include "../World/WorldSerializer.h"
+#include "../World/WorldGenerator.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <algorithm>
@@ -79,6 +80,7 @@ void UIManager::setMenuState(MenuState state) {
         case MenuState::LOAD_GAME: setupLoadGameMenu(); break;
         case MenuState::NEW_GAME: setupNewGameMenu(); break;
         case MenuState::INVENTORY: setupInventoryMenu(); break;
+        case MenuState::MAP: setupMapMenu(); break;
         case MenuState::NONE: break;
     }
 }
@@ -421,6 +423,11 @@ void UIManager::setupNewGameMenu() {
     float btnH = 40.0f;
     float gap = 10.0f;
 
+    // Seed constraints: Use range [1, 999999999] for user-friendly display
+    // The WorldGenerator uses unsigned int internally which can handle this range
+    constexpr long MAX_SEED = 999999999L;
+    constexpr long MIN_SEED = 1L;
+
     // Input fields
     static std::string nameInput = "New World";
     
@@ -429,7 +436,7 @@ void UIManager::setupNewGameMenu() {
     if (seedInput.empty()) {
         std::random_device rd;
         std::mt19937 gen(rd());
-        std::uniform_int_distribution<int> dis(INT_MIN, INT_MAX);
+        std::uniform_int_distribution<long> dis(MIN_SEED, MAX_SEED);
         seedInput = std::to_string(dis(gen));
     }
 
@@ -440,16 +447,32 @@ void UIManager::setupNewGameMenu() {
     elements.push_back(seedField);
 
     elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*2 + 20, btnW, btnH, "CREATE WORLD", false, [this]() { 
-        int seed = 0;
+        long seed = 0;
         std::string seedStr = *elements[1].textRef;
         
+        // Filter non-numeric characters and parse
+        std::string cleanSeed;
+        for (char c : seedStr) {
+            if (c >= '0' && c <= '9') cleanSeed += c;
+        }
+        
         try { 
-            seed = std::stoi(seedStr); 
+            if (!cleanSeed.empty()) {
+                seed = std::stol(cleanSeed);
+            }
         } catch(...) { 
-            // Fallback if user entered garbage, though we pre-filled it
+            seed = 0; // Will trigger random generation
+        }
+        
+        // Constrain seed to valid range
+        constexpr long MAX_SEED = 999999999L;
+        constexpr long MIN_SEED = 1L;
+        
+        if (seed < MIN_SEED || seed > MAX_SEED) {
+            // Generate random seed if out of range or invalid
             std::random_device rd;
             std::mt19937 gen(rd());
-            std::uniform_int_distribution<int> dis(INT_MIN, INT_MAX);
+            std::uniform_int_distribution<long> dis(MIN_SEED, MAX_SEED);
             seed = dis(gen);
         }
         
@@ -460,6 +483,10 @@ void UIManager::setupNewGameMenu() {
     elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*3 + 20, btnW, btnH, "BACK", false, [this]() { 
         setMenuState(MenuState::MAIN_MENU); 
     }});
+    
+    // Add hint text for seed range (non-interactive label)
+    UIElement seedHint = {centerX - btnW/2, centerY - 100 + btnH*2 + gap, btnW, 20, "(Seed: 1 - 999,999,999)", false, nullptr, false, nullptr, nullptr, nullptr, 0.0f, 0.0f, false, nullptr};
+    elements.push_back(seedHint);
 }
 
 void UIManager::setupInventoryMenu() {
@@ -634,6 +661,30 @@ void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool m
             }
         }
     }
+    
+    // Map click handling - teleport on left click
+    if (currentMenuState == MenuState::MAP && mousePressed && !lastMousePressed && !elements.empty()) {
+        const auto& mapEl = elements[0];
+        
+        // Check if click is on the map
+        if (mouseX >= mapEl.x && mouseX <= mapEl.x + mapEl.w &&
+            mouseY >= mapEl.y && mouseY <= mapEl.y + mapEl.h) {
+            
+            // Convert screen coords to map coords
+            float relX = (float)(mouseX - mapEl.x) / (float)mapEl.w; // 0 to 1
+            float relY = (float)(mouseY - mapEl.y) / (float)mapEl.h; // 0 to 1
+            
+            // Convert to world coords
+            float worldX = mapCenterX + (relX - 0.5f) * mapTextureSize * mapScale;
+            float worldZ = mapCenterZ + (relY - 0.5f) * mapTextureSize * mapScale;
+            
+            // Teleport
+            if (onTeleport) {
+                onTeleport(worldX, worldZ);
+                setMenuState(MenuState::NONE); // Close map after teleport
+            }
+        }
+    }
 
     if (pendingClick) {
         pendingClick();
@@ -657,9 +708,94 @@ void UIManager::render() {
         if (isMenuOpen()) {
             // Draw semi-transparent background
             drawRect(0, 0, (float)width, (float)height, glm::vec4(0.0f, 0.0f, 0.0f, 0.7f));
+            
+            // Special handling for MAP - render the map using colored rectangles
+            if (currentMenuState == MenuState::MAP && !elements.empty()) {
+                const auto& mapEl = elements[0];
+                
+                // Draw the map background
+                drawRect(mapEl.x, mapEl.y, mapEl.w, mapEl.h, glm::vec4(0.1f, 0.1f, 0.15f, 1.0f));
+                
+                // Draw map pixels as small colored rectangles
+                // We sample the heightmap at lower resolution for performance
+                if (worldGenerator) {
+                    int pixelRes = 128; // Sample resolution
+                    float pixelSize = mapEl.w / pixelRes;
+                    
+                    for (int py = 0; py < pixelRes; py++) {
+                        for (int px = 0; px < pixelRes; px++) {
+                            // Convert pixel coords to world coords
+                            float worldX = mapCenterX + (px - pixelRes / 2) * mapScale * (mapTextureSize / pixelRes);
+                            float worldZ = mapCenterZ + (py - pixelRes / 2) * mapScale * (mapTextureSize / pixelRes);
+                            
+                            // Get height and biome
+                            float h = worldGenerator->getHeight(worldX, worldZ);
+                            BiomeType biome = worldGenerator->getBiome(worldX, worldZ);
+                            
+                            // Determine color
+                            glm::vec4 color;
+                            
+                            if (h < 32) { // SEA_LEVEL
+                                float depth = (32 - h) / 32.0f;
+                                color = glm::vec4(0.08f + 0.15f * (1.0f - depth), 
+                                                  0.3f + 0.3f * (1.0f - depth), 
+                                                  0.7f + 0.2f * (1.0f - depth), 1.0f);
+                            } else {
+                                switch (biome) {
+                                    case BiomeType::OCEAN:
+                                        color = glm::vec4(0.15f, 0.4f, 0.8f, 1.0f);
+                                        break;
+                                    case BiomeType::PLAINS:
+                                        color = glm::vec4(0.47f, 0.7f, 0.3f, 1.0f);
+                                        break;
+                                    case BiomeType::DESERT:
+                                        color = glm::vec4(0.86f, 0.78f, 0.55f, 1.0f);
+                                        break;
+                                    case BiomeType::FOREST:
+                                        color = glm::vec4(0.2f, 0.5f, 0.2f, 1.0f);
+                                        break;
+                                    case BiomeType::MOUNTAINS:
+                                        if (h > 120) {
+                                            color = glm::vec4(0.94f, 0.96f, 0.98f, 1.0f); // Snow
+                                        } else {
+                                            float t = (h - 50.0f) / 70.0f;
+                                            color = glm::vec4(0.4f + 0.3f * t, 0.4f + 0.3f * t, 0.43f + 0.27f * t, 1.0f);
+                                        }
+                                        break;
+                                    case BiomeType::SNOWY_TUNDRA:
+                                        color = glm::vec4(0.86f, 0.9f, 0.94f, 1.0f);
+                                        break;
+                                    default:
+                                        color = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+                                        break;
+                                }
+                            }
+                            
+                            float rx = mapEl.x + px * pixelSize;
+                            float ry = mapEl.y + py * pixelSize;
+                            drawRect(rx, ry, pixelSize + 1, pixelSize + 1, color);
+                        }
+                    }
+                    
+                    // Draw player marker (red dot at center)
+                    float markerSize = 8.0f;
+                    float markerX = mapEl.x + mapEl.w / 2 - markerSize / 2;
+                    float markerY = mapEl.y + mapEl.h / 2 - markerSize / 2;
+                    drawRect(markerX, markerY, markerSize, markerSize, glm::vec4(1.0f, 0.2f, 0.2f, 1.0f));
+                    
+                    // Draw border
+                    drawRect(markerX - 1, markerY - 1, markerSize + 2, 2, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)); // Top
+                    drawRect(markerX - 1, markerY + markerSize - 1, markerSize + 2, 2, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)); // Bottom
+                }
+            }
 
             for (const auto& el : elements) {
                 glm::vec4 color = el.isHovered ? glm::vec4(0.6f, 0.6f, 0.6f, 1.0f) : glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
+                
+                // Skip the map element itself (we rendered it above)
+                if (currentMenuState == MenuState::MAP && &el == &elements[0]) {
+                    continue;
+                }
                 
                 if (el.isInventoryItem) {
                     // Draw slot background (darker)
@@ -942,4 +1078,156 @@ void UIManager::updateDebugInfo(float fps, const std::string& blockName, const g
     currentPlayerVel = playerVel;
 }
 
+void UIManager::generateMapTexture() {
+    if (!worldGenerator) return;
+    
+    // Create map texture if not exists
+    if (mapTexture == 0) {
+        glGenTextures(1, &mapTexture);
+    }
+    
+    // Generate pixel data
+    std::vector<unsigned char> pixels(mapTextureSize * mapTextureSize * 3);
+    
+    for (int py = 0; py < mapTextureSize; py++) {
+        for (int px = 0; px < mapTextureSize; px++) {
+            // Convert pixel coords to world coords
+            float worldX = mapCenterX + (px - mapTextureSize / 2) * mapScale;
+            float worldZ = mapCenterZ + (py - mapTextureSize / 2) * mapScale;
+            
+            // Get height and biome
+            float height = worldGenerator->getHeight(worldX, worldZ);
+            BiomeType biome = worldGenerator->getBiome(worldX, worldZ);
+            
+            // Determine color based on biome and height
+            unsigned char r, g, b;
+            
+            // Sea level check
+            if (height < 32) { // SEA_LEVEL
+                // Water - deeper = darker blue
+                float depth = (32 - height) / 32.0f;
+                r = static_cast<unsigned char>(20 + 40 * (1.0f - depth));
+                g = static_cast<unsigned char>(80 + 80 * (1.0f - depth));
+                b = static_cast<unsigned char>(180 + 50 * (1.0f - depth));
+            } else {
+                // Land - color by biome
+                switch (biome) {
+                    case BiomeType::OCEAN:
+                        r = 40; g = 100; b = 200;
+                        break;
+                    case BiomeType::PLAINS:
+                        r = 120; g = 180; b = 80;
+                        // Height shading
+                        r = static_cast<unsigned char>(r * (0.7f + 0.3f * std::min(height / 100.0f, 1.0f)));
+                        g = static_cast<unsigned char>(g * (0.7f + 0.3f * std::min(height / 100.0f, 1.0f)));
+                        break;
+                    case BiomeType::DESERT:
+                        r = 220; g = 200; b = 140;
+                        break;
+                    case BiomeType::FOREST:
+                        r = 50; g = 130; b = 50;
+                        // Darker for dense forest
+                        r = static_cast<unsigned char>(r * (0.8f + 0.2f * std::min(height / 80.0f, 1.0f)));
+                        g = static_cast<unsigned char>(g * (0.8f + 0.2f * std::min(height / 80.0f, 1.0f)));
+                        break;
+                    case BiomeType::MOUNTAINS:
+                        // Gray stone, whiter at peaks
+                        if (height > 120) {
+                            // Snow caps
+                            r = 240; g = 245; b = 250;
+                        } else {
+                            float t = (height - 50.0f) / 70.0f;
+                            r = static_cast<unsigned char>(100 + 80 * t);
+                            g = static_cast<unsigned char>(100 + 80 * t);
+                            b = static_cast<unsigned char>(110 + 70 * t);
+                        }
+                        break;
+                    case BiomeType::SNOWY_TUNDRA:
+                        r = 220; g = 230; b = 240;
+                        break;
+                    default:
+                        r = 128; g = 128; b = 128;
+                        break;
+                }
+            }
+            
+            int idx = (py * mapTextureSize + px) * 3;
+            pixels[idx] = r;
+            pixels[idx + 1] = g;
+            pixels[idx + 2] = b;
+        }
+    }
+    
+    // Upload texture
+    glBindTexture(GL_TEXTURE_2D, mapTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, mapTextureSize, mapTextureSize, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
 
+void UIManager::setupMapMenu() {
+    elements.clear();
+    
+    // Center the player position for the map
+    mapCenterX = currentPlayerPos.x;
+    mapCenterZ = currentPlayerPos.z;
+    
+    // Generate the map texture
+    generateMapTexture();
+    
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
+    
+    // Map display size (as large as possible while fitting on screen)
+    float mapDisplaySize = std::min(width, height) * 0.85f;
+    float mapX = centerX - mapDisplaySize / 2;
+    float mapY = centerY - mapDisplaySize / 2;
+    
+    // Map element - clicking on it will teleport
+    UIElement mapElement;
+    mapElement.x = mapX;
+    mapElement.y = mapY;
+    mapElement.w = mapDisplaySize;
+    mapElement.h = mapDisplaySize;
+    mapElement.text = ""; // No text, we'll render the texture
+    mapElement.isHovered = false;
+    mapElement.onClick = nullptr; // Handle click specially in update
+    elements.push_back(mapElement);
+    
+    // Close button
+    float btnW = 200.0f;
+    float btnH = 40.0f;
+    elements.push_back({
+        centerX - btnW / 2, mapY + mapDisplaySize + 10, btnW, btnH, 
+        "CLOSE (M)", false, [this]() {
+            setMenuState(MenuState::NONE);
+        }
+    });
+    
+    // Zoom controls
+    elements.push_back({
+        mapX - 50, centerY - 20, 40, 40, "+", false, [this]() {
+            mapScale = std::max(1.0f, mapScale / 2.0f);
+            generateMapTexture();
+        }
+    });
+    elements.push_back({
+        mapX - 50, centerY + 30, 40, 40, "-", false, [this]() {
+            mapScale = std::min(64.0f, mapScale * 2.0f);
+            generateMapTexture();
+        }
+    });
+    
+    // Info labels
+    UIElement scaleLabel = {mapX, mapY - 25, 300, 20, "Scale: " + std::to_string(static_cast<int>(mapScale)) + " blocks/pixel", false, nullptr};
+    elements.push_back(scaleLabel);
+    
+    UIElement coordLabel = {mapX, mapY - 50, 400, 20, "Center: X=" + std::to_string(static_cast<int>(mapCenterX)) + " Z=" + std::to_string(static_cast<int>(mapCenterZ)), false, nullptr};
+    elements.push_back(coordLabel);
+    
+    UIElement helpLabel = {centerX - 150, mapY + mapDisplaySize + 55, 300, 20, "Click on map to teleport", false, nullptr};
+    elements.push_back(helpLabel);
+}

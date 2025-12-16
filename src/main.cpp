@@ -82,6 +82,17 @@ public:
                         window->setCursorMode(GLFW_CURSOR_NORMAL);
                     }
                 }
+                
+                // M key toggles map
+                if (key == GLFW_KEY_M) {
+                    if (uiManager.getMenuState() == MenuState::MAP) {
+                        uiManager.setMenuState(MenuState::NONE);
+                        window->setCursorMode(GLFW_CURSOR_DISABLED);
+                    } else if (uiManager.getMenuState() == MenuState::NONE) {
+                        uiManager.setMenuState(MenuState::MAP);
+                        window->setCursorMode(GLFW_CURSOR_NORMAL);
+                    }
+                }
 
                 if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
                     uiManager.selectHotbarSlot(key - GLFW_KEY_1);
@@ -139,6 +150,18 @@ public:
         uiManager.setOnSettingsChanged([this]() {
             applySettings();
         });
+        
+        // Setup teleport callback for map
+        uiManager.setOnTeleport([this](float x, float z) {
+            // Get height at target location
+            float height = worldGenerator.getHeight(x, z);
+            // Teleport player to that location (slightly above ground)
+            camera.setPosition(glm::vec3(x, height + 2.0f, z));
+            LOG_INFO("Teleported to: " + std::to_string(x) + ", " + std::to_string(z));
+        });
+        
+        // Give UIManager access to world generator for map
+        uiManager.setWorldGenerator(&worldGenerator);
         
         // Apply initial settings
         applySettings();
