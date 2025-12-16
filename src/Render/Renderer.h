@@ -97,6 +97,10 @@ private:
     static constexpr double ORIGIN_REBASE_THRESHOLD = 256.0; // Rebase when camera is this far from origin
     size_t lastChunkCount = 0; // Track chunk loading for TAA history invalidation
 
+    // Track mesh upload frames so newly uploaded chunks are prioritized into shadow map
+    int frameCounter = 0;
+    std::unordered_map<ChunkPos, int> lastUploadedFrame; // frame index of last upload
+
     void setupOpenGL();
     bool loadShaders();
     void initCrosshair();

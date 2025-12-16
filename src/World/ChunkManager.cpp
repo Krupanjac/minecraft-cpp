@@ -37,19 +37,37 @@ std::shared_ptr<Chunk> ChunkManager::getChunkAt(const glm::vec3& worldPos) {
     return getChunk(worldToChunk(worldPos));
 }
 
+#include <chrono>
+
 void ChunkManager::unloadDistantChunks(const glm::vec3& cameraPos) {
     ChunkPos centerChunk = worldToChunk(cameraPos);
     int renderDist = Settings::instance().renderDistance;
     
-    std::vector<ChunkPos> toRemove;
+    auto now = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now().time_since_epoch()).count();
+
+    std::vector<ChunkPos> toEraseImmediately;
     for (const auto& [pos, chunk] : chunks) {
         if (!isChunkInRange(pos, centerChunk, renderDist + 2)) {
-            toRemove.push_back(pos);
+            // Not in range; check if already marked for unload
+            auto it = unloadTimestamps.find(pos);
+            if (it == unloadTimestamps.end()) {
+                unloadTimestamps[pos] = now; // start grace timer
+            } else {
+                double elapsed = now - it->second;
+                if (elapsed >= UNLOAD_DELAY_SECONDS) {
+                    toEraseImmediately.push_back(pos);
+                }
+            }
+        } else {
+            // In range -> ensure it's not pending unload
+            unloadTimestamps.erase(pos);
         }
     }
-    
-    for (const auto& pos : toRemove) {
+
+    // Erase chunks that exceeded the grace period
+    for (const auto& pos : toEraseImmediately) {
         chunks.erase(pos);
+        unloadTimestamps.erase(pos);
     }
 }
 

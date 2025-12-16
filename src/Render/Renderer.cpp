@@ -83,14 +83,20 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         lastChunkCount = currentChunkCount;
     }
 
+    // Update frame counter for upload tracking
+    frameCounter++;
+
     // Calculate Light Space Matrix
     // Center on player
     // We position the "sun" far away along the light direction
+    // Use the snapped render origin as the light target center to reduce jitter when the camera moves slightly
     float shadowRange = Settings::instance().shadowDistance; // Covers visible area
-    glm::vec3 lightPos = cameraRelative + lightDirection * 100.0f;
-    glm::mat4 lightView = glm::lookAt(lightPos, cameraRelative, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::vec3 lightTarget = glm::vec3(renderOrigin); // snapped origin - stable for TAA and shadows
+    glm::vec3 lightPos = lightTarget + lightDirection * 1000.0f; // far away
+    // Use an orthographic projection centered on the light target
+    glm::mat4 lightView = glm::lookAt(lightPos, lightTarget, glm::vec3(0.0f, 1.0f, 0.0f));
     
-    float near_plane = 1.0f, far_plane = 400.0f;
+    float near_plane = 1.0f, far_plane = 2000.0f;
     glm::mat4 lightProjection = glm::ortho(-shadowRange, shadowRange, -shadowRange, shadowRange, near_plane, far_plane);
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
@@ -101,16 +107,17 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         // Update shadow frustum for culling
         shadowFrustum.update(lightSpaceMatrix);
 
-        // Fix shadow acne by rendering back faces
+        // Fix shadow acne by rendering front faces and using polygon offset
         glEnable(GL_CULL_FACE);
         glCullFace(GL_FRONT);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(2.0f, 4.0f);
 
         shadowShader.use();
         shadowShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
         
         int shadowDrawCalls = 0;
-        // Render chunks for shadow map
-        // We only need to render opaque chunks
+        // Render chunks for shadow map (use camera-relative positions to match lightSpaceMatrix)
         for (const auto& [pos, chunk] : chunks) {
             bool shouldRender = (chunk->getState() == ChunkState::GPU_UPLOADED);
             if (!shouldRender) {
@@ -121,32 +128,41 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
                     }
                 }
             }
-            
-            if (shouldRender) {
-                // Frustum Culling for Shadows
-                glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
-                glm::vec3 chunkMin = chunkWorldPos;
-                glm::vec3 chunkMax = chunkWorldPos + glm::vec3(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE);
-                
+
+            if (!shouldRender) continue;
+
+            // Compute chunk position relative to render origin (same space as cameraRelative / lightSpaceMatrix)
+            glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
+            glm::vec3 chunkRelativePos = chunkWorldPos - glm::vec3(renderOrigin);
+            glm::vec3 chunkMin = chunkRelativePos;
+            glm::vec3 chunkMax = chunkRelativePos + glm::vec3(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE);
+
+            // If this chunk was uploaded very recently, force it into shadow pass for a few frames to ensure it contributes
+            auto itUploaded = lastUploadedFrame.find(pos);
+            bool recentUpload = (itUploaded != lastUploadedFrame.end() && (frameCounter - itUploaded->second) <= 3);
+            if (!recentUpload) {
                 if (!shadowFrustum.isBoxVisible(chunkMin, chunkMax)) {
                     continue;
                 }
+            }
 
-                auto it = chunkMeshes.find(pos);
-                if (it != chunkMeshes.end() && it->second->isUploaded()) {
-                    glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkWorldPos);
-                    shadowShader.setMat4("uModel", model);
-                    
-                    it->second->bind();
-                    it->second->draw();
-                    it->second->unbind();
-                    ++shadowDrawCalls;
-                }
+            auto it = chunkMeshes.find(pos);
+            if (it != chunkMeshes.end() && it->second->isUploaded()) {
+                glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkRelativePos);
+                shadowShader.setMat4("uModel", model);
+
+                it->second->bind();
+                it->second->draw();
+                it->second->unbind();
+                ++shadowDrawCalls;
             }
         }
-        
+
+        // Restore state
+        glDisable(GL_POLYGON_OFFSET_FILL);
         glCullFace(GL_BACK);
         glDisable(GL_CULL_FACE);
+
         shadowMap->unbind();
     }
     
@@ -339,7 +355,15 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         modelShader.setVec4("uBaseColor", glm::vec4(1.0f)); // Default white
 
         for (auto* entity : entities) {
-            if (entity) entity->render(modelShader);
+            if (!entity) continue;
+            // Render entity using camera-relative coordinates so rebasing doesn't move the model unexpectedly
+            glm::vec3 worldPos = entity->getPosition();
+            glm::vec3 relPos = glm::vec3(glm::dvec3(worldPos) - renderOrigin);
+            // Temporarily set position for rendering
+            entity->setPosition(relPos);
+            entity->render(modelShader);
+            // Restore world position
+            entity->setPosition(worldPos);
         }
         modelShader.unuse();
     }
@@ -381,10 +405,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         
         if (!shouldRender) continue;
         
-        // Frustum culling
+        // Frustum culling (use camera-relative positions like other geometry)
         glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
-        glm::vec3 chunkMin = chunkWorldPos;
-        glm::vec3 chunkMax = chunkWorldPos + glm::vec3(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE);
+        glm::vec3 chunkRelativePos = chunkWorldPos - originOffset; // camera-relative
+        glm::vec3 chunkMin = chunkRelativePos;
+        glm::vec3 chunkMax = chunkRelativePos + glm::vec3(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE);
         
         if (!frustum.isBoxVisible(chunkMin, chunkMax)) {
             continue;
@@ -393,7 +418,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         // Get or create mesh
         auto it = waterMeshes.find(pos);
         if (it != waterMeshes.end() && it->second->isUploaded()) {
-            glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkWorldPos);
+            glm::mat4 model = glm::translate(glm::mat4(1.0f), chunkRelativePos);
             waterShader.setMat4("uModel", model);
             
             it->second->bind();
@@ -1183,8 +1208,11 @@ void Renderer::uploadChunkMesh(const ChunkPos& pos,
         auto mesh = std::make_unique<Mesh>();
         mesh->upload(vertices, indices);
         chunkMeshes[pos] = std::move(mesh);
+        // Record upload frame so shadow pass can include this chunk immediately for a few frames
+        lastUploadedFrame[pos] = frameCounter;
     } else {
         chunkMeshes.erase(pos);
+        lastUploadedFrame.erase(pos);
     }
     
     // Water mesh
@@ -1192,7 +1220,9 @@ void Renderer::uploadChunkMesh(const ChunkPos& pos,
         auto mesh = std::make_unique<Mesh>();
         mesh->upload(waterVertices, waterIndices);
         waterMeshes[pos] = std::move(mesh);
+        lastUploadedFrame[pos] = frameCounter; // also mark
     } else {
         waterMeshes.erase(pos);
+        lastUploadedFrame.erase(pos);
     }
 }

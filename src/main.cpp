@@ -824,6 +824,8 @@ private:
         }
         
         renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight());
+        // Clean up any GPU meshes for chunks that have been unloaded by ChunkManager
+        renderer.cleanUnusedMeshes(chunkManager);
         
         uiManager.render();
     }

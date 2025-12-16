@@ -84,6 +84,10 @@ private:
     std::unordered_set<glm::ivec3> pendingFluidUpdates;
     std::mutex fluidMutex;
     std::string currentWorldName;
+
+    // Delayed unload support: mark chunks for unload and only erase after a grace period
+    std::unordered_map<ChunkPos, double> unloadTimestamps; // seconds since epoch
+    static constexpr double UNLOAD_DELAY_SECONDS = 5.0; // keep chunks for 5s after leaving range
     
     bool isChunkInRange(const ChunkPos& chunkPos, const ChunkPos& centerChunk, int range) const;
 };
