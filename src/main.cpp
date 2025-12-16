@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include "Core/Window.h"
 #include "Core/Time.h"
 #include "Core/Logger.h"
@@ -11,6 +12,7 @@
 #include "Util/Config.h"
 #include "UI/UIManager.h"
 #include "World/WorldSerializer.h"
+#include "Entity/PlayerEntity.h"
 
 #include <memory>
 #include <iostream>
@@ -24,7 +26,7 @@ public:
     Application() 
         : camera(glm::vec3(0.0f, 80.0f, 0.0f)),
           threadPool(THREAD_POOL_SIZE),
-          lastX(0.0), lastY(0.0), firstMouse(true),
+          lastX(0.0), lastY(0.0), lastSpaceTime(0.0), firstMouse(true),
           running(true) {
     }
     
@@ -47,7 +49,7 @@ public:
             onMouseButton(button, action, mods);
         });
         
-        window->setKeyCallback([this](int key, int /*scancode*/, int action, int /*mods*/) {
+        window->setKeyCallback([this](int key, int, int action, int) {
             if (action == GLFW_PRESS || action == GLFW_REPEAT) {
                 uiManager.handleKeyInput(key);
             }
@@ -59,11 +61,13 @@ public:
                 }
                 lastSpaceTime = currentTime;
             }
+
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
                 bool isMenuOpen = uiManager.isMenuOpen();
                 uiManager.setMenuState(isMenuOpen ? MenuState::NONE : MenuState::IN_GAME_MENU);
                 window->setCursorMode(isMenuOpen ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
             }
+
             if (action == GLFW_PRESS) {
                 if (key == Settings::instance().keys.inventory) {
                     if (uiManager.getMenuState() == MenuState::INVENTORY) {
@@ -74,10 +78,7 @@ public:
                         window->setCursorMode(GLFW_CURSOR_NORMAL);
                     }
                 }
-            }
-            
-            // Hotbar Keys (1-9)
-            if (action == GLFW_PRESS) {
+
                 if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
                     uiManager.selectHotbarSlot(key - GLFW_KEY_1);
                 }
@@ -249,32 +250,6 @@ public:
             }
         }
         
-        // Refine spawn position to ensure we are not inside a block (e.g. tree or mountain peak)
-        // We scan downwards from our high vantage point to find the first solid block.
-        // Since we started high (terrain + 30), we should be in air.
-        // We look for the first non-air block below us.
-        int scanStartY = static_cast<int>(camera.getPosition().y);
-        int currentSpawnX = static_cast<int>(camera.getPosition().x);
-        int currentSpawnZ = static_cast<int>(camera.getPosition().z);
-        
-        bool foundGround = false;
-        for (int y = scanStartY; y > 0; --y) {
-            Block block = chunkManager.getBlockAt(currentSpawnX, y, currentSpawnZ);
-            if (block.getType() != BlockType::AIR) {
-                // Found the highest block (could be leaves, wood, or ground)
-                // Set spawn point 2 blocks above it
-                camera.setPosition(glm::vec3(static_cast<float>(currentSpawnX), static_cast<float>(y) + 2.5f, static_cast<float>(currentSpawnZ)));
-                LOG_INFO("Spawn position refined to Y=" + std::to_string(y + 2.5f));
-                foundGround = true;
-                break;
-            }
-        }
-        
-        // Fallback if something went wrong (e.g. chunks not loaded), though unlikely
-        if (!foundGround) {
-             LOG_INFO("Could not find ground via raycast, using default height.");
-        }
-
         // Now wait for initial meshing of this small radius
         LOG_INFO("Building initial meshes...");
         bool initialLoadDone = false;
@@ -309,6 +284,39 @@ public:
                 window->pollEvents();
             }
         }
+        
+        // Spawn player entity
+        glm::vec3 spawnPos = camera.getPosition();
+        // Move slightly in front to see it initially, or at 0,0,0
+        spawnPos.z -= 5.0f; 
+        spawnPos.y = chunkManager.getHeightAt(static_cast<int>(spawnPos.x), static_cast<int>(spawnPos.z)) + 2.0f;
+        
+        playerEntity = std::make_unique<PlayerEntity>(spawnPos);
+        // Refine spawn position to ensure we are not inside a block (e.g. tree or mountain peak)
+        // We scan downwards from our high vantage point to find the first solid block.
+        // Since we started high (terrain + 30), we should be in air.
+        // We look for the first non-air block below us.
+        int scanStartY = static_cast<int>(camera.getPosition().y);
+        int currentSpawnX = static_cast<int>(camera.getPosition().x);
+        int currentSpawnZ = static_cast<int>(camera.getPosition().z);
+        
+        bool foundGround = false;
+        for (int y = scanStartY; y > 0; --y) {
+            Block block = chunkManager.getBlockAt(currentSpawnX, y, currentSpawnZ);
+            if (block.getType() != BlockType::AIR) {
+                // Found the highest block (could be leaves, wood, or ground)
+                // Set spawn point 2 blocks above it
+                camera.setPosition(glm::vec3(static_cast<float>(currentSpawnX), static_cast<float>(y) + 2.5f, static_cast<float>(currentSpawnZ)));
+                LOG_INFO("Spawn position refined to Y=" + std::to_string(y + 2.5f));
+                foundGround = true;
+                break;
+            }
+        }
+        
+        // Fallback if something went wrong (e.g. chunks not loaded), though unlikely
+        if (!foundGround) {
+             LOG_INFO("Could not find ground via raycast, using default height.");
+        }
     }
     
     bool loadWorld(const std::string& name = "world.dat") {
@@ -327,6 +335,9 @@ public:
             currentSeed = seed;
             worldGenerator.setSeed(static_cast<unsigned int>(seed));
             
+            // Initialize player entity at loaded position
+            playerEntity = std::make_unique<PlayerEntity>(playerPos);
+
             LOG_INFO("World loaded successfully");
             return true;
         } else {
@@ -427,13 +438,15 @@ private:
     std::vector<std::pair<ChunkPos, MeshData>> pendingMeshes;
 
     double lastX, lastY;
-    double lastSpaceTime = 0.0;
+    double lastSpaceTime;
     bool firstMouse;
     bool running;
     
     // Game State
     std::string currentWorldName = "New World";
     long currentSeed = 12345;
+    
+    std::unique_ptr<PlayerEntity> playerEntity;
     
     void applySettings() {
         auto& s = Settings::instance();
@@ -659,8 +672,11 @@ private:
 
         updatePhysics(deltaTime);
         camera.update(deltaTime);
-        chunkManager.update(camera.getPosition());
-        renderer.cleanUnusedMeshes(chunkManager);
+        chunkManager.update(camera.getPosition(), camera.getFront(), camera.getViewMatrix());
+        
+        if (playerEntity) {
+            playerEntity->update(deltaTime);
+        }
         
         // Generate chunks
         auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), Settings::instance().renderDistance, 10);
@@ -750,7 +766,11 @@ private:
     }
     
     void render() {
-        renderer.render(chunkManager, camera, window->getWidth(), window->getHeight());
+        std::vector<Entity*> entities;
+        if (playerEntity) entities.push_back(playerEntity.get());
+        
+        renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight());
+        
         uiManager.render();
     }
     

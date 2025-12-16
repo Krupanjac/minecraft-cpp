@@ -2,6 +2,7 @@
 #include "../Core/Logger.h"
 #include "../Util/Config.h"
 #include "../Core/Settings.h"
+#include "../Entity/Entity.h"
 #include <GLFW/glfw3.h>
 #include <random>
 #include <cmath>
@@ -44,7 +45,7 @@ void Renderer::onResize(int width, int height) {
     if (postProcess) postProcess->resize(width, height);
 }
 
-void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidth, int windowHeight) {
+void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, int windowWidth, int windowHeight) {
     // Calculate Light Space Matrix
     // Center on player
     // We position the "sun" far away along the light direction
@@ -217,6 +218,21 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, int windowWidt
     }
     
     blockShader.unuse();
+
+    // Render Entities
+    if (!entities.empty()) {
+        modelShader.use();
+        modelShader.setMat4("uProjection", projection);
+        modelShader.setMat4("uView", view);
+        modelShader.setVec3("uLightDir", lightDirection);
+        modelShader.setVec3("uCameraPos", camera.getPosition());
+        modelShader.setVec4("uBaseColor", glm::vec4(1.0f)); // Default white
+
+        for (auto* entity : entities) {
+            if (entity) entity->render(modelShader);
+        }
+        modelShader.unuse();
+    }
 
     // Render water chunks
     glEnable(GL_BLEND);
@@ -457,6 +473,10 @@ bool Renderer::loadShaders() {
     }
     if (!cloudShader.loadFromFiles("shaders/clouds.vert", "shaders/clouds.frag")) {
         LOG_ERROR("Failed to load cloud shader");
+        success = false;
+    }
+    if (!modelShader.loadFromFiles("shaders/model.vert", "shaders/model.frag")) {
+        LOG_ERROR("Failed to load model shader");
         success = false;
     }
     // Create simple shader for crosshair inline or load from file

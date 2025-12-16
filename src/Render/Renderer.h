@@ -11,6 +11,9 @@
 #include "../Mesh/Mesh.h"
 #include <memory>
 #include <unordered_map>
+#include <vector>
+
+class Entity;
 
 class Renderer {
 public:
@@ -18,7 +21,7 @@ public:
     ~Renderer() = default;
 
     bool initialize(int windowWidth, int windowHeight);
-    void render(ChunkManager& chunkManager, Camera& camera, int windowWidth, int windowHeight);
+    void render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, int windowWidth, int windowHeight);
     void onResize(int width, int height);
     
     void setLightDirection(const glm::vec3& direction) { lightDirection = direction; }
@@ -31,6 +34,7 @@ public:
     // void setShowShadows(bool show) { showShadows = show; } // Removed, uses Settings
 
     Shader& getBlockShader() { return blockShader; }
+    Shader& getModelShader() { return modelShader; }
     
     // Add mesh for a chunk
     void uploadChunkMesh(const ChunkPos& pos, 
@@ -58,6 +62,7 @@ private:
     Shader shadowShader;
     Shader starShader;
     Shader cloudShader;
+    Shader modelShader; // New shader for entities
     
     std::unique_ptr<Mesh> crosshairMesh;
     std::unique_ptr<Mesh> sunMesh;

@@ -57,6 +57,17 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(stb)
 include_directories(${stb_SOURCE_DIR})
 
+# tinygltf
+set(TINYGLTF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(TINYGLTF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    tinygltf
+    GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+    GIT_TAG release
+)
+FetchContent_MakeAvailable(tinygltf)
+include_directories(${tinygltf_SOURCE_DIR})
+
 # GLAD
 set(GLAD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/glad)
 if(NOT EXISTS ${GLAD_DIR})
@@ -88,6 +99,9 @@ set(SOURCES
     src/Render/ShadowMap.cpp
     src/Render/PostProcess.cpp
     src/UI/UIManager.cpp
+    src/Entity/Entity.cpp
+    src/Entity/PlayerEntity.cpp
+    src/Model/Model.cpp
     ${GLAD_DIR}/src/glad.c
 )
 

@@ -20,10 +20,11 @@ public:
     ChunkManager();
     ~ChunkManager() = default;
 
-    void update(const glm::vec3& cameraPos);
+    void update(const glm::vec3& cameraPos, const glm::vec3& viewDir, const glm::mat4& viewMatrix);
     
     std::shared_ptr<Chunk> getChunk(const ChunkPos& pos);
     std::shared_ptr<Chunk> getChunkAt(const glm::vec3& worldPos);
+    int getHeightAt(int x, int z);
     Block getBlockAt(int x, int y, int z);
     
     const std::unordered_map<ChunkPos, std::shared_ptr<Chunk>>& getChunks() const {

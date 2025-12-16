@@ -10,10 +10,19 @@
 ChunkManager::ChunkManager() {
 }
 
-void ChunkManager::update(const glm::vec3& cameraPos) {
+void ChunkManager::update(const glm::vec3& cameraPos, const glm::vec3& /*viewDir*/, const glm::mat4& /*viewMatrix*/) {
     // Unload distant chunks
     unloadDistantChunks(cameraPos);
     updateFluids();
+}
+
+int ChunkManager::getHeightAt(int x, int z) {
+    // Scan from top down
+    // Assumes reasonable bounds based on generation
+    for (int y = 256; y >= -64; --y) {
+        if (getBlockAt(x, y, z).getType() != BlockType::AIR) return y;
+    }
+    return 0;
 }
 
 std::shared_ptr<Chunk> ChunkManager::getChunk(const ChunkPos& pos) {

@@ -5,6 +5,7 @@
 class Texture {
 public:
     Texture(const std::string& path);
+    Texture(const unsigned char* data, int width, int height, int channels);
     ~Texture();
 
     void bind(unsigned int slot = 0) const;

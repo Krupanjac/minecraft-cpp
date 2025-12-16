@@ -1,0 +1,11 @@
+Model Information:
+* title:	Scientist from blue shift (animations+textures)
+* source:	https://sketchfab.com/3d-models/scientist-from-blue-shift-animationstextures-de661ad61d894cdfbdf85092490d1f2b
+* author:	Half-Life Fan (https://sketchfab.com/Huggywuggydead)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Scientist from blue shift (animations+textures)" (https://sketchfab.com/3d-models/scientist-from-blue-shift-animationstextures-de661ad61d894cdfbdf85092490d1f2b) by Half-Life Fan (https://sketchfab.com/Huggywuggydead) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
