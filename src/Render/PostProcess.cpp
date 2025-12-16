@@ -149,7 +149,14 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         ssaoShader.setMat4("projection", projection);
         ssaoShader.setMat4("invProjection", glm::inverse(projection));
         
-        for (unsigned int i = 0; i < 64; ++i)
+        // Dynamic noise tiling
+        ssaoShader.setVec2("noiseScale", glm::vec2((float)width / 4.0f, (float)height / 4.0f));
+        // Radius and bias tuned for view-space units
+        ssaoShader.setFloat("ssaoRadius", 1.0f);
+        ssaoShader.setFloat("ssaoBias", 0.025f);
+        ssaoShader.setInt("kernelSize", static_cast<int>(ssaoKernel.size()));
+        
+        for (unsigned int i = 0; i < ssaoKernel.size(); ++i)
             ssaoShader.setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
             
         glBindVertexArray(quadVAO);
@@ -168,7 +175,10 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         ssaoBlurShader.use();
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, ssaoFBO->getTexture());
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, depthTexture);
         ssaoBlurShader.setInt("ssaoInput", 0);
+        ssaoBlurShader.setInt("depthMap", 1);
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     } else {
