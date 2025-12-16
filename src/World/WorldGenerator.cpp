@@ -126,45 +126,57 @@ float WorldGenerator::getHumidity(float x, float z) const {
 }
 
 BiomeType WorldGenerator::getBiome(float x, float z) const {
-    // Advanced Biome Selection based on Continentalness, Erosion, Temperature, and Humidity
+    // Biome Selection matching the new terrain generation
     
-    // 1. Re-calculate Terrain Parameters (Must match getHeight logic)
-    float contX = x * NOISE_SCALE * 0.02f * globalFrequencyBias + offsetContinentX;
-    float contZ = z * NOISE_SCALE * 0.02f * globalFrequencyBias + offsetContinentZ;
-    float warpedContX = contX; float warpedContZ = contZ;
-    domainWarp(warpedContX, warpedContZ); 
-    float continentalness = fbm(warpedContX, warpedContZ, 4);
+    // SCALE FACTORS - Must match getHeight
+    const float CONTINENT_SCALE = 0.0008f * globalFrequencyBias;
+    const float MOUNTAIN_SCALE = 0.002f * globalFrequencyBias;
     
-    float eroX = x * NOISE_SCALE * 0.08f * globalFrequencyBias + offsetErosionX;
-    float eroZ = z * NOISE_SCALE * 0.08f * globalFrequencyBias + offsetErosionZ;
-    float erosion = fbm(eroX, eroZ, 3);
+    // 1. Continentalness (ocean vs land)
+    float contX = x * CONTINENT_SCALE + offsetContinentX;
+    float contZ = z * CONTINENT_SCALE + offsetContinentZ;
+    float warpX = contX, warpZ = contZ;
+    domainWarp(warpX, warpZ);
+    float continentalness = fbm(warpX, warpZ, 4);
     
+    // 2. Mountain factor (same as getHeight)
+    float mtX = x * MOUNTAIN_SCALE + offsetErosionX;
+    float mtZ = z * MOUNTAIN_SCALE + offsetErosionZ;
+    float mtWarpX = mtX + 0.5f * noise2D(mtX * 0.5f + 1000.0f, mtZ * 0.5f + 2000.0f);
+    float mtWarpZ = mtZ + 0.5f * noise2D(mtX * 0.5f + 3000.0f, mtZ * 0.5f + 4000.0f);
+    float mountainNoise = ridgedMultifractal(mtWarpX, mtWarpZ, 5, 2.2f, 0.6f, 1.0f);
+    float mountainFactor = std::clamp((mountainNoise - 0.35f) * 3.0f, 0.0f, 1.0f);
+    
+    // 3. Temperature and humidity
     float temp = getTemperature(x, z);
     float humid = getHumidity(x, z);
     
-    // 2. Biome Determination Logic
+    // Get actual height for height-based biome decisions
+    float height = getHeight(x, z);
     
-    // OCEAN / COAST
-    // Match the spline points: < -0.15 is Ocean/Shore
-    if (continentalness < -0.15f) return BiomeType::OCEAN;
+    // ========== BIOME SELECTION ==========
     
-    // MOUNTAINS (High Erosion)
-    // Match the spline points: > 0.5 is Mountain Base
-    if (erosion > 0.5f) {
-        if (temp < 0.4f) return BiomeType::SNOWY_TUNDRA; // Snowy Peaks
-        return BiomeType::MOUNTAINS; // Stone Mountains
+    // OCEAN
+    if (continentalness < -0.1f || height < 32.0f) {
+        return BiomeType::OCEAN;
     }
     
-    // HILLS / HIGHLANDS (Mid Erosion)
-    // Match the spline points: > 0.2 is Highlands
-    if (erosion > 0.2f) {
+    // MOUNTAINS (based on mountain factor and height)
+    if (mountainFactor > 0.4f || height > 100.0f) {
+        if (temp < 0.35f || height > 130.0f) {
+            return BiomeType::SNOWY_TUNDRA; // Snowy mountain peaks
+        }
+        return BiomeType::MOUNTAINS;
+    }
+    
+    // HILLS / HIGHLANDS
+    if (mountainFactor > 0.15f || height > 70.0f) {
         if (temp < 0.25f) return BiomeType::SNOWY_TUNDRA;
-        if (humid < 0.3f) return BiomeType::DESERT; // Desert Hills
-        return BiomeType::FOREST; // Forested Hills
+        if (humid < 0.3f && temp > 0.6f) return BiomeType::DESERT;
+        return BiomeType::FOREST; // Forested hills
     }
     
-    // FLAT LANDS (Low Erosion)
-    // Temperature/Humidity driven
+    // FLATLANDS - based on temperature and humidity
     if (temp < 0.2f) return BiomeType::SNOWY_TUNDRA;
     
     if (temp > 0.7f) {
@@ -172,7 +184,7 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
         return BiomeType::PLAINS; // Savanna-like
     }
     
-    if (humid > 0.6f) return BiomeType::FOREST;
+    if (humid > 0.55f) return BiomeType::FOREST;
     
     return BiomeType::PLAINS;
 }
@@ -416,108 +428,119 @@ float WorldGenerator::getNoise(float x, float y, float z) const {
 
 float WorldGenerator::getHeight(float x, float z) const {
     // =====================================================
-    // IMPROVED TERRAIN GENERATION with MULTI-OCTAVE FBM,
-    // DOMAIN WARPING, RIDGE NOISE, and HEIGHT SHAPING
+    // REALISTIC TERRAIN GENERATION
+    // Creates: Ocean, Beaches, Plains, Hills, Mountain Ranges
     // =====================================================
     
-    // 1. Continentalness (Macro-scale geography)
-    // Determines Oceans vs Land using multi-layer domain warping
-    // SCALE: Very low frequency for continent-sized features
-    float contX = x * NOISE_SCALE * 0.02f * globalFrequencyBias + offsetContinentX;
-    float contZ = z * NOISE_SCALE * 0.02f * globalFrequencyBias + offsetContinentZ;
+    // SCALE FACTORS - Adjust these to change feature sizes
+    const float CONTINENT_SCALE = 0.0008f * globalFrequencyBias;   // Very large landmasses (~1250 blocks)
+    const float MOUNTAIN_SCALE = 0.002f * globalFrequencyBias;     // Mountain ranges (~500 blocks)
+    const float HILLS_SCALE = 0.008f * globalFrequencyBias;        // Hills (~125 blocks)
+    const float DETAIL_SCALE = 0.03f * globalFrequencyBias;        // Local detail (~33 blocks)
     
-    // Multi-layer domain warping for natural, non-grid coastlines
-    float warpedContX = contX;
-    float warpedContZ = contZ;
-    domainWarp(warpedContX, warpedContZ);
+    // ========== 1. CONTINENTALNESS ==========
+    // Determines ocean vs land. Warped for natural coastlines.
+    float contX = x * CONTINENT_SCALE + offsetContinentX;
+    float contZ = z * CONTINENT_SCALE + offsetContinentZ;
     
-    // Apply second layer of warping for extra complexity
-    float warp2X = warpedContX + 0.3f * noise2D(warpedContX * 0.5f + 100.0f, warpedContZ * 0.5f + 200.0f);
-    float warp2Z = warpedContZ + 0.3f * noise2D(warpedContX * 0.5f + 300.0f, warpedContZ * 0.5f + 400.0f);
+    // Domain warp for organic coastlines
+    float warpX = contX, warpZ = contZ;
+    domainWarp(warpX, warpZ);
     
-    // Use FBM with more octaves for continentalness
-    float continentalness = fbm(warp2X, warp2Z, 5);
+    // Multi-octave for continental shapes
+    float continentalness = fbm(warpX, warpZ, 4);
     
-    // 2. Erosion (Mid-scale) - Determines mountains vs plains
-    // More octaves for natural transitions
-    float eroX = x * NOISE_SCALE * 0.08f * globalFrequencyBias + offsetErosionX;
-    float eroZ = z * NOISE_SCALE * 0.08f * globalFrequencyBias + offsetErosionZ;
+    // ========== 2. MOUNTAIN RANGE NOISE ==========
+    // Separate noise layer specifically for mountain ranges
+    // Uses ridged noise for dramatic mountain chains
+    float mtX = x * MOUNTAIN_SCALE + offsetErosionX;
+    float mtZ = z * MOUNTAIN_SCALE + offsetErosionZ;
     
-    // Warp erosion coordinates too for less grid-aligned features
-    float warpedEroX = eroX + 0.4f * noise2D(eroX * 0.7f + 500.0f, eroZ * 0.7f + 600.0f);
-    float warpedEroZ = eroZ + 0.4f * noise2D(eroX * 0.7f + 700.0f, eroZ * 0.7f + 800.0f);
+    // Warp to break grid alignment
+    float mtWarpX = mtX + 0.5f * noise2D(mtX * 0.5f + 1000.0f, mtZ * 0.5f + 2000.0f);
+    float mtWarpZ = mtZ + 0.5f * noise2D(mtX * 0.5f + 3000.0f, mtZ * 0.5f + 4000.0f);
     
-    float erosion = fbm(warpedEroX, warpedEroZ, 4);
+    // Use ridged multifractal for mountain chains
+    float mountainNoise = ridgedMultifractal(mtWarpX, mtWarpZ, 5, 2.2f, 0.6f, 1.0f);
     
-    // 3. Peaks & Valleys (Micro-scale / Detail)
-    // SCALE: Higher frequency for local terrain features
-    float pvX = x * NOISE_SCALE * 0.4f + offsetPVX; 
-    float pvZ = z * NOISE_SCALE * 0.4f + offsetPVZ;
+    // Create clear mountain vs non-mountain distinction
+    // Values > 0.5 are mountain regions
+    float mountainFactor = std::clamp((mountainNoise - 0.35f) * 3.0f, 0.0f, 1.0f);
     
-    // Use FBM with many octaves for smooth rolling terrain
-    float smoothPV = fbm(pvX, pvZ, 6);
+    // ========== 3. HILLS / EROSION NOISE ==========
+    // Medium scale for rolling hills
+    float hillX = x * HILLS_SCALE + offsetPVX;
+    float hillZ = z * HILLS_SCALE + offsetPVZ;
     
-    // Use ridgedMultifractal for sharp alpine-style mountain peaks
-    // Parameters tuned for realistic mountain generation:
-    // - 6 octaves for detailed ridges
-    // - lacunarity 2.0 for standard frequency doubling
-    // - gain 0.5 for balanced weight decay
-    // - offset 1.0 for sharp ridges
-    float alpinePV = ridgedMultifractal(pvX, pvZ, 6, 2.0f, 0.5f, 1.0f);
+    float hillNoise = fbm(hillX, hillZ, 4);
+    // Turbulence adds more interesting hill shapes
+    float hillTurb = turbulence(hillX * 1.5f, hillZ * 1.5f, 3);
+    float hills = lerp(hillNoise, hillTurb * 2.0f - 1.0f, 0.3f);
     
-    // Also add turbulence for mid-range hills
-    float turbPV = turbulence(pvX * 0.8f, pvZ * 0.8f, 4);
+    // ========== 4. DETAIL NOISE ==========
+    // High frequency detail for local terrain variation
+    float detX = x * DETAIL_SCALE + 5000.0f;
+    float detZ = z * DETAIL_SCALE + 6000.0f;
+    float detail = fbm(detX, detZ, 4);
     
-    // Blend based on erosion value:
-    // - Low erosion (plains) = smooth noise
-    // - Mid erosion (hills) = turbulent noise  
-    // - High erosion (mountains) = ridged multifractal
-    float ridgeFactor = std::clamp((erosion + 0.2f) * 1.5f, 0.0f, 1.0f);
-    float turbFactor = std::clamp((erosion + 0.5f) * 1.0f, 0.0f, 1.0f) - ridgeFactor * 0.5f;
-    turbFactor = std::clamp(turbFactor, 0.0f, 1.0f);
+    // ========== 5. COMBINE INTO FINAL HEIGHT ==========
     
-    // Three-way blend: smooth -> turbulent -> alpine
-    float pv = smoothPV * (1.0f - turbFactor - ridgeFactor) 
-             + turbPV * turbFactor 
-             + (alpinePV * 2.0f - 1.0f) * ridgeFactor; // Remap alpinePV from [0,1] to [-1,1]
+    // Base height from continentalness
+    float baseHeight;
+    if (continentalness < -0.3f) {
+        // Deep ocean
+        float oceanDepth = (-0.3f - continentalness) / 0.7f; // 0 to 1
+        baseHeight = 25.0f - oceanDepth * 20.0f; // 25 down to 5
+    } else if (continentalness < -0.1f) {
+        // Shallow ocean / shelf
+        float t = (continentalness + 0.3f) / 0.2f;
+        baseHeight = lerp(25.0f, 30.0f, t);
+    } else if (continentalness < 0.05f) {
+        // Beach / coast transition
+        float t = (continentalness + 0.1f) / 0.15f;
+        baseHeight = lerp(30.0f, 35.0f, t);
+    } else if (continentalness < 0.3f) {
+        // Low coastal plains
+        float t = (continentalness - 0.05f) / 0.25f;
+        baseHeight = lerp(35.0f, 45.0f, t);
+    } else if (continentalness < 0.6f) {
+        // Inland plains
+        float t = (continentalness - 0.3f) / 0.3f;
+        baseHeight = lerp(45.0f, 55.0f, t);
+    } else {
+        // Deep inland / highland base
+        float t = (continentalness - 0.6f) / 0.4f;
+        baseHeight = lerp(55.0f, 65.0f, t);
+    }
     
-    // 4. Height Shaping (Nonlinear Mapping)
-    // Apply power function to create flatter lowlands and steeper peaks
-    float rawHeight = getSplineHeight(continentalness, erosion, pv);
+    // Only add terrain features on land
+    float landFactor = std::clamp((continentalness + 0.1f) * 5.0f, 0.0f, 1.0f);
     
-    // Normalize to [0, 1] range first (approximate based on expected output range)
-    float minExpected = 10.0f;  // Deep ocean floor
-    float maxExpected = 230.0f; // Tallest peaks
-    float normalized = (rawHeight - minExpected) / (maxExpected - minExpected);
-    normalized = std::clamp(normalized, 0.0f, 1.0f);
+    // Hill contribution (moderate height variation)
+    float hillHeight = hills * 15.0f * landFactor;
     
-    // Apply height shaping curve
-    // exponent > 1 = flatter lowlands, sharper peaks
-    // exponent < 1 = higher average elevation
-    float exponent = 1.3f;
-    float shaped = std::pow(normalized, exponent);
+    // Mountain contribution (dramatic height for mountain areas)
+    // Mountains get MUCH taller when mountainFactor is high
+    float peakDetail = ridgedMultifractal(detX * 3.0f, detZ * 3.0f, 4, 2.0f, 0.5f, 1.0f);
+    float mountainHeight = mountainFactor * (60.0f + peakDetail * 80.0f + detail * 20.0f) * landFactor;
     
-    // Map back to world height
-    float finalHeight = minExpected + shaped * (maxExpected - minExpected);
+    // Add hills only where there are no mountains
+    float finalHillHeight = hillHeight * (1.0f - mountainFactor * 0.8f);
     
-    // 5. Simple Thermal Erosion Simulation
-    // Smooth out extremely steep areas (prevents impossible cliffs)
-    // Sample neighboring heights and blend slightly
-    float neighborScale = 2.0f; // Sample distance
-    float h1 = getSplineHeight(
-        fbm((x + neighborScale) * NOISE_SCALE * 0.02f * globalFrequencyBias + offsetContinentX, z * NOISE_SCALE * 0.02f * globalFrequencyBias + offsetContinentZ, 3),
-        fbm((x + neighborScale) * NOISE_SCALE * 0.08f * globalFrequencyBias + offsetErosionX, z * NOISE_SCALE * 0.08f * globalFrequencyBias + offsetErosionZ, 2),
-        0.0f
-    );
-    float h2 = getSplineHeight(
-        fbm(x * NOISE_SCALE * 0.02f * globalFrequencyBias + offsetContinentX, (z + neighborScale) * NOISE_SCALE * 0.02f * globalFrequencyBias + offsetContinentZ, 3),
-        fbm(x * NOISE_SCALE * 0.08f * globalFrequencyBias + offsetErosionX, (z + neighborScale) * NOISE_SCALE * 0.08f * globalFrequencyBias + offsetErosionZ, 2),
-        0.0f
-    );
+    // Detail adds small variations everywhere
+    float detailHeight = detail * 5.0f * landFactor;
     
-    // Blend with neighbors very slightly for smoothing
-    float erosionBlend = 0.05f;
-    finalHeight = finalHeight * (1.0f - 2.0f * erosionBlend) + h1 * erosionBlend + h2 * erosionBlend;
+    // Combine all layers
+    float finalHeight = baseHeight + finalHillHeight + mountainHeight + detailHeight;
+    
+    // Ensure minimum heights
+    finalHeight = std::max(finalHeight, 5.0f);
+    
+    // Apply height power curve for more dramatic peaks
+    if (finalHeight > 80.0f) {
+        float excess = finalHeight - 80.0f;
+        finalHeight = 80.0f + std::pow(excess / 100.0f, 0.8f) * 100.0f;
+    }
     
     return finalHeight;
 }
