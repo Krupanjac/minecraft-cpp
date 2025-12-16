@@ -61,6 +61,10 @@ public:
                 }
                 lastSpaceTime = currentTime;
             }
+            
+            if (key == GLFW_KEY_F5 && action == GLFW_PRESS) {
+                camera.toggleThirdPerson();
+            }
 
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
                 bool isMenuOpen = uiManager.isMenuOpen();
@@ -767,7 +771,28 @@ private:
     
     void render() {
         std::vector<Entity*> entities;
-        if (playerEntity) entities.push_back(playerEntity.get());
+        
+        // Sync player entity if it exists
+        if (playerEntity) {
+            // Visual sync: We want the model to be exactly where the player is.
+            // Camera position is eye pos. Model origin is usually at feet.
+            // Standard height ~1.62m to eyes.
+            glm::vec3 footPos = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
+            playerEntity->setPosition(footPos);
+            
+            // Yaw: Camera yaw 0 is safe, but GLTF might need rotation. 
+            // If camera looks -Z (yaw -90), model should face -Z.
+            // glTF default facing is usually +Z. So rotate 180?
+            // Let's try matching camera yaw + 180 or 90. 
+            // Camera::yaw is in degrees.
+            playerEntity->setRotation(glm::vec3(0.0f, -camera.getYaw() + 90.0f, 0.0f));
+
+            // Only render if we are in third person OR we want to see body parts (requires careful culling)
+            // User requested toggle.
+            if (camera.isThirdPerson()) {
+                entities.push_back(playerEntity.get());
+            }
+        }
         
         renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight());
         

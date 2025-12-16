@@ -153,6 +153,11 @@ glm::mat4 Camera::getViewMatrix() const {
          // We could also rotate view slightly for head tilt
     }
     
+    if (thirdPerson) {
+        glm::vec3 eye = viewPos - front * thirdPersonDistance;
+        return glm::lookAt(eye, viewPos, up);
+    }
+    
     return glm::lookAt(viewPos, viewPos + front, up);
 }
 

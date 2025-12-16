@@ -14,7 +14,7 @@ PlayerEntity::PlayerEntity(const glm::vec3& startPos) : Entity(startPos) {
     
     // Scale down if needed? Minecraft chars are ~1.8m tall. 
     // Assuming model is in meters or units.
-    setScale(glm::vec3(1.0f)); 
+    setScale(glm::vec3(0.03f)); 
 }
 
 void PlayerEntity::update(float deltaTime) {

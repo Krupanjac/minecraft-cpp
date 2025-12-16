@@ -22,7 +22,9 @@ public:
     
     void setPosition(const glm::vec3& pos) { position = pos; }
     void setYaw(float y) { yaw = y; updateCameraVectors(); }
+    float getYaw() const { return yaw; }
     void setPitch(float p) { pitch = p; updateCameraVectors(); }
+    float getPitch() const { return pitch; }
     void setSpeed(float speed) { movementSpeed = speed; }
     void setSensitivity(float sensitivity) { mouseSensitivity = sensitivity; }
     void setFov(float f) { fov = f; }
@@ -31,6 +33,11 @@ public:
     void toggleFlightMode() { isFlying = !isFlying; velocity = glm::vec3(0.0f); }
     bool getFlightMode() const { return isFlying; }
     void jump();
+    
+    // Third Person
+    void toggleThirdPerson() { thirdPerson = !thirdPerson; }
+    bool isThirdPerson() const { return thirdPerson; }
+    void setThirdPersonDistance(float dist) { thirdPersonDistance = dist; }
     
     glm::vec3 velocity;
     bool isFlying;
@@ -41,6 +48,10 @@ public:
     // View Bobbing
     float bobbingTimer = 0.0f;
     float defaultY = 0.0f; // Stores the local Y offset for the camera relative to player position
+    
+    // 3rd Person State
+    bool thirdPerson = false;
+    float thirdPersonDistance = 4.0f;
 
 
 private:
