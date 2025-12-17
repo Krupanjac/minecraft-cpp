@@ -87,17 +87,17 @@ void main() {
     } else if (vMaterial == 13u) { // Tall Grass
         baseColor *= vec3(0.4, 0.8, 0.3);
     } else if (vMaterial == 4u) { // Sand
-        baseColor = vec3(0.93, 0.87, 0.69);
+        baseColor *= vec3(0.93, 0.87, 0.69);
     } else if (vMaterial == 8u) { // Snow
-        baseColor = vec3(0.95, 0.95, 0.98);
+        baseColor *= vec3(0.95, 0.95, 0.98);
     } else if (vMaterial == 9u) { // Ice
-        baseColor = vec3(0.7, 0.85, 0.95);
+        baseColor *= vec3(0.7, 0.85, 0.95);
     } else if (vMaterial == 10u) { // Gravel
-        baseColor = vec3(0.55, 0.52, 0.50);
+        baseColor *= vec3(0.55, 0.52, 0.50);
     } else if (vMaterial == 11u) { // Sandstone
-        baseColor = vec3(0.85, 0.75, 0.60);
+        baseColor *= vec3(0.85, 0.87, 0.69);
     } else if (vMaterial == 15u) { // Bedrock
-        baseColor = vec3(0.2, 0.2, 0.2);
+        baseColor *= vec3(0.2, 0.2, 0.2);
     }
     
     // Simple lighting
