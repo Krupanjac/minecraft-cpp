@@ -64,8 +64,9 @@ BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
             info.temperature = 0.5f;
             info.humidity = 0.8f;
             info.heightVariation = 0.15f;
-            info.surfaceBlock = BlockType::GRAVEL;
-            info.subsurfaceBlock = BlockType::SAND;
+            // River banks should look sandy; gravel should be underwater / below the bed
+            info.surfaceBlock = BlockType::SAND;
+            info.subsurfaceBlock = BlockType::GRAVEL;
             info.surfaceDepth = 3;
             break;
             
@@ -309,6 +310,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             
             BiomeType biome = getBiome(static_cast<float>(worldX), static_cast<float>(worldZ));
             BiomeInfo biomeInfo = getBiomeInfo(biome);
+            float temp = getTemperature(static_cast<float>(worldX), static_cast<float>(worldZ));
             
             int height = getSurfaceHeight(worldX, worldZ);
             
@@ -324,9 +326,22 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     isInCave = false; // No caves in bedrock
                 } else if (!isInCave) {
                     if (worldY < height - biomeInfo.surfaceDepth) blockType = BlockType::STONE;
-                    else if (worldY < height - 1) blockType = biomeInfo.subsurfaceBlock;
-                    else if (worldY < height) {
+                    else if (worldY < height - 1) {
+                        // River: gravel under the bed (especially underwater), sand on dry banks
+                        if (biome == BiomeType::RIVER && height <= SEA_LEVEL) blockType = BlockType::GRAVEL;
+                        else blockType = biomeInfo.subsurfaceBlock;
+                    } else if (worldY < height) {
                         blockType = biomeInfo.surfaceBlock;
+
+                        // River: if the bed is underwater, top layer should be gravel (sand is for shores)
+                        if (biome == BiomeType::RIVER && worldY < SEA_LEVEL) blockType = BlockType::GRAVEL;
+
+                        // Snow line: add more snow on mountain tops, and make peaks feel less bare
+                        // (Temperature + altitude based, regardless of biome classification)
+                        if (worldY >= SEA_LEVEL + 55 && temp < 0.55f) {
+                            blockType = BlockType::SNOW;
+                        }
+
                         if (blockType == BlockType::SNOW && worldY < SEA_LEVEL) blockType = BlockType::ICE;
                     } else if (worldY < SEA_LEVEL) {
                         if (biome == BiomeType::SNOWY_TUNDRA && worldY == SEA_LEVEL - 1) blockType = BlockType::ICE;
@@ -563,7 +578,8 @@ float WorldGenerator::getHeight(float x, float z) const {
     float hillHeight = hills * 8.0f * landFactor;
     
     // Mountain contribution (two styles: sharp ridges vs gentle, walkable slopes)
-    float peakDetail = ridgedMultifractal(detX * 3.0f, detZ * 3.0f, 4, 2.0f, 0.5f, 1.0f);
+    // Reduce high-frequency peak noise a bit to avoid extremely sharp spires / "holey" peaks
+    float peakDetail = ridgedMultifractal(detX * 2.2f, detZ * 2.2f, 4, 2.0f, 0.5f, 1.0f);
     float sharpHeight = mountainFactor * (62.0f + peakDetail * 85.0f + detail * 16.0f) * landFactor;
     
     float gentleShape = (billowNoise(mtWarpX * 1.1f, mtWarpZ * 1.1f) + 1.0f) * 0.5f; // softer, rounded peaks
@@ -588,6 +604,8 @@ float WorldGenerator::getHeight(float x, float z) const {
     float riverVal = 1.0f - std::abs(riverBase);
     float riverMask = std::pow(std::clamp((riverVal - 0.78f) / 0.22f, 0.0f, 1.0f), 2.6f);
     riverMask *= landFactor;
+    // Don't let rivers carve huge gashes through mountain cores
+    riverMask *= (1.0f - mountainFactor * 0.85f);
 
     float riverBed = (float)SEA_LEVEL - 2.0f;
     finalHeight = lerp(finalHeight, riverBed, riverMask);
