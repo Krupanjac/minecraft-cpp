@@ -80,6 +80,7 @@ void main() {
     else if (aMaterial == 2u) textureIndex = 2u;   // Dirt
     else if (aMaterial == 3u) textureIndex = 1u;   // Stone
     else if (aMaterial == 4u) textureIndex = 18u;  // Sand
+    else if (aMaterial == 10u) textureIndex = 19u; // Gravel (Minecraft terrain.png index)
     else if (aMaterial == 6u) textureIndex = 4u;   // Wood (Plank)
     else if (aMaterial == 7u) textureIndex = 52u;  // Leaves
     else if (aMaterial == 12u) { // Log

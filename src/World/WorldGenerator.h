@@ -6,6 +6,7 @@
 
 enum class BiomeType {
     OCEAN,
+    RIVER,
     PLAINS,
     DESERT,
     FOREST,

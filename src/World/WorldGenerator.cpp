@@ -59,6 +59,15 @@ BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
             info.subsurfaceBlock = BlockType::SAND;
             info.surfaceDepth = 3;
             break;
+
+        case BiomeType::RIVER:
+            info.temperature = 0.5f;
+            info.humidity = 0.8f;
+            info.heightVariation = 0.15f;
+            info.surfaceBlock = BlockType::GRAVEL;
+            info.subsurfaceBlock = BlockType::SAND;
+            info.surfaceDepth = 3;
+            break;
             
         case BiomeType::PLAINS:
             info.temperature = 0.6f;
@@ -138,6 +147,8 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
     float warpX = contX, warpZ = contZ;
     domainWarp(warpX, warpZ);
     float continentalness = fbm(warpX, warpZ, 4);
+    // Must match getHeight() bias so biome/ocean decisions line up with terrain.
+    continentalness = std::clamp(continentalness + 0.12f, -1.0f, 1.0f);
     
     // 2. Mountain factor (same as getHeight)
     float mtX = x * MOUNTAIN_SCALE + offsetErosionX;
@@ -145,7 +156,8 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
     float mtWarpX = mtX + 0.5f * noise2D(mtX * 0.5f + 1000.0f, mtZ * 0.5f + 2000.0f);
     float mtWarpZ = mtZ + 0.5f * noise2D(mtX * 0.5f + 3000.0f, mtZ * 0.5f + 4000.0f);
     float mountainNoise = ridgedMultifractal(mtWarpX, mtWarpZ, 5, 2.2f, 0.6f, 1.0f);
-    float mountainFactor = std::clamp((mountainNoise - 0.35f) * 3.0f, 0.0f, 1.0f);
+    // Match getHeight
+    float mountainFactor = std::clamp((mountainNoise - 0.40f) * 3.1f, 0.0f, 1.0f);
     
     // 3. Temperature and humidity
     float temp = getTemperature(x, z);
@@ -153,24 +165,36 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
     
     // Get actual height for height-based biome decisions
     float height = getHeight(x, z);
+
+    // River mask (must match getHeight)
+    float rX = x * 0.0035f + offsetPVX * 0.25f + 31000.0f;
+    float rZ = z * 0.0035f + offsetPVZ * 0.25f + 42000.0f;
+    float riverBase = fbm(rX, rZ, 3);
+    float riverVal = 1.0f - std::abs(riverBase);
+    float riverMask = std::pow(std::clamp((riverVal - 0.78f) / 0.22f, 0.0f, 1.0f), 2.6f);
     
     // ========== BIOME SELECTION ==========
     
-    // OCEAN
-    if (continentalness < -0.1f || height < 32.0f) {
+    // OCEAN (reduce inland water: require strong ocean continentalness OR very low height)
+    if ((continentalness < -0.30f && height < (float)SEA_LEVEL + 1.0f) || height < (float)SEA_LEVEL - 3.0f) {
         return BiomeType::OCEAN;
+    }
+
+    // RIVERS (river-like water channels)
+    if (riverMask > 0.55f && height < (float)SEA_LEVEL + 3.0f) {
+        return BiomeType::RIVER;
     }
     
     // MOUNTAINS (based on mountain factor and height)
-    if (mountainFactor > 0.4f || height > 100.0f) {
-        if (temp < 0.35f || height > 130.0f) {
+    if (mountainFactor > 0.38f || height > 90.0f) {
+        if (temp < 0.33f || height > 122.0f) {
             return BiomeType::SNOWY_TUNDRA; // Snowy mountain peaks
         }
         return BiomeType::MOUNTAINS;
     }
     
     // HILLS / HIGHLANDS
-    if (mountainFactor > 0.15f || height > 70.0f) {
+    if (mountainFactor > 0.18f || height > 72.0f) {
         if (temp < 0.25f) return BiomeType::SNOWY_TUNDRA;
         if (humid < 0.3f && temp > 0.6f) return BiomeType::DESERT;
         return BiomeType::FOREST; // Forested hills
@@ -449,6 +473,9 @@ float WorldGenerator::getHeight(float x, float z) const {
     
     // Multi-octave for continental shapes
     float continentalness = fbm(warpX, warpZ, 4);
+    // Bias towards land so the world isn't overly ocean-heavy.
+    // This is the simplest way to get more flatlands without changing SEA_LEVEL.
+    continentalness = std::clamp(continentalness + 0.12f, -1.0f, 1.0f);
     
     // ========== 2. MOUNTAIN RANGE NOISE ==========
     // Separate noise layer specifically for mountain ranges
@@ -463,9 +490,8 @@ float WorldGenerator::getHeight(float x, float z) const {
     // Use ridged multifractal for mountain chains
     float mountainNoise = ridgedMultifractal(mtWarpX, mtWarpZ, 5, 2.2f, 0.6f, 1.0f);
     
-    // Create clear mountain vs non-mountain distinction
-    // Values > 0.5 are mountain regions
-    float mountainFactor = std::clamp((mountainNoise - 0.35f) * 3.0f, 0.0f, 1.0f);
+    // Create clear mountain vs non-mountain distinction (visible ranges, but not everywhere)
+    float mountainFactor = std::clamp((mountainNoise - 0.40f) * 3.1f, 0.0f, 1.0f);
     
     // Choose between sharp and gentle mountain styles per-range so both can spawn
     float mountainStyleNoise = (noise2D(mtWarpX * 0.6f + 7200.0f, mtWarpZ * 0.6f + 9100.0f) + 1.0f) * 0.5f;
@@ -493,47 +519,56 @@ float WorldGenerator::getHeight(float x, float z) const {
     
     // ========== 5. COMBINE INTO FINAL HEIGHT ==========
     
-    // Base height from continentalness
+    // Base height from continentalness (tuned for SEA_LEVEL = 32: more land, less overall ocean)
     float baseHeight;
-    if (continentalness < -0.3f) {
+    if (continentalness < -0.55f) {
         // Deep ocean
-        float oceanDepth = (-0.3f - continentalness) / 0.7f; // 0 to 1
-        baseHeight = 25.0f - oceanDepth * 20.0f; // 25 down to 5
-    } else if (continentalness < -0.1f) {
-        // Shallow ocean / shelf
-        float t = (continentalness + 0.3f) / 0.2f;
-        baseHeight = lerp(25.0f, 30.0f, t);
-    } else if (continentalness < 0.05f) {
-        // Beach / coast transition
-        float t = (continentalness + 0.1f) / 0.15f;
-        baseHeight = lerp(30.0f, 35.0f, t);
-    } else if (continentalness < 0.3f) {
-        // Low coastal plains
-        float t = (continentalness - 0.05f) / 0.25f;
-        baseHeight = lerp(35.0f, 45.0f, t);
-    } else if (continentalness < 0.6f) {
+        float t = (continentalness + 1.0f) / 0.45f; // [-1..-0.55] -> [0..1]
+        baseHeight = lerp((float)SEA_LEVEL - 26.0f, (float)SEA_LEVEL - 16.0f, std::clamp(t, 0.0f, 1.0f));
+    } else if (continentalness < -0.25f) {
+        // Ocean / shelf
+        float t = (continentalness + 0.55f) / 0.30f; // [-0.55..-0.25]
+        baseHeight = lerp((float)SEA_LEVEL - 16.0f, (float)SEA_LEVEL - 7.0f, std::clamp(t, 0.0f, 1.0f));
+    } else if (continentalness < -0.05f) {
+        // Coast transition
+        float t = (continentalness + 0.25f) / 0.20f; // [-0.25..-0.05]
+        baseHeight = lerp((float)SEA_LEVEL - 7.0f, (float)SEA_LEVEL + 1.5f, std::clamp(t, 0.0f, 1.0f));
+    } else if (continentalness < 0.20f) {
+        // Low plains
+        float t = (continentalness + 0.05f) / 0.25f; // [-0.05..0.20]
+        baseHeight = lerp((float)SEA_LEVEL + 1.5f, (float)SEA_LEVEL + 10.0f, std::clamp(t, 0.0f, 1.0f));
+    } else if (continentalness < 0.55f) {
         // Inland plains
-        float t = (continentalness - 0.3f) / 0.3f;
-        baseHeight = lerp(45.0f, 55.0f, t);
+        float t = (continentalness - 0.20f) / 0.35f; // [0.20..0.55]
+        baseHeight = lerp((float)SEA_LEVEL + 10.0f, (float)SEA_LEVEL + 19.0f, std::clamp(t, 0.0f, 1.0f));
     } else {
-        // Deep inland / highland base
-        float t = (continentalness - 0.6f) / 0.4f;
-        baseHeight = lerp(55.0f, 65.0f, t);
+        // Highlands base
+        float t = (continentalness - 0.55f) / 0.45f; // [0.55..1.0]
+        baseHeight = lerp((float)SEA_LEVEL + 19.0f, (float)SEA_LEVEL + 27.0f, std::clamp(t, 0.0f, 1.0f));
+    }
+
+    // Ocean islands: allow land to pop up inside ocean regions
+    if (continentalness < -0.30f) {
+        float iX = x * 0.004f + offsetContinentX * 0.15f + 10000.0f;
+        float iZ = z * 0.004f + offsetContinentZ * 0.15f + 20000.0f;
+        float islandN = (fbm(iX, iZ, 4) + 1.0f) * 0.5f;
+        float islandMask = std::pow(std::clamp((islandN - 0.72f) / 0.28f, 0.0f, 1.0f), 2.2f);
+        baseHeight += islandMask * 30.0f;
     }
     
     // Only add terrain features on land
-    float landFactor = std::clamp((continentalness + 0.1f) * 5.0f, 0.0f, 1.0f);
+    float landFactor = std::clamp((continentalness + 0.10f) * 3.5f, 0.0f, 1.0f);
     
     // Hill contribution (moderate height variation)
-    float hillHeight = hills * 15.0f * landFactor;
+    float hillHeight = hills * 8.0f * landFactor;
     
     // Mountain contribution (two styles: sharp ridges vs gentle, walkable slopes)
     float peakDetail = ridgedMultifractal(detX * 3.0f, detZ * 3.0f, 4, 2.0f, 0.5f, 1.0f);
-    float sharpHeight = mountainFactor * (60.0f + peakDetail * 80.0f + detail * 20.0f) * landFactor;
+    float sharpHeight = mountainFactor * (62.0f + peakDetail * 85.0f + detail * 16.0f) * landFactor;
     
     float gentleShape = (billowNoise(mtWarpX * 1.1f, mtWarpZ * 1.1f) + 1.0f) * 0.5f; // softer, rounded peaks
     float gentleDetail = (fbm(mtWarpX * 0.7f, mtWarpZ * 0.7f, 3) + 1.0f) * 0.5f;
-    float gentleHeight = mountainFactor * (45.0f + gentleShape * 55.0f + gentleDetail * 15.0f) * landFactor;
+    float gentleHeight = mountainFactor * (42.0f + gentleShape * 60.0f + gentleDetail * 14.0f) * landFactor;
     
     float mountainHeight = sharpWeight * sharpHeight + gentleWeight * gentleHeight;
     
@@ -541,18 +576,34 @@ float WorldGenerator::getHeight(float x, float z) const {
     float finalHillHeight = hillHeight * (1.0f - mountainFactor * 0.8f);
     
     // Detail adds small variations everywhere
-    float detailHeight = detail * 5.0f * landFactor;
+    float detailHeight = detail * 3.0f * landFactor;
     
     // Combine all layers
     float finalHeight = baseHeight + finalHillHeight + mountainHeight + detailHeight;
+
+    // River carving: create river-like water channels instead of random inland water.
+    float rX = x * 0.0035f + offsetPVX * 0.25f + 31000.0f;
+    float rZ = z * 0.0035f + offsetPVZ * 0.25f + 42000.0f;
+    float riverBase = fbm(rX, rZ, 3);
+    float riverVal = 1.0f - std::abs(riverBase);
+    float riverMask = std::pow(std::clamp((riverVal - 0.78f) / 0.22f, 0.0f, 1.0f), 2.6f);
+    riverMask *= landFactor;
+
+    float riverBed = (float)SEA_LEVEL - 2.0f;
+    finalHeight = lerp(finalHeight, riverBed, riverMask);
+
+    // Prevent random inland lakes: keep most land above sea level unless we're in a river.
+    if (continentalness > 0.00f && riverMask < 0.15f) {
+        finalHeight = std::max(finalHeight, (float)SEA_LEVEL + 3.0f);
+    }
     
     // Ensure minimum heights
     finalHeight = std::max(finalHeight, 5.0f);
     
-    // Apply height power curve for more dramatic peaks
-    if (finalHeight > 80.0f) {
-        float excess = finalHeight - 80.0f;
-        finalHeight = 80.0f + std::pow(excess / 100.0f, 0.8f) * 100.0f;
+    // Apply height power curve for more dramatic peaks (but keep extremes rarer)
+    if (finalHeight > 75.0f) {
+        float excess = finalHeight - 75.0f;
+        finalHeight = 75.0f + std::pow(excess / 120.0f, 0.85f) * 120.0f;
     }
     
     return finalHeight;
