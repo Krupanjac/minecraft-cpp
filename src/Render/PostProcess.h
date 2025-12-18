@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include <random>
+#include <glm/glm.hpp>
 
 class PostProcess {
 public:
@@ -19,6 +20,7 @@ public:
     // TAA specific
     const glm::mat4& getJitterMatrix() const { return jitterMatrix; }
     void updateJitter(int w, int h);
+    glm::vec2 getJitterOffset() const { return jitterOffset; }
 
     // Debug accessors for TAA
     float getLastTaaMotionMag() const;
@@ -27,6 +29,9 @@ public:
 private:
     int width, height;
     GLuint quadVAO, quadVBO;
+    // Depth blit helper FBOs (copy current depth texture into history depth texture)
+    GLuint depthBlitSrcFBO = 0;
+    GLuint depthBlitDstFBO = 0;
 
     // Shaders
     Shader ssaoShader;
@@ -45,6 +50,7 @@ private:
     std::unique_ptr<FrameBuffer> historyFBO[2]; // Ping-pong buffers
     int currentHistoryIndex = 0;
     glm::mat4 jitterMatrix;
+    glm::vec2 jitterOffset = glm::vec2(0.0f); // In screen UV units (pixels / resolution)
     glm::mat4 prevViewProj;
     glm::vec3 prevCameraPos = glm::vec3(0.0f); // Track camera movement for history rejection
     // For debugging TAA

@@ -77,11 +77,10 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     // === TAA HISTORY INVALIDATION ON CHUNK LOAD ===
     const auto& chunks = chunkManager.getChunks();
     size_t currentChunkCount = chunks.size();
-    if (currentChunkCount != lastChunkCount) {
-        // Chunks loaded/unloaded - invalidate TAA history to avoid ghosts from new geometry
-        if (postProcess) postProcess->invalidateTAAHistory();
-        lastChunkCount = currentChunkCount;
-    }
+    // NOTE:
+    // Invalidating TAA every time chunk count changes can effectively disable TAA while streaming,
+    // making the ON/OFF toggle look identical. Depth rejection should handle most disocclusions.
+    lastChunkCount = currentChunkCount;
 
     // Update frame counter for upload tracking
     frameCounter++;
@@ -89,9 +88,12 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     // Calculate Light Space Matrix
     // Center on player
     // We position the "sun" far away along the light direction
-    // Use the snapped render origin as the light target center to reduce jitter when the camera moves slightly
+    // IMPORTANT:
+    // All rendering (including shadows) is done in camera-relative coordinates (world - renderOrigin).
+    // That means the shadow frustum must also be built in that SAME coordinate space.
+    // Using world-space renderOrigin here will break shadows after teleports / origin rebases.
     float shadowRange = Settings::instance().shadowDistance; // Covers visible area
-    glm::vec3 lightTarget = glm::vec3(renderOrigin); // snapped origin - stable for TAA and shadows
+    glm::vec3 lightTarget = glm::vec3(0.0f); // renderOrigin in camera-relative space
     glm::vec3 lightPos = lightTarget + lightDirection * 1000.0f; // far away
     // Use an orthographic projection centered on the light target
     glm::mat4 lightView = glm::lookAt(lightPos, lightTarget, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -186,6 +188,14 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     glm::mat4 unjitteredProjection = camera.getProjectionMatrix(aspect);
     glm::mat4 projection = unjitteredProjection;
+    if (Settings::instance().enableTAA && postProcess) {
+        // Subpixel jitter is required for TAA to actually reduce aliasing.
+        // Apply jitter directly into the projection matrix so motion vectors include it.
+        postProcess->updateJitter(windowWidth, windowHeight);
+        glm::vec2 j = postProcess->getJitterOffset(); // UV units (pixel/res)
+        projection[2][0] += j.x * 2.0f;
+        projection[2][1] += j.y * 2.0f;
+    }
 
     // Create view matrix. For third-person we compute a collision-safe eye position
     glm::mat4 view;
@@ -245,7 +255,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     
     if (isFirstFrame) {
         prevView = view;
-        prevProjection = unjitteredProjection;
+        prevProjection = projection;
         prevRenderOrigin = renderOrigin;
         isFirstFrame = false;
     }
@@ -475,7 +485,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
 
     // Update History
     prevView = view;
-    prevProjection = unjitteredProjection;
+    prevProjection = projection;
     prevRenderOrigin = renderOrigin;
 
     // 3. UI / Overlays (Rendered directly to screen)

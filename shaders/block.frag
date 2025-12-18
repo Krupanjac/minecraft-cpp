@@ -65,6 +65,11 @@ void main() {
     vec2 uv = vCellOrigin + fract(vTexCoord) * cellSize;
     
     vec4 texColor = textureLod(uTexture, uv, 0.0);
+    
+    // Force snow to pure white so atlas misalignment doesn't matter
+    if (vMaterial == 8u) {
+        texColor = vec4(1.0);
+    }
     if (uDebugNoTexture == 0) {
         if (texColor.a < 0.1) discard;
     }

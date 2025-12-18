@@ -16,6 +16,10 @@ PostProcess::PostProcess(int width, int height) : width(width), height(height), 
     historyFBO[0] = std::make_unique<FrameBuffer>(width, height);
     historyFBO[1] = std::make_unique<FrameBuffer>(width, height);
 
+    // Helper FBOs for depth blit (texture-to-texture via framebuffer attachments)
+    glGenFramebuffers(1, &depthBlitSrcFBO);
+    glGenFramebuffers(1, &depthBlitDstFBO);
+
     initSSAO();
 }
 
@@ -23,6 +27,8 @@ PostProcess::~PostProcess() {
     glDeleteVertexArrays(1, &quadVAO);
     glDeleteBuffers(1, &quadVBO);
     glDeleteTextures(1, &noiseTexture);
+    if (depthBlitSrcFBO) glDeleteFramebuffers(1, &depthBlitSrcFBO);
+    if (depthBlitDstFBO) glDeleteFramebuffers(1, &depthBlitDstFBO);
 }
 
 void PostProcess::resize(int w, int h) {
@@ -34,6 +40,9 @@ void PostProcess::resize(int w, int h) {
     intermediateFBO->resize(w, h);
     historyFBO[0]->resize(w, h);
     historyFBO[1]->resize(w, h);
+    
+    // Resizing invalidates history (different resolution / different sampling footprint)
+    invalidateHistory = true;
 }
 
 void PostProcess::initQuad() {
@@ -125,12 +134,14 @@ void PostProcess::updateJitter(int w, int h) {
     frameCount++;
     int index = frameCount % 8;
     
-    // Scale to [-0.5, 0.5] pixels (Standard TAA jitter range)
-    // Previous [-1, 1] was too aggressive
-    float jitterX = (halton23[index][0] - 0.5f) / (float)w;
-    float jitterY = (halton23[index][1] - 0.5f) / (float)h;
-    
-    jitterMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(jitterX, jitterY, 0.0f));
+    // Scale to subpixel jitter in screen UV units.
+    // Keep it slightly under 0.5px to reduce visible shimmer when history is rejected (motion/disocclusion).
+    constexpr float JITTER_PIXELS = 0.35f; // was effectively 0.5px
+    float jitterX = (halton23[index][0] - 0.5f) * (JITTER_PIXELS / (float)w);
+    float jitterY = (halton23[index][1] - 0.5f) * (JITTER_PIXELS / (float)h);
+
+    jitterOffset = glm::vec2(jitterX, jitterY);
+    jitterMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(jitterX, jitterY, 0.0f)); // retained for any future use
 }
 
 void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint velocityTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection, float volumetricIntensity, const glm::vec3& lightColor) {
@@ -298,9 +309,26 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         // Depth linearization parameters
         taaShader.setFloat("nearPlane", 0.1f);  // Should match your camera near plane
         taaShader.setFloat("farPlane", 1000.0f); // Should match your camera far plane
+        taaShader.setFloat("gamma", settings.gamma);
         
         glBindVertexArray(quadVAO); // Ensure VAO is bound
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+        // Copy current scene depth into this history buffer's depth texture,
+        // so next frame's depth rejection can actually work.
+        // (historyFBO depth is NOT written by the fullscreen quad)
+        {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, depthBlitSrcFBO);
+            glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
+            glReadBuffer(GL_NONE);
+
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, depthBlitDstFBO);
+            glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, historyFBO[currentHistoryIndex]->getDepthTexture(), 0);
+            glDrawBuffer(GL_NONE);
+
+            glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        }
+
         historyFBO[currentHistoryIndex]->unbind();
         
         // 6. Blit to Screen

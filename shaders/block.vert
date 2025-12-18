@@ -86,6 +86,7 @@ void main() {
         if (aNormal == 2u || aNormal == 3u) textureIndex = 21u; // Top/Bottom
         else textureIndex = 20u; // Side
     }
+    else if (aMaterial == 8u) textureIndex = 240u;  // Snow
     else if (aMaterial == 13u) textureIndex = 39u; // Tall Grass
     else if (aMaterial == 14u) textureIndex = 12u; // Rose
     

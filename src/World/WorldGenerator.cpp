@@ -467,6 +467,14 @@ float WorldGenerator::getHeight(float x, float z) const {
     // Values > 0.5 are mountain regions
     float mountainFactor = std::clamp((mountainNoise - 0.35f) * 3.0f, 0.0f, 1.0f);
     
+    // Choose between sharp and gentle mountain styles per-range so both can spawn
+    float mountainStyleNoise = (noise2D(mtWarpX * 0.6f + 7200.0f, mtWarpZ * 0.6f + 9100.0f) + 1.0f) * 0.5f;
+    float sharpWeight = std::pow(std::clamp(mountainStyleNoise, 0.0f, 1.0f), 1.4f);
+    float gentleWeight = std::pow(1.0f - mountainStyleNoise, 1.4f);
+    float weightSum = sharpWeight + gentleWeight + 1e-6f;
+    sharpWeight /= weightSum;
+    gentleWeight /= weightSum;
+    
     // ========== 3. HILLS / EROSION NOISE ==========
     // Medium scale for rolling hills
     float hillX = x * HILLS_SCALE + offsetPVX;
@@ -519,10 +527,15 @@ float WorldGenerator::getHeight(float x, float z) const {
     // Hill contribution (moderate height variation)
     float hillHeight = hills * 15.0f * landFactor;
     
-    // Mountain contribution (dramatic height for mountain areas)
-    // Mountains get MUCH taller when mountainFactor is high
+    // Mountain contribution (two styles: sharp ridges vs gentle, walkable slopes)
     float peakDetail = ridgedMultifractal(detX * 3.0f, detZ * 3.0f, 4, 2.0f, 0.5f, 1.0f);
-    float mountainHeight = mountainFactor * (60.0f + peakDetail * 80.0f + detail * 20.0f) * landFactor;
+    float sharpHeight = mountainFactor * (60.0f + peakDetail * 80.0f + detail * 20.0f) * landFactor;
+    
+    float gentleShape = (billowNoise(mtWarpX * 1.1f, mtWarpZ * 1.1f) + 1.0f) * 0.5f; // softer, rounded peaks
+    float gentleDetail = (fbm(mtWarpX * 0.7f, mtWarpZ * 0.7f, 3) + 1.0f) * 0.5f;
+    float gentleHeight = mountainFactor * (45.0f + gentleShape * 55.0f + gentleDetail * 15.0f) * landFactor;
+    
+    float mountainHeight = sharpWeight * sharpHeight + gentleWeight * gentleHeight;
     
     // Add hills only where there are no mountains
     float finalHillHeight = hillHeight * (1.0f - mountainFactor * 0.8f);
