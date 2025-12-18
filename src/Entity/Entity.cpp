@@ -5,10 +5,18 @@ Entity::Entity(const glm::vec3& position)
     : position(position),
       rotation(0.0f),
       scale(1.0f),
-      velocity(0.0f) {
+      velocity(0.0f),
+      prevPosition(position),
+      prevRotation(0.0f),
+      prevScale(1.0f) {
 }
 
 void Entity::update(float deltaTime) {
+    // Capture previous transform for temporal effects (TAA velocity, etc.)
+    prevPosition = position;
+    prevRotation = rotation;
+    prevScale = scale;
+
     // Basic physics integration could go here, or be handled by subclasses/physics engine
     position += velocity * deltaTime;
     
@@ -22,7 +30,17 @@ void Entity::render(Shader& shader) {
     if (model) {
         glm::mat4 modelMatrix = getModelMatrix();
         shader.setMat4("uModel", modelMatrix);
-        model->draw(shader, modelMatrix);
+        // Fallback: assume previous == current when called this way
+        shader.setMat4("uPrevModel", modelMatrix);
+        model->draw(shader, modelMatrix, modelMatrix);
+    }
+}
+
+void Entity::renderWithMatrices(Shader& shader, const glm::mat4& currentModel, const glm::mat4& prevModel) {
+    if (model) {
+        shader.setMat4("uModel", currentModel);
+        shader.setMat4("uPrevModel", prevModel);
+        model->draw(shader, currentModel, prevModel);
     }
 }
 
@@ -33,5 +51,15 @@ glm::mat4 Entity::getModelMatrix() const {
     m = glm::rotate(m, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
     m = glm::rotate(m, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
     m = glm::scale(m, scale);
+    return m;
+}
+
+glm::mat4 Entity::getPrevModelMatrix() const {
+    glm::mat4 m = glm::mat4(1.0f);
+    m = glm::translate(m, prevPosition);
+    m = glm::rotate(m, glm::radians(prevRotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    m = glm::rotate(m, glm::radians(prevRotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    m = glm::rotate(m, glm::radians(prevRotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+    m = glm::scale(m, prevScale);
     return m;
 }

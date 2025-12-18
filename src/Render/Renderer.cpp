@@ -372,7 +372,6 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         modelShader.setMat4("uView", view);
         modelShader.setMat4("uPrevView", prevView);
         modelShader.setMat4("uPrevProjection", prevProjection);
-        modelShader.setVec3("uOriginDelta", originDelta);
         modelShader.setVec3("uLightDir", lightDirection);
         modelShader.setVec3("uCameraPos", cameraRelative);
         modelShader.setVec4("uBaseColor", glm::vec4(1.0f)); // Default white
@@ -381,14 +380,29 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         modelShader.setInt("uDebugShowNormals", Settings::instance().debugShowNormals ? 1 : 0);
         for (auto* entity : entities) {
             if (!entity) continue;
-            // Render entity using camera-relative coordinates so rebasing doesn't move the model unexpectedly
+
+            // Render in camera-relative space WITHOUT mutating the entity transform.
+            // Also compute a previous model matrix for correct motion vectors (TAA stability).
             glm::vec3 worldPos = entity->getPosition();
+            glm::vec3 prevWorldPos = entity->getPrevPosition();
+
             glm::vec3 relPos = glm::vec3(glm::dvec3(worldPos) - renderOrigin);
-            // Temporarily set position for rendering
-            entity->setPosition(relPos);
-            entity->render(modelShader);
-            // Restore world position
-            entity->setPosition(worldPos);
+            glm::vec3 prevRelPos = glm::vec3(glm::dvec3(prevWorldPos) - prevRenderOrigin);
+
+            auto buildMatrix = [](const glm::vec3& p, const glm::vec3& rDeg, const glm::vec3& s) {
+                glm::mat4 m = glm::mat4(1.0f);
+                m = glm::translate(m, p);
+                m = glm::rotate(m, glm::radians(rDeg.y), glm::vec3(0.0f, 1.0f, 0.0f));
+                m = glm::rotate(m, glm::radians(rDeg.x), glm::vec3(1.0f, 0.0f, 0.0f));
+                m = glm::rotate(m, glm::radians(rDeg.z), glm::vec3(0.0f, 0.0f, 1.0f));
+                m = glm::scale(m, s);
+                return m;
+            };
+
+            glm::mat4 currentModel = buildMatrix(relPos, entity->getRotation(), entity->getScale());
+            glm::mat4 prevModel = buildMatrix(prevRelPos, entity->getPrevRotation(), entity->getPrevScale());
+
+            entity->renderWithMatrices(modelShader, currentModel, prevModel);
         }
         modelShader.unuse();
     }

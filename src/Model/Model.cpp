@@ -54,6 +54,25 @@ void Model::loadModel(const std::string& path) {
 
     LOG_INFO("Loaded glTF model structure: " + path);
 
+    // Log animations (helps us pick idle/walk for mobs like Zombie)
+    if (!impl->model.animations.empty()) {
+        LOG_INFO("Animations found: " + std::to_string(impl->model.animations.size()));
+        for (size_t i = 0; i < impl->model.animations.size(); ++i) {
+            const auto& a = impl->model.animations[i];
+            std::string name = a.name.empty() ? ("anim" + std::to_string(i)) : a.name;
+            float duration = 0.0f;
+            for (const auto& sampler : a.samplers) {
+                const auto& accessor = impl->model.accessors[sampler.input];
+                if (!accessor.maxValues.empty()) {
+                    duration = std::max(duration, static_cast<float>(accessor.maxValues[0]));
+                }
+            }
+            LOG_INFO("  [" + std::to_string(i) + "] " + name + " (channels=" + std::to_string(a.channels.size()) + ", duration~" + std::to_string(duration) + "s)");
+        }
+    } else {
+        LOG_INFO("Animations found: 0");
+    }
+
     // Process textures
     // Process textures
     for (size_t i = 0; i < impl->model.images.size(); ++i) {
@@ -105,6 +124,10 @@ void Model::loadModel(const std::string& path) {
                 newNode->scale = glm::make_vec3(inputNode.scale.data());
             }
         }
+        // Cache bind pose TRS
+        newNode->bindTranslation = newNode->translation;
+        newNode->bindRotation = newNode->rotation;
+        newNode->bindScale = newNode->scale;
         // Calculate initial local transform
         // (Moved to getLocalMatrix or updateGlobalTransforms)
         // Check getLocalMatrix() in Node struct definition (Model.h)
@@ -200,6 +223,16 @@ void Model::loadModel(const std::string& path) {
     updateAnimation(0.0f);
 }
 
+std::vector<std::string> Model::getAnimationNames() const {
+    std::vector<std::string> out;
+    out.reserve(impl->model.animations.size());
+    for (size_t i = 0; i < impl->model.animations.size(); ++i) {
+        const auto& a = impl->model.animations[i];
+        out.push_back(a.name.empty() ? ("anim" + std::to_string(i)) : a.name);
+    }
+    return out;
+}
+
 void Model::loadSkins() {
     for (const auto& sourceSkin : impl->model.skins) {
         Skin skin;
@@ -225,9 +258,9 @@ void Model::loadSkins() {
     }
 }
 
-void Model::draw(Shader& shader, const glm::mat4& modelMatrix) {
+void Model::draw(Shader& shader, const glm::mat4& modelMatrix, const glm::mat4& prevModelMatrix) {
     for (const auto& node : nodes) {
-        drawNode(node.get(), shader, modelMatrix);
+        drawNode(node.get(), shader, modelMatrix, prevModelMatrix);
     }
 }
 
@@ -247,18 +280,30 @@ void Model::updateGlobalTransforms(Node* node, const glm::mat4& parentTransform)
     }
 }
 
-void Model::drawNode(Node* node, Shader& shader, const glm::mat4& modelMatrix) {
+void Model::drawNode(Node* node, Shader& shader, const glm::mat4& modelMatrix, const glm::mat4& prevModelMatrix) {
     if (!node) return;
 
     // Current node's world transform
     glm::mat4 worldTransform = modelMatrix * node->globalTransform;
     shader.setMat4("uModel", worldTransform);
 
+    // Previous node's world transform (same hierarchy, but previous entity transform)
+    glm::mat4 prevNodeGlobal = node->globalTransform;
+    if (node->index >= 0 && static_cast<size_t>(node->index) < prevNodeGlobalTransforms.size()) {
+        prevNodeGlobal = prevNodeGlobalTransforms[node->index];
+    }
+    glm::mat4 prevWorldTransform = prevModelMatrix * prevNodeGlobal;
+    shader.setMat4("uPrevModel", prevWorldTransform);
+
     // Skinning
     if (!skins.empty() && activeSkin >= 0 && static_cast<size_t>(activeSkin) < skins.size() && !jointMatrices.empty()) {
         shader.setBool("uHasSkin", true);
         // Using getProgram() as ID is private
         glUniformMatrix4fv(glGetUniformLocation(shader.getProgram(), "uJoints"), static_cast<GLsizei>(jointMatrices.size()), GL_FALSE, glm::value_ptr(jointMatrices[0]));
+
+        // Previous joints for motion vectors. If missing, fall back to current.
+        const auto& pj = prevJointMatrices.empty() ? jointMatrices : prevJointMatrices;
+        glUniformMatrix4fv(glGetUniformLocation(shader.getProgram(), "uPrevJoints"), static_cast<GLsizei>(pj.size()), GL_FALSE, glm::value_ptr(pj[0]));
     } else {
         shader.setBool("uHasSkin", false);
     }
@@ -311,7 +356,7 @@ void Model::drawNode(Node* node, Shader& shader, const glm::mat4& modelMatrix) {
     }
 
     for (const auto& child : node->children) {
-        drawNode(child.get(), shader, modelMatrix);
+        drawNode(child.get(), shader, modelMatrix, prevModelMatrix);
     }
 }
 
@@ -322,6 +367,7 @@ void Model::playAnimation(const std::string& name, bool loop) {
             currentAnimationName = name;
             animationLoop = loop;
             animationTime = 0.0f;
+            animationLoopEndFactor = 1.0f; // default: full clip
             
             // Calculate duration
             animationDuration = 0.0f;
@@ -341,13 +387,39 @@ void Model::stopAnimation() {
 }
 
 void Model::updateAnimation(float deltaTime) {
+    // Preserve previous node globals for motion vectors (covers animations that move nodes, not just bones)
+    if (prevNodeGlobalTransforms.empty()) {
+        prevNodeGlobalTransforms.resize(nodeMap.size(), glm::mat4(1.0f));
+    }
+    for (size_t i = 0; i < nodeMap.size(); ++i) {
+        if (nodeMap[i]) prevNodeGlobalTransforms[i] = nodeMap[i]->globalTransform;
+    }
+
+    // Preserve previous joints before updating animation time/pose
+    if (!jointMatrices.empty()) {
+        prevJointMatrices = jointMatrices;
+    }
+
     if (currentAnimation >= 0) {
-        animationTime += deltaTime;
-        if (animationTime > animationDuration) {
+        // Pick a root-motion node if not set: prefer active skin skeleton root.
+        if (rootMotionNodeIndex < 0) {
+            if (!skins.empty() && activeSkin >= 0 && static_cast<size_t>(activeSkin) < skins.size() && skins[activeSkin].skeletonRoot >= 0) {
+                rootMotionNodeIndex = skins[activeSkin].skeletonRoot;
+            } else if (!nodes.empty() && nodes[0]) {
+                rootMotionNodeIndex = nodes[0]->index; // fallback: first root node
+            }
+        }
+
+        float endTime = animationDuration * std::clamp(animationLoopEndFactor, 0.0f, 1.0f);
+        // Avoid 0-length loops
+        endTime = std::max(endTime, 0.0001f);
+
+        animationTime += deltaTime * std::max(0.0f, animationSpeed);
+        if (animationTime > endTime) {
             if (animationLoop) {
-                animationTime = fmod(animationTime, animationDuration);
+                animationTime = fmod(animationTime, endTime);
             } else {
-                animationTime = animationDuration;
+                animationTime = endTime;
             }
         }
         
@@ -385,7 +457,13 @@ void Model::updateAnimation(float deltaTime) {
             
             if (channel.target_path == "translation") {
                 const glm::vec3* values = reinterpret_cast<const glm::vec3*>(outData);
-                node->translation = glm::mix(values[prevKey], values[nextKey], t);
+                glm::vec3 tr = glm::mix(values[prevKey], values[nextKey], t);
+                // Lock root-motion XZ to bind pose to prevent mesh drifting away from entity.
+                if (lockRootMotionXZ && node->index == rootMotionNodeIndex) {
+                    tr.x = node->bindTranslation.x;
+                    tr.z = node->bindTranslation.z;
+                }
+                node->translation = tr;
                 node->useTRS = true;
             } else if (channel.target_path == "rotation") {
                 const glm::vec4* values = reinterpret_cast<const glm::vec4*>(outData); // vec4 xyzw
@@ -428,6 +506,19 @@ void Model::updateAnimation(float deltaTime) {
                 // But GlobalTransform is model space.
                 jointMatrices[i] = global * inverseBind;
             }
+        }
+    }
+
+    // First frame / no previous joints yet: initialize prev = current to avoid huge bogus motion.
+    if (prevJointMatrices.empty() && !jointMatrices.empty()) {
+        prevJointMatrices = jointMatrices;
+    }
+
+    // First frame / no previous nodes yet: initialize prev nodes too.
+    if (prevNodeGlobalTransforms.empty() && !nodeMap.empty()) {
+        prevNodeGlobalTransforms.resize(nodeMap.size(), glm::mat4(1.0f));
+        for (size_t i = 0; i < nodeMap.size(); ++i) {
+            if (nodeMap[i]) prevNodeGlobalTransforms[i] = nodeMap[i]->globalTransform;
         }
     }
 }

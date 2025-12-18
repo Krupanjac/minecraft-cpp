@@ -13,6 +13,7 @@
 #include "UI/UIManager.h"
 #include "World/WorldSerializer.h"
 #include "Entity/PlayerEntity.h"
+#include "Entity/ZombieEntity.h"
 
 #include <memory>
 #include <iostream>
@@ -527,6 +528,8 @@ private:
     long currentSeed = 12345;
     
     std::unique_ptr<PlayerEntity> playerEntity;
+    std::vector<std::unique_ptr<ZombieEntity>> zombies;
+    float zombieSpawnTimer = 0.0f;
     
     void applySettings() {
         auto& s = Settings::instance();
@@ -797,6 +800,41 @@ private:
         if (playerEntity) {
             playerEntity->update(deltaTime);
         }
+
+        // === Zombies ===
+        // Spawn a few around the player over time (simple, deterministic-ish)
+        zombieSpawnTimer -= deltaTime;
+        if (playerEntity && zombieSpawnTimer <= 0.0f) {
+            zombieSpawnTimer = 8.0f;
+            const size_t MAX_ZOMBIES = 6;
+            if (zombies.size() < MAX_ZOMBIES) {
+                glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
+                // spawn radius ring
+                float a = (float)(zombies.size()) * 2.3999632f; // golden angle
+                float r = 14.0f + (float)(zombies.size()) * 3.0f;
+                int sx = (int)std::floor(playerFeet.x + std::cos(a) * r);
+                int sz = (int)std::floor(playerFeet.z + std::sin(a) * r);
+                // Spawn at the first air block above terrain.
+                // getSurfaceHeight() returns int(height), and terrain fills blocks for worldY < height,
+                // so y==height is usually the first air block already.
+                int sy = worldGenerator.getSurfaceHeight(sx, sz);
+                if (sy < SEA_LEVEL) sy = SEA_LEVEL + 2;
+                zombies.push_back(std::make_unique<ZombieEntity>(glm::vec3((float)sx + 0.5f, (float)sy + 0.05f, (float)sz + 0.5f)));
+            }
+        }
+
+        // Update zombie AI (uses chunkManager for simple collision + camera pos for chasing)
+        if (playerEntity) {
+            glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
+            for (auto& z : zombies) {
+                if (!z) continue;
+                bool attacked = z->updateAI(deltaTime, chunkManager, playerFeet);
+                if (attacked) {
+                    // Apply knockback to player camera velocity as "attack" feedback.
+                    camera.velocity += z->consumeAttackImpulse();
+                }
+            }
+        }
         
         // Generate chunks
         auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), Settings::instance().renderDistance, 10);
@@ -909,6 +947,11 @@ private:
             if (camera.isThirdPerson()) {
                 entities.push_back(playerEntity.get());
             }
+        }
+
+        // Always render zombies (even in first-person)
+        for (auto& z : zombies) {
+            if (z) entities.push_back(z.get());
         }
         
         renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight());

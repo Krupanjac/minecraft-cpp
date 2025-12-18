@@ -10,22 +10,24 @@ out vec3 Normal;
 out vec2 TexCoord;
 
 uniform mat4 uModel;
+uniform mat4 uPrevModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
 
 uniform mat4 uPrevView;
 uniform mat4 uPrevProjection;
-uniform vec3 uOriginDelta;
 
 out vec4 vCurrentClip;
 out vec4 vPrevClip;
 
 const int MAX_JOINTS = 100;
 uniform mat4 uJoints[MAX_JOINTS];
+uniform mat4 uPrevJoints[MAX_JOINTS];
 uniform bool uHasSkin;
 
 void main() {
     vec4 totalLocalPos = vec4(0.0);
+    vec4 totalLocalPosPrev = vec4(0.0);
     vec3 totalNormal = vec3(0.0);
     
     if (uHasSkin) {
@@ -33,15 +35,18 @@ void main() {
             int jointIndex = int(aJoints[i]);
             if (jointIndex >= 0 && jointIndex < MAX_JOINTS) {
                 mat4 jointMat = uJoints[jointIndex];
+                mat4 prevJointMat = uPrevJoints[jointIndex];
                 float weight = aWeights[i];
                 
                 totalLocalPos += jointMat * vec4(aPos, 1.0) * weight;
+                totalLocalPosPrev += prevJointMat * vec4(aPos, 1.0) * weight;
                 vec3 worldNormal = mat3(jointMat) * aNormal;
                 totalNormal += worldNormal * weight;
             }
         }
     } else {
         totalLocalPos = vec4(aPos, 1.0);
+        totalLocalPosPrev = totalLocalPos;
         totalNormal = aNormal;
     }
 
@@ -60,7 +65,7 @@ void main() {
     gl_Position = uProjection * uView * vec4(FragPos, 1.0);
     
     vCurrentClip = gl_Position;
-    // Previous position (assuming static model relative to world for now)
-    vec4 prevWorldPos = vec4(FragPos + uOriginDelta, 1.0);
+    // Previous position (entity motion + animation)
+    vec4 prevWorldPos = uPrevModel * totalLocalPosPrev;
     vPrevClip = uPrevProjection * uPrevView * prevWorldPos;
 }

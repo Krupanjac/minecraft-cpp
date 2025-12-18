@@ -29,6 +29,10 @@ struct Node {
     glm::vec3 translation = glm::vec3(0.0f);
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     glm::vec3 scale = glm::vec3(1.0f);
+    // Bind pose TRS (for root-motion lock / resets)
+    glm::vec3 bindTranslation = glm::vec3(0.0f);
+    glm::quat bindRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    glm::vec3 bindScale = glm::vec3(1.0f);
     glm::mat4 matrix = glm::mat4(1.0f); // If set in GLTF
     bool useTRS = true; 
 
@@ -45,12 +49,21 @@ public:
     Model(const std::string& path);
     ~Model();
 
-    void draw(Shader& shader, const glm::mat4& modelMatrix);
+    void draw(Shader& shader, const glm::mat4& modelMatrix, const glm::mat4& prevModelMatrix);
     void updateAnimation(float deltaTime);
     
     void playAnimation(const std::string& name, bool loop = true);
     void stopAnimation();
     std::string getCurrentAnimation() const { return currentAnimationName; }
+    std::vector<std::string> getAnimationNames() const;
+    void setAnimationSpeed(float speed) { animationSpeed = speed; }
+    float getAnimationSpeed() const { return animationSpeed; }
+    // Loop only a fraction of the animation [0..1]. Useful to cut out root-motion drift.
+    void setAnimationLoopEndFactor(float factor) { animationLoopEndFactor = factor; }
+    float getAnimationLoopEndFactor() const { return animationLoopEndFactor; }
+    // Root-motion control: if enabled, lock the skeleton root node's XZ translation to bind pose.
+    void setLockRootMotionXZ(bool lock) { lockRootMotionXZ = lock; }
+    bool getLockRootMotionXZ() const { return lockRootMotionXZ; }
 
 private:
     // Root nodes of the scene
@@ -61,7 +74,7 @@ private:
     
     // Internal loading helpers
     void loadModel(const std::string& path);
-    void drawNode(Node* node, Shader& shader, const glm::mat4& modelMatrix);
+    void drawNode(Node* node, Shader& shader, const glm::mat4& modelMatrix, const glm::mat4& prevModelMatrix);
     void updateGlobalTransforms(Node* node, const glm::mat4& parentTransform);
     void loadSkins();
 
@@ -78,6 +91,8 @@ private:
     std::vector<Skin> skins;
     int activeSkin = 0;
     std::vector<glm::mat4> jointMatrices; // CPU cache of joints
+    std::vector<glm::mat4> prevJointMatrices; // Previous frame joints (for motion vectors)
+    std::vector<glm::mat4> prevNodeGlobalTransforms; // Previous frame node globals (for motion vectors)
     
     // Animation state
     int currentAnimation = -1;
@@ -85,6 +100,10 @@ private:
     bool animationLoop = true;
     float animationTime = 0.0f;
     float animationDuration = 0.0f;
+    float animationSpeed = 1.0f;
+    float animationLoopEndFactor = 1.0f;
+    bool lockRootMotionXZ = false;
+    int rootMotionNodeIndex = -1;
     
     struct Impl;
     std::unique_ptr<Impl> impl;

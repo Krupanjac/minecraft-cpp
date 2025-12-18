@@ -101,6 +101,7 @@ set(SOURCES
     src/UI/UIManager.cpp
     src/Entity/Entity.cpp
     src/Entity/PlayerEntity.cpp
+    src/Entity/ZombieEntity.cpp
     src/Model/Model.cpp
     ${GLAD_DIR}/src/glad.c
 )

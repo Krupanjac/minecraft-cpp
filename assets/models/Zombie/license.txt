@@ -1,6 +1,6 @@
 Model Information:
-* title:	Black Mesa Classic Headcrab Zombie Rig
-* source:	https://sketchfab.com/3d-models/black-mesa-classic-headcrab-zombie-rig-76d8fe6fb77c450dbf06ff52e1587d96
+* title:	HL1 Styled HL2 Zombie Rig
+* source:	https://sketchfab.com/3d-models/hl1-styled-hl2-zombie-rig-f126b48c28db4e80a35c2a206f0d9cd9
 * author:	NO DONT EAT ME CASEOH (Ferris wheel) (https://sketchfab.com/NO.DONT.EAT.ME.CASEOH)
 
 Model License:
@@ -8,4 +8,4 @@ Model License:
 * requirements:	Author must be credited. Commercial use is allowed.
 
 If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
-This work is based on "Black Mesa Classic Headcrab Zombie Rig" (https://sketchfab.com/3d-models/black-mesa-classic-headcrab-zombie-rig-76d8fe6fb77c450dbf06ff52e1587d96) by NO DONT EAT ME CASEOH (Ferris wheel) (https://sketchfab.com/NO.DONT.EAT.ME.CASEOH) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+This work is based on "HL1 Styled HL2 Zombie Rig" (https://sketchfab.com/3d-models/hl1-styled-hl2-zombie-rig-f126b48c28db4e80a35c2a206f0d9cd9) by NO DONT EAT ME CASEOH (Ferris wheel) (https://sketchfab.com/NO.DONT.EAT.ME.CASEOH) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
