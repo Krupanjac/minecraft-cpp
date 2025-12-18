@@ -412,6 +412,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE); // Allow seeing water surface from below
     glDepthMask(GL_FALSE); // Don't write to depth buffer for transparent objects
+
+    // IMPORTANT: Entity rendering binds its own textures (albedo/emissive) to texture units.
+    // Water uses the block atlas (uTexture=0). Re-bind it here, otherwise water may sample the last entity texture (e.g. zombie).
+    glActiveTexture(GL_TEXTURE0);
+    if (blockAtlas) blockAtlas->bind(0);
     
     waterShader.use();
     waterShader.setInt("uTexture", 0);

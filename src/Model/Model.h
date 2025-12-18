@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <unordered_map>
+#include <cstdint>
 #include "../Render/Shader.h"
 #include "../Render/Texture.h"
 
@@ -104,6 +105,7 @@ private:
     float animationLoopEndFactor = 1.0f;
     bool lockRootMotionXZ = false;
     int rootMotionNodeIndex = -1;
+    std::vector<uint8_t> lockRootXZMask; // per-node mask for XZ translation lock (skeleton nodes)
     
     struct Impl;
     std::unique_ptr<Impl> impl;

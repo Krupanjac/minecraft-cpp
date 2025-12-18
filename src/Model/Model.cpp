@@ -409,6 +409,28 @@ void Model::updateAnimation(float deltaTime) {
                 rootMotionNodeIndex = nodes[0]->index; // fallback: first root node
             }
         }
+        
+        // Build a mask of skeleton nodes so we can lock XZ translation on ALL of them when needed.
+        // Many assets bake forward motion into hips/pelvis translation instead of the skeleton root.
+        if (lockRootMotionXZ) {
+            if (lockRootXZMask.size() != nodeMap.size()) {
+                lockRootXZMask.assign(nodeMap.size(), 0);
+                if (!skins.empty() && activeSkin >= 0 && static_cast<size_t>(activeSkin) < skins.size()) {
+                    const auto& skin = skins[activeSkin];
+                    if (skin.skeletonRoot >= 0 && (size_t)skin.skeletonRoot < lockRootXZMask.size()) {
+                        lockRootXZMask[(size_t)skin.skeletonRoot] = 1;
+                    }
+                    for (int j : skin.joints) {
+                        if (j >= 0 && (size_t)j < lockRootXZMask.size()) lockRootXZMask[(size_t)j] = 1;
+                    }
+                } else if (rootMotionNodeIndex >= 0 && (size_t)rootMotionNodeIndex < lockRootXZMask.size()) {
+                    lockRootXZMask[(size_t)rootMotionNodeIndex] = 1;
+                }
+            }
+        } else {
+            // Keep mask empty when not in use
+            lockRootXZMask.clear();
+        }
 
         float endTime = animationDuration * std::clamp(animationLoopEndFactor, 0.0f, 1.0f);
         // Avoid 0-length loops
@@ -459,7 +481,15 @@ void Model::updateAnimation(float deltaTime) {
                 const glm::vec3* values = reinterpret_cast<const glm::vec3*>(outData);
                 glm::vec3 tr = glm::mix(values[prevKey], values[nextKey], t);
                 // Lock root-motion XZ to bind pose to prevent mesh drifting away from entity.
-                if (lockRootMotionXZ && node->index == rootMotionNodeIndex) {
+                // We lock the skeleton root AND (if available) all skeleton nodes (hips/pelvis commonly have baked motion).
+                bool lockThisNode = false;
+                if (lockRootMotionXZ) {
+                    if (node->index == rootMotionNodeIndex) lockThisNode = true;
+                    if (!lockRootXZMask.empty() && node->index >= 0 && (size_t)node->index < lockRootXZMask.size() && lockRootXZMask[(size_t)node->index]) {
+                        lockThisNode = true;
+                    }
+                }
+                if (lockThisNode) {
                     tr.x = node->bindTranslation.x;
                     tr.z = node->bindTranslation.z;
                 }

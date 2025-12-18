@@ -469,8 +469,10 @@ bool ZombieEntity::updateAI(float deltaTime, ChunkManager& chunkManager, const g
             model->setAnimationLoopEndFactor(1.0f / 5.0f);
             // Hard fix: lock root-motion XZ so the mesh doesn't drift ahead of the entity.
             model->setLockRootMotionXZ(true);
-            // Keep speed at 1.0; the shortened loop is what removes the bad section.
-            model->setAnimationSpeed(1.0f);
+            // Match stride cadence to actual movement speed to reduce foot sliding.
+            // (Reference: ~1.25 was our chase speed; scale around that.)
+            float animSpeed = std::clamp(speed / 1.25f, 0.8f, 1.0f);
+            model->setAnimationSpeed(animSpeed);
             if (!walkAnim.empty() && currentAnim != walkAnim) model->playAnimation(walkAnim, true);
         } else {
             model->setAnimationLoopEndFactor(1.0f);
