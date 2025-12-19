@@ -1,9 +1,17 @@
 # Minecraft C++ - High-Performance Voxel Engine
 
 A Minecraft-like voxel engine built from scratch in C++20 with OpenGL 4.5+. Features include infinite world streaming, chunk-based world management, greedy meshing, multithreaded generation, and frustum culling for optimal performance.
-
+## DAY 3
+![img33](https://i.imgur.com/WkcfMg1.png)
+![img36](https://i.imgur.com/2QRVBqh.png)
+![img34](https://i.imgur.com/RSh5edS.png)
+![img35](https://i.imgur.com/w56NlVc.png)
+![img32](https://i.imgur.com/voVfhKU.png)
+![img31](https://i.imgur.com/jylFVWX.png)
+## DAY 2
 ![imgnew](https://i.imgur.com/p9foGhs.png)
 ![Imgur](https://i.imgur.com/ZeQHhLO.png)
+## DAY 1
 ![Img1](https://i.imgur.com/ZqBQS3k.png)
 ![Img2](https://i.imgur.com/TW7kn2q.png)
 
