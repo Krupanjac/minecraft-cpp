@@ -21,7 +21,7 @@ A Minecraft-like voxel engine built from scratch in C++20 with OpenGL 4.5+. Feat
 
 ## Features
 
-- **High Performance**: Designed for 60-144 FPS
+- **High Performance**: Designed for maximizing performance
 - **Infinite World**: Chunk-based streaming with configurable render distance
 - **Greedy Meshing**: Optimized mesh generation reducing vertex count
 - **Multithreading**: Asynchronous chunk generation and mesh building
