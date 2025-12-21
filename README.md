@@ -161,7 +161,7 @@ Edit `src/Util/Config.h` to customize:
 - [x] Biomes and caves
 - [x] Water rendering with transparency
 - [x] Lighting system (Ambient Occlusion)
-- [ ] Save/load world data
+- [x] Save/load world data
 - [x] Player physics and collision
 - [ ] Multiplayer support
 
