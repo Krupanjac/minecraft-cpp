@@ -243,6 +243,12 @@ public:
             uiManager.setNetworkStatus("Connected");
         });
         
+        // Time sync callback (for clients receiving server time)
+        networkManager.setTimeSyncCallback([this](float timeOfDay, bool isPaused) {
+            uiManager.timeOfDay = timeOfDay;
+            uiManager.isDayNightPaused = isPaused;
+        });
+        
         // Apply initial settings
         applySettings();
         
@@ -823,16 +829,37 @@ private:
         
         // renderer.setShowShadows(uiManager.showShadows); // Removed, Renderer uses Settings directly
 
-        if (!uiManager.isDayNightPaused) {
-            uiManager.timeOfDay += deltaTime * 10.0f; // Still sped up slightly for gameplay, but slower than before
+        // Time control - only offline or host can control time
+        bool canControlTime = !networkManager.isOnline() || networkManager.isHost();
+        
+        if (canControlTime) {
+            if (!uiManager.isDayNightPaused) {
+                uiManager.timeOfDay += deltaTime * 10.0f; // Still sped up slightly for gameplay, but slower than before
+            }
+            
+            // Manual Time Control (only for host/offline)
+            bool timeChanged = false;
+            if (window->isKeyPressed(GLFW_KEY_RIGHT)) {
+                uiManager.timeOfDay += deltaTime * 100.0f;
+                timeChanged = true;
+            }
+            if (window->isKeyPressed(GLFW_KEY_LEFT)) {
+                uiManager.timeOfDay -= deltaTime * 100.0f;
+                timeChanged = true;
+            }
+            
+            if (uiManager.timeOfDay >= DAY_DURATION) uiManager.timeOfDay -= DAY_DURATION;
+            if (uiManager.timeOfDay < 0.0f) uiManager.timeOfDay += DAY_DURATION;
+            
+            // Sync time to clients if hosting (every 2 seconds or when manually changed)
+            static float timeSyncTimer = 0.0f;
+            timeSyncTimer += deltaTime;
+            if (networkManager.isHost() && (timeChanged || timeSyncTimer >= 2.0f)) {
+                networkManager.sendTimeSync(uiManager.timeOfDay, uiManager.isDayNightPaused);
+                timeSyncTimer = 0.0f;
+            }
         }
-        
-        // Manual Time Control
-        if (window->isKeyPressed(GLFW_KEY_RIGHT)) uiManager.timeOfDay += deltaTime * 100.0f;
-        if (window->isKeyPressed(GLFW_KEY_LEFT)) uiManager.timeOfDay -= deltaTime * 100.0f;
-        
-        if (uiManager.timeOfDay >= DAY_DURATION) uiManager.timeOfDay -= DAY_DURATION;
-        if (uiManager.timeOfDay < 0.0f) uiManager.timeOfDay += DAY_DURATION;
+        // Note: Clients receive time via TIME_SYNC packets and don't update locally
         
         float angle = (uiManager.timeOfDay / DAY_DURATION) * glm::two_pi<float>();
         

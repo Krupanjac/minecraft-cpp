@@ -367,6 +367,17 @@ void GameServer::broadcastChatMessage(const std::string& message) {
     broadcastToAll(packet);
 }
 
+void GameServer::broadcastTimeSync(float timeOfDay, bool isPaused) {
+    std::lock_guard<std::mutex> lock(m_clientsMutex);
+    
+    m_timeOfDay = timeOfDay;
+    m_timePaused = isPaused;
+    
+    PacketBuffer packet;
+    serializeTimeSync(packet, timeOfDay, isPaused);
+    broadcastToAll(packet);
+}
+
 size_t GameServer::getPlayerCount() const {
     std::lock_guard<std::mutex> lock(m_clientsMutex);
     return std::count_if(m_clients.begin(), m_clients.end(),

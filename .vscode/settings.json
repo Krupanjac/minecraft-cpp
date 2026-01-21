@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd \"c:\\\\Users\\\\da170706d\\\\Documents\\\\1 PROJECTS\\\\minecraft-cpp\\\\build\"; cmake \\.\\. 2>&1$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

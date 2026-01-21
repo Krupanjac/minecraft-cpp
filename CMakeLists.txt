@@ -68,6 +68,25 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(tinygltf)
 include_directories(${tinygltf_SOURCE_DIR})
 
+# ImGui (for dedicated server GUI)
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG v1.90.1
+)
+FetchContent_MakeAvailable(imgui)
+
+# ImGui source files
+set(IMGUI_SOURCES
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+)
+
 # GLAD
 set(GLAD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/glad)
 if(NOT EXISTS ${GLAD_DIR})
@@ -103,6 +122,7 @@ set(SOURCES
     src/Network/GameServer.cpp
     src/Network/GameClient.cpp
     src/Network/NetworkManager.cpp
+    src/Server/DedicatedServer.cpp
     src/UI/UIManager.cpp
     src/Entity/Entity.cpp
     src/Entity/PlayerEntity.cpp
@@ -111,7 +131,26 @@ set(SOURCES
     ${GLAD_DIR}/src/glad.c
 )
 
-# Create executable
+# Shared sources (used by both game and server)
+set(SHARED_SOURCES
+    src/Core/Logger.cpp
+    src/Network/Socket.cpp
+    src/Network/Protocol.cpp
+    src/Network/GameServer.cpp
+    src/Network/GameClient.cpp
+    src/Server/DedicatedServer.cpp
+    ${GLAD_DIR}/src/glad.c
+)
+
+# Server-specific sources
+set(SERVER_SOURCES
+    src/Server/ServerMain.cpp
+    src/Server/ServerGUI.cpp
+    ${SHARED_SOURCES}
+    ${IMGUI_SOURCES}
+)
+
+# Create main game executable
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 # Include directories
@@ -128,6 +167,30 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
 )
 
+# Create dedicated server executable
+add_executable(minecraft_server ${SERVER_SOURCES})
+
+target_include_directories(minecraft_server PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${GLAD_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+)
+
+target_link_libraries(minecraft_server PRIVATE
+    OpenGL::GL
+    glfw
+    glm::glm
+)
+
+# Platform-specific settings for server
+if(WIN32)
+    target_compile_definitions(minecraft_server PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32)
+    target_link_libraries(minecraft_server PRIVATE ws2_32)
+endif()
+
 # Copy assets and shaders to build directory
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -139,9 +202,20 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
 )
 
+add_custom_command(TARGET minecraft_server POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:minecraft_server>/shaders
+)
+
+add_custom_command(TARGET minecraft_server POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:minecraft_server>/assets
+)
+
 # Platform-specific settings
 if(WIN32)
     target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_compile_definitions(minecraft_server PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif()
 
 message(STATUS "Project configured successfully")

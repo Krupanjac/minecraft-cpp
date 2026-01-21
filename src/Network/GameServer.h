@@ -62,10 +62,17 @@ public:
     // Broadcast events
     void broadcastBlockChange(int x, int y, int z, uint8_t blockType);
     void broadcastChatMessage(const std::string& message);
+    void broadcastTimeSync(float timeOfDay, bool isPaused);
     
     // Update host player position (broadcasts to all clients)
     void updateHostPosition(const glm::vec3& position, float yaw, float pitch,
                            const glm::vec3& velocity, bool onGround);
+    
+    // Time management (server-authoritative)
+    void setTimeOfDay(float time) { m_timeOfDay = time; }
+    float getTimeOfDay() const { return m_timeOfDay; }
+    void setTimePaused(bool paused) { m_timePaused = paused; }
+    bool isTimePaused() const { return m_timePaused; }
     
     // Callbacks
     using BlockChangeCallback = std::function<void(int x, int y, int z, uint8_t blockType, uint32_t playerId)>;
@@ -107,6 +114,11 @@ private:
     float m_hostPitch = 0.0f;
     bool m_hostOnGround = false;
     std::string m_hostName = "Host";
+    
+    // Server-authoritative time
+    float m_timeOfDay = 600.0f;  // Start at noon
+    bool m_timePaused = false;
+    float m_timeSyncTimer = 0.0f;
     
     // Callbacks
     BlockChangeCallback m_onBlockChange;

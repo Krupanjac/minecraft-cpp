@@ -222,4 +222,11 @@ void serializeDisconnect(PacketBuffer& buffer, const std::string& reason) {
     buffer.writeString(reason, 64);
 }
 
+void serializeTimeSync(PacketBuffer& buffer, float timeOfDay, bool isPaused) {
+    buffer.writeU8(static_cast<uint8_t>(PacketType::TIME_SYNC));
+    buffer.writeU16(4 + 1);  // float + bool
+    buffer.writeFloat(timeOfDay);
+    buffer.writeU8(isPaused ? 1 : 0);
+}
+
 } // namespace Network

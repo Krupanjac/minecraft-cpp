@@ -283,6 +283,16 @@ void GameClient::handlePacket(PacketType type, PacketBuffer& buffer) {
             break;
         }
         
+        case PacketType::TIME_SYNC: {
+            float timeOfDay = buffer.readFloat();
+            bool isPaused = buffer.readU8() != 0;
+            
+            if (m_onTimeSync) {
+                m_onTimeSync(timeOfDay, isPaused);
+            }
+            break;
+        }
+        
         default:
             LOG_WARNING("Unknown packet type: " + std::to_string(static_cast<int>(type)));
             break;

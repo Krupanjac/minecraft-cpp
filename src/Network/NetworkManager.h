@@ -71,6 +71,9 @@ public:
     // Send chat message
     void sendChatMessage(const std::string& message);
     
+    // Time synchronization (server-authoritative)
+    void sendTimeSync(float timeOfDay, bool isPaused);
+    
     // Get remote player entities for rendering
     std::vector<RemotePlayerEntity*> getRemotePlayerEntities();
     
@@ -91,11 +94,13 @@ public:
     using ChatCallback = std::function<void(const std::string& playerName, const std::string& message)>;
     using DisconnectCallback = std::function<void(const std::string& reason)>;
     using ConnectedCallback = std::function<void()>;
+    using TimeSyncCallback = std::function<void(float timeOfDay, bool isPaused)>;
     
     void setBlockChangeCallback(BlockChangeCallback cb) { m_onBlockChange = std::move(cb); }
     void setChatCallback(ChatCallback cb) { m_onChat = std::move(cb); }
     void setDisconnectCallback(DisconnectCallback cb) { m_onDisconnect = std::move(cb); }
     void setConnectedCallback(ConnectedCallback cb) { m_onConnected = std::move(cb); }
+    void setTimeSyncCallback(TimeSyncCallback cb) { m_onTimeSync = std::move(cb); }
     
 private:
     void updateRemotePlayerEntities();
@@ -125,6 +130,7 @@ private:
     ChatCallback m_onChat;
     DisconnectCallback m_onDisconnect;
     ConnectedCallback m_onConnected;
+    TimeSyncCallback m_onTimeSync;
 };
 
 } // namespace Network

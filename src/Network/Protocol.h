@@ -29,9 +29,13 @@ enum class PacketType : uint8_t {
     // World
     BLOCK_CHANGE = 0x20,
     CHUNK_DATA = 0x21,
+    TIME_SYNC = 0x22,
     
     // Chat
     CHAT_MESSAGE = 0x30,
+    
+    // Server
+    SERVER_INFO = 0x40,
 };
 
 // Packet header (sent before every packet)
@@ -128,6 +132,13 @@ struct ChatMessagePacket {
     static constexpr PacketType TYPE = PacketType::CHAT_MESSAGE;
 };
 
+struct TimeSyncPacket {
+    float timeOfDay;       // Current time of day (0-2400)
+    uint8_t isPaused;      // Whether day/night cycle is paused
+    
+    static constexpr PacketType TYPE = PacketType::TIME_SYNC;
+};
+
 // ============== Packet Serialization ==============
 
 class PacketBuffer {
@@ -189,5 +200,6 @@ void serializeChatMessage(PacketBuffer& buffer, uint32_t senderId, const std::st
 void serializePing(PacketBuffer& buffer, uint64_t timestamp);
 void serializePong(PacketBuffer& buffer, uint64_t timestamp);
 void serializeDisconnect(PacketBuffer& buffer, const std::string& reason);
+void serializeTimeSync(PacketBuffer& buffer, float timeOfDay, bool isPaused);
 
 } // namespace Network

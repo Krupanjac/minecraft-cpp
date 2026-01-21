@@ -263,6 +263,13 @@ void NetworkManager::sendChatMessage(const std::string& message) {
     }
 }
 
+void NetworkManager::sendTimeSync(float timeOfDay, bool isPaused) {
+    // Only host/server can sync time
+    if (m_mode == NetworkMode::HOST && m_server) {
+        m_server->broadcastTimeSync(timeOfDay, isPaused);
+    }
+}
+
 std::vector<RemotePlayerEntity*> NetworkManager::getRemotePlayerEntities() {
     std::vector<RemotePlayerEntity*> entities;
     entities.reserve(m_remotePlayerEntities.size());
@@ -426,6 +433,12 @@ void NetworkManager::setupClientCallbacks() {
         LOG_INFO("Successfully connected to server");
         if (m_onConnected) {
             m_onConnected();
+        }
+    });
+    
+    m_client->setTimeSyncCallback([this](float timeOfDay, bool isPaused) {
+        if (m_onTimeSync) {
+            m_onTimeSync(timeOfDay, isPaused);
         }
     });
 }

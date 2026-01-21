@@ -59,6 +59,7 @@ public:
     using ChatCallback = std::function<void(uint32_t senderId, const std::string& message)>;
     using DisconnectCallback = std::function<void(const std::string& reason)>;
     using ConnectedCallback = std::function<void()>;
+    using TimeSyncCallback = std::function<void(float timeOfDay, bool isPaused)>;
     
     void setBlockChangeCallback(BlockChangeCallback cb) { m_onBlockChange = std::move(cb); }
     void setPlayerJoinCallback(PlayerJoinCallback cb) { m_onPlayerJoin = std::move(cb); }
@@ -66,6 +67,7 @@ public:
     void setChatCallback(ChatCallback cb) { m_onChat = std::move(cb); }
     void setDisconnectCallback(DisconnectCallback cb) { m_onDisconnect = std::move(cb); }
     void setConnectedCallback(ConnectedCallback cb) { m_onConnected = std::move(cb); }
+    void setTimeSyncCallback(TimeSyncCallback cb) { m_onTimeSync = std::move(cb); }
     
 private:
     void processPackets();
@@ -102,6 +104,7 @@ private:
     ChatCallback m_onChat;
     DisconnectCallback m_onDisconnect;
     ConnectedCallback m_onConnected;
+    TimeSyncCallback m_onTimeSync;
 };
 
 } // namespace Network
