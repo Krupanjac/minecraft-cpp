@@ -14,6 +14,7 @@ enum class MenuState {
     IN_GAME_MENU,
     SETTINGS,
     VIDEO_SETTINGS,
+    PLAYER_SETTINGS,
     LOAD_GAME,
     NEW_GAME,
     INVENTORY,
@@ -205,6 +206,7 @@ private:
     void setupInGameMenu();
     void setupSettingsMenu();
     void setupVideoSettingsMenu();
+    void setupPlayerSettingsMenu();
     void setupControlsMenu();
     void setupLoadGameMenu();
     void setupNewGameMenu();

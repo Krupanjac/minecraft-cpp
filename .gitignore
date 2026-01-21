@@ -13,6 +13,8 @@ Makefile
 *.cmake
 !CMakeLists.txt
 
+/assets/Cube World - Aug 2023/
+
 # User-specific files
 *.rsuser
 *.suo

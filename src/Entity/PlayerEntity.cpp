@@ -1,23 +1,48 @@
 #include "PlayerEntity.h"
 #include "../Model/Model.h"
 #include "../Core/Logger.h"
+#include "../Core/Settings.h"
 
 PlayerEntity::PlayerEntity(const glm::vec3& startPos) : Entity(startPos) {
-    // Load player model
-    // Path is relative to executable (or asset root)
-    std::string modelPath = "assets/models/Player/scene.gltf";
+    loadModelFromSettings();
+}
+
+void PlayerEntity::loadModelFromSettings() {
+    auto& settings = Settings::instance();
+    int modelIndex = settings.playerModelIndex;
     
-    // In a real engine, we'd use a ResourceManager to avoid multiple loads
-    // For now, load directly
+    // Validate index
+    if (modelIndex < 0 || modelIndex >= Settings::NUM_PLAYER_MODELS) {
+        modelIndex = 0;
+    }
+    
+    std::string modelPath = Settings::PLAYER_MODEL_PATHS[modelIndex];
+    LOG_INFO("Loading player model: " + modelPath);
+    
     auto playerModel = std::make_shared<ModelSystem::Model>(modelPath);
     setModel(playerModel);
     
-    // Scale down if needed? Minecraft chars are ~1.8m tall. 
-    // Assuming model is in meters or units.
-    setScale(glm::vec3(0.03f)); 
+    // Different scales for different models
+    if (modelIndex == 0) {
+        // Half-Life model - needs smaller scale
+        setScale(glm::vec3(0.03f));
+        rotationOffset = glm::vec3(0.0f, 0.0f, 0.0f);
+    } else {
+        // Quaternius characters - larger scale
+        setScale(glm::vec3(0.5f));
+        rotationOffset = glm::vec3(0.0f, 180.0f, 0.0f);
+    }
+    setRotation(rotationOffset);
+    
+    currentModelIndex = modelIndex;
 }
 
 void PlayerEntity::update(float deltaTime) {
+    // Check if model needs to be reloaded (settings changed)
+    if (Settings::instance().playerModelIndex != currentModelIndex) {
+        loadModelFromSettings();
+    }
+    
     Entity::update(deltaTime);
     
     if (model) {

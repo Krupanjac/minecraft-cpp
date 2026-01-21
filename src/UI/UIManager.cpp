@@ -128,6 +128,7 @@ void UIManager::setMenuState(MenuState state) {
         case MenuState::IN_GAME_MENU: setupInGameMenu(); break;
         case MenuState::SETTINGS: setupSettingsMenu(); break;
         case MenuState::VIDEO_SETTINGS: setupVideoSettingsMenu(); break;
+        case MenuState::PLAYER_SETTINGS: setupPlayerSettingsMenu(); break;
         case MenuState::CONTROLS: setupControlsMenu(); break;
         case MenuState::LOAD_GAME: setupLoadGameMenu(); break;
         case MenuState::NEW_GAME: setupNewGameMenu(); break;
@@ -285,10 +286,16 @@ void UIManager::setupSettingsMenu() {
     float btnW = 300.0f;
     float btnH = 40.0f;
     float gap = 10.0f;
-    float startY = cy - 100.0f;
+    float startY = cy - 120.0f;
 
     elements.push_back({cx - btnW/2, startY, btnW, btnH, "VIDEO SETTINGS", false, [this]() { 
         setMenuState(MenuState::VIDEO_SETTINGS); 
+    }});
+    startY += btnH + gap;
+
+    // Player Settings (nickname + model)
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "PLAYER SETTINGS", false, [this]() {
+         setMenuState(MenuState::PLAYER_SETTINGS);
     }});
     startY += btnH + gap;
 
@@ -2391,6 +2398,104 @@ void UIManager::setupAboutMenu() {
     back.h = 45;
     back.text = "Back";
     back.onClick = [this]() { setMenuState(MenuState::MAIN_MENU); };
+    elements.push_back(back);
+}
+
+void UIManager::setupPlayerSettingsMenu() {
+    elements.clear();
+    
+    auto& s = Settings::instance();
+    
+    float centerX = width / 2.0f;
+    float startY = 80.0f;
+    float lineHeight = 50.0f;
+    float btnW = 400.0f;
+    float btnH = 40.0f;
+    
+    // Title
+    UIElement title;
+    title.x = centerX - 150;
+    title.y = startY;
+    title.w = 300;
+    title.h = 40;
+    title.text = "Player Settings";
+    title.isHeader = true;
+    elements.push_back(title);
+    startY += 70.0f;
+    
+    // Nickname input
+    UIElement nicknameLabel;
+    nicknameLabel.x = centerX - 200;
+    nicknameLabel.y = startY;
+    nicknameLabel.w = 150;
+    nicknameLabel.h = 30;
+    nicknameLabel.text = "Nickname:";
+    nicknameLabel.isLabel = true;
+    elements.push_back(nicknameLabel);
+    
+    UIElement nicknameInput;
+    nicknameInput.x = centerX - 40;
+    nicknameInput.y = startY - 5;
+    nicknameInput.w = 240;
+    nicknameInput.h = btnH;
+    nicknameInput.text = s.playerNickname;
+    nicknameInput.isInput = true;
+    nicknameInput.textRef = &s.playerNickname;
+    nicknameInput.tooltip = "Your in-game name";
+    elements.push_back(nicknameInput);
+    startY += lineHeight;
+    
+    // Player Model selection
+    UIElement modelLabel;
+    modelLabel.x = centerX - 200;
+    modelLabel.y = startY;
+    modelLabel.w = 150;
+    modelLabel.h = 30;
+    modelLabel.text = "Player Model:";
+    modelLabel.isLabel = true;
+    elements.push_back(modelLabel);
+    startY += lineHeight * 0.7f;
+    
+    // Model buttons - cycle through available models
+    for (int i = 0; i < Settings::NUM_PLAYER_MODELS; i++) {
+        UIElement modelBtn;
+        modelBtn.x = centerX - btnW / 2;
+        modelBtn.y = startY;
+        modelBtn.w = btnW;
+        modelBtn.h = btnH;
+        
+        std::string prefix = (s.playerModelIndex == i) ? "> " : "  ";
+        std::string suffix = (s.playerModelIndex == i) ? " <" : "";
+        modelBtn.text = prefix + std::string(Settings::PLAYER_MODEL_NAMES[i]) + suffix;
+        
+        if (s.playerModelIndex == i) {
+            modelBtn.customColor = glm::vec4(0.3f, 0.6f, 0.3f, 1.0f);
+        }
+        
+        int modelIndex = i;
+        modelBtn.onClick = [this, modelIndex]() {
+            Settings::instance().playerModelIndex = modelIndex;
+            if (onSettingsChanged) onSettingsChanged();
+            setupPlayerSettingsMenu(); // Refresh to show selection
+        };
+        
+        elements.push_back(modelBtn);
+        startY += btnH + 5.0f;
+    }
+    
+    startY += 20.0f;
+    
+    // Back button
+    UIElement back;
+    back.x = centerX - 100;
+    back.y = height - 80;
+    back.w = 200;
+    back.h = 45;
+    back.text = "Back";
+    back.onClick = [this]() { 
+        Settings::instance().save();
+        setMenuState(MenuState::SETTINGS); 
+    };
     elements.push_back(back);
 }
 

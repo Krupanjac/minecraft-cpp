@@ -40,6 +40,27 @@ public:
     // UI settings
     bool enableTooltips = true; // Show tooltips on hover
     
+    // Player customization
+    std::string playerNickname = "Steve";
+    int playerModelIndex = 0; // 0 = Half-Life, 1-4 = Quaternius characters
+    
+    // Available player models
+    static constexpr int NUM_PLAYER_MODELS = 5;
+    static constexpr const char* PLAYER_MODEL_NAMES[] = {
+        "Half-Life (Default)",
+        "Male Character 1",
+        "Male Character 2", 
+        "Female Character 1",
+        "Female Character 2"
+    };
+    static constexpr const char* PLAYER_MODEL_PATHS[] = {
+        "assets/models/Player/scene.gltf",
+        "assets/models/Characters/Character_Male_1.gltf",
+        "assets/models/Characters/Character_Male_2.gltf",
+        "assets/models/Characters/Character_Female_1.gltf",
+        "assets/models/Characters/Character_Female_2.gltf"
+    };
+    
     // Multiplayer settings
     std::string lastPlayerName = "Player";
     std::string lastServerAddress = "localhost";
@@ -92,6 +113,9 @@ public:
                     else if (key == "fullscreen") fullscreen = std::stoi(value);
                     // UI
                     else if (key == "enableTooltips") enableTooltips = (value == "1");
+                    // Player customization
+                    else if (key == "playerNickname") playerNickname = value;
+                    else if (key == "playerModelIndex") playerModelIndex = std::stoi(value);
                     // Multiplayer
                     else if (key == "lastPlayerName") lastPlayerName = value;
                     else if (key == "lastServerAddress") lastServerAddress = value;
@@ -138,6 +162,9 @@ public:
         file << "fullscreen=" << fullscreen << "\n";
         // UI
         file << "enableTooltips=" << (enableTooltips ? "1" : "0") << "\n";
+        // Player customization
+        file << "playerNickname=" << playerNickname << "\n";
+        file << "playerModelIndex=" << playerModelIndex << "\n";
         // Multiplayer
         file << "lastPlayerName=" << lastPlayerName << "\n";
         file << "lastServerAddress=" << lastServerAddress << "\n";

@@ -127,6 +127,11 @@ set(SOURCES
     src/Entity/Entity.cpp
     src/Entity/PlayerEntity.cpp
     src/Entity/ZombieEntity.cpp
+    src/Entity/PassiveMob.cpp
+    src/Entity/PigEntity.cpp
+    src/Entity/ChickenEntity.cpp
+    src/Entity/SheepEntity.cpp
+    src/Entity/SkeletonEntity.cpp
     src/Model/Model.cpp
     ${GLAD_DIR}/src/glad.c
 )

@@ -3,6 +3,10 @@
         "/^cd \"c:\\\\Users\\\\da170706d\\\\Documents\\\\1 PROJECTS\\\\minecraft-cpp\\\\build\"; cmake \\.\\. 2>&1$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^New-Item -ItemType Directory -Force -Path \"c:\\\\Users\\\\da170706d\\\\Documents\\\\1 PROJECTS\\\\minecraft-cpp\\\\assets\\\\models\\\\Pig\"; New-Item -ItemType Directory -Force -Path \"c:\\\\Users\\\\da170706d\\\\Documents\\\\1 PROJECTS\\\\minecraft-cpp\\\\assets\\\\models\\\\Chicken\"; New-Item -ItemType Directory -Force -Path \"c:\\\\Users\\\\da170706d\\\\Documents\\\\1 PROJECTS\\\\minecraft-cpp\\\\assets\\\\models\\\\Sheep\"; New-Item -ItemType Directory -Force -Path \"c:\\\\Users\\\\da170706d\\\\Documents\\\\1 PROJECTS\\\\minecraft-cpp\\\\assets\\\\models\\\\Skeleton\"; New-Item -ItemType Directory -Force -Path \"c:\\\\Users\\\\da170706d\\\\Documents\\\\1 PROJECTS\\\\minecraft-cpp\\\\assets\\\\models\\\\Characters\"$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }

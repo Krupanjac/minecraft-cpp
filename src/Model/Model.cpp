@@ -318,21 +318,32 @@ void Model::drawNode(Node* node, Shader& shader, const glm::mat4& modelMatrix, c
             const auto& mat = impl->model.materials[primitive.materialIndex];
             
             // Base Color Texture
+            // glTF: material -> texture index -> texture -> source (image index)
             int texIndex = mat.pbrMetallicRoughness.baseColorTexture.index;
-            if (texIndex >= 0 && static_cast<size_t>(texIndex) < textures.size()) {
-                textures[texIndex]->bind(0);
-                shader.setInt("uAlbedoMap", 0); 
-                shader.setBool("uHasTexture", true);
+            if (texIndex >= 0 && static_cast<size_t>(texIndex) < impl->model.textures.size()) {
+                int imageIndex = impl->model.textures[texIndex].source;
+                if (imageIndex >= 0 && static_cast<size_t>(imageIndex) < textures.size()) {
+                    textures[imageIndex]->bind(0);
+                    shader.setInt("uAlbedoMap", 0); 
+                    shader.setBool("uHasTexture", true);
+                } else {
+                    shader.setBool("uHasTexture", false);
+                }
             } else {
                 shader.setBool("uHasTexture", false);
             }
 
             // Emissive Texture
-            int emissiveIndex = mat.emissiveTexture.index;
-            if (emissiveIndex >= 0 && static_cast<size_t>(emissiveIndex) < textures.size()) {
-                textures[emissiveIndex]->bind(1);
-                shader.setInt("uEmissiveMap", 1);
-                shader.setBool("uHasEmissive", true);
+            int emissiveTexIndex = mat.emissiveTexture.index;
+            if (emissiveTexIndex >= 0 && static_cast<size_t>(emissiveTexIndex) < impl->model.textures.size()) {
+                int emissiveImageIndex = impl->model.textures[emissiveTexIndex].source;
+                if (emissiveImageIndex >= 0 && static_cast<size_t>(emissiveImageIndex) < textures.size()) {
+                    textures[emissiveImageIndex]->bind(1);
+                    shader.setInt("uEmissiveMap", 1);
+                    shader.setBool("uHasEmissive", true);
+                } else {
+                    shader.setBool("uHasEmissive", false);
+                }
             } else {
                  shader.setBool("uHasEmissive", false);
             }

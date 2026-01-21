@@ -70,15 +70,15 @@ static std::string pickIdlePreferIdle1(const std::vector<std::string>& names) {
 }
 
 ZombieEntity::ZombieEntity(const glm::vec3& startPos) : Entity(startPos) {
-    std::string modelPath = "assets/models/Zombie/scene.gltf";
+    std::string modelPath = "assets/models/Zombie/Zombie_Quaternius.gltf";
     auto zombieModel = std::make_shared<ModelSystem::Model>(modelPath);
     setModel(zombieModel);
 
-    // Match player scale
-    setScale(glm::vec3(0.03f));
+    // Quaternius Cube World zombie scale - adjust to be roughly player-sized
+    setScale(glm::vec3(0.5f));
 
-    // Axis fix for this Zombie asset (upright) + yaw flip (model forward is reversed).
-    rotationOffset = glm::vec3(90.0f, 180.0f, 0.0f);
+    // Quaternius model faces +Y up, +Z forward, so minimal rotation needed
+    rotationOffset = glm::vec3(0.0f, 180.0f, 0.0f);
     setRotation(rotationOffset);
 
     // Stable-ish seed from position

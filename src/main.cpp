@@ -14,6 +14,10 @@
 #include "World/WorldSerializer.h"
 #include "Entity/PlayerEntity.h"
 #include "Entity/ZombieEntity.h"
+#include "Entity/SkeletonEntity.h"
+#include "Entity/PigEntity.h"
+#include "Entity/ChickenEntity.h"
+#include "Entity/SheepEntity.h"
 #include "Network/NetworkManager.h"
 
 #include <memory>
@@ -204,6 +208,10 @@ public:
         uiManager.setOnReturnToMainMenu([this]() {
             LOG_INFO("Returning to main menu, reinitializing menu world...");
             zombies.clear(); // Clear any spawned zombies
+            skeletons.clear();
+            pigs.clear();
+            chickens.clear();
+            sheep.clear();
             menuWorldInitialized = false; // Force reinitialization
             initializeMenuWorld();
         });
@@ -285,6 +293,10 @@ public:
             uiManager.setWorldLoaded(false);
             // Re-initialize menu world
             zombies.clear();
+            skeletons.clear();
+            pigs.clear();
+            chickens.clear();
+            sheep.clear();
             menuWorldInitialized = false;
             initializeMenuWorld();
             uiManager.setMenuState(MenuState::MAIN_MENU);
@@ -347,8 +359,12 @@ public:
         long seed = static_cast<long>(time(nullptr));
         createWorld("Multiplayer_" + std::to_string(seed), seed);
         
-        // Clear zombies for multiplayer (they're single-player only for now)
+        // Clear mobs for multiplayer (they're single-player only for now)
         zombies.clear();
+        skeletons.clear();
+        pigs.clear();
+        chickens.clear();
+        sheep.clear();
         
         // Start the server
         if (networkManager.hostGame(port, seed, camera.getPosition(), playerName)) {
@@ -366,8 +382,12 @@ public:
     void joinMultiplayerGame(const std::string& playerName, const std::string& address, uint16_t port) {
         uiManager.setNetworkStatus("Connecting...");
         
-        // Clear zombies for multiplayer (they're single-player only for now)
+        // Clear mobs for multiplayer (they're single-player only for now)
         zombies.clear();
+        skeletons.clear();
+        pigs.clear();
+        chickens.clear();
+        sheep.clear();
         
         if (networkManager.joinGame(address, port, playerName)) {
             // Connection initiated - wait for connected callback
@@ -859,7 +879,12 @@ private:
     
     std::unique_ptr<PlayerEntity> playerEntity;
     std::vector<std::unique_ptr<ZombieEntity>> zombies;
+    std::vector<std::unique_ptr<SkeletonEntity>> skeletons;
+    std::vector<std::unique_ptr<PigEntity>> pigs;
+    std::vector<std::unique_ptr<ChickenEntity>> chickens;
+    std::vector<std::unique_ptr<SheepEntity>> sheep;
     float zombieSpawnTimer = 0.0f;
+    float passiveMobSpawnTimer = 0.0f;
     
     // Menu background world
     bool menuWorldInitialized = false;
@@ -1231,6 +1256,48 @@ private:
                     int sy = worldGenerator.getSurfaceHeight(sx, sz);
                     if (sy < SEA_LEVEL) sy = SEA_LEVEL + 2;
                     zombies.push_back(std::make_unique<ZombieEntity>(glm::vec3((float)sx + 0.5f, (float)sy + 0.05f, (float)sz + 0.5f)));
+                    
+                    // Also spawn a skeleton sometimes
+                    if (skeletons.size() < 4 && zombies.size() % 2 == 0) {
+                        float skelA = a + 3.14159f; // opposite side
+                        int skelX = (int)std::floor(playerFeet.x + std::cos(skelA) * r);
+                        int skelZ = (int)std::floor(playerFeet.z + std::sin(skelA) * r);
+                        int skelY = worldGenerator.getSurfaceHeight(skelX, skelZ);
+                        if (skelY < SEA_LEVEL) skelY = SEA_LEVEL + 2;
+                        skeletons.push_back(std::make_unique<SkeletonEntity>(glm::vec3((float)skelX + 0.5f, (float)skelY + 0.05f, (float)skelZ + 0.5f)));
+                    }
+                }
+            }
+            
+            // Spawn passive mobs (pigs, chickens, sheep)
+            passiveMobSpawnTimer -= deltaTime;
+            if (playerEntity && passiveMobSpawnTimer <= 0.0f) {
+                passiveMobSpawnTimer = 5.0f;
+                const size_t MAX_PASSIVE_MOBS = 12;
+                size_t totalPassive = pigs.size() + chickens.size() + sheep.size();
+                
+                if (totalPassive < MAX_PASSIVE_MOBS) {
+                    glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
+                    float a = (float)(totalPassive) * 2.3999632f + 1.5f; // offset from hostile
+                    float r = 20.0f + (float)(totalPassive) * 2.0f;
+                    int sx = (int)std::floor(playerFeet.x + std::cos(a) * r);
+                    int sz = (int)std::floor(playerFeet.z + std::sin(a) * r);
+                    int sy = worldGenerator.getSurfaceHeight(sx, sz);
+                    
+                    // Only spawn on land above sea level
+                    if (sy >= SEA_LEVEL) {
+                        glm::vec3 spawnPos((float)sx + 0.5f, (float)sy + 0.05f, (float)sz + 0.5f);
+                        
+                        // Rotate through mob types
+                        int mobType = totalPassive % 3;
+                        if (mobType == 0 && pigs.size() < 4) {
+                            pigs.push_back(std::make_unique<PigEntity>(spawnPos));
+                        } else if (mobType == 1 && chickens.size() < 4) {
+                            chickens.push_back(std::make_unique<ChickenEntity>(spawnPos));
+                        } else if (sheep.size() < 4) {
+                            sheep.push_back(std::make_unique<SheepEntity>(spawnPos));
+                        }
+                    }
                 }
             }
             
@@ -1244,6 +1311,26 @@ private:
                         // Apply knockback to player camera velocity as "attack" feedback.
                         camera.velocity += z->consumeAttackImpulse();
                     }
+                }
+                
+                // Update skeleton AI
+                for (auto& s : skeletons) {
+                    if (!s || s->isDead()) continue;
+                    bool attacked = s->updateAI(deltaTime, chunkManager, playerFeet);
+                    if (attacked) {
+                        camera.velocity += s->consumeAttackImpulse();
+                    }
+                }
+                
+                // Update passive mobs
+                for (auto& p : pigs) {
+                    if (p && !p->isDead()) p->updateAI(deltaTime, chunkManager);
+                }
+                for (auto& c : chickens) {
+                    if (c && !c->isDead()) c->updateAI(deltaTime, chunkManager);
+                }
+                for (auto& s : sheep) {
+                    if (s && !s->isDead()) s->updateAI(deltaTime, chunkManager);
                 }
             }
         } // End of OFFLINE mode zombie code
@@ -1387,6 +1474,22 @@ private:
         // Always render zombies (even in first-person)
         for (auto& z : zombies) {
             if (z) entities.push_back(z.get());
+        }
+        
+        // Render skeletons
+        for (auto& s : skeletons) {
+            if (s && !s->isDead()) entities.push_back(s.get());
+        }
+        
+        // Render passive mobs
+        for (auto& p : pigs) {
+            if (p && !p->isDead()) entities.push_back(p.get());
+        }
+        for (auto& c : chickens) {
+            if (c && !c->isDead()) entities.push_back(c.get());
+        }
+        for (auto& s : sheep) {
+            if (s && !s->isDead()) entities.push_back(s.get());
         }
         
         // Render remote players from network
