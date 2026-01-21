@@ -60,6 +60,13 @@ struct UIElement {
     bool isCard = false;       // Card-style container
     bool isHeader = false;     // Section header
     glm::vec4 customColor = glm::vec4(0.0f);  // Custom color (if any component > 0)
+    
+    // For world preview thumbnails
+    GLuint textureId = 0;      // OpenGL texture ID for preview image
+    float thumbnailX = 0;      // X position for thumbnail within element
+    float thumbnailY = 0;      // Y position for thumbnail within element
+    float thumbnailW = 0;      // Width of thumbnail
+    float thumbnailH = 0;      // Height of thumbnail
 };
 
 class UIManager {
@@ -156,7 +163,9 @@ private:
 
     int width, height;
     Shader uiShader;
+    Shader texturedShader;  // For rendering world preview thumbnails
     GLuint vao, vbo;
+    GLuint texturedVao, texturedVbo;  // VAO/VBO with texture coords
     
     std::vector<UIElement> elements;
     std::function<void()> onSettingsChanged;
@@ -214,7 +223,13 @@ private:
     float mapScale = 8.0f;    // Blocks per pixel
     std::function<void(float, float)> onTeleport;
     
+    // World preview textures cache
+    std::unordered_map<std::string, GLuint> worldPreviewTextures;
+    GLuint loadWorldPreviewTexture(const std::string& worldName);
+    void clearWorldPreviewTextures();
+    
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
+    void drawTexturedRect(float x, float y, float w, float h, GLuint textureId);
     void drawText(float x, float y, float scale, const std::string& text, const glm::vec4& color);
     
     // Helper for vector font

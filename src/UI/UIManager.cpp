@@ -6,8 +6,9 @@
 #include <algorithm>
 #include <random>
 #include <climits>
+#include <stb_image.h>
 
-UIManager::UIManager() : vao(0), vbo(0), width(1280), height(720), showDebug(false), currentFPS(0.0f), currentMenuState(MenuState::MAIN_MENU) {}
+UIManager::UIManager() : vao(0), vbo(0), texturedVao(0), texturedVbo(0), width(1280), height(720), showDebug(false), currentFPS(0.0f), currentMenuState(MenuState::MAIN_MENU) {}
 
 void UIManager::initialize(int windowWidth, int windowHeight) {
     width = windowWidth;
@@ -34,8 +35,34 @@ void UIManager::initialize(int windowWidth, int windowHeight) {
     )";
 
     uiShader.loadFromSource(vertSrc, fragSrc);
+    
+    // Textured UI shader for world preview thumbnails
+    const char* texVertSrc = R"(
+        #version 450 core
+        layout (location = 0) in vec2 aPos;
+        layout (location = 1) in vec2 aTexCoord;
+        out vec2 TexCoord;
+        uniform mat4 uProjection;
+        uniform mat4 uModel;
+        void main() {
+            gl_Position = uProjection * uModel * vec4(aPos, 0.0, 1.0);
+            TexCoord = aTexCoord;
+        }
+    )";
 
-    // Setup quad VAO
+    const char* texFragSrc = R"(
+        #version 450 core
+        in vec2 TexCoord;
+        out vec4 FragColor;
+        uniform sampler2D uTexture;
+        void main() {
+            FragColor = texture(uTexture, TexCoord);
+        }
+    )";
+    
+    texturedShader.loadFromSource(texVertSrc, texFragSrc);
+
+    // Setup quad VAO (no texture coords)
     float vertices[] = { 
         0.0f, 1.0f,
         1.0f, 0.0f,
@@ -55,6 +82,31 @@ void UIManager::initialize(int windowWidth, int windowHeight) {
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glBindVertexArray(0);
+    
+    // Setup textured quad VAO (with texture coords)
+    float texturedVertices[] = {
+        // pos        // tex
+        0.0f, 1.0f,   0.0f, 0.0f,
+        1.0f, 0.0f,   1.0f, 1.0f,
+        0.0f, 0.0f,   0.0f, 1.0f,
+        
+        0.0f, 1.0f,   0.0f, 0.0f,
+        1.0f, 1.0f,   1.0f, 0.0f,
+        1.0f, 0.0f,   1.0f, 1.0f
+    };
+    
+    glGenVertexArrays(1, &texturedVao);
+    glGenBuffers(1, &texturedVbo);
+    
+    glBindVertexArray(texturedVao);
+    glBindBuffer(GL_ARRAY_BUFFER, texturedVbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(texturedVertices), texturedVertices, GL_STATIC_DRAW);
+    
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glBindVertexArray(0);
 
     setupMainMenu();
@@ -707,6 +759,9 @@ void UIManager::setupControlsMenu() {
 void UIManager::setupLoadGameMenu() {
     elements.clear();
     
+    // Clear old preview textures and reload them
+    clearWorldPreviewTextures();
+    
     // Title
     UIElement title;
     title.x = width / 2.0f - 100;
@@ -719,12 +774,15 @@ void UIManager::setupLoadGameMenu() {
     
     std::vector<std::string> worlds = WorldSerializer::getAvailableWorlds();
     
-    // World cards layout
-    float cardW = 350.0f;
-    float cardH = 70.0f;
+    // World cards layout - larger to accommodate thumbnail
+    float cardW = 400.0f;
+    float cardH = 80.0f;
     float cardGap = 15.0f;
     float startY = 100.0f;
     float centerX = width / 2.0f;
+    float thumbW = 100.0f;  // Thumbnail width
+    float thumbH = 56.0f;   // Thumbnail height (16:9 aspect)
+    float thumbPadding = 12.0f;
     
     // Scrollable area hint if many worlds
     if (worlds.empty()) {
@@ -741,6 +799,9 @@ void UIManager::setupLoadGameMenu() {
         for (size_t i = 0; i < worlds.size() && i < 6; i++) { // Max 6 visible
             std::string wName = worlds[i];
             
+            // Try to load preview texture
+            GLuint previewTex = loadWorldPreviewTexture(wName);
+            
             // World card (acts like a big button)
             UIElement card;
             card.x = centerX - cardW / 2;
@@ -750,6 +811,16 @@ void UIManager::setupLoadGameMenu() {
             card.text = wName;
             card.isCard = true;
             card.tooltip = "Click to load \"" + wName + "\"";
+            
+            // Set thumbnail info if preview exists
+            if (previewTex != 0) {
+                card.textureId = previewTex;
+                card.thumbnailX = card.x + thumbPadding;
+                card.thumbnailY = card.y + (cardH - thumbH) / 2.0f;
+                card.thumbnailW = thumbW;
+                card.thumbnailH = thumbH;
+            }
+            
             card.onClick = [this, wName]() { 
                 if (onLoadGame) onLoadGame(wName);
                 setMenuState(MenuState::NONE);
@@ -1312,11 +1383,36 @@ void UIManager::render() {
                     drawRect(el.x - borderWidth, el.y - borderWidth, el.w + borderWidth*2, el.h + borderWidth*2, cardBorder);
                     drawRect(el.x, el.y, el.w, el.h, cardColor);
                     
-                    // Draw text centered with larger scale
+                    // Draw thumbnail if available
+                    float textOffsetX = 0.0f;
+                    if (el.textureId != 0) {
+                        // Draw thumbnail border
+                        float thumbBorder = 2.0f;
+                        drawRect(el.thumbnailX - thumbBorder, el.thumbnailY - thumbBorder, 
+                                 el.thumbnailW + thumbBorder*2, el.thumbnailH + thumbBorder*2, 
+                                 glm::vec4(0.1f, 0.1f, 0.12f, 1.0f));
+                        
+                        // Draw the thumbnail image
+                        drawTexturedRect(el.thumbnailX, el.thumbnailY, el.thumbnailW, el.thumbnailH, el.textureId);
+                        
+                        // Offset text to the right of thumbnail
+                        textOffsetX = el.thumbnailW + 24.0f;
+                    }
+                    
+                    // Draw text (left-aligned if thumbnail, centered otherwise)
                     float textScale = 2.5f;
                     float textW = el.text.length() * 6.0f * textScale;
-                    float textX = el.x + (el.w - textW) / 2.0f;
-                    float textY = el.y + (el.h - 7.0f * textScale) / 2.0f;
+                    float textX, textY;
+                    
+                    if (el.textureId != 0) {
+                        // Left-align after thumbnail
+                        textX = el.x + textOffsetX + 12.0f;
+                        textY = el.y + (el.h - 7.0f * textScale) / 2.0f;
+                    } else {
+                        // Center if no thumbnail
+                        textX = el.x + (el.w - textW) / 2.0f;
+                        textY = el.y + (el.h - 7.0f * textScale) / 2.0f;
+                    }
                     drawText(textX, textY, textScale, el.text, glm::vec4(1.0f));
                     continue;
                 }
@@ -1550,6 +1646,80 @@ void UIManager::drawRect(float x, float y, float w, float h, const glm::vec4& co
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+}
+
+void UIManager::drawTexturedRect(float x, float y, float w, float h, GLuint textureId) {
+    if (textureId == 0) return;
+    
+    texturedShader.use();
+    glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
+    texturedShader.setMat4("uProjection", projection);
+    
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(x, y, 0.0f));
+    model = glm::scale(model, glm::vec3(w, h, 1.0f));
+    texturedShader.setMat4("uModel", model);
+    
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textureId);
+    texturedShader.setInt("uTexture", 0);
+    
+    glBindVertexArray(texturedVao);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+    
+    // Switch back to UI shader for subsequent draws
+    uiShader.use();
+    uiShader.setMat4("uProjection", projection);
+}
+
+GLuint UIManager::loadWorldPreviewTexture(const std::string& worldName) {
+    // Check cache first
+    auto it = worldPreviewTextures.find(worldName);
+    if (it != worldPreviewTextures.end()) {
+        return it->second;
+    }
+    
+    // Check if preview file exists
+    if (!WorldSerializer::hasScreenshot(worldName)) {
+        return 0;
+    }
+    
+    std::string path = WorldSerializer::getScreenshotPath(worldName);
+    
+    int imgWidth, imgHeight, channels;
+    unsigned char* data = stbi_load(path.c_str(), &imgWidth, &imgHeight, &channels, 3);
+    
+    if (!data) {
+        return 0;
+    }
+    
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imgWidth, imgHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    
+    stbi_image_free(data);
+    
+    // Cache the texture
+    worldPreviewTextures[worldName] = texture;
+    
+    return texture;
+}
+
+void UIManager::clearWorldPreviewTextures() {
+    for (auto& pair : worldPreviewTextures) {
+        if (pair.second != 0) {
+            glDeleteTextures(1, &pair.second);
+        }
+    }
+    worldPreviewTextures.clear();
 }
 
 void UIManager::drawText(float x, float y, float scale, const std::string& text, const glm::vec4& color) {

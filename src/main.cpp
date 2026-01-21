@@ -179,8 +179,17 @@ public:
         });
         
         uiManager.setOnSave([this]() {
+            // Save world data
             WorldSerializer::saveWorld(currentWorldName, chunkManager, camera.getPosition(), currentSeed);
-            LOG_INFO("Game Saved");
+            
+            // Capture screenshot for world preview
+            int w = window->getWidth();
+            int h = window->getHeight();
+            std::vector<unsigned char> pixels(w * h * 3);
+            glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+            WorldSerializer::saveScreenshot(currentWorldName, pixels.data(), w, h);
+            
+            LOG_INFO("Game Saved with preview screenshot");
         });
         
         uiManager.setOnExit([this]() {

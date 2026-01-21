@@ -4,6 +4,9 @@
 #include <fstream>
 #include <iostream>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
 namespace fs = std::filesystem;
 
 std::string WorldSerializer::getSaveDirectory() {
@@ -152,4 +155,39 @@ bool WorldSerializer::createNewWorld(const std::string& worldName, long seed) {
         return true;
     }
     return false;
+}
+
+bool WorldSerializer::saveScreenshot(const std::string& worldName, const unsigned char* pixels, int width, int height) {
+    std::string worldDir = getWorldDirectory(worldName);
+    
+    if (!fs::exists(worldDir)) {
+        fs::create_directories(worldDir);
+    }
+    
+    std::string screenshotPath = worldDir + "/preview.png";
+    
+    // Flip the image vertically (OpenGL has origin at bottom-left)
+    std::vector<unsigned char> flipped(width * height * 3);
+    for (int y = 0; y < height; y++) {
+        memcpy(&flipped[y * width * 3], &pixels[(height - 1 - y) * width * 3], width * 3);
+    }
+    
+    // Save as PNG using stb_image_write
+    int result = stbi_write_png(screenshotPath.c_str(), width, height, 3, flipped.data(), width * 3);
+    
+    if (result) {
+        LOG_INFO("Saved world preview screenshot: " + screenshotPath);
+        return true;
+    } else {
+        LOG_ERROR("Failed to save world preview screenshot");
+        return false;
+    }
+}
+
+std::string WorldSerializer::getScreenshotPath(const std::string& worldName) {
+    return getWorldDirectory(worldName) + "/preview.png";
+}
+
+bool WorldSerializer::hasScreenshot(const std::string& worldName) {
+    return fs::exists(getScreenshotPath(worldName));
 }
