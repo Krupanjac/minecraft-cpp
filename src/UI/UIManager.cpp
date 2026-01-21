@@ -447,6 +447,68 @@ void UIManager::setupVideoSettingsMenu() {
     aa.minVal = 0.0f; aa.maxVal = 2.0f;  // None=0, FXAA=1, TAA=2
     aa.tooltip = "Anti-aliasing method (None/FXAA/TAA)";
     elements.push_back(aa);
+    y += rowHeight + rowGap;
+    
+    // Ray Tracing toggle
+    UIElement rt;
+    rt.x = leftCol; rt.y = y; rt.w = colWidth; rt.h = rowHeight;
+    rt.text = "Ray Tracing: " + std::string(s.enableRayTracing ? "ON" : "OFF");
+    rt.boolValueRef = &s.enableRayTracing;
+    rt.onClick = [](){};
+    rt.tooltip = "Experimental voxel ray tracing (OpenGL 4.3+)";
+    elements.push_back(rt);
+    y += rowHeight + rowGap;
+    
+    // Ray Tracing quality selector
+    UIElement rtq;
+    rtq.x = leftCol; rtq.y = y; rtq.w = colWidth; rtq.h = rowHeight;
+    rtq.text = "RT Quality: " + std::string(Settings::RT_QUALITY_NAMES[s.rayTracingQuality]);
+    rtq.intValueRef = &s.rayTracingQuality;
+    rtq.onClick = [](){};  // intValueRef handles cycling
+    rtq.minVal = 0.0f; rtq.maxVal = 2.0f;  // Low=0, Medium=1, High=2
+    rtq.tooltip = "Ray tracing quality (Low/Medium/High)";
+    elements.push_back(rtq);
+    y += rowHeight + rowGap;
+    
+    // Shadow Method selector
+    UIElement sm;
+    sm.x = leftCol; sm.y = y; sm.w = colWidth; sm.h = rowHeight;
+    sm.text = "Shadows: " + std::string(Settings::SHADOW_METHOD_NAMES[s.shadowMethod]);
+    sm.intValueRef = &s.shadowMethod;
+    sm.onClick = [](){};
+    sm.minVal = 0.0f; sm.maxVal = 1.0f;  // ShadowMap=0, RayTraced=1
+    sm.tooltip = "Shadow method (Shadow Map = fast, Ray Traced = accurate)";
+    elements.push_back(sm);
+    y += rowHeight + rowGap;
+    
+    // RT Shadows toggle
+    UIElement rts;
+    rts.x = leftCol; rts.y = y; rts.w = colWidth; rts.h = rowHeight;
+    rts.text = "RT Shadows: " + std::string(s.rtShadows ? "ON" : "OFF");
+    rts.boolValueRef = &s.rtShadows;
+    rts.onClick = [](){};
+    rts.tooltip = "Ray traced shadows (requires RT enabled)";
+    elements.push_back(rts);
+    y += rowHeight + rowGap;
+    
+    // RT AO toggle
+    UIElement rtao;
+    rtao.x = leftCol; rtao.y = y; rtao.w = colWidth; rtao.h = rowHeight;
+    rtao.text = "RT AO: " + std::string(s.rtAO ? "ON" : "OFF");
+    rtao.boolValueRef = &s.rtAO;
+    rtao.onClick = [](){};
+    rtao.tooltip = "Ray traced ambient occlusion (requires RT enabled)";
+    elements.push_back(rtao);
+    y += rowHeight + rowGap;
+    
+    // RT Sky Visibility toggle
+    UIElement rtsv;
+    rtsv.x = leftCol; rtsv.y = y; rtsv.w = colWidth; rtsv.h = rowHeight;
+    rtsv.text = "RT Sky: " + std::string(s.rtSkyVisibility ? "ON" : "OFF");
+    rtsv.boolValueRef = &s.rtSkyVisibility;
+    rtsv.onClick = [](){};
+    rtsv.tooltip = "Ray traced sky visibility for caves (requires RT enabled)";
+    elements.push_back(rtsv);
     
     // === RIGHT COLUMN - Visual ===
     y = startY;
@@ -1172,6 +1234,14 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             
                             if (el.text.find("AA METHOD") != std::string::npos) {
                                 el.text = "AA METHOD: " + std::string(Settings::AA_METHOD_NAMES[*el.intValueRef]);
+                            }
+                            
+                            if (el.text.find("RT Quality") != std::string::npos) {
+                                el.text = "RT Quality: " + std::string(Settings::RT_QUALITY_NAMES[*el.intValueRef]);
+                            }
+                            
+                            if (el.text.find("Shadows:") != std::string::npos && el.text.find("RT") == std::string::npos) {
+                                el.text = "Shadows: " + std::string(Settings::SHADOW_METHOD_NAMES[*el.intValueRef]);
                             }
                             
                             if (onSettingsChanged) onSettingsChanged();

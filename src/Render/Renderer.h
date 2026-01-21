@@ -7,6 +7,7 @@
 #include "FrameBuffer.h"
 #include "ShadowMap.h"
 #include "PostProcess.h"
+#include "VoxelRayTracer.h"
 #include "../World/ChunkManager.h"
 #include "../Mesh/Mesh.h"
 #include <memory>
@@ -77,6 +78,7 @@ private:
     std::unique_ptr<FrameBuffer> mainFBO;
     std::unique_ptr<ShadowMap> shadowMap;
     std::unique_ptr<PostProcess> postProcess;
+    std::unique_ptr<VoxelRayTracer> rayTracer;
 
     Frustum frustum;
     Frustum shadowFrustum;

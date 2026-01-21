@@ -117,6 +117,7 @@ set(SOURCES
     src/Render/FrameBuffer.cpp
     src/Render/ShadowMap.cpp
     src/Render/PostProcess.cpp
+    src/Render/VoxelRayTracer.cpp
     src/Network/Socket.cpp
     src/Network/Protocol.cpp
     src/Network/GameServer.cpp

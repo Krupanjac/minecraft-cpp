@@ -31,12 +31,29 @@ public:
     bool enableShadows = true;
     float shadowDistance = 160.0f;
     
+    // Shadow method: 0 = Shadow Map (fast), 1 = Ray Traced (accurate)
+    int shadowMethod = 0;
+    static constexpr int SHADOW_MAP = 0;
+    static constexpr int SHADOW_RAY_TRACED = 1;
+    static constexpr const char* SHADOW_METHOD_NAMES[] = { "Shadow Map", "Ray Traced" };
+    
     // Anti-aliasing method: 0 = None, 1 = FXAA, 2 = TAA
     int aaMethod = 1; // Default to FXAA
     static constexpr int AA_NONE = 0;
     static constexpr int AA_FXAA = 1;
     static constexpr int AA_TAA = 2;
     static constexpr const char* AA_METHOD_NAMES[] = { "None", "FXAA", "TAA" };
+    
+    // Ray Tracing settings (OpenGL compute shader based)
+    bool enableRayTracing = false; // Disabled by default (experimental)
+    int rayTracingQuality = 1;     // 0 = Low, 1 = Medium, 2 = High
+    static constexpr int RT_QUALITY_LOW = 0;
+    static constexpr int RT_QUALITY_MEDIUM = 1;
+    static constexpr int RT_QUALITY_HIGH = 2;
+    static constexpr const char* RT_QUALITY_NAMES[] = { "Low", "Medium", "High" };
+    bool rtShadows = true;         // Ray traced shadows
+    bool rtAO = true;              // Ray traced ambient occlusion
+    bool rtSkyVisibility = true;   // Ray traced sky visibility (for caves)
     
     int fullscreen = 0; // 0: Windowed, 1: Fullscreen, 2: Borderless
     // Debug visualization options
@@ -114,6 +131,12 @@ public:
                     else if (key == "enableShadows") enableShadows = (value == "1");
                     else if (key == "shadowDistance") shadowDistance = std::stof(value);
                     else if (key == "aaMethod") aaMethod = std::stoi(value);
+                    else if (key == "enableRayTracing") enableRayTracing = (value == "1");
+                    else if (key == "rayTracingQuality") rayTracingQuality = std::stoi(value);
+                    else if (key == "shadowMethod") shadowMethod = std::stoi(value);
+                    else if (key == "rtShadows") rtShadows = (value == "1");
+                    else if (key == "rtAO") rtAO = (value == "1");
+                    else if (key == "rtSkyVisibility") rtSkyVisibility = (value == "1");
                     else if (key == "debugShowTAA") debugShowTAA = (value == "1");
                     else if (key == "debugNoTexture") debugNoTexture = (value == "1");
                     else if (key == "debugWireframe") debugWireframe = (value == "1");
@@ -165,6 +188,12 @@ public:
         file << "enableShadows=" << (enableShadows ? "1" : "0") << "\n";
         file << "shadowDistance=" << shadowDistance << "\n";
         file << "aaMethod=" << aaMethod << "\n";
+        file << "enableRayTracing=" << (enableRayTracing ? "1" : "0") << "\n";
+        file << "rayTracingQuality=" << rayTracingQuality << "\n";
+        file << "shadowMethod=" << shadowMethod << "\n";
+        file << "rtShadows=" << (rtShadows ? "1" : "0") << "\n";
+        file << "rtAO=" << (rtAO ? "1" : "0") << "\n";
+        file << "rtSkyVisibility=" << (rtSkyVisibility ? "1" : "0") << "\n";
         file << "debugShowTAA=" << (debugShowTAA ? "1" : "0") << "\n";
         file << "debugNoTexture=" << (debugNoTexture ? "1" : "0") << "\n";
         file << "debugWireframe=" << (debugWireframe ? "1" : "0") << "\n";

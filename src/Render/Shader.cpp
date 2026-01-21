@@ -43,6 +43,28 @@ bool Shader::loadFromSource(const std::string& vertexSrc, const std::string& fra
     return success;
 }
 
+bool Shader::loadComputeShader(const std::string& computePath) {
+    std::string computeSrc = readFile(computePath);
+    
+    if (computeSrc.empty()) {
+        LOG_ERROR("Failed to read compute shader file: " + computePath);
+        return false;
+    }
+    
+    return loadComputeShaderFromSource(computeSrc);
+}
+
+bool Shader::loadComputeShaderFromSource(const std::string& computeSrc) {
+    GLuint computeShader = compileShader(GL_COMPUTE_SHADER, computeSrc);
+    if (!computeShader) return false;
+    
+    bool success = linkComputeProgram(computeShader);
+    
+    glDeleteShader(computeShader);
+    
+    return success;
+}
+
 void Shader::use() const {
     glUseProgram(program);
 }
@@ -110,6 +132,25 @@ bool Shader::linkProgram(GLuint vertShader, GLuint fragShader) {
         char infoLog[512];
         glGetProgramInfoLog(program, 512, nullptr, infoLog);
         LOG_ERROR("Shader linking failed: " + std::string(infoLog));
+        glDeleteProgram(program);
+        program = 0;
+        return false;
+    }
+    
+    return true;
+}
+
+bool Shader::linkComputeProgram(GLuint computeShader) {
+    program = glCreateProgram();
+    glAttachShader(program, computeShader);
+    glLinkProgram(program);
+    
+    GLint success;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(program, 512, nullptr, infoLog);
+        LOG_ERROR("Compute shader linking failed: " + std::string(infoLog));
         glDeleteProgram(program);
         program = 0;
         return false;

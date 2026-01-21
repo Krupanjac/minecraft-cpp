@@ -36,6 +36,19 @@ bool Renderer::initialize(int windowWidth, int windowHeight) {
         LOG_ERROR("Failed to initialize Shadow Map");
         return false;
     }
+    
+    // Initialize Ray Tracer (optional, depends on hardware support)
+    if (VoxelRayTracer::isSupported()) {
+        rayTracer = std::make_unique<VoxelRayTracer>();
+        if (!rayTracer->initialize(windowWidth, windowHeight)) {
+            LOG_WARNING("Failed to initialize Voxel Ray Tracer - disabling");
+            rayTracer.reset();
+        } else {
+            LOG_INFO("Voxel Ray Tracer initialized successfully");
+        }
+    } else {
+        LOG_INFO("Voxel Ray Tracing not supported on this hardware");
+    }
 
     LOG_INFO("Renderer initialized");
     return true;
@@ -44,11 +57,15 @@ bool Renderer::initialize(int windowWidth, int windowHeight) {
 void Renderer::onResize(int width, int height) {
     if (mainFBO) mainFBO->resize(width, height);
     if (postProcess) postProcess->resize(width, height);
+    if (rayTracer) rayTracer->resize(width, height);
 }
 
 void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, int windowWidth, int windowHeight) {
     // === CAMERA-RELATIVE RENDERING SETUP ===
     // This prevents floating-point precision issues when far from world origin
+    
+    // Ray tracing output texture (will be filled later if RT is enabled)
+    GLuint rayTracedLighting = 0;
     
     glm::dvec3 cameraPos = glm::dvec3(camera.getPosition());
     
@@ -125,11 +142,15 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         
         float shadowDistSq = shadowRange * shadowRange;
 
-        // Fix shadow acne by rendering front faces and using polygon offset
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_FRONT);
+        // IMPORTANT: Disable face culling entirely for shadow pass!
+        // When culling front faces, only back faces render - but for solid blocks,
+        // back faces are on the INSIDE and don't properly occlude light.
+        // We need ALL faces rendered to shadow map for proper depth testing.
+        glDisable(GL_CULL_FACE);
+        
+        // Use polygon offset to prevent shadow acne (z-fighting)
         glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(2.0f, 4.0f);
+        glPolygonOffset(4.0f, 4.0f);  // Increased offset for better acne prevention
 
         shadowShader.use();
         shadowShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
@@ -177,8 +198,8 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
 
         // Restore state
         glDisable(GL_POLYGON_OFFSET_FILL);
+        glEnable(GL_CULL_FACE);  // Re-enable culling for main pass
         glCullFace(GL_BACK);
-        glDisable(GL_CULL_FACE);
 
         shadowMap->unbind();
     }
@@ -294,10 +315,23 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, shadowMap->getDepthMap());
     
+    // Bind ray tracing texture if available
+    glActiveTexture(GL_TEXTURE2);
+    if (rayTracer && Settings::instance().enableRayTracing && rayTracedLighting != 0) {
+        glBindTexture(GL_TEXTURE_2D, rayTracedLighting);
+    } else {
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    
     blockShader.use();
     blockShader.setInt("uTexture", 0);
     blockShader.setInt("uShadowMap", 1);
+    blockShader.setInt("uRayTracingMap", 2);
     blockShader.setInt("uUseShadows", Settings::instance().enableShadows ? 1 : 0);
+    blockShader.setInt("uShadowMethod", Settings::instance().shadowMethod);
+    blockShader.setInt("uUseRTShadows", (Settings::instance().enableRayTracing && Settings::instance().rtShadows) ? 1 : 0);
+    blockShader.setInt("uUseRTAO", (Settings::instance().enableRayTracing && Settings::instance().rtAO) ? 1 : 0);
+    blockShader.setInt("uUseRTSky", (Settings::instance().enableRayTracing && Settings::instance().rtSkyVisibility) ? 1 : 0);
     blockShader.setMat4("uProjection", projection);
     blockShader.setMat4("uView", view);
     blockShader.setMat4("uPrevView", prevView);
@@ -318,7 +352,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }    
     // Disable face culling to prevent missing faces due to LOD/winding issues
-    glDisable(GL_CULL_FACE);
+    glDisable(GL_CULL_FACE);;
     
     // Fog settings
     float fogDist = static_cast<float>(Settings::instance().renderDistance * CHUNK_SIZE);
@@ -495,6 +529,39 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
 
     mainFBO->unbind();
 
+    // === Ray Tracing Pass (Optional) ===
+    // Updates voxel grid and traces rays for accurate lighting
+    if (rayTracer && Settings::instance().enableRayTracing) {
+        // Update voxel grid around player
+        glm::vec3 playerWorldPos = camera.getPosition();
+        rayTracer->updateVoxelGrid(chunkManager, playerWorldPos);
+        
+        // Set quality settings
+        int quality = Settings::instance().rayTracingQuality;
+        if (quality == Settings::RT_QUALITY_LOW) {
+            rayTracer->setMaxRaySteps(128);
+            rayTracer->setRayMaxDistance(64.0f);
+        } else if (quality == Settings::RT_QUALITY_MEDIUM) {
+            rayTracer->setMaxRaySteps(256);
+            rayTracer->setRayMaxDistance(128.0f);
+        } else { // HIGH
+            rayTracer->setMaxRaySteps(512);
+            rayTracer->setRayMaxDistance(256.0f);
+        }
+        
+        // Compute inverse view-projection for world position reconstruction
+        glm::mat4 invViewProj = glm::inverse(projection * view);
+        
+        // Trace rays
+        rayTracedLighting = rayTracer->trace(
+            mainFBO->getDepthTexture(),
+            invViewProj,
+            cameraRelative,
+            lightDirection,
+            glm::vec3(1.0f, 0.9f, 0.7f) // Light color
+        );
+    }
+
     // 2. Post Processing Pass
     // Clear default framebuffer
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -515,7 +582,10 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         lightCol = glm::mix(glm::vec3(0.6f, 0.7f, 1.0f), glm::vec3(1.0f, 0.9f, 0.7f), t);
     }
 
-    postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), mainFBO->getVelocityTexture(), projection, view, cameraRelative, lightDirection, unjitteredProjection, volIntensity, lightCol);
+    postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), mainFBO->getVelocityTexture(), 
+                        projection, view, cameraRelative, lightDirection, unjitteredProjection, 
+                        volIntensity, lightCol, 
+                        shadowMap->getDepthMap(), lightSpaceMatrix, rayTracedLighting);
 
     // Update History
     prevView = view;

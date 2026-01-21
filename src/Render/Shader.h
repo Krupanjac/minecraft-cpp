@@ -11,6 +11,8 @@ public:
 
     bool loadFromFiles(const std::string& vertexPath, const std::string& fragmentPath);
     bool loadFromSource(const std::string& vertexSrc, const std::string& fragmentSrc);
+    bool loadComputeShader(const std::string& computePath);
+    bool loadComputeShaderFromSource(const std::string& computeSrc);
     
     void use() const;
     void unuse() const;
@@ -31,5 +33,6 @@ private:
     
     GLuint compileShader(GLenum type, const std::string& source);
     bool linkProgram(GLuint vertShader, GLuint fragShader);
+    bool linkComputeProgram(GLuint computeShader);
     std::string readFile(const std::string& path);
 };

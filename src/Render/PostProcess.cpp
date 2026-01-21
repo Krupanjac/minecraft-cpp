@@ -145,7 +145,12 @@ void PostProcess::updateJitter(int w, int h) {
     jitterMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(jitterX, jitterY, 0.0f)); // retained for any future use
 }
 
-void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint velocityTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection, float volumetricIntensity, const glm::vec3& lightColor) {
+void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint velocityTexture, 
+                         const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, 
+                         const glm::vec3& lightDir, const glm::mat4& unjitteredProjection, 
+                         float volumetricIntensity, const glm::vec3& lightColor,
+                         GLuint shadowMapTexture, const glm::mat4& lightSpaceMatrix,
+                         GLuint rayTracingTexture) {
     
     glDisable(GL_DEPTH_TEST); // Disable depth test for full screen quads
     auto& settings = Settings::instance();
@@ -214,12 +219,17 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         volumetricShader.use();
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, depthTexture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, shadowMapTexture);
         volumetricShader.setInt("depthMap", 0);
+        volumetricShader.setInt("shadowMap", 1);
         volumetricShader.setMat4("invViewProj", glm::inverse(projection * view));
+        volumetricShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
         volumetricShader.setVec3("lightDir", lightDir);
         volumetricShader.setVec3("cameraPos", cameraPos);
         volumetricShader.setFloat("uIntensity", volumetricIntensity);
         volumetricShader.setVec3("uLightColor", lightColor);
+        volumetricShader.setInt("uUseShadows", settings.enableShadows ? 1 : 0);
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     } else {

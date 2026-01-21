@@ -13,7 +13,12 @@ uniform float uFogDist;
 uniform vec3 uSkyColor;
 uniform sampler2D uTexture;
 uniform sampler2D uShadowMap;
+uniform sampler2D uRayTracingMap;  // Ray tracing output: R=shadow, G=sky, B=bounce, A=ao
 uniform int uUseShadows;
+uniform int uShadowMethod;         // 0 = Shadow Map, 1 = Ray Traced
+uniform int uUseRTShadows;         // Use RT shadows when available
+uniform int uUseRTAO;              // Use RT ambient occlusion
+uniform int uUseRTSky;             // Use RT sky visibility
 uniform float uAOStrength;
 
 // Debug uniforms
@@ -28,29 +33,40 @@ layout(location = 0) out vec4 FragColor;
 layout(location = 1) out vec2 Velocity;
 
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
+    // CRITICAL: Check if surface faces AWAY from light (back-face)
+    // Surfaces facing away from the sun should ALWAYS be in shadow
+    // This is the key fix for cave interiors!
+    float NdotL = dot(normal, lightDir);
+    if (NdotL <= 0.0) {
+        // Surface faces away from light - always in shadow
+        return 1.0;
+    }
+    
     // perform perspective divide
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     // transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
     
-    // Outside shadow map bounds - no shadow
+    // Outside shadow map bounds - assume shadow for safety in caves
+    // (rather than no shadow, which causes light leaks)
     if(projCoords.x < 0.0 || projCoords.x > 1.0 || 
-       projCoords.y < 0.0 || projCoords.y > 1.0 ||
-       projCoords.z > 1.0) {
-        return 0.0;
+       projCoords.y < 0.0 || projCoords.y > 1.0) {
+        return 0.5; // Partial shadow outside bounds
+    }
+    if(projCoords.z > 1.0) {
+        return 0.0; // Beyond far plane - no shadow
     }
     
     // Calculate bias based on surface angle to light
-    // More aggressive bias for surfaces nearly parallel to light direction
-    float NdotL = dot(normal, lightDir);
-    float slopeFactor = 1.0 - NdotL;
-    slopeFactor = clamp(slopeFactor * slopeFactor, 0.0, 1.0);
+    // Less aggressive bias since we handle back-faces separately
+    float slopeFactor = sqrt(1.0 - NdotL * NdotL); // sin(angle)
     
     // Depth-dependent bias - farther objects need more bias
-    float depthBias = projCoords.z * 0.001;
+    float depthBias = projCoords.z * 0.0005;
     
     // Combined bias: base + slope-dependent + depth-dependent
-    float bias = 0.001 + 0.003 * slopeFactor + depthBias;
+    // Reduced base bias since back-faces are handled separately
+    float bias = 0.0005 + 0.002 * slopeFactor + depthBias;
     
     // PCF with larger kernel for softer shadows
     float shadow = 0.0;
@@ -73,7 +89,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
             
             float pcfDepth = texture(uShadowMap, samplePos).r;
             
-            // Soft shadow edge using smoothstep
+            // Shadow test with bias
             float occluder = currentDepth - bias > pcfDepth ? 1.0 : 0.0;
             shadow += occluder;
             pcfSamples += 1.0;
@@ -89,6 +105,11 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
     float edgeDist = min(min(projCoords.x, 1.0 - projCoords.x), 
                          min(projCoords.y, 1.0 - projCoords.y));
     edgeFade = smoothstep(0.0, 0.05, edgeDist);
+    
+    // Boost shadow strength for grazing angles (surfaces nearly parallel to light)
+    // This helps with edges of blocks catching unwanted light
+    float grazingBoost = smoothstep(0.3, 0.0, NdotL) * 0.5;
+    shadow = min(1.0, shadow + grazingBoost);
     
     return shadow * edgeFade;
 }
@@ -159,18 +180,43 @@ void main() {
     float skyBrightness = dot(uSkyColor, vec3(0.299, 0.587, 0.114)); // Luminance
     float ambient = clamp(skyBrightness * 0.6, 0.05, 0.4);
     
-    // Calculate Shadow
-    // Only calculate shadow if surface is facing the light
+    // Calculate Shadow - choose between shadow map and ray tracing
     float shadow = 0.0;
-    if (uUseShadows != 0 && diffuse > 0.0) {
-        shadow = ShadowCalculation(vFragPosLightSpace, normal, lightDir);
+    float rtAO = 1.0;
+    float rtSkyVisibility = 1.0;
+    
+    if (uUseShadows != 0) {
+        if (uShadowMethod == 1 && uUseRTShadows != 0) {
+            // Ray traced shadows - sample from ray tracing texture
+            // Convert clip space to screen UV
+            vec2 screenUV = (vCurrentClip.xy / vCurrentClip.w) * 0.5 + 0.5;
+            vec4 rtData = texture(uRayTracingMap, screenUV);
+            shadow = 1.0 - rtData.r;  // R channel is direct light (0=shadow, 1=lit)
+            
+            if (uUseRTSky != 0) {
+                rtSkyVisibility = rtData.g;  // G channel is sky visibility
+            }
+            if (uUseRTAO != 0) {
+                rtAO = rtData.a;  // A channel is ray traced AO
+            }
+        } else {
+            // Shadow map shadows
+            shadow = ShadowCalculation(vFragPosLightSpace, normal, lightDir);
+        }
     }
     
-    // Apply AO
+    // Apply AO - combine vertex AO with ray traced AO if available
     // Use smoothstep for non-linear AO curve
     float aoCurve = smoothstep(0.0, 1.0, vAO);
     float minAO = max(0.0, mix(1.0, 0.25, uAOStrength));
     float aoFactor = mix(minAO, 1.0, aoCurve);
+    
+    // Blend in ray traced AO
+    aoFactor *= rtAO;
+    
+    // Reduce ambient in areas with low sky visibility (caves)
+    float skyAmbientFactor = mix(0.3, 1.0, rtSkyVisibility);
+    ambient *= skyAmbientFactor;
     
     vec3 lighting = vec3(ambient + (1.0 - shadow) * diffuse * 0.7) * aoFactor;
     vec3 color = baseColor * lighting;

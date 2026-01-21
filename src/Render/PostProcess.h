@@ -15,7 +15,12 @@ public:
     void resize(int width, int height);
     
     // Main render function
-    void render(GLuint colorTexture, GLuint depthTexture, GLuint velocityTexture, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, const glm::vec3& lightDir, const glm::mat4& unjitteredProjection, float volumetricIntensity = 1.0f, const glm::vec3& lightColor = glm::vec3(1.0f, 0.9f, 0.7f));
+    void render(GLuint colorTexture, GLuint depthTexture, GLuint velocityTexture, 
+                const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos, 
+                const glm::vec3& lightDir, const glm::mat4& unjitteredProjection, 
+                float volumetricIntensity = 1.0f, const glm::vec3& lightColor = glm::vec3(1.0f, 0.9f, 0.7f),
+                GLuint shadowMapTexture = 0, const glm::mat4& lightSpaceMatrix = glm::mat4(1.0f),
+                GLuint rayTracingTexture = 0);
 
     // TAA specific
     const glm::mat4& getJitterMatrix() const { return jitterMatrix; }
