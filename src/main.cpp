@@ -18,6 +18,7 @@
 #include "Entity/PigEntity.h"
 #include "Entity/ChickenEntity.h"
 #include "Entity/SheepEntity.h"
+#include "Entity/MobSpawnManager.h"
 #include "Network/NetworkManager.h"
 
 #include <memory>
@@ -721,6 +722,9 @@ public:
         if (!foundGround) {
              LOG_INFO("Could not find ground via raycast, using default height.");
         }
+        
+        // Initialize mob spawn manager
+        mobSpawnManager = std::make_unique<MobSpawnManager>(chunkManager, worldGenerator);
     }
     
     bool loadWorld(const std::string& name = "world.dat") {
@@ -741,6 +745,9 @@ public:
             
             // Initialize player entity at loaded position
             playerEntity = std::make_unique<PlayerEntity>(playerPos);
+            
+            // Initialize mob spawn manager for loaded world
+            mobSpawnManager = std::make_unique<MobSpawnManager>(chunkManager, worldGenerator);
 
             LOG_INFO("World loaded successfully");
             return true;
@@ -790,7 +797,7 @@ public:
             if (playerEntity) {
                 // Sync velocity from camera before update so animation state machine can use it
                 playerEntity->setVelocity(camera.velocity);
-                playerEntity->update(deltaTime);
+                playerEntity->updateWithCamera(deltaTime, camera);
             }
             if (fpsUpdateTimer >= 0.5f) {
                 displayFPS = fpsAccumulator / frameAccumulator;
@@ -883,8 +890,7 @@ private:
     std::vector<std::unique_ptr<PigEntity>> pigs;
     std::vector<std::unique_ptr<ChickenEntity>> chickens;
     std::vector<std::unique_ptr<SheepEntity>> sheep;
-    float zombieSpawnTimer = 0.0f;
-    float passiveMobSpawnTimer = 0.0f;
+    std::unique_ptr<MobSpawnManager> mobSpawnManager;
     
     // Menu background world
     bool menuWorldInitialized = false;
@@ -1234,71 +1240,18 @@ private:
             playerEntity->update(deltaTime);
         }
 
-        // === Zombies ===
-        // Only spawn zombies in single-player mode to avoid duplicates
-        // In multiplayer, zombies would need to be server-authoritative (future work)
+        // === Mob Spawning & AI ===
+        // Only spawn mobs in single-player mode to avoid duplicates
+        // In multiplayer, mobs would need to be server-authoritative (future work)
         if (!skipPlayerControls && networkManager.getMode() == Network::NetworkMode::OFFLINE) {
-            // Spawn a few around the player over time (simple, deterministic-ish)
-            zombieSpawnTimer -= deltaTime;
-            if (playerEntity && zombieSpawnTimer <= 0.0f) {
-                zombieSpawnTimer = 8.0f;
-                const size_t MAX_ZOMBIES = 6;
-                if (zombies.size() < MAX_ZOMBIES) {
-                    glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
-                    // spawn radius ring
-                    float a = (float)(zombies.size()) * 2.3999632f; // golden angle
-                    float r = 14.0f + (float)(zombies.size()) * 3.0f;
-                    int sx = (int)std::floor(playerFeet.x + std::cos(a) * r);
-                    int sz = (int)std::floor(playerFeet.z + std::sin(a) * r);
-                    // Spawn at the first air block above terrain.
-                    // getSurfaceHeight() returns int(height), and terrain fills blocks for worldY < height,
-                    // so y==height is usually the first air block already.
-                    int sy = worldGenerator.getSurfaceHeight(sx, sz);
-                    if (sy < SEA_LEVEL) sy = SEA_LEVEL + 2;
-                    zombies.push_back(std::make_unique<ZombieEntity>(glm::vec3((float)sx + 0.5f, (float)sy + 0.05f, (float)sz + 0.5f)));
-                    
-                    // Also spawn a skeleton sometimes
-                    if (skeletons.size() < 4 && zombies.size() % 2 == 0) {
-                        float skelA = a + 3.14159f; // opposite side
-                        int skelX = (int)std::floor(playerFeet.x + std::cos(skelA) * r);
-                        int skelZ = (int)std::floor(playerFeet.z + std::sin(skelA) * r);
-                        int skelY = worldGenerator.getSurfaceHeight(skelX, skelZ);
-                        if (skelY < SEA_LEVEL) skelY = SEA_LEVEL + 2;
-                        skeletons.push_back(std::make_unique<SkeletonEntity>(glm::vec3((float)skelX + 0.5f, (float)skelY + 0.05f, (float)skelZ + 0.5f)));
-                    }
-                }
-            }
-            
-            // Spawn passive mobs (pigs, chickens, sheep)
-            passiveMobSpawnTimer -= deltaTime;
-            if (playerEntity && passiveMobSpawnTimer <= 0.0f) {
-                passiveMobSpawnTimer = 5.0f;
-                const size_t MAX_PASSIVE_MOBS = 12;
-                size_t totalPassive = pigs.size() + chickens.size() + sheep.size();
+            // Use MobSpawnManager for Minecraft-like spawning based on time of day, light, blocks
+            if (mobSpawnManager && playerEntity) {
+                // Convert timeOfDay to normalized 0-1 range (0 = midnight, 0.5 = noon)
+                float normalizedTime = uiManager.timeOfDay / DAY_DURATION;
+                glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
                 
-                if (totalPassive < MAX_PASSIVE_MOBS) {
-                    glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
-                    float a = (float)(totalPassive) * 2.3999632f + 1.5f; // offset from hostile
-                    float r = 20.0f + (float)(totalPassive) * 2.0f;
-                    int sx = (int)std::floor(playerFeet.x + std::cos(a) * r);
-                    int sz = (int)std::floor(playerFeet.z + std::sin(a) * r);
-                    int sy = worldGenerator.getSurfaceHeight(sx, sz);
-                    
-                    // Only spawn on land above sea level
-                    if (sy >= SEA_LEVEL) {
-                        glm::vec3 spawnPos((float)sx + 0.5f, (float)sy + 0.05f, (float)sz + 0.5f);
-                        
-                        // Rotate through mob types
-                        int mobType = totalPassive % 3;
-                        if (mobType == 0 && pigs.size() < 4) {
-                            pigs.push_back(std::make_unique<PigEntity>(spawnPos));
-                        } else if (mobType == 1 && chickens.size() < 4) {
-                            chickens.push_back(std::make_unique<ChickenEntity>(spawnPos));
-                        } else if (sheep.size() < 4) {
-                            sheep.push_back(std::make_unique<SheepEntity>(spawnPos));
-                        }
-                    }
-                }
+                mobSpawnManager->update(deltaTime, playerFeet, normalizedTime,
+                                       zombies, skeletons, pigs, chickens, sheep);
             }
             
             // Update zombie AI (uses chunkManager for simple collision + camera pos for chasing)
