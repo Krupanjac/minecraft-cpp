@@ -153,6 +153,14 @@ set(SERVER_SOURCES
 # Create main game executable
 add_executable(${PROJECT_NAME} ${SOURCES})
 
+# Hide console window in Release builds on Windows (use /SUBSYSTEM:WINDOWS but keep main() entry point)
+if(WIN32)
+    target_link_options(${PROJECT_NAME} PRIVATE
+        "$<$<CONFIG:Release>:/SUBSYSTEM:WINDOWS>"
+        "$<$<CONFIG:Release>:/ENTRY:mainCRTStartup>"
+    )
+endif()
+
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -169,6 +177,14 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 # Create dedicated server executable
 add_executable(minecraft_server ${SERVER_SOURCES})
+
+# Hide console window in Release builds on Windows (use /SUBSYSTEM:WINDOWS but keep main() entry point)
+if(WIN32)
+    target_link_options(minecraft_server PRIVATE
+        "$<$<CONFIG:Release>:/SUBSYSTEM:WINDOWS>"
+        "$<$<CONFIG:Release>:/ENTRY:mainCRTStartup>"
+    )
+endif()
 
 target_include_directories(minecraft_server PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

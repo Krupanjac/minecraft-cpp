@@ -157,28 +157,28 @@ void UIManager::handleKeyInput(int key) {
 void UIManager::setupMainMenu() {
     elements.clear();
     float centerX = width / 2.0f;
-    float centerY = height / 2.0f;
-    float btnW = 200.0f;
-    float btnH = 40.0f;
-    float gap = 10.0f;
+    float centerY = height / 2.0f + 30.0f; // Shifted down to make room for title
+    float btnW = 280.0f;  // Wider buttons
+    float btnH = 50.0f;   // Taller buttons
+    float gap = 12.0f;    // More spacing
 
-    elements.push_back({centerX - btnW/2, centerY - 125, btnW, btnH, "NEW GAME", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 125, btnW, btnH, "Singleplayer", false, [this]() { 
         setMenuState(MenuState::NEW_GAME); 
     }});
     
-    elements.push_back({centerX - btnW/2, centerY - 125 + btnH + gap, btnW, btnH, "LOAD GAME", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 125 + btnH + gap, btnW, btnH, "Load World", false, [this]() { 
         setMenuState(MenuState::LOAD_GAME); 
     }});
     
-    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*2, btnW, btnH, "MULTIPLAYER", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*2, btnW, btnH, "Multiplayer", false, [this]() { 
         setMenuState(MenuState::MULTIPLAYER); 
     }});
 
-    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*3, btnW, btnH, "SETTINGS", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*3, btnW, btnH, "Options", false, [this]() { 
         setMenuState(MenuState::SETTINGS); 
     }});
 
-    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*4, btnW, btnH, "EXIT", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*4, btnW, btnH, "Quit Game", false, [this]() { 
         if (onExit) onExit(); 
     }});
 }
@@ -250,85 +250,262 @@ void UIManager::setupSettingsMenu() {
 void UIManager::setupVideoSettingsMenu() {
     elements.clear();
     
-    float cx = width / 2.0f;
-    float cy = height / 2.0f;
-    float btnW = 300.0f;
-    float btnH = 30.0f;
-    float gap = 10.0f;
-    float startY = cy - 150.0f;
-
     auto& s = Settings::instance();
-
-    // Render Distance
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "RENDER DIST: " + std::to_string(s.renderDistance), false, nullptr, true, nullptr, &s.renderDistance, nullptr, 2.0f, 32.0f});
-    startY += btnH + gap;
-
-    // FOV
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "FOV: " + std::to_string((int)s.fov), false, nullptr, true, &s.fov, nullptr, nullptr, 30.0f, 110.0f});
-    startY += btnH + gap;
-
-    // AO Strength
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "AO STRENGTH: " + std::to_string(s.aoStrength).substr(0, 3), false, nullptr, true, &s.aoStrength, nullptr, nullptr, 0.0f, 2.0f});
-    startY += btnH + gap;
-
-    // Gamma
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "GAMMA: " + std::to_string(s.gamma).substr(0, 3), false, nullptr, true, &s.gamma, nullptr, nullptr, 1.0f, 3.0f});
-    startY += btnH + gap;
-
-    // Exposure (Brightness)
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "BRIGHTNESS: " + std::to_string(s.exposure).substr(0, 3), false, nullptr, true, &s.exposure, nullptr, nullptr, 0.1f, 5.0f});
-    startY += btnH + gap;
-
-    // Sun Size
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "SUN SIZE: " + std::to_string(s.sunSize).substr(0, 3), false, nullptr, true, &s.sunSize, nullptr, nullptr, 0.5f, 10.0f});
-    startY += btnH + gap;
-
-    // Moon Size
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "MOON SIZE: " + std::to_string(s.moonSize).substr(0, 3), false, nullptr, true, &s.moonSize, nullptr, nullptr, 0.5f, 10.0f});
-    startY += btnH + gap;
-
-    // VSync (Toggle)
-    std::string vsyncText = "VSYNC: " + std::string(s.vsync ? "ON" : "OFF");
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, vsyncText, false, [](){}, false, nullptr, nullptr, &s.vsync});
-    startY += btnH + gap;
-
-    // SSAO (Toggle)
-    std::string ssaoText = "SSAO: " + std::string(s.enableSSAO ? "ON" : "OFF");
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, ssaoText, false, [](){}, false, nullptr, nullptr, &s.enableSSAO});
-    startY += btnH + gap;
-
-    // Volumetrics (Toggle)
-    std::string volText = "VOLUMETRICS: " + std::string(s.enableVolumetrics ? "ON" : "OFF");
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, volText, false, [](){}, false, nullptr, nullptr, &s.enableVolumetrics});
-    startY += btnH + gap;
-
-    // TAA (Toggle)
-    std::string taaText = "TAA: " + std::string(s.enableTAA ? "ON" : "OFF");
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, taaText, false, [](){}, false, nullptr, nullptr, &s.enableTAA});
-    startY += btnH + gap;
-
-    // Shadows (Toggle)
-    std::string shadowText = "SHADOWS: " + std::string(s.enableShadows ? "ON" : "OFF");
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, shadowText, false, [](){}, false, nullptr, nullptr, &s.enableShadows});
-    startY += btnH + gap;
-
-    // Shadow Distance
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "SHADOW DIST: " + std::to_string((int)s.shadowDistance), false, nullptr, true, &s.shadowDistance, nullptr, nullptr, 50.0f, 300.0f});
-    startY += btnH + gap;
-
-    // Fullscreen (Cycle)
-    std::string fsText = "WINDOW MODE: ";
-    if (s.fullscreen == 0) fsText += "WINDOWED";
-    else if (s.fullscreen == 1) fsText += "FULLSCREEN";
-    else if (s.fullscreen == 2) fsText += "BORDERLESS";
     
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, fsText, false, [](){}, false, nullptr, &s.fullscreen, nullptr, 0.0f, 2.0f});
-    startY += btnH + gap;
-
-    // Back
-    elements.push_back({cx - btnW/2, startY + 20, btnW, btnH, "BACK", false, [this]() { 
-        setMenuState(MenuState::SETTINGS); 
-    }});
+    // Grid layout - 2 columns
+    float colWidth = 280.0f;
+    float colGap = 40.0f;
+    float rowHeight = 35.0f;
+    float rowGap = 8.0f;
+    float startY = 80.0f;
+    float leftCol = width / 2.0f - colWidth - colGap / 2;
+    float rightCol = width / 2.0f + colGap / 2;
+    
+    // Title
+    UIElement title;
+    title.x = width / 2.0f - 100;
+    title.y = 30;
+    title.w = 200;
+    title.h = 30;
+    title.text = "Video Settings";
+    title.isLabel = true;
+    elements.push_back(title);
+    
+    // === LEFT COLUMN - Performance ===
+    UIElement perfHeader;
+    perfHeader.x = leftCol;
+    perfHeader.y = startY;
+    perfHeader.w = colWidth;
+    perfHeader.h = 25;
+    perfHeader.text = "-- Performance --";
+    perfHeader.isLabel = true;
+    perfHeader.isHeader = true;
+    elements.push_back(perfHeader);
+    
+    float y = startY + 35;
+    
+    // Render Distance
+    UIElement rd;
+    rd.x = leftCol; rd.y = y; rd.w = colWidth; rd.h = rowHeight;
+    rd.text = "Render Distance: " + std::to_string(s.renderDistance);
+    rd.isSlider = true;
+    rd.intValueRef = &s.renderDistance;
+    rd.minVal = 2.0f; rd.maxVal = 32.0f;
+    rd.tooltip = "How far chunks are rendered (2-32)";
+    elements.push_back(rd);
+    y += rowHeight + rowGap;
+    
+    // Shadow Distance
+    UIElement sd;
+    sd.x = leftCol; sd.y = y; sd.w = colWidth; sd.h = rowHeight;
+    sd.text = "Shadow Distance: " + std::to_string((int)s.shadowDistance);
+    sd.isSlider = true;
+    sd.valueRef = &s.shadowDistance;
+    sd.minVal = 50.0f; sd.maxVal = 300.0f;
+    sd.tooltip = "Max distance for shadow rendering";
+    elements.push_back(sd);
+    y += rowHeight + rowGap;
+    
+    // VSync
+    UIElement vs;
+    vs.x = leftCol; vs.y = y; vs.w = colWidth; vs.h = rowHeight;
+    vs.text = "VSync: " + std::string(s.vsync ? "ON" : "OFF");
+    vs.boolValueRef = &s.vsync;
+    vs.onClick = [](){};
+    vs.tooltip = "Sync framerate to monitor refresh rate";
+    elements.push_back(vs);
+    y += rowHeight + rowGap;
+    
+    // Window Mode
+    UIElement wm;
+    wm.x = leftCol; wm.y = y; wm.w = colWidth; wm.h = rowHeight;
+    std::string wmText = "Window: ";
+    if (s.fullscreen == 0) wmText += "Windowed";
+    else if (s.fullscreen == 1) wmText += "Fullscreen";
+    else wmText += "Borderless";
+    wm.text = wmText;
+    wm.intValueRef = &s.fullscreen;
+    wm.onClick = [](){};
+    wm.minVal = 0.0f; wm.maxVal = 2.0f;
+    wm.tooltip = "Click to cycle: Windowed/Fullscreen/Borderless";
+    elements.push_back(wm);
+    y += rowHeight + rowGap;
+    
+    // === LEFT COLUMN - Effects ===
+    y += 15;
+    UIElement fxHeader;
+    fxHeader.x = leftCol;
+    fxHeader.y = y;
+    fxHeader.w = colWidth;
+    fxHeader.h = 25;
+    fxHeader.text = "-- Effects --";
+    fxHeader.isLabel = true;
+    fxHeader.isHeader = true;
+    elements.push_back(fxHeader);
+    y += 35;
+    
+    // Shadows
+    UIElement sh;
+    sh.x = leftCol; sh.y = y; sh.w = colWidth; sh.h = rowHeight;
+    sh.text = "Shadows: " + std::string(s.enableShadows ? "ON" : "OFF");
+    sh.boolValueRef = &s.enableShadows;
+    sh.onClick = [](){};
+    sh.tooltip = "Enable dynamic shadows from sun/moon";
+    elements.push_back(sh);
+    y += rowHeight + rowGap;
+    
+    // SSAO
+    UIElement ssao;
+    ssao.x = leftCol; ssao.y = y; ssao.w = colWidth; ssao.h = rowHeight;
+    ssao.text = "SSAO: " + std::string(s.enableSSAO ? "ON" : "OFF");
+    ssao.boolValueRef = &s.enableSSAO;
+    ssao.onClick = [](){};
+    ssao.tooltip = "Screen-space ambient occlusion";
+    elements.push_back(ssao);
+    y += rowHeight + rowGap;
+    
+    // Volumetrics
+    UIElement vol;
+    vol.x = leftCol; vol.y = y; vol.w = colWidth; vol.h = rowHeight;
+    vol.text = "Volumetrics: " + std::string(s.enableVolumetrics ? "ON" : "OFF");
+    vol.boolValueRef = &s.enableVolumetrics;
+    vol.onClick = [](){};
+    vol.tooltip = "Volumetric lighting (god rays)";
+    elements.push_back(vol);
+    y += rowHeight + rowGap;
+    
+    // TAA
+    UIElement taa;
+    taa.x = leftCol; taa.y = y; taa.w = colWidth; taa.h = rowHeight;
+    taa.text = "TAA: " + std::string(s.enableTAA ? "ON" : "OFF");
+    taa.boolValueRef = &s.enableTAA;
+    taa.onClick = [](){};
+    taa.tooltip = "Temporal anti-aliasing (may cause jitter)";
+    elements.push_back(taa);
+    
+    // === RIGHT COLUMN - Visual ===
+    y = startY;
+    UIElement visHeader;
+    visHeader.x = rightCol;
+    visHeader.y = y;
+    visHeader.w = colWidth;
+    visHeader.h = 25;
+    visHeader.text = "-- Visual --";
+    visHeader.isLabel = true;
+    visHeader.isHeader = true;
+    elements.push_back(visHeader);
+    y += 35;
+    
+    // FOV
+    UIElement fov;
+    fov.x = rightCol; fov.y = y; fov.w = colWidth; fov.h = rowHeight;
+    fov.text = "FOV: " + std::to_string((int)s.fov);
+    fov.isSlider = true;
+    fov.valueRef = &s.fov;
+    fov.minVal = 30.0f; fov.maxVal = 110.0f;
+    fov.tooltip = "Field of view (30-110 degrees)";
+    elements.push_back(fov);
+    y += rowHeight + rowGap;
+    
+    // AO Strength
+    UIElement ao;
+    ao.x = rightCol; ao.y = y; ao.w = colWidth; ao.h = rowHeight;
+    ao.text = "AO Strength: " + std::to_string(s.aoStrength).substr(0, 3);
+    ao.isSlider = true;
+    ao.valueRef = &s.aoStrength;
+    ao.minVal = 0.0f; ao.maxVal = 2.0f;
+    ao.tooltip = "Ambient occlusion intensity";
+    elements.push_back(ao);
+    y += rowHeight + rowGap;
+    
+    // Gamma
+    UIElement gm;
+    gm.x = rightCol; gm.y = y; gm.w = colWidth; gm.h = rowHeight;
+    gm.text = "Gamma: " + std::to_string(s.gamma).substr(0, 3);
+    gm.isSlider = true;
+    gm.valueRef = &s.gamma;
+    gm.minVal = 1.0f; gm.maxVal = 3.0f;
+    gm.tooltip = "Display gamma correction";
+    elements.push_back(gm);
+    y += rowHeight + rowGap;
+    
+    // Brightness
+    UIElement br;
+    br.x = rightCol; br.y = y; br.w = colWidth; br.h = rowHeight;
+    br.text = "Brightness: " + std::to_string(s.exposure).substr(0, 3);
+    br.isSlider = true;
+    br.valueRef = &s.exposure;
+    br.minVal = 0.1f; br.maxVal = 5.0f;
+    br.tooltip = "Overall scene brightness";
+    elements.push_back(br);
+    y += rowHeight + rowGap;
+    
+    // === RIGHT COLUMN - Celestial ===
+    y += 15;
+    UIElement celHeader;
+    celHeader.x = rightCol;
+    celHeader.y = y;
+    celHeader.w = colWidth;
+    celHeader.h = 25;
+    celHeader.text = "-- Celestial --";
+    celHeader.isLabel = true;
+    celHeader.isHeader = true;
+    elements.push_back(celHeader);
+    y += 35;
+    
+    // Sun Size
+    UIElement ss;
+    ss.x = rightCol; ss.y = y; ss.w = colWidth; ss.h = rowHeight;
+    ss.text = "Sun Size: " + std::to_string(s.sunSize).substr(0, 3);
+    ss.isSlider = true;
+    ss.valueRef = &s.sunSize;
+    ss.minVal = 0.5f; ss.maxVal = 10.0f;
+    ss.tooltip = "Size of the sun in the sky";
+    elements.push_back(ss);
+    y += rowHeight + rowGap;
+    
+    // Moon Size
+    UIElement ms;
+    ms.x = rightCol; ms.y = y; ms.w = colWidth; ms.h = rowHeight;
+    ms.text = "Moon Size: " + std::to_string(s.moonSize).substr(0, 3);
+    ms.isSlider = true;
+    ms.valueRef = &s.moonSize;
+    ms.minVal = 0.5f; ms.maxVal = 10.0f;
+    ms.tooltip = "Size of the moon in the sky";
+    elements.push_back(ms);
+    y += rowHeight + rowGap;
+    
+    // === RIGHT COLUMN - UI ===
+    y += 15;
+    UIElement uiHeader;
+    uiHeader.x = rightCol;
+    uiHeader.y = y;
+    uiHeader.w = colWidth;
+    uiHeader.h = 25;
+    uiHeader.text = "-- Interface --";
+    uiHeader.isLabel = true;
+    uiHeader.isHeader = true;
+    elements.push_back(uiHeader);
+    y += 35;
+    
+    // Tooltips
+    UIElement tt;
+    tt.x = rightCol; tt.y = y; tt.w = colWidth; tt.h = rowHeight;
+    tt.text = "Tooltips: " + std::string(s.enableTooltips ? "ON" : "OFF");
+    tt.boolValueRef = &s.enableTooltips;
+    tt.onClick = [](){};
+    tt.tooltip = "Show helpful tooltips on hover";
+    elements.push_back(tt);
+    
+    // Back button centered at bottom
+    UIElement back;
+    back.x = width / 2.0f - 100;
+    back.y = height - 80;
+    back.w = 200;
+    back.h = 45;
+    back.text = "Back";
+    back.onClick = [this]() { setMenuState(MenuState::SETTINGS); };
+    elements.push_back(back);
 }
 
 std::string getKeyName(int key) {
@@ -384,86 +561,251 @@ std::string getKeyName(int key) {
 void UIManager::setupControlsMenu() {
     elements.clear();
     
-    float cx = width / 2.0f;
-    float cy = height / 2.0f;
-    float btnW = 300.0f;
-    float btnH = 30.0f;
-    float gap = 5.0f;
-    float startY = cy - 200.0f;
-
     auto& k = Settings::instance().keys;
     
-    auto addKeyBtn = [&](const std::string& label, int* keyRef) {
-        std::string text = label + ": " + getKeyName(*keyRef);
+    // Grid layout - 2 columns
+    float colWidth = 240.0f;
+    float colGap = 60.0f;
+    float rowHeight = 38.0f;
+    float rowGap = 10.0f;
+    float startY = 80.0f;
+    float leftCol = width / 2.0f - colWidth - colGap / 2;
+    float rightCol = width / 2.0f + colGap / 2;
+    
+    // Title
+    UIElement title;
+    title.x = width / 2.0f - 80;
+    title.y = 30;
+    title.w = 160;
+    title.h = 30;
+    title.text = "Controls";
+    title.isLabel = true;
+    elements.push_back(title);
+    
+    // === LEFT COLUMN - Movement ===
+    UIElement moveHeader;
+    moveHeader.x = leftCol;
+    moveHeader.y = startY;
+    moveHeader.w = colWidth;
+    moveHeader.h = 25;
+    moveHeader.text = "-- Movement --";
+    moveHeader.isLabel = true;
+    moveHeader.isHeader = true;
+    elements.push_back(moveHeader);
+    
+    float y = startY + 35;
+    
+    auto addKeyBtn = [&](float x, float& yPos, const std::string& label, int* keyRef, const std::string& tip) {
         UIElement el;
-        el.x = cx - btnW/2;
-        el.y = startY;
-        el.w = btnW;
-        el.h = btnH;
-        el.text = text;
+        el.x = x;
+        el.y = yPos;
+        el.w = colWidth;
+        el.h = rowHeight;
+        el.text = label + ": " + getKeyName(*keyRef);
         el.isKeybind = true;
         el.keyBindRef = keyRef;
-        // onClick handled in update loop for keybinds
+        el.tooltip = tip;
         elements.push_back(el);
-        startY += btnH + gap;
+        yPos += rowHeight + rowGap;
     };
-
-    addKeyBtn("FORWARD", &k.forward);
-    addKeyBtn("BACKWARD", &k.backward);
-    addKeyBtn("LEFT", &k.left);
-    addKeyBtn("RIGHT", &k.right);
-    addKeyBtn("JUMP", &k.jump);
-    addKeyBtn("SPRINT", &k.sprint);
-    addKeyBtn("SNEAK", &k.sneak);
-    addKeyBtn("INVENTORY", &k.inventory);
-
-    // Back
-    startY += 10;
-    elements.push_back({cx - btnW/2, startY, btnW, btnH, "BACK", false, [this]() { 
-        setMenuState(MenuState::SETTINGS); 
-    }});
+    
+    addKeyBtn(leftCol, y, "Forward", &k.forward, "Move forward");
+    addKeyBtn(leftCol, y, "Backward", &k.backward, "Move backward");
+    addKeyBtn(leftCol, y, "Strafe Left", &k.left, "Move left");
+    addKeyBtn(leftCol, y, "Strafe Right", &k.right, "Move right");
+    addKeyBtn(leftCol, y, "Jump", &k.jump, "Jump / Fly up");
+    addKeyBtn(leftCol, y, "Sprint", &k.sprint, "Hold to run faster");
+    addKeyBtn(leftCol, y, "Sneak", &k.sneak, "Sneak / Fly down");
+    
+    // === RIGHT COLUMN - Actions ===
+    y = startY;
+    UIElement actHeader;
+    actHeader.x = rightCol;
+    actHeader.y = y;
+    actHeader.w = colWidth;
+    actHeader.h = 25;
+    actHeader.text = "-- Actions --";
+    actHeader.isLabel = true;
+    actHeader.isHeader = true;
+    elements.push_back(actHeader);
+    y += 35;
+    
+    addKeyBtn(rightCol, y, "Inventory", &k.inventory, "Open inventory (E)");
+    
+    // Info labels
+    y += 20;
+    UIElement info1;
+    info1.x = rightCol; info1.y = y; info1.w = colWidth; info1.h = 25;
+    info1.text = "Mouse: Look around";
+    info1.isLabel = true;
+    elements.push_back(info1);
+    y += 30;
+    
+    UIElement info2;
+    info2.x = rightCol; info2.y = y; info2.w = colWidth; info2.h = 25;
+    info2.text = "LMB: Break block";
+    info2.isLabel = true;
+    elements.push_back(info2);
+    y += 30;
+    
+    UIElement info3;
+    info3.x = rightCol; info3.y = y; info3.w = colWidth; info3.h = 25;
+    info3.text = "RMB: Place block";
+    info3.isLabel = true;
+    elements.push_back(info3);
+    y += 30;
+    
+    UIElement info4;
+    info4.x = rightCol; info4.y = y; info4.w = colWidth; info4.h = 25;
+    info4.text = "1-9: Select hotbar";
+    info4.isLabel = true;
+    elements.push_back(info4);
+    y += 30;
+    
+    UIElement info5;
+    info5.x = rightCol; info5.y = y; info5.w = colWidth; info5.h = 25;
+    info5.text = "Scroll: Cycle hotbar";
+    info5.isLabel = true;
+    elements.push_back(info5);
+    y += 30;
+    
+    UIElement info6;
+    info6.x = rightCol; info6.y = y; info6.w = colWidth; info6.h = 25;
+    info6.text = "F1: Toggle debug";
+    info6.isLabel = true;
+    elements.push_back(info6);
+    y += 30;
+    
+    UIElement info7;
+    info7.x = rightCol; info7.y = y; info7.w = colWidth; info7.h = 25;
+    info7.text = "M: Open map";
+    info7.isLabel = true;
+    elements.push_back(info7);
+    
+    // Instruction
+    UIElement inst;
+    inst.x = width / 2.0f - 150;
+    inst.y = height - 130;
+    inst.w = 300;
+    inst.h = 25;
+    inst.text = "Click a key to rebind";
+    inst.isLabel = true;
+    inst.customColor = glm::vec4(0.7f, 0.7f, 0.5f, 1.0f);
+    elements.push_back(inst);
+    
+    // Back button
+    UIElement back;
+    back.x = width / 2.0f - 100;
+    back.y = height - 80;
+    back.w = 200;
+    back.h = 45;
+    back.text = "Back";
+    back.onClick = [this]() { setMenuState(MenuState::SETTINGS); };
+    elements.push_back(back);
 }
 
 void UIManager::setupLoadGameMenu() {
     elements.clear();
-    float centerX = width / 2.0f;
-    float startY = height / 2.0f - 150.0f;
-    float btnW = 300.0f;
-    float btnH = 40.0f;
-    float gap = 10.0f;
-
+    
+    // Title
+    UIElement title;
+    title.x = width / 2.0f - 100;
+    title.y = 40;
+    title.w = 200;
+    title.h = 35;
+    title.text = "Load World";
+    title.isLabel = true;
+    elements.push_back(title);
+    
     std::vector<std::string> worlds = WorldSerializer::getAvailableWorlds();
     
-    for (size_t i = 0; i < worlds.size(); i++) {
-        std::string wName = worlds[i];
-        elements.push_back({centerX - btnW/2, startY + i * (btnH + gap), btnW, btnH, wName, false, [this, wName]() { 
-            if (onLoadGame) onLoadGame(wName);
-            setMenuState(MenuState::NONE);
-        }});
+    // World cards layout
+    float cardW = 350.0f;
+    float cardH = 70.0f;
+    float cardGap = 15.0f;
+    float startY = 100.0f;
+    float centerX = width / 2.0f;
+    
+    // Scrollable area hint if many worlds
+    if (worlds.empty()) {
+        UIElement noWorlds;
+        noWorlds.x = centerX - 150;
+        noWorlds.y = height / 2.0f - 30;
+        noWorlds.w = 300;
+        noWorlds.h = 30;
+        noWorlds.text = "No saved worlds found";
+        noWorlds.isLabel = true;
+        noWorlds.customColor = glm::vec4(0.6f, 0.6f, 0.6f, 1.0f);
+        elements.push_back(noWorlds);
+    } else {
+        for (size_t i = 0; i < worlds.size() && i < 6; i++) { // Max 6 visible
+            std::string wName = worlds[i];
+            
+            // World card (acts like a big button)
+            UIElement card;
+            card.x = centerX - cardW / 2;
+            card.y = startY + i * (cardH + cardGap);
+            card.w = cardW;
+            card.h = cardH;
+            card.text = wName;
+            card.isCard = true;
+            card.tooltip = "Click to load \"" + wName + "\"";
+            card.onClick = [this, wName]() { 
+                if (onLoadGame) onLoadGame(wName);
+                setMenuState(MenuState::NONE);
+            };
+            elements.push_back(card);
+        }
+        
+        if (worlds.size() > 6) {
+            UIElement more;
+            more.x = centerX - 100;
+            more.y = startY + 6 * (cardH + cardGap);
+            more.w = 200;
+            more.h = 25;
+            more.text = "+" + std::to_string(worlds.size() - 6) + " more worlds...";
+            more.isLabel = true;
+            more.customColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+            elements.push_back(more);
+        }
     }
-
-    elements.push_back({centerX - btnW/2, startY + worlds.size() * (btnH + gap) + 20, btnW, btnH, "BACK", false, [this]() { 
-        setMenuState(MenuState::MAIN_MENU); 
-    }});
+    
+    // Back button
+    UIElement back;
+    back.x = centerX - 100;
+    back.y = height - 80;
+    back.w = 200;
+    back.h = 45;
+    back.text = "Back";
+    back.onClick = [this]() { setMenuState(MenuState::MAIN_MENU); };
+    elements.push_back(back);
 }
 
 void UIManager::setupNewGameMenu() {
     elements.clear();
+    
+    // Title
+    UIElement title;
+    title.x = width / 2.0f - 120;
+    title.y = 50;
+    title.w = 240;
+    title.h = 35;
+    title.text = "Create New World";
+    title.isLabel = true;
+    elements.push_back(title);
+    
     float centerX = width / 2.0f;
-    float centerY = height / 2.0f;
-    float btnW = 300.0f;
-    float btnH = 40.0f;
-    float gap = 10.0f;
-
-    // Seed constraints: Use range [1, 999999999] for user-friendly display
-    // The WorldGenerator uses unsigned int internally which can handle this range
+    float centerY = height / 2.0f - 40;
+    float inputW = 320.0f;
+    float inputH = 45.0f;
+    float gap = 20.0f;
+    
+    // Seed constraints
     constexpr long MAX_SEED = 999999999L;
     constexpr long MIN_SEED = 1L;
 
-    // Input fields
+    // Static inputs to preserve values
     static std::string nameInput = "New World";
-    
-    // Generate a random seed immediately for display
     static std::string seedInput = "";
     if (seedInput.empty()) {
         std::random_device rd;
@@ -471,18 +813,75 @@ void UIManager::setupNewGameMenu() {
         std::uniform_int_distribution<long> dis(MIN_SEED, MAX_SEED);
         seedInput = std::to_string(dis(gen));
     }
+    
+    // World Name Label
+    UIElement nameLabel;
+    nameLabel.x = centerX - inputW / 2;
+    nameLabel.y = centerY - 80;
+    nameLabel.w = inputW;
+    nameLabel.h = 20;
+    nameLabel.text = "World Name:";
+    nameLabel.isLabel = true;
+    elements.push_back(nameLabel);
 
-    UIElement nameField = {centerX - btnW/2, centerY - 100, btnW, btnH, "NAME: " + nameInput, false, nullptr, false, nullptr, nullptr, nullptr, 0.0f, 0.0f, true, &nameInput};
+    // World Name Input
+    UIElement nameField;
+    nameField.x = centerX - inputW / 2;
+    nameField.y = centerY - 55;
+    nameField.w = inputW;
+    nameField.h = inputH;
+    nameField.text = nameInput;
+    nameField.isInput = true;
+    nameField.textRef = &nameInput;
+    nameField.tooltip = "Enter a name for your world";
     elements.push_back(nameField);
 
-    UIElement seedField = {centerX - btnW/2, centerY - 100 + btnH + gap, btnW, btnH, "SEED: " + seedInput, false, nullptr, false, nullptr, nullptr, nullptr, 0.0f, 0.0f, true, &seedInput};
+    // Seed Label
+    UIElement seedLabel;
+    seedLabel.x = centerX - inputW / 2;
+    seedLabel.y = centerY + 10;
+    seedLabel.w = inputW;
+    seedLabel.h = 20;
+    seedLabel.text = "World Seed:";
+    seedLabel.isLabel = true;
+    elements.push_back(seedLabel);
+    
+    // Seed Input
+    UIElement seedField;
+    seedField.x = centerX - inputW / 2;
+    seedField.y = centerY + 35;
+    seedField.w = inputW;
+    seedField.h = inputH;
+    seedField.text = seedInput;
+    seedField.isInput = true;
+    seedField.textRef = &seedInput;
+    seedField.tooltip = "Numeric seed (1 - 999,999,999)";
     elements.push_back(seedField);
+    
+    // Seed hint
+    UIElement seedHint;
+    seedHint.x = centerX - inputW / 2;
+    seedHint.y = centerY + 85;
+    seedHint.w = inputW;
+    seedHint.h = 18;
+    seedHint.text = "Leave empty or use numbers only";
+    seedHint.isLabel = true;
+    seedHint.customColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+    elements.push_back(seedHint);
 
-    elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*2 + 20, btnW, btnH, "CREATE WORLD", false, [this]() { 
+    // Create World Button
+    UIElement createBtn;
+    createBtn.x = centerX - 120;
+    createBtn.y = centerY + 130;
+    createBtn.w = 240;
+    createBtn.h = 50;
+    createBtn.text = "Create World";
+    createBtn.tooltip = "Generate and enter a new world";
+    createBtn.onClick = [this]() { 
         long seed = 0;
-        std::string seedStr = *elements[1].textRef;
+        std::string seedStr = *elements[4].textRef; // seedField is element 4
         
-        // Filter non-numeric characters and parse
+        // Filter non-numeric characters
         std::string cleanSeed;
         for (char c : seedStr) {
             if (c >= '0' && c <= '9') cleanSeed += c;
@@ -493,32 +892,33 @@ void UIManager::setupNewGameMenu() {
                 seed = std::stol(cleanSeed);
             }
         } catch(...) { 
-            seed = 0; // Will trigger random generation
+            seed = 0;
         }
         
-        // Constrain seed to valid range
         constexpr long MAX_SEED = 999999999L;
         constexpr long MIN_SEED = 1L;
         
         if (seed < MIN_SEED || seed > MAX_SEED) {
-            // Generate random seed if out of range or invalid
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_int_distribution<long> dis(MIN_SEED, MAX_SEED);
             seed = dis(gen);
         }
         
-        if (onNewGame) onNewGame(*elements[0].textRef, seed);
+        if (onNewGame) onNewGame(*elements[2].textRef, seed); // nameField is element 2
         setMenuState(MenuState::NONE);
-    }});
+    };
+    elements.push_back(createBtn);
 
-    elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*3 + 20, btnW, btnH, "BACK", false, [this]() { 
-        setMenuState(MenuState::MAIN_MENU); 
-    }});
-    
-    // Add hint text for seed range (non-interactive label)
-    UIElement seedHint = {centerX - btnW/2, centerY - 100 + btnH*2 + gap, btnW, 20, "(Seed: 1 - 999,999,999)", false, nullptr, false, nullptr, nullptr, nullptr, 0.0f, 0.0f, false, nullptr};
-    elements.push_back(seedHint);
+    // Back button
+    UIElement back;
+    back.x = centerX - 100;
+    back.y = height - 80;
+    back.w = 200;
+    back.h = 45;
+    back.text = "Back";
+    back.onClick = [this]() { setMenuState(MenuState::MAIN_MENU); };
+    elements.push_back(back);
 }
 
 void UIManager::setupInventoryMenu() {
@@ -597,9 +997,11 @@ glm::vec4 UIManager::getBlockColor(BlockType type) {
     }
 }
 
-void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool mousePressed, bool rightMousePressed) {
+void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mousePressed, bool rightMousePressed) {
     if (!isMenuOpen()) {
         lastMousePressed = mousePressed;
+        currentTooltip.clear();
+        tooltipTimer = 0.0f;
         return;
     }
 
@@ -607,6 +1009,10 @@ void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool m
 
     // Block clicks if waiting for keybind
     if (waitingForKeyBind) return;
+    
+    // Track tooltip
+    std::string hoveredTooltip;
+    bool anyHovered = false;
 
     for (auto& el : elements) {
         // Hit test
@@ -614,6 +1020,16 @@ void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool m
             mouseY >= el.y && mouseY <= el.y + el.h) {
             
             el.isHovered = true;
+            anyHovered = true;
+            
+            // Track tooltip for hovered element
+            if (!el.tooltip.empty() && Settings::instance().enableTooltips) {
+                if (hoveredTooltip.empty()) {
+                    hoveredTooltip = el.tooltip;
+                    tooltipX = static_cast<float>(mouseX) + 15.0f;
+                    tooltipY = static_cast<float>(mouseY) + 15.0f;
+                }
+            }
             
             if (mousePressed) {
                 if (el.isSlider) {
@@ -722,6 +1138,19 @@ void UIManager::update(float /*deltaTime*/, double mouseX, double mouseY, bool m
         pendingClick();
     }
     
+    // Update tooltip state
+    if (!hoveredTooltip.empty()) {
+        if (currentTooltip == hoveredTooltip) {
+            tooltipTimer += deltaTime;
+        } else {
+            currentTooltip = hoveredTooltip;
+            tooltipTimer = 0.0f;
+        }
+    } else {
+        currentTooltip.clear();
+        tooltipTimer = 0.0f;
+    }
+    
     lastMousePressed = mousePressed;
     lastRightMousePressed = rightMousePressed;
 }
@@ -740,6 +1169,28 @@ void UIManager::render() {
         if (isMenuOpen()) {
             // Draw semi-transparent background
             drawRect(0, 0, (float)width, (float)height, glm::vec4(0.0f, 0.0f, 0.0f, 0.7f));
+            
+            // Draw game title for main menu
+            if (currentMenuState == MenuState::MAIN_MENU) {
+                // Title: C++craft with stylish colors
+                std::string title = "Bettercraft";
+                float titleScale = 6.0f;
+                float titleW = title.length() * 6.0f * titleScale;
+                float titleX = (width - titleW) / 2.0f;
+                float titleY = height * 0.15f;
+                
+                // Draw shadow
+                drawText(titleX + 4, titleY + 4, titleScale, title, glm::vec4(0.0f, 0.0f, 0.0f, 0.6f));
+                // Draw main title with gradient-like effect (green for C++, white for craft)
+                drawText(titleX, titleY, titleScale, title, glm::vec4(0.4f, 0.9f, 0.4f, 1.0f));
+                
+                // Subtitle
+                std::string subtitle = "A Minecraft Clone";
+                float subScale = 2.0f;
+                float subW = subtitle.length() * 6.0f * subScale;
+                float subX = (width - subW) / 2.0f;
+                drawText(subX, titleY + titleScale * 12.0f, subScale, subtitle, glm::vec4(0.7f, 0.7f, 0.7f, 1.0f));
+            }
             
             // Special handling for MAP - render the map using colored rectangles
             if (currentMenuState == MenuState::MAP && !elements.empty()) {
@@ -822,10 +1273,51 @@ void UIManager::render() {
             }
 
             for (const auto& el : elements) {
-                glm::vec4 color = el.isHovered ? glm::vec4(0.6f, 0.6f, 0.6f, 1.0f) : glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
+                glm::vec4 color = el.isHovered ? glm::vec4(0.5f, 0.7f, 0.5f, 0.95f) : glm::vec4(0.25f, 0.25f, 0.28f, 0.9f);
+                glm::vec4 borderColor = el.isHovered ? glm::vec4(0.6f, 0.9f, 0.6f, 1.0f) : glm::vec4(0.1f, 0.1f, 0.12f, 1.0f);
                 
                 // Skip the map element itself (we rendered it above)
                 if (currentMenuState == MenuState::MAP && &el == &elements[0]) {
+                    continue;
+                }
+                
+                // Handle labels (just text, no background)
+                if (el.isLabel) {
+                    float textScale = 1.8f;
+                    glm::vec4 textColor = el.customColor.a > 0 ? el.customColor : glm::vec4(0.85f, 0.85f, 0.85f, 1.0f);
+                    // Left-align labels
+                    drawText(el.x, el.y + (el.h - 7.0f * textScale) / 2.0f, textScale, el.text, textColor);
+                    continue;
+                }
+                
+                // Handle headers (larger text with underline)
+                if (el.isHeader) {
+                    float textScale = 2.2f;
+                    glm::vec4 textColor = el.customColor.a > 0 ? el.customColor : glm::vec4(0.5f, 0.9f, 0.5f, 1.0f);
+                    float textW = el.text.length() * 6.0f * textScale;
+                    float textX = el.x + (el.w - textW) / 2.0f;
+                    drawText(textX, el.y, textScale, el.text, textColor);
+                    // Draw underline
+                    drawRect(el.x, el.y + textScale * 10.0f, el.w, 2, glm::vec4(textColor.r, textColor.g, textColor.b, 0.5f));
+                    continue;
+                }
+                
+                // Handle card-style elements (larger, rounded-look buttons)
+                if (el.isCard) {
+                    glm::vec4 cardColor = el.isHovered ? glm::vec4(0.35f, 0.45f, 0.35f, 0.95f) : glm::vec4(0.18f, 0.2f, 0.22f, 0.9f);
+                    glm::vec4 cardBorder = el.isHovered ? glm::vec4(0.5f, 0.8f, 0.5f, 1.0f) : glm::vec4(0.3f, 0.35f, 0.38f, 1.0f);
+                    
+                    // Draw card background with thicker border
+                    float borderWidth = 3.0f;
+                    drawRect(el.x - borderWidth, el.y - borderWidth, el.w + borderWidth*2, el.h + borderWidth*2, cardBorder);
+                    drawRect(el.x, el.y, el.w, el.h, cardColor);
+                    
+                    // Draw text centered with larger scale
+                    float textScale = 2.5f;
+                    float textW = el.text.length() * 6.0f * textScale;
+                    float textX = el.x + (el.w - textW) / 2.0f;
+                    float textY = el.y + (el.h - 7.0f * textScale) / 2.0f;
+                    drawText(textX, textY, textScale, el.text, glm::vec4(1.0f));
                     continue;
                 }
                 
@@ -850,6 +1342,9 @@ void UIManager::render() {
                      continue;
                 }
 
+                // Draw button with border for better look
+                float borderWidth = 2.0f;
+                drawRect(el.x - borderWidth, el.y - borderWidth, el.w + borderWidth*2, el.h + borderWidth*2, borderColor);
                 drawRect(el.x, el.y, el.w, el.h, color);
                 
                 // Draw slider indicator
@@ -911,6 +1406,30 @@ void UIManager::render() {
                 drawText(10.0f, 420.0f, 2.0f, taaMotion, glm::vec4(0.9f, 0.6f, 0.2f, 1.0f));
                 drawText(10.0f, 450.0f, 2.0f, taaHistory, glm::vec4(0.9f, 0.6f, 0.2f, 1.0f));
             }
+        }
+        
+        // Render tooltip if visible and timer exceeded delay
+        if (!currentTooltip.empty() && tooltipTimer >= tooltipDelay && Settings::instance().enableTooltips) {
+            float padding = 8.0f;
+            float textScale = 1.5f;
+            float tooltipW = currentTooltip.length() * 6.0f * textScale + padding * 2;
+            float tooltipH = 7.0f * textScale + padding * 2;
+            
+            // Keep tooltip on screen
+            float drawX = tooltipX;
+            float drawY = tooltipY;
+            if (drawX + tooltipW > width) drawX = width - tooltipW - 5;
+            if (drawY + tooltipH > height) drawY = height - tooltipH - 5;
+            
+            // Draw tooltip background
+            drawRect(drawX, drawY, tooltipW, tooltipH, glm::vec4(0.1f, 0.1f, 0.12f, 0.95f));
+            // Draw border
+            drawRect(drawX, drawY, tooltipW, 1, glm::vec4(0.4f, 0.4f, 0.45f, 1.0f));
+            drawRect(drawX, drawY + tooltipH - 1, tooltipW, 1, glm::vec4(0.4f, 0.4f, 0.45f, 1.0f));
+            drawRect(drawX, drawY, 1, tooltipH, glm::vec4(0.4f, 0.4f, 0.45f, 1.0f));
+            drawRect(drawX + tooltipW - 1, drawY, 1, tooltipH, glm::vec4(0.4f, 0.4f, 0.45f, 1.0f));
+            // Draw text
+            drawText(drawX + padding, drawY + padding, textScale, currentTooltip, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f));
         }
 
         uiShader.unuse();
@@ -1285,37 +1804,76 @@ void UIManager::setupMapMenu() {
 void UIManager::setupMultiplayerMenu() {
     elements.clear();
     float centerX = width / 2.0f;
-    float centerY = height / 2.0f;
-    float btnW = 200.0f;
-    float btnH = 40.0f;
-    float gap = 10.0f;
     
-    // Title area - just spacing
-    float startY = centerY - 75;
-
-    elements.push_back({centerX - btnW/2, startY, btnW, btnH, "HOST GAME", false, [this]() { 
-        setMenuState(MenuState::HOST_GAME); 
-    }});
+    // Title
+    UIElement title;
+    title.x = centerX - 100;
+    title.y = 50;
+    title.w = 200;
+    title.h = 35;
+    title.text = "Multiplayer";
+    title.isLabel = true;
+    elements.push_back(title);
     
-    elements.push_back({centerX - btnW/2, startY + btnH + gap, btnW, btnH, "JOIN GAME", false, [this]() { 
-        setMenuState(MenuState::JOIN_GAME); 
-    }});
+    // Card-style buttons
+    float cardW = 300.0f;
+    float cardH = 80.0f;
+    float gap = 25.0f;
+    float startY = height / 2.0f - cardH - gap/2;
+    
+    // Host Game Card
+    UIElement hostCard;
+    hostCard.x = centerX - cardW/2;
+    hostCard.y = startY;
+    hostCard.w = cardW;
+    hostCard.h = cardH;
+    hostCard.text = "Host Game";
+    hostCard.isCard = true;
+    hostCard.tooltip = "Create a server for others to join";
+    hostCard.onClick = [this]() { setMenuState(MenuState::HOST_GAME); };
+    elements.push_back(hostCard);
+    
+    // Join Game Card
+    UIElement joinCard;
+    joinCard.x = centerX - cardW/2;
+    joinCard.y = startY + cardH + gap;
+    joinCard.w = cardW;
+    joinCard.h = cardH;
+    joinCard.text = "Join Game";
+    joinCard.isCard = true;
+    joinCard.tooltip = "Connect to an existing server";
+    joinCard.onClick = [this]() { setMenuState(MenuState::JOIN_GAME); };
+    elements.push_back(joinCard);
 
-    elements.push_back({centerX - btnW/2, startY + (btnH + gap)*2, btnW, btnH, "BACK", false, [this]() { 
-        setMenuState(MenuState::MAIN_MENU); 
-    }});
+    // Back button
+    UIElement back;
+    back.x = centerX - 100;
+    back.y = height - 80;
+    back.w = 200;
+    back.h = 45;
+    back.text = "Back";
+    back.onClick = [this]() { setMenuState(MenuState::MAIN_MENU); };
+    elements.push_back(back);
 }
 
 void UIManager::setupHostGameMenu() {
     elements.clear();
     float centerX = width / 2.0f;
-    float centerY = height / 2.0f;
-    float inputW = 300.0f;
-    float inputH = 35.0f;
-    float btnW = 200.0f;
-    float btnH = 40.0f;
-    float gap = 15.0f;
-    float startY = centerY - 100;
+    
+    // Title
+    UIElement title;
+    title.x = centerX - 100;
+    title.y = 50;
+    title.w = 200;
+    title.h = 35;
+    title.text = "Host Game";
+    title.isLabel = true;
+    elements.push_back(title);
+    
+    float inputW = 320.0f;
+    float inputH = 42.0f;
+    float gap = 20.0f;
+    float startY = height / 2.0f - 100;
     
     // Load last used values from settings
     auto& settings = Settings::instance();
@@ -1326,61 +1884,99 @@ void UIManager::setupHostGameMenu() {
         serverPort = std::to_string(settings.lastServerPort);
     }
     
-    // Player Name label + input
-    UIElement nameLabel = {centerX - inputW/2, startY, inputW, 20, "Player Name:", false, nullptr};
+    // Player Name Label
+    UIElement nameLabel;
+    nameLabel.x = centerX - inputW/2;
+    nameLabel.y = startY;
+    nameLabel.w = inputW;
+    nameLabel.h = 20;
+    nameLabel.text = "Your Name:";
+    nameLabel.isLabel = true;
     elements.push_back(nameLabel);
     
+    // Player Name Input
     UIElement nameInput;
     nameInput.x = centerX - inputW/2;
-    nameInput.y = startY + 22;
+    nameInput.y = startY + 25;
     nameInput.w = inputW;
     nameInput.h = inputH;
     nameInput.text = playerName;
     nameInput.isInput = true;
     nameInput.textRef = &playerName;
+    nameInput.tooltip = "Name shown to other players";
     elements.push_back(nameInput);
     
-    // Port label + input
-    UIElement portLabel = {centerX - inputW/2, startY + inputH + gap + 22, inputW, 20, "Port:", false, nullptr};
+    // Port Label
+    UIElement portLabel;
+    portLabel.x = centerX - inputW/2;
+    portLabel.y = startY + inputH + gap + 25;
+    portLabel.w = inputW;
+    portLabel.h = 20;
+    portLabel.text = "Server Port:";
+    portLabel.isLabel = true;
     elements.push_back(portLabel);
     
+    // Port Input
     UIElement portInput;
     portInput.x = centerX - inputW/2;
-    portInput.y = startY + inputH + gap + 44;
+    portInput.y = startY + inputH + gap + 50;
     portInput.w = inputW;
     portInput.h = inputH;
     portInput.text = serverPort;
     portInput.isInput = true;
     portInput.textRef = &serverPort;
+    portInput.tooltip = "Port to host on (default: 25565)";
     elements.push_back(portInput);
     
     // Host button
-    elements.push_back({centerX - btnW/2, startY + (inputH + gap)*2 + 60, btnW, btnH, "HOST", false, [this]() {
+    UIElement hostBtn;
+    hostBtn.x = centerX - 120;
+    hostBtn.y = startY + (inputH + gap)*2 + 70;
+    hostBtn.w = 240;
+    hostBtn.h = 50;
+    hostBtn.text = "Start Hosting";
+    hostBtn.tooltip = "Create server and wait for players";
+    hostBtn.onClick = [this]() {
         if (onHostGame) {
             int port = std::stoi(serverPort.empty() ? "25565" : serverPort);
-            // Save last used values
             Settings::instance().lastPlayerName = playerName;
             Settings::instance().lastServerPort = port;
             onHostGame(playerName, port);
         }
-    }});
+    };
+    elements.push_back(hostBtn);
     
     // Back button
-    elements.push_back({centerX - btnW/2, startY + (inputH + gap)*2 + 60 + btnH + gap, btnW, btnH, "BACK", false, [this]() { 
-        setMenuState(MenuState::MULTIPLAYER); 
-    }});
+    UIElement back;
+    back.x = centerX - 100;
+    back.y = height - 80;
+    back.w = 200;
+    back.h = 45;
+    back.text = "Back";
+    back.onClick = [this]() { setMenuState(MenuState::MULTIPLAYER); };
+    elements.push_back(back);
 }
 
 void UIManager::setupJoinGameMenu() {
     elements.clear();
     float centerX = width / 2.0f;
-    float centerY = height / 2.0f;
-    float inputW = 300.0f;
-    float inputH = 35.0f;
-    float btnW = 200.0f;
-    float btnH = 40.0f;
-    float gap = 15.0f;
-    float startY = centerY - 130;
+    
+    // Title
+    UIElement title;
+    title.x = centerX - 100;
+    title.y = 50;
+    title.w = 200;
+    title.h = 35;
+    title.text = "Join Game";
+    title.isLabel = true;
+    elements.push_back(title);
+    
+    float inputW = 320.0f;
+    float inputH = 42.0f;
+    float gap = 18.0f;
+    float btnW = 240.0f;
+    float btnH = 50.0f;
+    float startY = height / 2.0f - 140;
     
     // Load last used values from settings
     auto& settings = Settings::instance();
@@ -1394,56 +1990,93 @@ void UIManager::setupJoinGameMenu() {
         serverPort = std::to_string(settings.lastServerPort);
     }
     
-    // Player Name label + input
-    UIElement nameLabel = {centerX - inputW/2, startY, inputW, 20, "Player Name:", false, nullptr};
+    // Player Name Label
+    UIElement nameLabel;
+    nameLabel.x = centerX - inputW/2;
+    nameLabel.y = startY;
+    nameLabel.w = inputW;
+    nameLabel.h = 20;
+    nameLabel.text = "Your Name:";
+    nameLabel.isLabel = true;
     elements.push_back(nameLabel);
     
+    // Player Name Input
     UIElement nameInput;
     nameInput.x = centerX - inputW/2;
-    nameInput.y = startY + 22;
+    nameInput.y = startY + 25;
     nameInput.w = inputW;
     nameInput.h = inputH;
     nameInput.text = playerName;
     nameInput.isInput = true;
     nameInput.textRef = &playerName;
+    nameInput.tooltip = "Name shown to other players";
     elements.push_back(nameInput);
     
-    // Server Address label + input
-    UIElement addrLabel = {centerX - inputW/2, startY + inputH + gap + 22, inputW, 20, "Server Address:", false, nullptr};
+    // Server Address Label
+    UIElement addrLabel;
+    addrLabel.x = centerX - inputW/2;
+    addrLabel.y = startY + inputH + gap + 25;
+    addrLabel.w = inputW;
+    addrLabel.h = 20;
+    addrLabel.text = "Server Address:";
+    addrLabel.isLabel = true;
     elements.push_back(addrLabel);
     
+    // Server Address Input
     UIElement addrInput;
     addrInput.x = centerX - inputW/2;
-    addrInput.y = startY + inputH + gap + 44;
+    addrInput.y = startY + inputH + gap + 50;
     addrInput.w = inputW;
     addrInput.h = inputH;
     addrInput.text = serverAddress;
     addrInput.isInput = true;
     addrInput.textRef = &serverAddress;
+    addrInput.tooltip = "IP address or hostname of the server";
     elements.push_back(addrInput);
     
-    // Port label + input
-    UIElement portLabel = {centerX - inputW/2, startY + (inputH + gap)*2 + 44, inputW, 20, "Port:", false, nullptr};
+    // Port Label
+    UIElement portLabel;
+    portLabel.x = centerX - inputW/2;
+    portLabel.y = startY + (inputH + gap)*2 + 50;
+    portLabel.w = inputW;
+    portLabel.h = 20;
+    portLabel.text = "Server Port:";
+    portLabel.isLabel = true;
     elements.push_back(portLabel);
     
+    // Port Input
     UIElement portInput;
     portInput.x = centerX - inputW/2;
-    portInput.y = startY + (inputH + gap)*2 + 66;
+    portInput.y = startY + (inputH + gap)*2 + 75;
     portInput.w = inputW;
     portInput.h = inputH;
     portInput.text = serverPort;
     portInput.isInput = true;
     portInput.textRef = &serverPort;
+    portInput.tooltip = "Port to connect to (default: 25565)";
     elements.push_back(portInput);
     
     // Status display
     if (!networkStatus.empty()) {
-        UIElement statusLabel = {centerX - inputW/2, startY + (inputH + gap)*3 + 80, inputW, 20, networkStatus, false, nullptr};
+        UIElement statusLabel;
+        statusLabel.x = centerX - inputW/2;
+        statusLabel.y = startY + (inputH + gap)*3 + 90;
+        statusLabel.w = inputW;
+        statusLabel.h = 20;
+        statusLabel.text = networkStatus;
+        statusLabel.isLabel = true;
+        statusLabel.customColor = glm::vec4(1.0f, 0.7f, 0.3f, 1.0f);
         elements.push_back(statusLabel);
     }
     
     // Join button
-    elements.push_back({centerX - btnW/2, startY + (inputH + gap)*3 + 110, btnW, btnH, "JOIN", false, [this]() {
+    UIElement joinBtn;
+    joinBtn.x = centerX - btnW/2;
+    joinBtn.y = startY + (inputH + gap)*3 + 110;
+    joinBtn.w = btnW;
+    joinBtn.h = btnH;
+    joinBtn.text = "JOIN";
+    joinBtn.onClick = [this]() {
         if (onJoinGame) {
             int port = std::stoi(serverPort.empty() ? "25565" : serverPort);
             // Save last used values
@@ -1452,12 +2085,18 @@ void UIManager::setupJoinGameMenu() {
             Settings::instance().lastServerPort = port;
             onJoinGame(playerName, serverAddress, port);
         }
-    }});
+    };
+    elements.push_back(joinBtn);
     
     // Back button
-    elements.push_back({centerX - btnW/2, startY + (inputH + gap)*3 + 110 + btnH + gap, btnW, btnH, "BACK", false, [this]() { 
-        setMenuState(MenuState::MULTIPLAYER); 
-    }});
+    UIElement backBtn;
+    backBtn.x = centerX - btnW/2;
+    backBtn.y = startY + (inputH + gap)*3 + 110 + btnH + gap;
+    backBtn.w = btnW;
+    backBtn.h = btnH;
+    backBtn.text = "BACK";
+    backBtn.onClick = [this]() { setMenuState(MenuState::MULTIPLAYER); };
+    elements.push_back(backBtn);
 }
 
 void UIManager::addChatMessage(const std::string& senderName, const std::string& message) {

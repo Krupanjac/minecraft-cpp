@@ -51,6 +51,15 @@ struct UIElement {
     // For Keybinding
     bool isKeybind = false;
     int* keyBindRef = nullptr;
+    
+    // For tooltips
+    std::string tooltip;
+    
+    // Visual styling
+    bool isLabel = false;      // Non-interactive label
+    bool isCard = false;       // Card-style container
+    bool isHeader = false;     // Section header
+    glm::vec4 customColor = glm::vec4(0.0f);  // Custom color (if any component > 0)
 };
 
 class UIManager {
@@ -133,6 +142,12 @@ private:
 
     bool waitingForKeyBind = false;
     int* keyBindPtr = nullptr;
+    
+    // Tooltip state
+    std::string currentTooltip;
+    float tooltipX = 0.0f, tooltipY = 0.0f;
+    float tooltipTimer = 0.0f;
+    const float tooltipDelay = 0.5f; // Seconds before tooltip appears
 
     BlockType selectedBlock = BlockType::STONE; // Deprecated by hotbar, keeping for internal ref if needed, but hotbar[selectedSlot] is primary.
     

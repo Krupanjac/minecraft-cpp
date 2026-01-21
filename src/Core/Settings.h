@@ -37,6 +37,9 @@ public:
     bool debugWireframe = false; // Render in wireframe
     bool debugShowNormals = false; // Visualize normals as colors
     
+    // UI settings
+    bool enableTooltips = true; // Show tooltips on hover
+    
     // Multiplayer settings
     std::string lastPlayerName = "Player";
     std::string lastServerAddress = "localhost";
@@ -87,6 +90,8 @@ public:
                     else if (key == "debugShowNormals") debugShowNormals = (value == "1");
                     else if (key == "shadowDistance") shadowDistance = std::stof(value);
                     else if (key == "fullscreen") fullscreen = std::stoi(value);
+                    // UI
+                    else if (key == "enableTooltips") enableTooltips = (value == "1");
                     // Multiplayer
                     else if (key == "lastPlayerName") lastPlayerName = value;
                     else if (key == "lastServerAddress") lastServerAddress = value;
@@ -131,6 +136,8 @@ public:
         file << "debugWireframe=" << (debugWireframe ? "1" : "0") << "\n";
         file << "debugShowNormals=" << (debugShowNormals ? "1" : "0") << "\n";
         file << "fullscreen=" << fullscreen << "\n";
+        // UI
+        file << "enableTooltips=" << (enableTooltips ? "1" : "0") << "\n";
         // Multiplayer
         file << "lastPlayerName=" << lastPlayerName << "\n";
         file << "lastServerAddress=" << lastServerAddress << "\n";
