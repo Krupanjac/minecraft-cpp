@@ -22,6 +22,8 @@
 #include <vector>
 #include <ctime>
 #include <cstdlib>
+#include <chrono>
+#include <unordered_map>
 
 class Application {
 public:
@@ -189,6 +191,14 @@ public:
             applySettings();
         });
         
+        // Return to main menu callback - reinitialize menu world
+        uiManager.setOnReturnToMainMenu([this]() {
+            LOG_INFO("Returning to main menu, reinitializing menu world...");
+            zombies.clear(); // Clear any spawned zombies
+            menuWorldInitialized = false; // Force reinitialization
+            initializeMenuWorld();
+        });
+        
         // Setup teleport callback for map
         uiManager.setOnTeleport([this](float x, float z) {
             // Get height at target location (from generator which is deterministic)
@@ -264,6 +274,10 @@ public:
             uiManager.setIsOnline(false);
             uiManager.setNetworkStatus("Disconnected: " + reason);
             uiManager.setWorldLoaded(false);
+            // Re-initialize menu world
+            zombies.clear();
+            menuWorldInitialized = false;
+            initializeMenuWorld();
             uiManager.setMenuState(MenuState::MAIN_MENU);
         });
         
@@ -356,59 +370,102 @@ public:
     }
     
     void initializeMenuWorld() {
-        if (menuWorldInitialized) return;
-        
         LOG_INFO("Initializing menu background world...");
         
-        // Use a fixed seed for the menu world for consistent views
-        long menuSeed = 42424242;
-        worldGenerator.setSeed(static_cast<unsigned int>(menuSeed));
+        // Clear any existing world data first
+        chunkManager.unloadAll();
+        chunkManager.clear();
+        renderer.clear();
         
-        // Find positions close to terrain for nice scenic views
-        int terrainHeight = worldGenerator.getSurfaceHeight(0, 0);
-        menuScenePositions[0] = glm::vec3(0.0f, static_cast<float>(terrainHeight) + 8.0f, 0.0f);
-        menuScenePositions[1] = glm::vec3(200.0f, static_cast<float>(worldGenerator.getSurfaceHeight(200, 200)) + 6.0f, 200.0f);
-        menuScenePositions[2] = glm::vec3(-150.0f, static_cast<float>(worldGenerator.getSurfaceHeight(-150, 100)) + 10.0f, 100.0f);
-        menuScenePositions[3] = glm::vec3(100.0f, static_cast<float>(worldGenerator.getSurfaceHeight(100, -200)) + 7.0f, -200.0f);
+        // Initialize seed ONCE per .exe session (O(1) lookup for subsequent calls)
+        if (!menuSeedInitialized) {
+            menuWorldSeed = static_cast<long>(std::chrono::system_clock::now().time_since_epoch().count());
+            menuSeedInitialized = true;
+            LOG_INFO("Menu world seed initialized: " + std::to_string(menuWorldSeed));
+        } else {
+            LOG_INFO("Reusing cached menu world seed: " + std::to_string(menuWorldSeed));
+        }
+        worldGenerator.setSeed(static_cast<unsigned int>(menuWorldSeed));
+        
+        // Find a nice scenic spot - keep all camera positions within a reasonable area
+        int centerX = 0;
+        int centerZ = 0;
+        int terrainHeight = worldGenerator.getSurfaceHeight(centerX, centerZ);
+        float baseY = static_cast<float>(terrainHeight) + 25.0f; // Higher above ground
+        
+        // Scene positions with more movement but still within pre-loaded area (~50 block radius)
+        menuScenePositions[0] = glm::vec3(centerX, baseY, centerZ);
+        menuScenePositions[1] = glm::vec3(centerX + 40.0f, baseY + 8.0f, centerZ + 35.0f);
+        menuScenePositions[2] = glm::vec3(centerX - 35.0f, baseY + 5.0f, centerZ + 25.0f);
+        menuScenePositions[3] = glm::vec3(centerX + 25.0f, baseY + 3.0f, centerZ - 40.0f);
         
         menuCamera.setPosition(menuScenePositions[0]);
         menuCamera.setYaw(menuCameraYaw);
-        menuCamera.setPitch(menuCameraPitch);
+        menuCamera.setPitch(-15.0f); // Looking down at the terrain
+        menuCameraPitch = -15.0f;
         menuCamera.setFov(70.0f);
         
-        // Generate chunks around the first scene position
-        int menuRadius = 4;
+        // Pre-generate a good sized area with loading screen
+        // Radius of 6 gives 13x13 chunks = ~208 blocks coverage, enough for 50 block camera movement
+        int menuRadius = 6;
+        int totalChunks = (menuRadius * 2 + 1) * (menuRadius * 2 + 1) * 8;
+        int generatedChunks = 0;
+        
+        // Check if we have cached data (O(1) cache lookup)
+        bool usingCache = menuCacheValid && !menuChunkCache.empty();
+        if (usingCache) {
+            LOG_INFO("Restoring menu world from cache (" + std::to_string(menuChunkCache.size()) + " chunks)...");
+        } else {
+            LOG_INFO("Generating menu world chunks with loading screen...");
+        }
+        
+        // Generate or restore all chunks with loading screen feedback
         for (int x = -menuRadius; x <= menuRadius; x++) {
             for (int z = -menuRadius; z <= menuRadius; z++) {
                 for (int y = 0; y < 8; y++) {
-                    ChunkPos pos = ChunkManager::worldToChunk(menuScenePositions[0] + glm::vec3(x * CHUNK_SIZE, y * CHUNK_SIZE - 64, z * CHUNK_SIZE));
-                    chunkManager.requestChunkGeneration(pos);
-                }
-            }
-        }
-        
-        // Wait for initial chunks to generate and mesh (in background thread would be better)
-        bool initialDone = false;
-        int attempts = 0;
-        while (!initialDone && attempts < 100) {
-            auto chunksToGen = chunkManager.getChunksToGenerate(menuCamera.getPosition(), menuRadius, 1000);
-            if (chunksToGen.empty()) {
-                initialDone = true;
-            } else {
-                for (const auto& pos : chunksToGen) {
+                    ChunkPos pos = ChunkManager::worldToChunk(glm::vec3(centerX, 0, centerZ) + glm::vec3(x * CHUNK_SIZE, y * CHUNK_SIZE - 64, z * CHUNK_SIZE));
                     chunkManager.requestChunkGeneration(pos);
                     auto chunk = chunkManager.getChunk(pos);
-                    if (chunk && chunk->getState() == ChunkState::GENERATING) {
-                        worldGenerator.generate(chunk);
-                        chunk->setState(ChunkState::READY);
+                    
+                    // Check for UNLOADED state (new chunks start as UNLOADED after requestChunkGeneration)
+                    if (chunk && chunk->getState() == ChunkState::UNLOADED) {
+                        // O(1) cache lookup - check if this chunk is already cached
+                        auto cacheIt = menuChunkCache.find(pos);
+                        if (usingCache && cacheIt != menuChunkCache.end()) {
+                            // Restore from cache (O(1) lookup + O(n) copy where n = blocks in chunk)
+                            chunk->setBlocks(cacheIt->second);
+                        } else {
+                            // Generate new chunk and cache it
+                            worldGenerator.generate(chunk);
+                            
+                            // Store in cache for future use (O(1) insert)
+                            menuChunkCache[pos] = chunk->getBlocks();
+                        }
+                        // Set to MESH_BUILD so getChunksToMesh will pick it up
+                        chunk->setState(ChunkState::MESH_BUILD);
+                    }
+                    generatedChunks++;
+                    
+                    // Update loading screen periodically
+                    if (generatedChunks % 20 == 0) {
+                        float progress = static_cast<float>(generatedChunks) / static_cast<float>(totalChunks) * 0.6f;
+                        renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
+                        window->swapBuffers();
+                        window->pollEvents();
                     }
                 }
             }
-            attempts++;
         }
         
-        // Build meshes for generated chunks
+        // Mark cache as valid for future reloads
+        menuCacheValid = true;
+        
+        // Build meshes for all generated chunks with loading screen
+        LOG_INFO("Building menu world meshes...");
         auto chunksToMesh = chunkManager.getChunksToMesh(menuCamera.getPosition(), 1000);
+        int totalMeshes = static_cast<int>(chunksToMesh.size());
+        int meshedCount = 0;
+        
         for (auto& chunk : chunksToMesh) {
             auto neighbors = chunkManager.getNeighbors(chunk->getPosition());
             MeshData meshData = meshBuilder.buildChunkMesh(chunk, 
@@ -417,58 +474,50 @@ public:
                 meshData.vertices, meshData.indices, 
                 meshData.waterVertices, meshData.waterIndices);
             chunk->setState(ChunkState::GPU_UPLOADED);
+            meshedCount++;
+            
+            // Update loading screen periodically
+            if (meshedCount % 10 == 0) {
+                float progress = 0.6f + (static_cast<float>(meshedCount) / static_cast<float>(totalMeshes)) * 0.4f;
+                renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
+                window->swapBuffers();
+                window->pollEvents();
+            }
         }
         
+        // Show final 100% loading screen before transitioning
+        renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), 1.0f);
+        window->swapBuffers();
+        window->pollEvents();
+        
         menuWorldInitialized = true;
-        LOG_INFO("Menu background world initialized");
+        LOG_INFO("Menu background world initialized with " + std::to_string(generatedChunks) + " chunks" + 
+                 (usingCache ? " (from cache)" : " (newly generated)"));
     }
     
     void updateMenuCamera(float deltaTime) {
         // Slowly rotate camera for panoramic effect
-        menuCameraYaw += deltaTime * 5.0f; // 5 degrees per second
+        menuCameraYaw += deltaTime * 3.0f; // 3 degrees per second (slower rotation)
         if (menuCameraYaw > 360.0f) menuCameraYaw -= 360.0f;
         
         menuCamera.setYaw(menuCameraYaw);
         menuCamera.setPitch(menuCameraPitch);
         
-        // Change scene every 15 seconds with smooth transition
+        // Change scene every 20 seconds with smooth transition
         menuCameraTimer += deltaTime;
-        if (menuCameraTimer >= 15.0f) {
+        if (menuCameraTimer >= 20.0f) {
             menuCameraTimer = 0.0f;
             menuSceneIndex = (menuSceneIndex + 1) % NUM_MENU_SCENES;
         }
         
-        // Smooth interpolation to target position
+        // Smooth interpolation to target position (within pre-loaded area)
         glm::vec3 targetPos = menuScenePositions[menuSceneIndex];
         glm::vec3 currentPos = menuCamera.getPosition();
-        glm::vec3 newPos = currentPos + (targetPos - currentPos) * deltaTime * 0.5f;
+        glm::vec3 newPos = currentPos + (targetPos - currentPos) * deltaTime * 0.3f;
         menuCamera.setPosition(newPos);
         
-        // Update chunk manager (unloads distant chunks)
-        chunkManager.update(menuCamera.getPosition(), menuCamera.getFront(), menuCamera.getViewMatrix());
-        
-        // Generate chunks around current camera position (more chunks for better view)
-        auto chunksToGen = chunkManager.getChunksToGenerate(menuCamera.getPosition(), 6, 200);
-        for (const auto& pos : chunksToGen) {
-            chunkManager.requestChunkGeneration(pos);
-            auto chunk = chunkManager.getChunk(pos);
-            if (chunk && chunk->getState() == ChunkState::GENERATING) {
-                worldGenerator.generate(chunk);
-                chunk->setState(ChunkState::READY);
-            }
-        }
-        
-        // Mesh nearby chunks (more for better view)
-        auto chunksToMesh = chunkManager.getChunksToMesh(menuCamera.getPosition(), 100);
-        for (auto& chunk : chunksToMesh) {
-            auto neighbors = chunkManager.getNeighbors(chunk->getPosition());
-            MeshData meshData = meshBuilder.buildChunkMesh(chunk, 
-                neighbors[0], neighbors[1], neighbors[2], neighbors[3], neighbors[4], neighbors[5], chunk->getCurrentLOD());
-            renderer.uploadChunkMesh(chunk->getPosition(), 
-                meshData.vertices, meshData.indices, 
-                meshData.waterVertices, meshData.waterIndices);
-            chunk->setState(ChunkState::GPU_UPLOADED);
-        }
+        // NO dynamic chunk generation - everything is pre-loaded
+        // Just update the view matrix for rendering
     }
 
     void createWorld(const std::string& name, long seed = 12345) {
@@ -818,6 +867,12 @@ private:
         glm::vec3(100.0f, 90.0f, -200.0f)
     };
     
+    // Menu world cache - O(1) lookup for chunks within session
+    long menuWorldSeed = 0; // Set once at startup, reused for entire session
+    bool menuSeedInitialized = false;
+    std::unordered_map<ChunkPos, std::array<Block, CHUNK_VOLUME>> menuChunkCache;
+    bool menuCacheValid = false; // True if cache contains valid data for current seed
+    
     void applySettings() {
         auto& s = Settings::instance();
         camera.setFov(s.fov);
@@ -951,16 +1006,17 @@ private:
             );
         }
         
-        if (uiManager.isMenuOpen()) return;
+        // Check if we should skip player controls but continue world updates
+        bool skipPlayerControls = uiManager.isMenuOpen();
+        // Always continue world updates in multiplayer OR when world is loaded OR in main menu (for background)
+        bool continueWorldUpdates = networkManager.isOnline() || uiManager.isWorldLoaded() || menuWorldInitialized;
 
-        // Day/Night Cycle
-        // Full cycle = 2400 seconds (40 minutes) - Drastically increased
-        // 0 = Sunrise, 600 = Noon, 1200 = Sunset, 1800 = Midnight
+        // Day/Night Cycle - ALWAYS update for sky effects (even in main menu)
         constexpr float DAY_DURATION = 2400.0f; 
         
-        // Debug Controls
+        // Debug Controls - only when not in menu
         static bool f1Pressed = false;
-        if (window->isKeyPressed(GLFW_KEY_F1)) {
+        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F1)) {
             if (!f1Pressed) {
                 uiManager.toggleDebug();
                 f1Pressed = true;
@@ -970,7 +1026,7 @@ private:
         }
 
         static bool f2Pressed = false;
-        if (window->isKeyPressed(GLFW_KEY_F2)) {
+        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F2)) {
             if (!f2Pressed) {
                 uiManager.isDayNightPaused = !uiManager.isDayNightPaused;
                 f2Pressed = true;
@@ -980,7 +1036,7 @@ private:
         }
         
         static bool f3Pressed = false;
-        if (window->isKeyPressed(GLFW_KEY_F3)) {
+        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F3)) {
             if (!f3Pressed) {
                 Settings::instance().enableShadows = !Settings::instance().enableShadows;
                 f3Pressed = true;
@@ -990,7 +1046,7 @@ private:
         }
 
         static bool f4Pressed = false;
-        if (window->isKeyPressed(GLFW_KEY_F4)) {
+        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F4)) {
             if (!f4Pressed) {
                 Settings::instance().debugShowTAA = !Settings::instance().debugShowTAA;
                 f4Pressed = true;
@@ -1000,7 +1056,7 @@ private:
         }
 
         static bool f8Pressed = false;
-        if (window->isKeyPressed(GLFW_KEY_F8)) {
+        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F8)) {
             if (!f8Pressed) {
                 Settings::instance().debugNoTexture = !Settings::instance().debugNoTexture;
                 f8Pressed = true;
@@ -1010,7 +1066,7 @@ private:
         }
 
         static bool f6Pressed = false;
-        if (window->isKeyPressed(GLFW_KEY_F6)) {
+        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F6)) {
             if (!f6Pressed) {
                 Settings::instance().debugWireframe = !Settings::instance().debugWireframe;
                 f6Pressed = true;
@@ -1020,7 +1076,7 @@ private:
         }
 
         static bool f7Pressed = false;
-        if (window->isKeyPressed(GLFW_KEY_F7)) {
+        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F7)) {
             if (!f7Pressed) {
                 Settings::instance().debugShowNormals = !Settings::instance().debugShowNormals;
                 f7Pressed = true;
@@ -1039,9 +1095,9 @@ private:
             uiManager.timeOfDay += deltaTime * 10.0f; // Still sped up slightly for gameplay, but slower than before
         }
         
-        // Manual Time Control (only for host/offline)
+        // Manual Time Control (only for host/offline, and not in menu)
         bool timeChanged = false;
-        if (canControlTime) {
+        if (canControlTime && !skipPlayerControls) {
             if (window->isKeyPressed(GLFW_KEY_RIGHT)) {
                 uiManager.timeOfDay += deltaTime * 100.0f;
                 timeChanged = true;
@@ -1129,18 +1185,25 @@ private:
         renderer.setSunHeight(sunY);
         renderer.setTimeOfDay(uiManager.timeOfDay);
 
-        updatePhysics(deltaTime);
-        camera.update(deltaTime);
-        chunkManager.update(camera.getPosition(), camera.getFront(), camera.getViewMatrix());
+        // Physics and player updates - only when not in menu
+        if (!skipPlayerControls) {
+            updatePhysics(deltaTime);
+            camera.update(deltaTime);
+        }
         
-        if (playerEntity) {
+        // Chunk updates - always run if world is loaded or in multiplayer
+        if (continueWorldUpdates) {
+            chunkManager.update(camera.getPosition(), camera.getFront(), camera.getViewMatrix());
+        }
+        
+        if (!skipPlayerControls && playerEntity) {
             playerEntity->update(deltaTime);
         }
 
         // === Zombies ===
         // Only spawn zombies in single-player mode to avoid duplicates
         // In multiplayer, zombies would need to be server-authoritative (future work)
-        if (networkManager.getMode() == Network::NetworkMode::OFFLINE) {
+        if (!skipPlayerControls && networkManager.getMode() == Network::NetworkMode::OFFLINE) {
             // Spawn a few around the player over time (simple, deterministic-ish)
             zombieSpawnTimer -= deltaTime;
             if (playerEntity && zombieSpawnTimer <= 0.0f) {
@@ -1176,91 +1239,93 @@ private:
             }
         } // End of OFFLINE mode zombie code
         
-        // Generate chunks
-        auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), Settings::instance().renderDistance, 10);
-        for (const auto& pos : chunksToGenerate) {
-            chunkManager.requestChunkGeneration(pos);
-            auto chunk = chunkManager.getChunk(pos);
-            if (chunk && chunk->getState() == ChunkState::UNLOADED) {
-                chunk->setState(ChunkState::GENERATING);
-                
-                // Generate in thread pool
-                threadPool.enqueue([this, chunk]() {
-                    if (chunkManager.hasPreloadedData(chunk->getPosition())) {
-                        auto blocks = chunkManager.getPreloadedData(chunk->getPosition());
-                        std::copy(blocks.begin(), blocks.end(), chunk->getBlocks().begin());
-                        chunk->setModified(true);
-                    } else {
-                        worldGenerator.generate(chunk);
-                    }
+        // Generate chunks - always run if world is loaded
+        if (continueWorldUpdates) {
+            auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), Settings::instance().renderDistance, 10);
+            for (const auto& pos : chunksToGenerate) {
+                chunkManager.requestChunkGeneration(pos);
+                auto chunk = chunkManager.getChunk(pos);
+                if (chunk && chunk->getState() == ChunkState::UNLOADED) {
+                    chunk->setState(ChunkState::GENERATING);
                     
-                    // Scan for water to initialize fluid simulation
-                    for (int x = 0; x < CHUNK_SIZE; ++x) {
-                        for (int y = 0; y < CHUNK_HEIGHT; ++y) {
-                            for (int z = 0; z < CHUNK_SIZE; ++z) {
-                                if (chunk->getBlock(x, y, z).getType() == BlockType::WATER) {
-                                    glm::vec3 worldPos = ChunkManager::chunkToWorld(chunk->getPosition());
-                                    chunkManager.scheduleFluidUpdate(
-                                        static_cast<int>(worldPos.x) + x,
-                                        static_cast<int>(worldPos.y) + y,
-                                        static_cast<int>(worldPos.z) + z
-                                    );
+                    // Generate in thread pool
+                    threadPool.enqueue([this, chunk]() {
+                        if (chunkManager.hasPreloadedData(chunk->getPosition())) {
+                            auto blocks = chunkManager.getPreloadedData(chunk->getPosition());
+                            std::copy(blocks.begin(), blocks.end(), chunk->getBlocks().begin());
+                            chunk->setModified(true);
+                        } else {
+                            worldGenerator.generate(chunk);
+                        }
+                        
+                        // Scan for water to initialize fluid simulation
+                        for (int x = 0; x < CHUNK_SIZE; ++x) {
+                            for (int y = 0; y < CHUNK_HEIGHT; ++y) {
+                                for (int z = 0; z < CHUNK_SIZE; ++z) {
+                                    if (chunk->getBlock(x, y, z).getType() == BlockType::WATER) {
+                                        glm::vec3 worldPos = ChunkManager::chunkToWorld(chunk->getPosition());
+                                        chunkManager.scheduleFluidUpdate(
+                                            static_cast<int>(worldPos.x) + x,
+                                            static_cast<int>(worldPos.y) + y,
+                                            static_cast<int>(worldPos.z) + z
+                                        );
+                                    }
                                 }
                             }
                         }
-                    }
-                    
-                    chunk->setState(ChunkState::MESH_BUILD);
-                });
-            }
-        }
-        
-        // Build meshes
-        auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), MAX_MESHES_PER_FRAME);
-        for (auto chunk : chunksToMesh) {
-            chunk->setState(ChunkState::READY);
-            
-            // Get neighbors for greedy meshing
-            const ChunkPos& pos = chunk->getPosition();
-            auto chunkXPos = chunkManager.getChunk(pos + ChunkPos(1, 0, 0));
-            auto chunkXNeg = chunkManager.getChunk(pos + ChunkPos(-1, 0, 0));
-            auto chunkYPos = chunkManager.getChunk(pos + ChunkPos(0, 1, 0));
-            auto chunkYNeg = chunkManager.getChunk(pos + ChunkPos(0, -1, 0));
-            auto chunkZPos = chunkManager.getChunk(pos + ChunkPos(0, 0, 1));
-            auto chunkZNeg = chunkManager.getChunk(pos + ChunkPos(0, 0, -1));
-            
-            int lod = chunk->getCurrentLOD();
-
-            threadPool.enqueue([this, chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg, lod]() {
-                auto meshData = meshBuilder.buildChunkMesh(chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg, lod);
-                
-                std::lock_guard<std::mutex> lock(meshMutex);
-                pendingMeshes.emplace_back(chunk->getPosition(), std::move(meshData));
-            });
-        }
-
-        // Upload meshes
-        {
-            std::lock_guard<std::mutex> lock(meshMutex);
-            for (auto& [pos, meshData] : pendingMeshes) {
-                if (!meshData.isEmpty()) {
-                    renderer.uploadChunkMesh(pos, meshData.vertices, meshData.indices, meshData.waterVertices, meshData.waterIndices);
-                    auto chunk = chunkManager.getChunk(pos);
-                    if (chunk) {
-                        chunk->setState(ChunkState::GPU_UPLOADED);
-                    }
-                } else {
-                    // Empty mesh (e.g. air chunk), but still mark as processed
-                    auto chunk = chunkManager.getChunk(pos);
-                    if (chunk) {
-                        chunk->setState(ChunkState::GPU_UPLOADED);
-                    }
-                    // Ensure we clear any existing mesh for this chunk
-                    renderer.uploadChunkMesh(pos, {}, {}, {}, {});
+                        
+                        chunk->setState(ChunkState::MESH_BUILD);
+                    });
                 }
             }
-            pendingMeshes.clear();
-        }
+        
+            // Build meshes
+            auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), MAX_MESHES_PER_FRAME);
+            for (auto chunk : chunksToMesh) {
+                chunk->setState(ChunkState::READY);
+                
+                // Get neighbors for greedy meshing
+                const ChunkPos& pos = chunk->getPosition();
+                auto chunkXPos = chunkManager.getChunk(pos + ChunkPos(1, 0, 0));
+                auto chunkXNeg = chunkManager.getChunk(pos + ChunkPos(-1, 0, 0));
+                auto chunkYPos = chunkManager.getChunk(pos + ChunkPos(0, 1, 0));
+                auto chunkYNeg = chunkManager.getChunk(pos + ChunkPos(0, -1, 0));
+                auto chunkZPos = chunkManager.getChunk(pos + ChunkPos(0, 0, 1));
+                auto chunkZNeg = chunkManager.getChunk(pos + ChunkPos(0, 0, -1));
+                
+                int lod = chunk->getCurrentLOD();
+
+                threadPool.enqueue([this, chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg, lod]() {
+                    auto meshData = meshBuilder.buildChunkMesh(chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg, lod);
+                    
+                    std::lock_guard<std::mutex> lock(meshMutex);
+                    pendingMeshes.emplace_back(chunk->getPosition(), std::move(meshData));
+                });
+            }
+
+            // Upload meshes
+            {
+                std::lock_guard<std::mutex> lock(meshMutex);
+                for (auto& [pos, meshData] : pendingMeshes) {
+                    if (!meshData.isEmpty()) {
+                        renderer.uploadChunkMesh(pos, meshData.vertices, meshData.indices, meshData.waterVertices, meshData.waterIndices);
+                        auto chunk = chunkManager.getChunk(pos);
+                        if (chunk) {
+                            chunk->setState(ChunkState::GPU_UPLOADED);
+                        }
+                    } else {
+                        // Empty mesh (e.g. air chunk), but still mark as processed
+                        auto chunk = chunkManager.getChunk(pos);
+                        if (chunk) {
+                            chunk->setState(ChunkState::GPU_UPLOADED);
+                        }
+                        // Ensure we clear any existing mesh for this chunk
+                        renderer.uploadChunkMesh(pos, {}, {}, {}, {});
+                    }
+                }
+                pendingMeshes.clear();
+            }
+        } // End of continueWorldUpdates block
     }
     
     void render() {

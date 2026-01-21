@@ -207,12 +207,14 @@ void UIManager::setupInGameMenu() {
         elements.push_back({centerX - btnW/2, centerY - 75 + (btnH + gap)*3, btnW, btnH, "DISCONNECT", false, [this]() { 
             if (onDisconnectGame) onDisconnectGame();
             worldLoaded = false;
+            if (onReturnToMainMenu) onReturnToMainMenu();
             setMenuState(MenuState::MAIN_MENU); 
         }});
     } else {
         elements.push_back({centerX - btnW/2, centerY - 75 + (btnH + gap)*3, btnW, btnH, "MAIN MENU", false, [this]() { 
             if (onSave) onSave(); // Auto save on exit to menu
             worldLoaded = false;
+            if (onReturnToMainMenu) onReturnToMainMenu();
             setMenuState(MenuState::MAIN_MENU); 
         }});
     }

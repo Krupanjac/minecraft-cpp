@@ -31,6 +31,7 @@ public:
     
     const std::array<Block, CHUNK_VOLUME>& getBlocks() const { return blocks; }
     std::array<Block, CHUNK_VOLUME>& getBlocks() { return blocks; }
+    void setBlocks(const std::array<Block, CHUNK_VOLUME>& newBlocks) { blocks = newBlocks; }
 
     bool isDirty() const { return dirty; }
     void setDirty(bool value) { dirty = value; }

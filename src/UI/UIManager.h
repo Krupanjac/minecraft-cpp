@@ -76,6 +76,7 @@ public:
     void setOnSave(std::function<void()> callback) { onSave = callback; }
     void setOnTeleport(std::function<void(float, float)> callback) { onTeleport = callback; }
     void setWorldGenerator(class WorldGenerator* gen) { worldGenerator = gen; }
+    void setOnReturnToMainMenu(std::function<void()> callback) { onReturnToMainMenu = callback; }
     
     // Multiplayer callbacks
     void setOnHostGame(std::function<void(std::string, int)> callback) { onHostGame = callback; }
@@ -148,6 +149,7 @@ private:
     std::function<void(std::string)> onLoadGame;
     std::function<void()> onExit;
     std::function<void()> onSave;
+    std::function<void()> onReturnToMainMenu;
     std::function<void(std::string, int)> onHostGame;
     std::function<void(std::string, std::string, int)> onJoinGame;
     std::function<void()> onDisconnectGame;
