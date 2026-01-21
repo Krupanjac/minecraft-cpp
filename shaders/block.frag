@@ -33,26 +33,64 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
     // transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
     
-    // keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
-    if(projCoords.z > 1.0)
+    // Outside shadow map bounds - no shadow
+    if(projCoords.x < 0.0 || projCoords.x > 1.0 || 
+       projCoords.y < 0.0 || projCoords.y > 1.0 ||
+       projCoords.z > 1.0) {
         return 0.0;
-        
-    // calculate bias (based on depth map resolution and slope)
-    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
+    }
     
-    // PCF
+    // Calculate bias based on surface angle to light
+    // More aggressive bias for surfaces nearly parallel to light direction
+    float NdotL = dot(normal, lightDir);
+    float slopeFactor = 1.0 - NdotL;
+    slopeFactor = clamp(slopeFactor * slopeFactor, 0.0, 1.0);
+    
+    // Depth-dependent bias - farther objects need more bias
+    float depthBias = projCoords.z * 0.001;
+    
+    // Combined bias: base + slope-dependent + depth-dependent
+    float bias = 0.001 + 0.003 * slopeFactor + depthBias;
+    
+    // PCF with larger kernel for softer shadows
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(uShadowMap, 0);
-    for(int x = -1; x <= 1; ++x) {
-        for(int y = -1; y <= 1; ++y) {
-            float pcfDepth = texture(uShadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
-            float currentDepth = projCoords.z;
-            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+    float currentDepth = projCoords.z;
+    
+    // 5x5 PCF for smoother shadows
+    const int pcfRadius = 2;
+    float pcfSamples = 0.0;
+    
+    for(int x = -pcfRadius; x <= pcfRadius; ++x) {
+        for(int y = -pcfRadius; y <= pcfRadius; ++y) {
+            vec2 samplePos = projCoords.xy + vec2(x, y) * texelSize;
+            
+            // Skip samples outside shadow map
+            if(samplePos.x < 0.0 || samplePos.x > 1.0 || 
+               samplePos.y < 0.0 || samplePos.y > 1.0) {
+                continue;
+            }
+            
+            float pcfDepth = texture(uShadowMap, samplePos).r;
+            
+            // Soft shadow edge using smoothstep
+            float occluder = currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+            shadow += occluder;
+            pcfSamples += 1.0;
         }    
     }
-    shadow /= 9.0;
     
-    return shadow;
+    if (pcfSamples > 0.0) {
+        shadow /= pcfSamples;
+    }
+    
+    // Fade shadows at shadow map edges to prevent hard cutoffs
+    float edgeFade = 1.0;
+    float edgeDist = min(min(projCoords.x, 1.0 - projCoords.x), 
+                         min(projCoords.y, 1.0 - projCoords.y));
+    edgeFade = smoothstep(0.0, 0.05, edgeDist);
+    
+    return shadow * edgeFade;
 }
 
 void main() {

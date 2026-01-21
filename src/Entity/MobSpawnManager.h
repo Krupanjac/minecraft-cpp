@@ -24,22 +24,22 @@ class SheepEntity;
 
 struct SpawnConfig {
     // Hostile mob settings
-    int maxHostileMobs = 12;
-    float hostileSpawnRadius = 24.0f;
-    float hostileDespawnRadius = 64.0f;
-    float hostileSpawnInterval = 2.0f;
+    int maxHostileMobs = 20;
+    float hostileSpawnRadius = 48.0f;
+    float hostileDespawnRadius = 96.0f;
+    float hostileSpawnInterval = 1.5f;
     int hostileMinLightLevel = 7;  // Spawn only if light <= this
     
     // Passive mob settings  
-    int maxPassiveMobs = 16;
-    float passiveSpawnRadius = 32.0f;
-    float passiveDespawnRadius = 80.0f;
-    float passiveSpawnInterval = 4.0f;
-    int passiveMinLightLevel = 9;  // Spawn only if light >= this
+    int maxPassiveMobs = 40;
+    float passiveSpawnRadius = 64.0f;
+    float passiveDespawnRadius = 128.0f;
+    float passiveSpawnInterval = 1.0f;  // Faster spawning
+    int passiveMaxLightLevel = 11;  // Spawn only if light <= this (prefer shade/dark)
     
     // General settings
-    float minSpawnDistFromPlayer = 16.0f;
-    int maxSpawnAttemptsPerTick = 4;
+    float minSpawnDistFromPlayer = 24.0f;
+    int maxSpawnAttemptsPerTick = 8;  // More attempts for better spawn rates
 };
 
 class MobSpawnManager {

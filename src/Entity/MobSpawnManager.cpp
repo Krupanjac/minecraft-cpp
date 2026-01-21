@@ -91,16 +91,18 @@ void MobSpawnManager::update(float deltaTime, const glm::vec3& playerPos, float 
         }
     }
     
-    // Passive mob spawning
+    // Passive mob spawning - spawn multiple animals per tick for herds
     passiveSpawnTimer -= deltaTime;
     if (passiveSpawnTimer <= 0.0f) {
         passiveSpawnTimer = config.passiveSpawnInterval;
         
         int totalPassive = static_cast<int>(pigs.size() + chickens.size() + sheep.size());
         if (totalPassive < config.maxPassiveMobs) {
-            for (int i = 0; i < config.maxSpawnAttemptsPerTick; ++i) {
+            int spawnsThisTick = 0;
+            int maxSpawnsPerTick = 3;  // Spawn up to 3 animals per tick
+            for (int i = 0; i < config.maxSpawnAttemptsPerTick && spawnsThisTick < maxSpawnsPerTick; ++i) {
                 if (trySpawnPassiveMob(playerPos, timeOfDay, pigs, chickens, sheep)) {
-                    break;
+                    spawnsThisTick++;
                 }
             }
         }
@@ -226,10 +228,19 @@ bool MobSpawnManager::isValidHostileSpawn(const glm::vec3& pos, float timeOfDay)
 }
 
 bool MobSpawnManager::isValidPassiveSpawn(const glm::vec3& pos, float timeOfDay) const {
-    // Check light level  
+    // Check light level - animals prefer darker areas or twilight
+    // They don't spawn in broad daylight (like Minecraft)
     int light = getLightLevel(pos, timeOfDay);
-    if (light < config.passiveMinLightLevel) {
-        return false;  // Too dark
+    
+    // Animals spawn in shaded/dark areas OR during dawn/dusk
+    bool isDawnOrDusk = (timeOfDay > 0.2f && timeOfDay < 0.3f) ||  // Dawn
+                        (timeOfDay > 0.7f && timeOfDay < 0.8f);     // Dusk
+    
+    // Allow spawning if: in dark area (cave), OR during dawn/dusk, OR underground
+    bool isUnderground = light == 0;  // Underground is always light level 0
+    
+    if (!isDawnOrDusk && !isUnderground && light > config.passiveMaxLightLevel) {
+        return false;  // Too bright in broad daylight
     }
     
     // Check for solid ground

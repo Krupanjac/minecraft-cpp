@@ -72,6 +72,7 @@ void PostProcess::initShaders() {
     if (!volumetricShader.loadFromFiles("shaders/post_process.vert", "shaders/volumetric.frag")) LOG_ERROR("Failed to load Volumetric shader");
     if (!compositeShader.loadFromFiles("shaders/post_process.vert", "shaders/composite.frag")) LOG_ERROR("Failed to load Composite shader");
     if (!taaShader.loadFromFiles("shaders/post_process.vert", "shaders/taa.frag")) LOG_ERROR("Failed to load TAA shader");
+    if (!fxaaShader.loadFromFiles("shaders/post_process.vert", "shaders/fxaa.frag")) LOG_ERROR("Failed to load FXAA shader");
 }
 
 void PostProcess::initSSAO() {
@@ -252,8 +253,11 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     intermediateFBO->unbind();
 
-    // 5. TAA Resolve
-    if (settings.enableTAA) {
+    // 5. Anti-Aliasing Pass (based on aaMethod setting)
+    int aaMethod = settings.aaMethod;
+    
+    if (aaMethod == Settings::AA_TAA) {
+        // TAA Resolve
         int prevHistoryIndex = 1 - currentHistoryIndex;
         historyFBO[currentHistoryIndex]->bind();
         glClear(GL_COLOR_BUFFER_BIT);
@@ -331,7 +335,7 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
 
         historyFBO[currentHistoryIndex]->unbind();
         
-        // 6. Blit to Screen
+        // Blit to Screen
         glBindFramebuffer(GL_READ_FRAMEBUFFER, historyFBO[currentHistoryIndex]->getID());
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
@@ -341,8 +345,25 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         prevCameraPos = cameraPos;
         currentHistoryIndex = 1 - currentHistoryIndex;
         invalidateHistory = false; // Reset after this frame
+    } else if (aaMethod == Settings::AA_FXAA) {
+        // FXAA Pass - render to screen directly
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
+        
+        fxaaShader.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, intermediateFBO->getTexture());
+        fxaaShader.setInt("screenTexture", 0);
+        fxaaShader.setVec2("inverseScreenSize", glm::vec2(1.0f / width, 1.0f / height));
+        
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        
+        // Keep TAA history updated in case user switches
+        prevViewProj = unjitteredProjection * view;
+        prevCameraPos = cameraPos;
     } else {
-        // No TAA, just blit intermediate to screen
+        // No AA - just blit intermediate to screen
         glBindFramebuffer(GL_READ_FRAMEBUFFER, intermediateFBO->getID());
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);

@@ -30,6 +30,14 @@ public:
     bool enableTAA = false; // Disabled by default due to potential jitter/shaking artifacts
     bool enableShadows = true;
     float shadowDistance = 160.0f;
+    
+    // Anti-aliasing method: 0 = None, 1 = FXAA, 2 = TAA
+    int aaMethod = 1; // Default to FXAA
+    static constexpr int AA_NONE = 0;
+    static constexpr int AA_FXAA = 1;
+    static constexpr int AA_TAA = 2;
+    static constexpr const char* AA_METHOD_NAMES[] = { "None", "FXAA", "TAA" };
+    
     int fullscreen = 0; // 0: Windowed, 1: Fullscreen, 2: Borderless
     // Debug visualization options
     bool debugShowTAA = false; // Show TAA motion/weight overlay
@@ -105,6 +113,7 @@ public:
                     else if (key == "enableTAA") enableTAA = (value == "1");
                     else if (key == "enableShadows") enableShadows = (value == "1");
                     else if (key == "shadowDistance") shadowDistance = std::stof(value);
+                    else if (key == "aaMethod") aaMethod = std::stoi(value);
                     else if (key == "debugShowTAA") debugShowTAA = (value == "1");
                     else if (key == "debugNoTexture") debugNoTexture = (value == "1");
                     else if (key == "debugWireframe") debugWireframe = (value == "1");
@@ -155,6 +164,7 @@ public:
         file << "enableTAA=" << (enableTAA ? "1" : "0") << "\n";
         file << "enableShadows=" << (enableShadows ? "1" : "0") << "\n";
         file << "shadowDistance=" << shadowDistance << "\n";
+        file << "aaMethod=" << aaMethod << "\n";
         file << "debugShowTAA=" << (debugShowTAA ? "1" : "0") << "\n";
         file << "debugNoTexture=" << (debugNoTexture ? "1" : "0") << "\n";
         file << "debugWireframe=" << (debugWireframe ? "1" : "0") << "\n";

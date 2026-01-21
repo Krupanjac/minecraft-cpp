@@ -92,22 +92,38 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     // All rendering (including shadows) is done in camera-relative coordinates (world - renderOrigin).
     // That means the shadow frustum must also be built in that SAME coordinate space.
     // Using world-space renderOrigin here will break shadows after teleports / origin rebases.
-    float shadowRange = Settings::instance().shadowDistance; // Covers visible area
+    float shadowRange = Settings::instance().shadowDistance; // Covers visible area horizontally
+    
+    // For caves: we need the shadow frustum to extend FAR above the player to capture
+    // terrain that blocks light from reaching cave interiors. 
+    // The shadow ortho needs asymmetric vertical bounds.
+    float shadowRangeVertical = shadowRange * 2.0f;  // More vertical coverage
+    
     glm::vec3 lightTarget = glm::vec3(0.0f); // renderOrigin in camera-relative space
     glm::vec3 lightPos = lightTarget + lightDirection * 1000.0f; // far away
     // Use an orthographic projection centered on the light target
     glm::mat4 lightView = glm::lookAt(lightPos, lightTarget, glm::vec3(0.0f, 1.0f, 0.0f));
     
-    float near_plane = 1.0f, far_plane = 2000.0f;
-    glm::mat4 lightProjection = glm::ortho(-shadowRange, shadowRange, -shadowRange, shadowRange, near_plane, far_plane);
+    // Use asymmetric ortho - extend MORE in the direction towards the light source
+    // This ensures terrain above caves gets rendered to shadow map
+    float near_plane = 1.0f, far_plane = 2500.0f;
+    glm::mat4 lightProjection = glm::ortho(-shadowRange, shadowRange, 
+                                           -shadowRangeVertical, shadowRangeVertical, 
+                                           near_plane, far_plane);
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
     // 0. Shadow Pass
     if (Settings::instance().enableShadows) {
         shadowMap->bind();
         
-        // Update shadow frustum for culling
-        shadowFrustum.update(lightSpaceMatrix);
+        // NOTE: We intentionally do NOT use frustum culling for the shadow pass.
+        // Shadow casters can be far from the camera (e.g., terrain above caves) but still
+        // need to cast shadows into the visible area. Using the shadow frustum for culling
+        // causes light to "leak" through blocks that are outside the frustum but between
+        // the light source and the shadowed area.
+        // Instead, we render all chunks within the shadow distance from the camera.
+        
+        float shadowDistSq = shadowRange * shadowRange;
 
         // Fix shadow acne by rendering front faces and using polygon offset
         glEnable(GL_CULL_FACE);
@@ -136,16 +152,15 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
             // Compute chunk position relative to render origin (same space as cameraRelative / lightSpaceMatrix)
             glm::vec3 chunkWorldPos = ChunkManager::chunkToWorld(pos);
             glm::vec3 chunkRelativePos = chunkWorldPos - glm::vec3(renderOrigin);
-            glm::vec3 chunkMin = chunkRelativePos;
-            glm::vec3 chunkMax = chunkRelativePos + glm::vec3(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE);
-
-            // If this chunk was uploaded very recently, force it into shadow pass for a few frames to ensure it contributes
-            auto itUploaded = lastUploadedFrame.find(pos);
-            bool recentUpload = (itUploaded != lastUploadedFrame.end() && (frameCounter - itUploaded->second) <= 3);
-            if (!recentUpload) {
-                if (!shadowFrustum.isBoxVisible(chunkMin, chunkMax)) {
-                    continue;
-                }
+            glm::vec3 chunkCenter = chunkRelativePos + glm::vec3(CHUNK_SIZE * 0.5f, CHUNK_HEIGHT * 0.5f, CHUNK_SIZE * 0.5f);
+            
+            // Distance-based culling - ONLY use XZ distance to ensure we render
+            // ALL chunks in a vertical column. This is critical for caves:
+            // chunks above the camera must render to shadow map even if they're
+            // far away vertically, because they block light from reaching caves below.
+            float xzDistSq = chunkCenter.x * chunkCenter.x + chunkCenter.z * chunkCenter.z;
+            if (xzDistSq > shadowDistSq * 2.25f) {  // 1.5x shadow range (1.5^2 = 2.25)
+                continue;
             }
 
             auto it = chunkMeshes.find(pos);
@@ -188,7 +203,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     glm::mat4 unjitteredProjection = camera.getProjectionMatrix(aspect);
     glm::mat4 projection = unjitteredProjection;
-    if (Settings::instance().enableTAA && postProcess) {
+    if (Settings::instance().aaMethod == Settings::AA_TAA && postProcess) {
         // Subpixel jitter is required for TAA to actually reduce aliasing.
         // Apply jitter directly into the projection matrix so motion vectors include it.
         postProcess->updateJitter(windowWidth, windowHeight);

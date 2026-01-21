@@ -4,28 +4,49 @@ out float FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D ssaoInput;
-uniform sampler2D gPositionDepth; // used for depth-aware/bilateral blur
+uniform sampler2D gPositionDepth;
 uniform float blurDepthFalloff;
 
 void main() {
     vec2 texelSize = 1.0 / vec2(textureSize(ssaoInput, 0));
     float centerDepth = texture(gPositionDepth, TexCoords).r;
+    float centerAO = texture(ssaoInput, TexCoords).r;
+    
+    // Early out for sky
+    if (centerDepth >= 0.9999) {
+        FragColor = 1.0;
+        return;
+    }
+    
     float result = 0.0;
     float weightSum = 0.0;
 
-    // 5x5 bilateral-style blur (depth-weighted)
-    for (int x = -2; x <= 2; ++x) {
-        for (int y = -2; y <= 2; ++y) {
+    // 7x7 gaussian-weighted bilateral blur for smoother results
+    const float gaussianKernel[7] = float[](0.0044, 0.054, 0.242, 0.398, 0.242, 0.054, 0.0044);
+    
+    for (int x = -3; x <= 3; ++x) {
+        for (int y = -3; y <= 3; ++y) {
             vec2 offset = vec2(float(x), float(y)) * texelSize;
-            float sample = texture(ssaoInput, TexCoords + offset).r;
-            float sampleDepth = texture(gPositionDepth, TexCoords + offset).r;
+            vec2 sampleUV = TexCoords + offset;
+            
+            float sampleAO = texture(ssaoInput, sampleUV).r;
+            float sampleDepth = texture(gPositionDepth, sampleUV).r;
+            
+            // Skip sky samples
+            if (sampleDepth >= 0.9999) continue;
+            
+            // Depth-based weight (bilateral)
             float depthDiff = abs(centerDepth - sampleDepth);
-            float depthWeight = exp(-depthDiff * blurDepthFalloff); // Tunable: higher -> more edge preservation
-            float kernelWeight = 1.0; // box kernel; could be gaussian for nicer falloff
-            float w = kernelWeight * depthWeight;
-            result += sample * w;
+            float depthWeight = exp(-depthDiff * blurDepthFalloff);
+            
+            // Spatial gaussian weight
+            float spatialWeight = gaussianKernel[x + 3] * gaussianKernel[y + 3];
+            
+            float w = spatialWeight * depthWeight;
+            result += sampleAO * w;
             weightSum += w;
         }
     }
-    FragColor = result / max(weightSum, 1e-6);
+    
+    FragColor = (weightSum > 0.0001) ? (result / weightSum) : centerAO;
 }

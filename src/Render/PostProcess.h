@@ -39,6 +39,7 @@ private:
     Shader volumetricShader;
     Shader compositeShader; // Final combine + Tone mapping + Gamma
     Shader taaShader;
+    Shader fxaaShader;
 
     // Framebuffers
     std::unique_ptr<FrameBuffer> ssaoFBO;

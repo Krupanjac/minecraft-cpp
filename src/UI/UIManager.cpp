@@ -438,14 +438,15 @@ void UIManager::setupVideoSettingsMenu() {
     elements.push_back(vol);
     y += rowHeight + rowGap;
     
-    // TAA
-    UIElement taa;
-    taa.x = leftCol; taa.y = y; taa.w = colWidth; taa.h = rowHeight;
-    taa.text = "TAA: " + std::string(s.enableTAA ? "ON" : "OFF");
-    taa.boolValueRef = &s.enableTAA;
-    taa.onClick = [](){};
-    taa.tooltip = "Temporal anti-aliasing (may cause jitter)";
-    elements.push_back(taa);
+    // Anti-aliasing method selector
+    UIElement aa;
+    aa.x = leftCol; aa.y = y; aa.w = colWidth; aa.h = rowHeight;
+    aa.text = "AA METHOD: " + std::string(Settings::AA_METHOD_NAMES[s.aaMethod]);
+    aa.intValueRef = &s.aaMethod;
+    aa.onClick = [](){};  // intValueRef handles cycling
+    aa.minVal = 0.0f; aa.maxVal = 2.0f;  // None=0, FXAA=1, TAA=2
+    aa.tooltip = "Anti-aliasing method (None/FXAA/TAA)";
+    elements.push_back(aa);
     
     // === RIGHT COLUMN - Visual ===
     y = startY;
@@ -1167,6 +1168,10 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                                 else if (*el.intValueRef == 1) modeStr = "FULLSCREEN";
                                 else if (*el.intValueRef == 2) modeStr = "BORDERLESS";
                                 el.text = "WINDOW MODE: " + modeStr;
+                            }
+                            
+                            if (el.text.find("AA METHOD") != std::string::npos) {
+                                el.text = "AA METHOD: " + std::string(Settings::AA_METHOD_NAMES[*el.intValueRef]);
                             }
                             
                             if (onSettingsChanged) onSettingsChanged();
