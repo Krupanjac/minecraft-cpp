@@ -22,7 +22,8 @@ enum class MenuState {
     MULTIPLAYER,
     HOST_GAME,
     JOIN_GAME,
-    CHAT
+    CHAT,
+    ABOUT
 };
 
 struct UIElement {
@@ -212,6 +213,7 @@ private:
     void setupMultiplayerMenu();
     void setupHostGameMenu();
     void setupJoinGameMenu();
+    void setupAboutMenu();
     void generateMapTexture();
     
     // Map data

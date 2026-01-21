@@ -90,6 +90,7 @@ void main() {
     else if (aMaterial == 8u) textureIndex = 240u;  // Snow
     else if (aMaterial == 13u) textureIndex = 39u; // Tall Grass
     else if (aMaterial == 14u) textureIndex = 12u; // Rose
+    else if (aMaterial == 11u) textureIndex = 192u; // Sandstone
     
     float col = float(textureIndex % 16u);
     float row = float(textureIndex / 16u);

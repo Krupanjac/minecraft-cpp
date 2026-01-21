@@ -136,6 +136,7 @@ void UIManager::setMenuState(MenuState state) {
         case MenuState::MULTIPLAYER: setupMultiplayerMenu(); break;
         case MenuState::HOST_GAME: setupHostGameMenu(); break;
         case MenuState::JOIN_GAME: setupJoinGameMenu(); break;
+        case MenuState::ABOUT: setupAboutMenu(); break;
         case MenuState::CHAT: break; // Chat doesn't use elements system
         case MenuState::NONE: break;
     }
@@ -229,8 +230,12 @@ void UIManager::setupMainMenu() {
     elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*3, btnW, btnH, "Options", false, [this]() { 
         setMenuState(MenuState::SETTINGS); 
     }});
+    
+    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*4, btnW, btnH, "About", false, [this]() { 
+        setMenuState(MenuState::ABOUT); 
+    }});
 
-    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*4, btnW, btnH, "Quit Game", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*5, btnW, btnH, "Quit Game", false, [this]() { 
         if (onExit) onExit(); 
     }});
 }
@@ -2267,6 +2272,126 @@ void UIManager::setupJoinGameMenu() {
     backBtn.text = "BACK";
     backBtn.onClick = [this]() { setMenuState(MenuState::MULTIPLAYER); };
     elements.push_back(backBtn);
+}
+
+void UIManager::setupAboutMenu() {
+    elements.clear();
+    
+    float centerX = width / 2.0f;
+    float startY = 80.0f;
+    float lineHeight = 35.0f;
+    
+    // Title
+    UIElement title;
+    title.x = centerX - 150;
+    title.y = startY;
+    title.w = 300;
+    title.h = 40;
+    title.text = "About Bettercraft";
+    title.isHeader = true;
+    elements.push_back(title);
+    startY += 70.0f;
+    
+    // Project description
+    UIElement desc1;
+    desc1.x = centerX - 200;
+    desc1.y = startY;
+    desc1.w = 400;
+    desc1.h = 25;
+    desc1.text = "A Minecraft clone written in C++";
+    desc1.isLabel = true;
+    desc1.customColor = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f);
+    elements.push_back(desc1);
+    startY += lineHeight;
+    
+    UIElement desc2;
+    desc2.x = centerX - 200;
+    desc2.y = startY;
+    desc2.w = 400;
+    desc2.h = 25;
+    desc2.text = "Built with OpenGL 4.5, GLFW, GLM";
+    desc2.isLabel = true;
+    desc2.customColor = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f);
+    elements.push_back(desc2);
+    startY += lineHeight * 2;
+    
+    // Developer section
+    UIElement devHeader;
+    devHeader.x = centerX - 100;
+    devHeader.y = startY;
+    devHeader.w = 200;
+    devHeader.h = 30;
+    devHeader.text = "Developer";
+    devHeader.isHeader = true;
+    devHeader.customColor = glm::vec4(0.5f, 0.8f, 0.5f, 1.0f);
+    elements.push_back(devHeader);
+    startY += 50.0f;
+    
+    UIElement devName;
+    devName.x = centerX - 150;
+    devName.y = startY;
+    devName.w = 300;
+    devName.h = 25;
+    devName.text = "Krupanjac";
+    devName.isLabel = true;
+    devName.customColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    elements.push_back(devName);
+    startY += lineHeight * 1.5f;
+    
+    // Links section
+    UIElement linksHeader;
+    linksHeader.x = centerX - 100;
+    linksHeader.y = startY;
+    linksHeader.w = 200;
+    linksHeader.h = 30;
+    linksHeader.text = "Links";
+    linksHeader.isHeader = true;
+    linksHeader.customColor = glm::vec4(0.5f, 0.8f, 0.5f, 1.0f);
+    elements.push_back(linksHeader);
+    startY += 50.0f;
+    
+    UIElement website;
+    website.x = centerX - 150;
+    website.y = startY;
+    website.w = 300;
+    website.h = 25;
+    website.text = "Website: krupanjac.dev";
+    website.isLabel = true;
+    website.customColor = glm::vec4(0.6f, 0.8f, 1.0f, 1.0f);
+    elements.push_back(website);
+    startY += lineHeight;
+    
+    UIElement github;
+    github.x = centerX - 200;
+    github.y = startY;
+    github.w = 400;
+    github.h = 25;
+    github.text = "GitHub: Krupanjac/minecraft-cpp";
+    github.isLabel = true;
+    github.customColor = glm::vec4(0.6f, 0.8f, 1.0f, 1.0f);
+    elements.push_back(github);
+    startY += lineHeight * 2;
+    
+    // Version info
+    UIElement version;
+    version.x = centerX - 100;
+    version.y = startY;
+    version.w = 200;
+    version.h = 25;
+    version.text = "Version 1.0";
+    version.isLabel = true;
+    version.customColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+    elements.push_back(version);
+    
+    // Back button
+    UIElement back;
+    back.x = centerX - 100;
+    back.y = height - 80;
+    back.w = 200;
+    back.h = 45;
+    back.text = "Back";
+    back.onClick = [this]() { setMenuState(MenuState::MAIN_MENU); };
+    elements.push_back(back);
 }
 
 void UIManager::addChatMessage(const std::string& senderName, const std::string& message) {
