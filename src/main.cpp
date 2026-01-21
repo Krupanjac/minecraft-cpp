@@ -267,9 +267,22 @@ public:
         });
         
         // Time sync callback (for clients receiving server time)
-        networkManager.setTimeSyncCallback([this](float timeOfDay, bool isPaused) {
-            uiManager.timeOfDay = timeOfDay;
+        // Only set pause state immediately, time will be corrected gradually to avoid jarring jumps
+        networkManager.setTimeSyncCallback([this](float serverTime, bool isPaused) {
+            constexpr float DAY_LENGTH = 2400.0f;
             uiManager.isDayNightPaused = isPaused;
+            
+            // Calculate time difference (accounting for day wrap-around)
+            float diff = serverTime - uiManager.timeOfDay;
+            if (diff > DAY_LENGTH / 2.0f) diff -= DAY_LENGTH;
+            if (diff < -DAY_LENGTH / 2.0f) diff += DAY_LENGTH;
+            
+            // If drift is small (< 50 time units), let local time continue
+            // If drift is larger, snap to server time to prevent major desync
+            if (std::abs(diff) > 50.0f) {
+                uiManager.timeOfDay = serverTime;
+            }
+            // Otherwise local time continues and will naturally sync
         });
         
         // Apply initial settings
@@ -994,16 +1007,17 @@ private:
         
         // renderer.setShowShadows(uiManager.showShadows); // Removed, Renderer uses Settings directly
 
-        // Time control - only offline or host can control time
+        // Time control - host/offline can manually control, all players update time locally for smoothness
         bool canControlTime = !networkManager.isOnline() || networkManager.isHost();
         
+        // All players update time locally for smooth progression
+        if (!uiManager.isDayNightPaused) {
+            uiManager.timeOfDay += deltaTime * 10.0f; // Still sped up slightly for gameplay, but slower than before
+        }
+        
+        // Manual Time Control (only for host/offline)
+        bool timeChanged = false;
         if (canControlTime) {
-            if (!uiManager.isDayNightPaused) {
-                uiManager.timeOfDay += deltaTime * 10.0f; // Still sped up slightly for gameplay, but slower than before
-            }
-            
-            // Manual Time Control (only for host/offline)
-            bool timeChanged = false;
             if (window->isKeyPressed(GLFW_KEY_RIGHT)) {
                 uiManager.timeOfDay += deltaTime * 100.0f;
                 timeChanged = true;
@@ -1012,19 +1026,19 @@ private:
                 uiManager.timeOfDay -= deltaTime * 100.0f;
                 timeChanged = true;
             }
-            
-            if (uiManager.timeOfDay >= DAY_DURATION) uiManager.timeOfDay -= DAY_DURATION;
-            if (uiManager.timeOfDay < 0.0f) uiManager.timeOfDay += DAY_DURATION;
-            
-            // Sync time to clients if hosting (every 2 seconds or when manually changed)
-            static float timeSyncTimer = 0.0f;
-            timeSyncTimer += deltaTime;
-            if (networkManager.isHost() && (timeChanged || timeSyncTimer >= 2.0f)) {
-                networkManager.sendTimeSync(uiManager.timeOfDay, uiManager.isDayNightPaused);
-                timeSyncTimer = 0.0f;
-            }
         }
-        // Note: Clients receive time via TIME_SYNC packets and don't update locally
+        
+        if (uiManager.timeOfDay >= DAY_DURATION) uiManager.timeOfDay -= DAY_DURATION;
+        if (uiManager.timeOfDay < 0.0f) uiManager.timeOfDay += DAY_DURATION;
+        
+        // Sync time to clients if hosting (every 2 seconds or when manually changed)
+        static float timeSyncTimer = 0.0f;
+        timeSyncTimer += deltaTime;
+        if (networkManager.isHost() && (timeChanged || timeSyncTimer >= 2.0f)) {
+            networkManager.sendTimeSync(uiManager.timeOfDay, uiManager.isDayNightPaused);
+            timeSyncTimer = 0.0f;
+        }
+        // Note: Clients also update time locally for smoothness, server syncs correct drift
         
         float angle = (uiManager.timeOfDay / DAY_DURATION) * glm::two_pi<float>();
         
