@@ -83,13 +83,35 @@ python -m glad --generator=c --out-path=external/glad --profile=core --api="gl=4
 mkdir build
 cd build
 cmake ..
-cmake --build .
+cmake --build . --config Release
 ```
+
+This builds both executables:
+- `minecraft_cpp` - The main game client
+- `minecraft_server` - Dedicated server with GUI
 
 ### Step 3: Run
 
+**Run the game:**
 ```bash
-./bin/minecraft_cpp
+./bin/Release/minecraft_cpp
+```
+
+**Run the dedicated server:**
+```bash
+./bin/Release/minecraft_server
+```
+
+### Building Specific Targets
+
+To build only the game client:
+```bash
+cmake --build . --config Release --target minecraft_cpp
+```
+
+To build only the dedicated server:
+```bash
+cmake --build . --config Release --target minecraft_server
 ```
 
 ## Controls
@@ -184,6 +206,33 @@ The game supports basic multiplayer functionality:
 - Block placement/destruction sync across clients
 - Remote player rendering
 - Low-latency TCP networking
+- Server-side time of day control
+
+## Dedicated Server
+
+The game includes a standalone dedicated server with a graphical interface for managing multiplayer sessions.
+
+### Running the Dedicated Server
+
+```bash
+./bin/Release/minecraft_server
+```
+
+### Server GUI Features
+- **Setup Screen**: Configure server name, port, max players, spawn position, and world seed
+- **Console**: View server logs and execute commands in real-time
+- **Player List**: See connected players with their positions
+- **Stats Panel**: Monitor players online, TPS, uptime, and server time
+
+### Server Commands
+- `help` - Show available commands
+- `list` - List connected players
+- `kick <id>` - Kick a player by ID
+- `time set <value>` - Set time of day (0-2400)
+- `time pause` - Pause day-night cycle
+- `time resume` - Resume day-night cycle
+- `status` - Show server status
+- `stop` - Stop the server
 
 ## License
 

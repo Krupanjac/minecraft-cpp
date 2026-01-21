@@ -37,9 +37,21 @@ bool DedicatedServer::start() {
     
     // Setup callbacks
     m_server->setPlayerJoinCallback([this](uint32_t playerId, const std::string& name) {
-        m_stats.totalConnections++;
-        log("INFO", "Player joined: " + name + " (ID: " + std::to_string(playerId) + ")");
-        broadcastMessage(name + " joined the game");
+        try {
+            log("DEBUG", "Player join callback started for: " + name);
+            {
+                std::lock_guard<std::mutex> lock(m_statsMutex);
+                m_stats.totalConnections++;
+            }
+            log("INFO", "Player joined: " + name + " (ID: " + std::to_string(playerId) + ")");
+            log("DEBUG", "About to broadcast join message...");
+            broadcastMessage(name + " joined the game");
+            log("DEBUG", "Player join callback completed");
+        } catch (const std::exception& e) {
+            log("ERROR", "Exception in player join callback: " + std::string(e.what()));
+        } catch (...) {
+            log("ERROR", "Unknown exception in player join callback");
+        }
     });
     
     m_server->setPlayerLeaveCallback([this](uint32_t playerId) {
@@ -47,6 +59,8 @@ bool DedicatedServer::start() {
     });
     
     m_server->setBlockChangeCallback([this](int x, int y, int z, uint8_t blockType, uint32_t playerId) {
+        // Silence unused parameter warnings
+        (void)x; (void)y; (void)z; (void)blockType; (void)playerId;
         // Could log block changes if verbose logging is enabled
     });
     
@@ -114,6 +128,8 @@ void DedicatedServer::update(float deltaTime) {
 }
 
 void DedicatedServer::updateStats(float deltaTime) {
+    std::lock_guard<std::mutex> lock(m_statsMutex);
+    
     // Update uptime
     auto now = std::chrono::steady_clock::now();
     m_stats.uptimeSeconds = std::chrono::duration<double>(now - m_startTime).count();
@@ -133,6 +149,11 @@ void DedicatedServer::updateStats(float deltaTime) {
     }
 }
 
+ServerStats DedicatedServer::getStats() const {
+    std::lock_guard<std::mutex> lock(m_statsMutex);
+    return m_stats;  // Return a copy
+}
+
 void DedicatedServer::syncTime() {
     if (m_server) {
         m_server->broadcastTimeSync(m_config.timeOfDay, m_config.timePaused);
@@ -148,7 +169,7 @@ void DedicatedServer::executeCommand(const std::string& command) {
     iss >> cmd;
     
     // Convert to lowercase
-    std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::tolower);
+    std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     
     if (cmd == "help") {
         log("INFO", "Available commands:");
@@ -194,7 +215,7 @@ void DedicatedServer::executeCommand(const std::string& command) {
     else if (cmd == "time") {
         std::string subcmd;
         iss >> subcmd;
-        std::transform(subcmd.begin(), subcmd.end(), subcmd.begin(), ::tolower);
+        std::transform(subcmd.begin(), subcmd.end(), subcmd.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         
         if (subcmd == "set") {
             float value;
@@ -268,6 +289,11 @@ std::vector<Network::RemotePlayer> DedicatedServer::getPlayers() const {
         return m_server->getPlayers();
     }
     return {};
+}
+
+std::vector<LogEntry> DedicatedServer::getLogs() const {
+    std::lock_guard<std::mutex> lock(m_logMutex);
+    return m_logs;  // Return a copy for thread safety
 }
 
 void DedicatedServer::log(const std::string& level, const std::string& message) {

@@ -5,8 +5,28 @@
 #include "../Core/Logger.h"
 
 #include <iostream>
+#include <csignal>
+
+// Global flag for clean shutdown
+static volatile bool g_running = true;
+
+void signalHandler(int signum) {
+    LOG_INFO("Received signal " + std::to_string(signum) + ", shutting down...");
+    g_running = false;
+}
 
 int main(int argc, char* argv[]) {
+    // Setup signal handlers for clean shutdown
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
+    
+#ifdef _DEBUG
+    // Enable file logging in Debug mode
+    Logger::instance().setLevel(LogLevel::DEBUG);
+    Logger::instance().enableFileLogging("server_debug.log");
+    LOG_DEBUG("Debug logging enabled - writing to server_debug.log");
+#endif
+    
     LOG_INFO("=== Minecraft CPP Dedicated Server ===");
     
     // Check for command line mode
@@ -15,6 +35,11 @@ int main(int argc, char* argv[]) {
         std::string arg = argv[i];
         if (arg == "--headless" || arg == "-h") {
             headless = true;
+        }
+        if (arg == "--log" || arg == "-l") {
+            // Enable file logging even in Release mode
+            Logger::instance().enableFileLogging("server.log");
+            LOG_INFO("File logging enabled - writing to server.log");
         }
     }
     
@@ -35,12 +60,17 @@ int main(int argc, char* argv[]) {
     LOG_INFO("Server GUI initialized");
     
     // Main loop
-    while (gui.update()) {
+    while (g_running && gui.update()) {
         // GUI handles everything
     }
     
     gui.shutdown();
     
     LOG_INFO("Server shutdown complete");
+    
+#ifdef _DEBUG
+    Logger::instance().disableFileLogging();
+#endif
+    
     return 0;
 }

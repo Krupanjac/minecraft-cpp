@@ -98,7 +98,7 @@ private:
     
     Socket m_listenSocket;
     std::vector<std::unique_ptr<ClientConnection>> m_clients;
-    mutable std::mutex m_clientsMutex;
+    mutable std::recursive_mutex m_clientsMutex;
     
     std::atomic<bool> m_running{false};
     uint16_t m_port = 0;

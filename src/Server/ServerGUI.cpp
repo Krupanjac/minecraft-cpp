@@ -1,4 +1,5 @@
 #include "ServerGUI.h"
+#include "../Core/Logger.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -86,16 +87,22 @@ bool ServerGUI::update() {
         return false;
     }
     
-    glfwPollEvents();
-    
-    // Calculate delta time
-    float currentTime = static_cast<float>(glfwGetTime());
-    float deltaTime = currentTime - m_lastFrameTime;
-    m_lastFrameTime = currentTime;
-    
-    // Update server if running
-    if (m_state == ServerGUIState::RUNNING && m_server && m_server->isRunning()) {
-        m_server->update(deltaTime);
+    try {
+        glfwPollEvents();
+        
+        // Calculate delta time
+        float currentTime = static_cast<float>(glfwGetTime());
+        float deltaTime = currentTime - m_lastFrameTime;
+        m_lastFrameTime = currentTime;
+        
+        // Update server if running
+        if (m_state == ServerGUIState::RUNNING && m_server && m_server->isRunning()) {
+            m_server->update(deltaTime);
+        }
+    } catch (const std::exception& e) {
+        LOG_ERROR("Exception in ServerGUI::update (server): " + std::string(e.what()));
+    } catch (...) {
+        LOG_ERROR("Unknown exception in ServerGUI::update (server)");
     }
     
     // Start ImGui frame
@@ -314,7 +321,8 @@ void ServerGUI::renderStatsPanel() {
     ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "ONLINE");
     ImGui::Spacing();
     
-    const auto& stats = m_server->getStats();
+    // Get thread-safe copies
+    auto stats = m_server->getStats();
     const auto& config = m_server->getConfig();
     
     ImGui::Text("Server: %s", config.serverName.c_str());
@@ -373,7 +381,8 @@ void ServerGUI::renderPlayersPanel() {
     }
     
     for (const auto& player : players) {
-        ImGui::PushID(player.id);
+        // Use player.id + 1 to ensure non-zero ID for ImGui (or use string-based ID)
+        ImGui::PushID(static_cast<int>(player.id) + 1);
         
         // Player name with color based on state
         ImVec4 color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -388,8 +397,8 @@ void ServerGUI::renderPlayersPanel() {
             ImGui::EndTooltip();
         }
         
-        // Context menu
-        if (ImGui::BeginPopupContextItem()) {
+        // Context menu - use explicit string ID
+        if (ImGui::BeginPopupContextItem(("player_ctx_" + std::to_string(player.id)).c_str())) {
             if (ImGui::MenuItem("Kick")) {
                 m_server->executeCommand("kick " + std::to_string(player.id));
             }

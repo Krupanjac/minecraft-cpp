@@ -96,9 +96,8 @@ void UIManager::handleCharInput(unsigned int codepoint) {
             if (codepoint >= 32 && codepoint <= 126) {
                 *el.textRef += (char)codepoint;
             }
-            // Update display text
-            if (el.text.find("NAME:") != std::string::npos) el.text = "NAME: " + *el.textRef;
-            if (el.text.find("SEED:") != std::string::npos) el.text = "SEED: " + *el.textRef;
+            // Update display text - sync with textRef for all input fields
+            el.text = *el.textRef;
         }
     }
 }
@@ -106,25 +105,13 @@ void UIManager::handleCharInput(unsigned int codepoint) {
 void UIManager::handleKeyInput(int key) {
     if (!isMenuOpen()) return;
     
-    // For text input
-    if (currentMenuState == MenuState::NEW_GAME) {
-       for (auto& el : elements) {
-           if (el.isInput && el.isHovered) {
-               if (key == 259 && el.textRef && !el.textRef->empty()) { // Backspace
-                   el.textRef->pop_back();
-                   if (el.textRef == &newWorldName) el.text = "World Name: " + *el.textRef;
-                   else if (el.textRef == &newWorldSeed) el.text = "Seed: " + *el.textRef;
-               }
-           }
-       }
-    } else { // Original text input handling for other menus if applicable
-        for (auto& el : elements) {
-            if (el.isInput && el.isHovered && el.textRef) {
-                if (key == 259) { // GLFW_KEY_BACKSPACE
-                    if (!el.textRef->empty()) el.textRef->pop_back();
-                    // Update display text
-                    if (el.text.find("NAME:") != std::string::npos) el.text = "NAME: " + *el.textRef;
-                    if (el.text.find("SEED:") != std::string::npos) el.text = "SEED: " + *el.textRef;
+    // Handle backspace for text input in any menu
+    for (auto& el : elements) {
+        if (el.isInput && el.isHovered && el.textRef) {
+            if (key == 259) { // GLFW_KEY_BACKSPACE
+                if (!el.textRef->empty()) {
+                    el.textRef->pop_back();
+                    el.text = *el.textRef;
                 }
             }
         }
@@ -192,11 +179,13 @@ void UIManager::setupInGameMenu() {
     if (isOnline) {
         elements.push_back({centerX - btnW/2, centerY - 75 + (btnH + gap)*3, btnW, btnH, "DISCONNECT", false, [this]() { 
             if (onDisconnectGame) onDisconnectGame();
+            worldLoaded = false;
             setMenuState(MenuState::MAIN_MENU); 
         }});
     } else {
         elements.push_back({centerX - btnW/2, centerY - 75 + (btnH + gap)*3, btnW, btnH, "MAIN MENU", false, [this]() { 
             if (onSave) onSave(); // Auto save on exit to menu
+            worldLoaded = false;
             setMenuState(MenuState::MAIN_MENU); 
         }});
     }

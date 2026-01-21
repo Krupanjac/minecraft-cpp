@@ -69,8 +69,8 @@ public:
     void setTimePaused(bool paused);
     
     // Getters
-    const ServerStats& getStats() const { return m_stats; }
-    const std::vector<LogEntry>& getLogs() const { return m_logs; }
+    ServerStats getStats() const;  // Returns a copy for thread safety
+    std::vector<LogEntry> getLogs() const;  // Returns a copy for thread safety
     std::vector<Network::RemotePlayer> getPlayers() const;
     
     // Callbacks
@@ -99,6 +99,7 @@ private:
     
     LogCallback m_onLog;
     mutable std::mutex m_logMutex;
+    mutable std::mutex m_statsMutex;
 };
 
 } // namespace Server

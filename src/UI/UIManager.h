@@ -82,6 +82,10 @@ public:
     void setOnDisconnect(std::function<void()> callback) { onDisconnectGame = callback; }
     void setNetworkStatus(const std::string& status) { networkStatus = status; }
     void setIsOnline(bool online) { isOnline = online; }
+    
+    // World state
+    void setWorldLoaded(bool loaded) { worldLoaded = loaded; }
+    bool isWorldLoaded() const { return worldLoaded; }
 
     void toggleDebug() { showDebug = !showDebug; }
 
@@ -147,6 +151,7 @@ private:
     std::string serverPort = "25565";
     std::string networkStatus;
     bool isOnline = false;
+    bool worldLoaded = false;
     bool lastMousePressed = false;
     bool lastRightMousePressed = false;
     

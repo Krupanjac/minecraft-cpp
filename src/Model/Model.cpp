@@ -1,13 +1,17 @@
 #define GLM_ENABLE_EXPERIMENTAL
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #include "Model.h"
 #include "../Core/Logger.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
-
 #define TINYGLTF_IMPLEMENTATION
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define STB_IMAGE_IMPLEMENTATION

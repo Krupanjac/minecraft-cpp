@@ -62,7 +62,7 @@ void GameServer::stop() {
     
     // Disconnect all clients
     {
-        std::lock_guard<std::mutex> lock(m_clientsMutex);
+        std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
         
         PacketBuffer disconnectPacket;
         serializeDisconnect(disconnectPacket, "Server shutting down");
@@ -81,26 +81,32 @@ void GameServer::stop() {
 void GameServer::update() {
     if (!m_running) return;
     
-    // Accept new connections
-    acceptConnections();
-    
-    // Process existing clients
-    std::lock_guard<std::mutex> lock(m_clientsMutex);
-    
-    std::vector<uint32_t> disconnectedClients;
-    
-    for (auto& client : m_clients) {
-        if (!client->socket.isValid()) {
-            disconnectedClients.push_back(client->playerId);
-            continue;
+    try {
+        // Accept new connections
+        acceptConnections();
+        
+        // Process existing clients
+        std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
+        
+        std::vector<uint32_t> disconnectedClients;
+        
+        for (auto& client : m_clients) {
+            if (!client->socket.isValid()) {
+                disconnectedClients.push_back(client->playerId);
+                continue;
+            }
+            
+            processClient(*client);
         }
         
-        processClient(*client);
-    }
-    
-    // Remove disconnected clients
-    for (uint32_t id : disconnectedClients) {
-        removeClient(id);
+        // Remove disconnected clients
+        for (uint32_t id : disconnectedClients) {
+            removeClient(id);
+        }
+    } catch (const std::exception& e) {
+        LOG_ERROR("Exception in GameServer::update: " + std::string(e.what()));
+    } catch (...) {
+        LOG_ERROR("Unknown exception in GameServer::update");
     }
 }
 
@@ -117,7 +123,7 @@ void GameServer::acceptConnections() {
     
     LOG_INFO("New connection from " + connection->socket.getRemoteAddress());
     
-    std::lock_guard<std::mutex> lock(m_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
     m_clients.push_back(std::move(connection));
 }
 
@@ -161,10 +167,13 @@ void GameServer::processClient(ClientConnection& client) {
 }
 
 void GameServer::handlePacket(ClientConnection& client, PacketType type, PacketBuffer& buffer) {
+    try {
     switch (type) {
         case PacketType::CONNECT_REQUEST: {
+            LOG_DEBUG("Processing CONNECT_REQUEST...");
             uint16_t protocolVersion = buffer.readU16();
             std::string playerName = buffer.readString(32);
+            LOG_DEBUG("Player name: " + playerName + ", protocol: " + std::to_string(protocolVersion));
             
             if (protocolVersion != PROTOCOL_VERSION) {
                 PacketBuffer response;
@@ -209,9 +218,13 @@ void GameServer::handlePacket(ClientConnection& client, PacketType type, PacketB
                 }
             }
             
+            LOG_DEBUG("About to call onPlayerJoin callback...");
             if (m_onPlayerJoin) {
+                LOG_DEBUG("Calling onPlayerJoin callback");
                 m_onPlayerJoin(client.playerId, client.playerName);
+                LOG_DEBUG("onPlayerJoin callback completed");
             }
+            LOG_DEBUG("CONNECT_REQUEST handling complete");
             break;
         }
         
@@ -285,6 +298,11 @@ void GameServer::handlePacket(ClientConnection& client, PacketType type, PacketB
             LOG_WARNING("Unknown packet type: " + std::to_string(static_cast<int>(type)));
             break;
     }
+    } catch (const std::exception& e) {
+        LOG_ERROR("Exception in handlePacket: " + std::string(e.what()));
+    } catch (...) {
+        LOG_ERROR("Unknown exception in handlePacket");
+    }
 }
 
 void GameServer::sendToClient(ClientConnection& client, const PacketBuffer& buffer) {
@@ -332,7 +350,7 @@ void GameServer::removeClient(uint32_t playerId) {
 }
 
 std::vector<RemotePlayer> GameServer::getPlayers() const {
-    std::lock_guard<std::mutex> lock(m_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
     
     std::vector<RemotePlayer> players;
     for (const auto& client : m_clients) {
@@ -352,7 +370,7 @@ std::vector<RemotePlayer> GameServer::getPlayers() const {
 }
 
 void GameServer::broadcastBlockChange(int x, int y, int z, uint8_t blockType) {
-    std::lock_guard<std::mutex> lock(m_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
     
     PacketBuffer packet;
     serializeBlockChange(packet, x, y, z, blockType);
@@ -360,7 +378,7 @@ void GameServer::broadcastBlockChange(int x, int y, int z, uint8_t blockType) {
 }
 
 void GameServer::broadcastChatMessage(const std::string& message) {
-    std::lock_guard<std::mutex> lock(m_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
     
     PacketBuffer packet;
     serializeChatMessage(packet, 0, message);  // 0 = server message
@@ -368,7 +386,7 @@ void GameServer::broadcastChatMessage(const std::string& message) {
 }
 
 void GameServer::broadcastTimeSync(float timeOfDay, bool isPaused) {
-    std::lock_guard<std::mutex> lock(m_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
     
     m_timeOfDay = timeOfDay;
     m_timePaused = isPaused;
@@ -379,7 +397,7 @@ void GameServer::broadcastTimeSync(float timeOfDay, bool isPaused) {
 }
 
 size_t GameServer::getPlayerCount() const {
-    std::lock_guard<std::mutex> lock(m_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
     return std::count_if(m_clients.begin(), m_clients.end(),
         [](const auto& client) { return client->playerId != 0; });
 }
@@ -393,7 +411,7 @@ void GameServer::updateHostPosition(const glm::vec3& position, float yaw, float 
     m_hostOnGround = onGround;
     
     // Broadcast host position to all clients
-    std::lock_guard<std::mutex> lock(m_clientsMutex);
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
     PacketBuffer posPacket;
     serializePlayerPosition(posPacket, 0, m_hostPosition, m_hostYaw, m_hostPitch, m_hostVelocity, m_hostOnGround);
     broadcastToAll(posPacket);

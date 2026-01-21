@@ -69,9 +69,28 @@ public:
             }
 
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-                bool isMenuOpen = uiManager.isMenuOpen();
-                uiManager.setMenuState(isMenuOpen ? MenuState::NONE : MenuState::IN_GAME_MENU);
-                window->setCursorMode(isMenuOpen ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+                // Only allow closing menu to game if a world is loaded
+                if (uiManager.isWorldLoaded()) {
+                    bool isMenuOpen = uiManager.isMenuOpen();
+                    uiManager.setMenuState(isMenuOpen ? MenuState::NONE : MenuState::IN_GAME_MENU);
+                    window->setCursorMode(isMenuOpen ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+                } else {
+                    // In main menu without world - ESC does nothing or goes back in menu hierarchy
+                    MenuState currentState = uiManager.getMenuState();
+                    if (currentState == MenuState::SETTINGS || currentState == MenuState::VIDEO_SETTINGS ||
+                        currentState == MenuState::CONTROLS || currentState == MenuState::NEW_GAME ||
+                        currentState == MenuState::LOAD_GAME || currentState == MenuState::MULTIPLAYER ||
+                        currentState == MenuState::HOST_GAME || currentState == MenuState::JOIN_GAME) {
+                        // Go back to main menu from sub-menus
+                        if (currentState == MenuState::VIDEO_SETTINGS || currentState == MenuState::CONTROLS) {
+                            uiManager.setMenuState(MenuState::SETTINGS);
+                        } else if (currentState == MenuState::HOST_GAME || currentState == MenuState::JOIN_GAME) {
+                            uiManager.setMenuState(MenuState::MULTIPLAYER);
+                        } else {
+                            uiManager.setMenuState(MenuState::MAIN_MENU);
+                        }
+                    }
+                }
             }
 
             if (action == GLFW_PRESS) {
@@ -129,12 +148,14 @@ public:
         // Setup UI Callbacks
         uiManager.setOnNewGame([this](std::string name, long seed) {
             createWorld(name, seed);
+            uiManager.setWorldLoaded(true);
             uiManager.setMenuState(MenuState::NONE);
             window->setCursorMode(GLFW_CURSOR_DISABLED);
         });
         
         uiManager.setOnLoadGame([this](std::string name) {
             if (loadWorld(name)) {
+                uiManager.setWorldLoaded(true);
                 uiManager.setMenuState(MenuState::NONE);
                 window->setCursorMode(GLFW_CURSOR_DISABLED);
             }
@@ -227,16 +248,18 @@ public:
             LOG_INFO("Disconnected from server: " + reason);
             uiManager.setIsOnline(false);
             uiManager.setNetworkStatus("Disconnected: " + reason);
+            uiManager.setWorldLoaded(false);
             uiManager.setMenuState(MenuState::MAIN_MENU);
         });
         
         networkManager.setConnectedCallback([this]() {
             if (networkManager.isClient()) {
                 // Client just connected - use server's world seed
-                createWorld("Multiplayer", networkManager.getWorldSeed());
+                createWorld("Multiplayer", static_cast<long>(networkManager.getWorldSeed()));
                 glm::vec3 spawn = networkManager.getSpawnPosition();
                 camera.setPosition(spawn);
             }
+            uiManager.setWorldLoaded(true);
             uiManager.setMenuState(MenuState::NONE);
             window->setCursorMode(GLFW_CURSOR_DISABLED);
             uiManager.setIsOnline(true);
@@ -292,6 +315,122 @@ public:
         } else {
             uiManager.setNetworkStatus("Failed to connect");
             LOG_ERROR("Failed to connect to server");
+        }
+    }
+    
+    void initializeMenuWorld() {
+        if (menuWorldInitialized) return;
+        
+        LOG_INFO("Initializing menu background world...");
+        
+        // Use a fixed seed for the menu world for consistent views
+        long menuSeed = 42424242;
+        worldGenerator.setSeed(static_cast<unsigned int>(menuSeed));
+        
+        // Find positions close to terrain for nice scenic views
+        int terrainHeight = worldGenerator.getSurfaceHeight(0, 0);
+        menuScenePositions[0] = glm::vec3(0.0f, static_cast<float>(terrainHeight) + 8.0f, 0.0f);
+        menuScenePositions[1] = glm::vec3(200.0f, static_cast<float>(worldGenerator.getSurfaceHeight(200, 200)) + 6.0f, 200.0f);
+        menuScenePositions[2] = glm::vec3(-150.0f, static_cast<float>(worldGenerator.getSurfaceHeight(-150, 100)) + 10.0f, 100.0f);
+        menuScenePositions[3] = glm::vec3(100.0f, static_cast<float>(worldGenerator.getSurfaceHeight(100, -200)) + 7.0f, -200.0f);
+        
+        menuCamera.setPosition(menuScenePositions[0]);
+        menuCamera.setYaw(menuCameraYaw);
+        menuCamera.setPitch(menuCameraPitch);
+        menuCamera.setFov(70.0f);
+        
+        // Generate chunks around the first scene position
+        int menuRadius = 4;
+        for (int x = -menuRadius; x <= menuRadius; x++) {
+            for (int z = -menuRadius; z <= menuRadius; z++) {
+                for (int y = 0; y < 8; y++) {
+                    ChunkPos pos = ChunkManager::worldToChunk(menuScenePositions[0] + glm::vec3(x * CHUNK_SIZE, y * CHUNK_SIZE - 64, z * CHUNK_SIZE));
+                    chunkManager.requestChunkGeneration(pos);
+                }
+            }
+        }
+        
+        // Wait for initial chunks to generate and mesh (in background thread would be better)
+        bool initialDone = false;
+        int attempts = 0;
+        while (!initialDone && attempts < 100) {
+            auto chunksToGen = chunkManager.getChunksToGenerate(menuCamera.getPosition(), menuRadius, 1000);
+            if (chunksToGen.empty()) {
+                initialDone = true;
+            } else {
+                for (const auto& pos : chunksToGen) {
+                    chunkManager.requestChunkGeneration(pos);
+                    auto chunk = chunkManager.getChunk(pos);
+                    if (chunk && chunk->getState() == ChunkState::GENERATING) {
+                        worldGenerator.generate(chunk);
+                        chunk->setState(ChunkState::READY);
+                    }
+                }
+            }
+            attempts++;
+        }
+        
+        // Build meshes for generated chunks
+        auto chunksToMesh = chunkManager.getChunksToMesh(menuCamera.getPosition(), 1000);
+        for (auto& chunk : chunksToMesh) {
+            auto neighbors = chunkManager.getNeighbors(chunk->getPosition());
+            MeshData meshData = meshBuilder.buildChunkMesh(chunk, 
+                neighbors[0], neighbors[1], neighbors[2], neighbors[3], neighbors[4], neighbors[5], chunk->getCurrentLOD());
+            renderer.uploadChunkMesh(chunk->getPosition(), 
+                meshData.vertices, meshData.indices, 
+                meshData.waterVertices, meshData.waterIndices);
+            chunk->setState(ChunkState::GPU_UPLOADED);
+        }
+        
+        menuWorldInitialized = true;
+        LOG_INFO("Menu background world initialized");
+    }
+    
+    void updateMenuCamera(float deltaTime) {
+        // Slowly rotate camera for panoramic effect
+        menuCameraYaw += deltaTime * 5.0f; // 5 degrees per second
+        if (menuCameraYaw > 360.0f) menuCameraYaw -= 360.0f;
+        
+        menuCamera.setYaw(menuCameraYaw);
+        menuCamera.setPitch(menuCameraPitch);
+        
+        // Change scene every 15 seconds with smooth transition
+        menuCameraTimer += deltaTime;
+        if (menuCameraTimer >= 15.0f) {
+            menuCameraTimer = 0.0f;
+            menuSceneIndex = (menuSceneIndex + 1) % NUM_MENU_SCENES;
+        }
+        
+        // Smooth interpolation to target position
+        glm::vec3 targetPos = menuScenePositions[menuSceneIndex];
+        glm::vec3 currentPos = menuCamera.getPosition();
+        glm::vec3 newPos = currentPos + (targetPos - currentPos) * deltaTime * 0.5f;
+        menuCamera.setPosition(newPos);
+        
+        // Update chunk manager (unloads distant chunks)
+        chunkManager.update(menuCamera.getPosition(), menuCamera.getFront(), menuCamera.getViewMatrix());
+        
+        // Generate chunks around current camera position (more chunks for better view)
+        auto chunksToGen = chunkManager.getChunksToGenerate(menuCamera.getPosition(), 6, 200);
+        for (const auto& pos : chunksToGen) {
+            chunkManager.requestChunkGeneration(pos);
+            auto chunk = chunkManager.getChunk(pos);
+            if (chunk && chunk->getState() == ChunkState::GENERATING) {
+                worldGenerator.generate(chunk);
+                chunk->setState(ChunkState::READY);
+            }
+        }
+        
+        // Mesh nearby chunks (more for better view)
+        auto chunksToMesh = chunkManager.getChunksToMesh(menuCamera.getPosition(), 100);
+        for (auto& chunk : chunksToMesh) {
+            auto neighbors = chunkManager.getNeighbors(chunk->getPosition());
+            MeshData meshData = meshBuilder.buildChunkMesh(chunk, 
+                neighbors[0], neighbors[1], neighbors[2], neighbors[3], neighbors[4], neighbors[5], chunk->getCurrentLOD());
+            renderer.uploadChunkMesh(chunk->getPosition(), 
+                meshData.vertices, meshData.indices, 
+                meshData.waterVertices, meshData.waterIndices);
+            chunk->setState(ChunkState::GPU_UPLOADED);
         }
     }
 
@@ -499,6 +638,9 @@ public:
     void run() {
         LOG_INFO("Starting main loop");
         
+        // Initialize menu background world
+        initializeMenuWorld();
+        
         Time::instance().reset();
         
         while (!window->shouldClose() && running) {
@@ -507,6 +649,14 @@ public:
             // Clamp physics/update delta to avoid large stalls causing physics explosions (teleport/new world)
             const float MAX_PHYSICS_DELTA = 0.1f; // 100 ms
             float clampedDelta = std::min(deltaTime, MAX_PHYSICS_DELTA);
+            
+            // Check if we're in the main menu (no world loaded)
+            bool inMainMenu = !uiManager.isWorldLoaded();
+            
+            if (inMainMenu) {
+                // Update menu camera for panoramic effect
+                updateMenuCamera(clampedDelta);
+            }
             
             processInput(deltaTime); // Input/GUI can use full frame delta
             update(clampedDelta); // Physics/render updates use clamped delta
@@ -615,6 +765,21 @@ private:
     std::unique_ptr<PlayerEntity> playerEntity;
     std::vector<std::unique_ptr<ZombieEntity>> zombies;
     float zombieSpawnTimer = 0.0f;
+    
+    // Menu background world
+    bool menuWorldInitialized = false;
+    Camera menuCamera{glm::vec3(0.0f, 100.0f, 0.0f)};
+    float menuCameraYaw = 0.0f;
+    float menuCameraPitch = -15.0f;
+    float menuCameraTimer = 0.0f;
+    int menuSceneIndex = 0;
+    static constexpr int NUM_MENU_SCENES = 4;
+    glm::vec3 menuScenePositions[NUM_MENU_SCENES] = {
+        glm::vec3(0.0f, 100.0f, 0.0f),
+        glm::vec3(200.0f, 85.0f, 200.0f),
+        glm::vec3(-150.0f, 110.0f, 100.0f),
+        glm::vec3(100.0f, 90.0f, -200.0f)
+    };
     
     void applySettings() {
         auto& s = Settings::instance();
@@ -1061,6 +1226,27 @@ private:
     }
     
     void render() {
+        // Check if we're in main menu without a world loaded
+        bool inMainMenu = !uiManager.isWorldLoaded() && 
+                          (uiManager.getMenuState() == MenuState::MAIN_MENU ||
+                           uiManager.getMenuState() == MenuState::MULTIPLAYER ||
+                           uiManager.getMenuState() == MenuState::HOST_GAME ||
+                           uiManager.getMenuState() == MenuState::JOIN_GAME ||
+                           uiManager.getMenuState() == MenuState::NEW_GAME ||
+                           uiManager.getMenuState() == MenuState::LOAD_GAME ||
+                           uiManager.getMenuState() == MenuState::SETTINGS ||
+                           uiManager.getMenuState() == MenuState::VIDEO_SETTINGS ||
+                           uiManager.getMenuState() == MenuState::CONTROLS);
+        
+        if (inMainMenu) {
+            // Render menu background world
+            std::vector<Entity*> emptyEntities;
+            renderer.render(chunkManager, menuCamera, emptyEntities, window->getWidth(), window->getHeight());
+            renderer.cleanUnusedMeshes(chunkManager);
+            uiManager.render();
+            return;
+        }
+        
         std::vector<Entity*> entities;
         
         // Sync player entity if it exists
