@@ -49,7 +49,6 @@ public:
             }
         }
     }
-    void setHalfResolution(bool half) { useHalfResolution = half; }
     
     // Check if ray tracing is available (compute shader support)
     static bool isSupported();
@@ -72,7 +71,6 @@ private:
     // Settings
     int maxRaySteps = 128;      // Default for medium quality
     float rayMaxDistance = 64.0f; // Default for medium quality
-    bool useHalfResolution = false; // Render at half res for better performance
     
     // Last update position (to avoid unnecessary updates)
     glm::ivec3 lastUpdateChunk = glm::ivec3(INT_MAX);

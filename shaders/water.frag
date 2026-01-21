@@ -31,59 +31,81 @@ layout(location = 1) out vec2 Velocity;
 in vec4 vCurrentClip;
 in vec4 vPrevClip;
 
-// Simple screen-space reflection
+// Screen-space reflection
 vec3 getReflection(vec3 worldPos, vec3 normal, vec3 viewDir) {
+    // Calculate proper reflection direction
     vec3 reflectDir = reflect(-viewDir, normal);
     
     // Add slight wave distortion based on time
-    float wave = sin(worldPos.x * 2.0 + uTime * 2.0) * 0.02 + 
-                 cos(worldPos.z * 2.0 + uTime * 1.5) * 0.02;
-    reflectDir.xz += wave;
+    float wave1 = sin(worldPos.x * 2.0 + uTime * 2.0) * 0.015;
+    float wave2 = cos(worldPos.z * 2.0 + uTime * 1.5) * 0.015;
+    reflectDir.x += wave1;
+    reflectDir.z += wave2;
     reflectDir = normalize(reflectDir);
     
-    // Simple ray march in screen space
-    vec3 startPos = worldPos + normal * 0.1;  // Offset to avoid self-intersection
+    // Get starting screen position
+    vec4 startClip = uProjection * uView * vec4(worldPos, 1.0);
+    vec2 startScreen = (startClip.xy / startClip.w) * 0.5 + 0.5;
     
-    const int maxSteps = 32;
+    // Get end position along reflection ray
+    vec3 endWorldPos = worldPos + reflectDir * 50.0;
+    vec4 endClip = uProjection * uView * vec4(endWorldPos, 1.0);
+    vec2 endScreen = (endClip.xy / endClip.w) * 0.5 + 0.5;
     
-    // Binary search refinement for more accurate hits
-    vec3 lastPos = startPos;
+    // Ray direction in screen space
+    vec2 rayDir = endScreen - startScreen;
+    float rayLength = length(rayDir);
     
-    for (int i = 0; i < maxSteps; i++) {
-        // Exponential step size for better coverage
-        float t = float(i + 1) * 0.5 + float(i * i) * 0.1;
-        vec3 samplePos = startPos + reflectDir * t;
-        
-        // Project to screen space
-        vec4 clipPos = uProjection * uView * vec4(samplePos, 1.0);
-        vec3 ndc = clipPos.xyz / clipPos.w;
-        vec2 screenUV = ndc.xy * 0.5 + 0.5;
+    if (rayLength < 0.001) {
+        return uSkyColor;
+    }
+    
+    rayDir /= rayLength;
+    
+    // March along the ray in screen space
+    const int maxSteps = 64;
+    float stepSize = min(rayLength, 1.0) / float(maxSteps);
+    
+    vec2 currentUV = startScreen;
+    float startDepth = startClip.z / startClip.w;
+    float endDepth = endClip.z / endClip.w;
+    float depthStep = (endDepth - startDepth) / float(maxSteps);
+    float currentDepth = startDepth;
+    
+    for (int i = 1; i <= maxSteps; i++) {
+        currentUV += rayDir * stepSize;
+        currentDepth += depthStep;
         
         // Check bounds
-        if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) {
+        if (currentUV.x < 0.0 || currentUV.x > 1.0 || currentUV.y < 0.0 || currentUV.y > 1.0) {
             break;
         }
         
         // Sample scene depth
-        float sceneDepth = texture(uSceneDepth, screenUV).r;
-        float sampleDepth = ndc.z * 0.5 + 0.5;
+        float sceneDepth = texture(uSceneDepth, currentUV).r;
+        float rayDepth = currentDepth * 0.5 + 0.5;
         
-        // Hit test - if we're behind the scene geometry
-        if (sampleDepth > sceneDepth && sceneDepth < 0.999) {
-            // Found a hit! Sample the scene color
-            vec3 reflectedColor = texture(uSceneColor, screenUV).rgb;
+        // Check for intersection (ray went behind geometry)
+        float thickness = 0.02;
+        if (rayDepth > sceneDepth && rayDepth < sceneDepth + thickness && sceneDepth < 0.999) {
+            // Found intersection - sample scene color
+            vec3 reflectedColor = texture(uSceneColor, currentUV).rgb;
             
-            // Fade reflection based on distance traveled
-            float fade = 1.0 - float(i) / float(maxSteps);
-            return mix(uSkyColor * 0.8, reflectedColor, fade * 0.8);
+            // Fade based on distance and screen edge
+            float edgeFade = 1.0 - smoothstep(0.0, 0.1, min(min(currentUV.x, 1.0 - currentUV.x), 
+                                                            min(currentUV.y, 1.0 - currentUV.y)));
+            edgeFade = 1.0 - edgeFade;
+            
+            float distFade = 1.0 - float(i) / float(maxSteps);
+            float fade = edgeFade * distFade;
+            
+            return mix(uSkyColor, reflectedColor, fade * 0.85);
         }
-        
-        lastPos = samplePos;
     }
     
     // No hit - return sky color with horizon blend
     float horizon = max(0.0, reflectDir.y);
-    vec3 skyReflect = mix(uSkyColor * 0.8, uSkyColor, horizon);
+    vec3 skyReflect = mix(uSkyColor * 0.7, uSkyColor, horizon);
     return skyReflect;
 }
 

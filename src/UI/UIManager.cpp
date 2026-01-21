@@ -1257,10 +1257,13 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                                 el.text = "Shadows: " + std::string(Settings::SHADOW_METHOD_NAMES[*el.intValueRef]);
                             }
                             
-                            // Handle preset selector - apply the preset after cycling
+                            // Handle preset selector - apply the preset after cycling and refresh UI
                             if (el.intValueRef == &Settings::instance().graphicsPreset) {
                                 Settings::instance().applyPreset(*el.intValueRef);
-                                el.text = Settings::PRESET_NAMES[*el.intValueRef];
+                                // Refresh video settings UI to show updated values
+                                this->setupVideoSettingsMenu();
+                                if (onSettingsChanged) onSettingsChanged();
+                                return; // Exit early since we rebuilt the UI
                             }
                             
                             if (onSettingsChanged) onSettingsChanged();

@@ -16,8 +16,8 @@ uniform int uUseShadows;
 uniform int uUseRTShadows;      // Use ray traced shadows
 uniform vec3 uRenderOrigin;     // For converting camera-relative to world space
 
-const int STEPS = 48;
-const float MAX_DIST = 150.0;
+const int STEPS = 64;           // More steps for better quality
+const float MAX_DIST = 200.0;   // Increased max distance
 
 vec3 getWorldPos(vec2 uv, float depth) {
     vec4 clipSpace = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
@@ -94,8 +94,11 @@ void main() {
         float scattering = max(dot(rayDir, lightDir), 0.0);
         float phase = pow(scattering, 8.0); // Sharper forward scattering
         
+        // Enhanced scattering when using RT shadows (more accurate light visibility)
+        float scatterMultiplier = (uUseRTShadows != 0) ? 1.5 : 1.0;
+        
         // Combine phase function with visibility
-        float inScatter = density * (0.02 + phase * 0.8) * lightVisibility;
+        float inScatter = density * (0.02 + phase * 0.8 * scatterMultiplier) * lightVisibility;
         
         // Beer-Lambert absorption
         float absorption = density * 0.1;
@@ -105,5 +108,7 @@ void main() {
         accumulation += inScatter * transmittance * stepSize;
     }
     
-    FragColor = vec4(uLightColor * accumulation * uIntensity, 1.0);
+    // Boost intensity slightly when using RT for more visible god rays
+    float rtBoost = (uUseRTShadows != 0) ? 1.3 : 1.0;
+    FragColor = vec4(uLightColor * accumulation * uIntensity * rtBoost, 1.0);
 }

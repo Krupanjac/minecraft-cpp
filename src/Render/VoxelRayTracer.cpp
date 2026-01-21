@@ -68,14 +68,10 @@ bool VoxelRayTracer::initialize(int screenWidth, int screenHeight) {
 }
 
 void VoxelRayTracer::resize(int w, int h) {
-    // Store full resolution
-    int newWidth = useHalfResolution ? w / 2 : w;
-    int newHeight = useHalfResolution ? h / 2 : h;
+    if (w == width && h == height) return;
     
-    if (newWidth == width && newHeight == height) return;
-    
-    width = newWidth;
-    height = newHeight;
+    width = w;
+    height = h;
     createLightingTexture();
 }
 
@@ -211,6 +207,9 @@ GLuint VoxelRayTracer::trace(GLuint depthTexture, const glm::mat4& invViewProj,
     
     // Memory barrier to ensure writes are visible
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+    
+    // Reset active texture to avoid state pollution
+    glActiveTexture(GL_TEXTURE0);
     
     computeShader.unuse();
     

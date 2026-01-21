@@ -152,6 +152,9 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
                          GLuint shadowMapTexture, const glm::mat4& lightSpaceMatrix,
                          GLuint rayTracingTexture) {
     
+    // Reset viewport to full resolution at start to ensure correct state
+    glViewport(0, 0, width, height);
+    
     glDisable(GL_DEPTH_TEST); // Disable depth test for full screen quads
     auto& settings = Settings::instance();
 
@@ -242,6 +245,9 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         glClear(GL_COLOR_BUFFER_BIT);
     }
     volumetricFBO->unbind();
+    
+    // Reset viewport to full resolution after half-res volumetric pass
+    glViewport(0, 0, width, height);
 
     // 4. Composite (Tone Mapping + Gamma + Combine)
     intermediateFBO->bind();

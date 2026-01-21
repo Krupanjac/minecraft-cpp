@@ -135,20 +135,17 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         // Set quality settings - optimized for performance
         int quality = Settings::instance().rayTracingQuality;
         if (quality == Settings::RT_QUALITY_LOW) {
-            rayTracer->setMaxRaySteps(64);
+            rayTracer->setMaxRaySteps(48);
+            rayTracer->setRayMaxDistance(32.0f);
+            rayTracer->setVoxelGridRadius(24);
+        } else if (quality == Settings::RT_QUALITY_MEDIUM) {
+            rayTracer->setMaxRaySteps(96);
             rayTracer->setRayMaxDistance(48.0f);
             rayTracer->setVoxelGridRadius(32);
-            rayTracer->setHalfResolution(true);  // Use half resolution for low quality
-        } else if (quality == Settings::RT_QUALITY_MEDIUM) {
-            rayTracer->setMaxRaySteps(128);
+        } else { // HIGH
+            rayTracer->setMaxRaySteps(192);
             rayTracer->setRayMaxDistance(64.0f);
             rayTracer->setVoxelGridRadius(48);
-            rayTracer->setHalfResolution(true);  // Use half resolution for medium too
-        } else { // HIGH
-            rayTracer->setMaxRaySteps(256);
-            rayTracer->setRayMaxDistance(96.0f);
-            rayTracer->setVoxelGridRadius(64);
-            rayTracer->setHalfResolution(false); // Full resolution for high quality
         }
         
         // Use previous frame's matrices for reconstruction
@@ -646,6 +643,10 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
                         projection, view, cameraRelative, lightDirection, unjitteredProjection, 
                         volIntensity, lightCol, 
                         shadowMap->getDepthMap(), lightSpaceMatrix, rayTracedLighting);
+
+    // Force full-resolution viewport before UI/overlays (prevents half-size output state leaks)
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, windowWidth, windowHeight);
 
     // Update History
     prevView = view;

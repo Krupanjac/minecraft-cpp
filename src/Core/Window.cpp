@@ -91,9 +91,17 @@ void Window::setMouseButtonCallback(std::function<void(int, int, int)> callback)
 
 void Window::setFramebufferSizeCallback(std::function<void(int, int)> callback) {
     windowData.framebufferSizeCallback = callback;
+    windowData.windowRef = this;  // Store reference to update width/height
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow* win, int w, int h) {
         auto data = static_cast<WindowData*>(glfwGetWindowUserPointer(win));
-        if (data && data->framebufferSizeCallback) data->framebufferSizeCallback(w, h);
+        if (data) {
+            // Update the Window's internal width/height to match new framebuffer size
+            if (data->windowRef) {
+                data->windowRef->width = w;
+                data->windowRef->height = h;
+            }
+            if (data->framebufferSizeCallback) data->framebufferSizeCallback(w, h);
+        }
     });
 }
 

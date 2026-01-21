@@ -50,6 +50,7 @@ private:
         std::function<void(double, double)> cursorPosCallback;
         std::function<void(int, int, int)> mouseButtonCallback;
         std::function<void(int, int)> framebufferSizeCallback;
+        Window* windowRef = nullptr;  // Reference for updating width/height on resize
     };
     WindowData windowData;
 };
