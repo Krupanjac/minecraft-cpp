@@ -37,6 +37,12 @@ void PlayerEntity::loadModelFromSettings() {
     currentModelIndex = modelIndex;
 }
 
+static std::string toLowerPlayer(const std::string& s) {
+    std::string result = s;
+    for (auto& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return result;
+}
+
 void PlayerEntity::update(float deltaTime) {
     // Check if model needs to be reloaded (settings changed)
     if (Settings::instance().playerModelIndex != currentModelIndex) {
@@ -47,23 +53,23 @@ void PlayerEntity::update(float deltaTime) {
     
     if (model) {
         float speed = glm::length(glm::vec2(velocity.x, velocity.z));
-        std::string currentAnim = model->getCurrentAnimation();
+        std::string currentAnim = toLowerPlayer(model->getCurrentAnimation());
         
-        // Simple state machine
+        // Update animation
+        model->updateAnimation(deltaTime);
+        
+        // Simple state machine for animation switching
         if (speed > 0.1f) {
-            // Check if we are already playing a walk/run animation
-            if (currentAnim != "walk" && currentAnim != "run" && currentAnim.find("walk") == std::string::npos) {
-                // Try to find a walk animation. 
-                // Using "walk" as a guess, assuming the model has one.
-                model->playAnimation("walk", true);
+            // Walking/Running
+            if (currentAnim.find("walk") == std::string::npos && 
+                currentAnim.find("run") == std::string::npos) {
+                model->playAnimation("Walk", true);
             }
         } else {
-             // Idle
-             if (currentAnim != "idle" && currentAnim.find("idle") == std::string::npos) {
-                  model->playAnimation("idle", true);
-                  // If "idle" not found, try "idle1" based on user list
-                  if (model->getCurrentAnimation() != "idle") model->playAnimation("idle1", true);
-             }
+            // Idle
+            if (currentAnim.find("idle") == std::string::npos) {
+                model->playAnimation("Idle", true);
+            }
         }
     }
 }

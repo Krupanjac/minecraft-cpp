@@ -13,6 +13,7 @@ public:
 
     int getWidth() const { return width; }
     int getHeight() const { return height; }
+    unsigned int getID() const { return rendererID; }
 
 private:
     unsigned int rendererID;

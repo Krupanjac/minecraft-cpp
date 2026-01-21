@@ -77,24 +77,36 @@ void Model::loadModel(const std::string& path) {
         LOG_INFO("Animations found: 0");
     }
 
-    // Process textures
-    // Process textures
+    // Process textures from images
+    LOG_INFO("Processing " + std::to_string(impl->model.images.size()) + " images for textures");
     for (size_t i = 0; i < impl->model.images.size(); ++i) {
         const auto& img = impl->model.images[i];
-        // img.image is a vector of bytes
-        LOG_INFO("Processing image " + std::to_string(i) + ": " + img.name);
-        LOG_INFO("  Dimensions: " + std::to_string(img.width) + "x" + std::to_string(img.height));
-        LOG_INFO("  Components: " + std::to_string(img.component));
-        LOG_INFO("  Data size: " + std::to_string(img.image.size()));
+        LOG_INFO("Image " + std::to_string(i) + ": " + img.name + 
+                 " (" + std::to_string(img.width) + "x" + std::to_string(img.height) + 
+                 ", " + std::to_string(img.component) + " channels, " + 
+                 std::to_string(img.image.size()) + " bytes)");
         
         if (img.image.empty() || img.width <= 0 || img.height <= 0) {
-             LOG_ERROR("  Image data is invalid or empty!");
+            LOG_ERROR("  Image data is invalid or empty!");
+            textures.push_back(nullptr); // Push placeholder to keep indices aligned
+            continue;
         }
 
-        // Create Texture from memory
-        auto tex = std::make_shared<Texture>(img.image.data(), img.width, img.height, img.component);
+        // glTF specifies UV origin at top-left, OpenGL expects bottom-left.
+        // Flip the image vertically to match OpenGL conventions.
+        std::vector<unsigned char> flippedData(img.image.size());
+        int rowSize = img.width * img.component;
+        for (int y = 0; y < img.height; ++y) {
+            const unsigned char* srcRow = &img.image[(img.height - 1 - y) * rowSize];
+            unsigned char* dstRow = &flippedData[y * rowSize];
+            std::memcpy(dstRow, srcRow, rowSize);
+        }
+
+        // Create Texture from flipped memory
+        auto tex = std::make_shared<Texture>(flippedData.data(), img.width, img.height, img.component);
         textures.push_back(tex);
     }
+    LOG_INFO("Textures loaded: " + std::to_string(textures.size()));
 
     // Process nodes recursively
     const tinygltf::Scene& scene = impl->model.scenes[impl->model.defaultScene > -1 ? impl->model.defaultScene : 0];
@@ -176,8 +188,9 @@ void Model::loadModel(const std::string& path) {
                     unsigned int vbo;
                     glGenBuffers(1, &vbo);
                     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-                    glBufferData(GL_ARRAY_BUFFER, bufferView.byteLength, 
-                                 &buffer.data[bufferView.byteOffset + accessor.byteOffset], GL_STATIC_DRAW);
+                    // Upload full bufferView so interleaved data + stride works correctly.
+                    glBufferData(GL_ARRAY_BUFFER, bufferView.byteLength,
+                                 &buffer.data[bufferView.byteOffset], GL_STATIC_DRAW);
                     
                     int location = -1;
                     if (name == "POSITION") location = 0;
@@ -193,10 +206,23 @@ void Model::loadModel(const std::string& path) {
                         else if (accessor.type == TINYGLTF_TYPE_VEC3) size = 3;
                         else if (accessor.type == TINYGLTF_TYPE_VEC4) size = 4;
                         
+                        // Debug: Log UV data for first few vertices
+                        if (name == "TEXCOORD_0" && accessor.componentType == 5126) { // 5126 = GL_FLOAT
+                            const float* uvData = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
+                            LOG_INFO("TEXCOORD_0 Debug: accessorIdx=" + std::to_string(accessorIdx) + 
+                                     ", bvOffset=" + std::to_string(bufferView.byteOffset) + 
+                                     ", accOffset=" + std::to_string(accessor.byteOffset) +
+                                     ", stride=" + std::to_string(accessor.ByteStride(bufferView)) +
+                                     ", count=" + std::to_string(accessor.count));
+                            LOG_INFO("  First 3 UVs: (" + std::to_string(uvData[0]) + "," + std::to_string(uvData[1]) + ") " +
+                                     "(" + std::to_string(uvData[2]) + "," + std::to_string(uvData[3]) + ") " +
+                                     "(" + std::to_string(uvData[4]) + "," + std::to_string(uvData[5]) + ")");
+                        }
+                        
                         glEnableVertexAttribArray(location);
-                        glVertexAttribPointer(location, size, accessor.componentType, 
-                                              accessor.normalized ? GL_TRUE : GL_FALSE, 
-                                              accessor.ByteStride(bufferView), (void*)0);
+                        glVertexAttribPointer(location, size, accessor.componentType,
+                                              accessor.normalized ? GL_TRUE : GL_FALSE,
+                                              accessor.ByteStride(bufferView), (void*)(intptr_t)accessor.byteOffset);
                     }
                     // Note: We leak VBO handle here technically if we don't store it to delete later. 
                     // Usually we store them in primitive or just rely on VAO deletion (VAO doesn't delete VBOs though).
@@ -320,32 +346,41 @@ void Model::drawNode(Node* node, Shader& shader, const glm::mat4& modelMatrix, c
             // Base Color Texture
             // glTF: material -> texture index -> texture -> source (image index)
             int texIndex = mat.pbrMetallicRoughness.baseColorTexture.index;
+            bool texturesBound = false;
             if (texIndex >= 0 && static_cast<size_t>(texIndex) < impl->model.textures.size()) {
                 int imageIndex = impl->model.textures[texIndex].source;
-                if (imageIndex >= 0 && static_cast<size_t>(imageIndex) < textures.size()) {
+                if (imageIndex >= 0 && static_cast<size_t>(imageIndex) < textures.size() && textures[imageIndex]) {
                     textures[imageIndex]->bind(0);
-                    shader.setInt("uAlbedoMap", 0); 
+                    shader.setInt("uAlbedoMap", 0);
                     shader.setBool("uHasTexture", true);
-                } else {
-                    shader.setBool("uHasTexture", false);
+                    texturesBound = true;
+                    // Debug: Log texture ID and size once per model
+                    static std::unordered_map<void*, bool> loggedOnce;
+                    if (loggedOnce.find((void*)textures[imageIndex].get()) == loggedOnce.end()) {
+                        LOG_INFO("Draw Texture: texID=" + std::to_string(textures[imageIndex]->getID()) + 
+                                 ", size=" + std::to_string(textures[imageIndex]->getWidth()) + "x" + std::to_string(textures[imageIndex]->getHeight()));
+                        loggedOnce[(void*)textures[imageIndex].get()] = true;
+                    }
                 }
-            } else {
+            }
+            if (!texturesBound) {
                 shader.setBool("uHasTexture", false);
             }
 
             // Emissive Texture
             int emissiveTexIndex = mat.emissiveTexture.index;
+            bool emissiveBound = false;
             if (emissiveTexIndex >= 0 && static_cast<size_t>(emissiveTexIndex) < impl->model.textures.size()) {
                 int emissiveImageIndex = impl->model.textures[emissiveTexIndex].source;
-                if (emissiveImageIndex >= 0 && static_cast<size_t>(emissiveImageIndex) < textures.size()) {
+                if (emissiveImageIndex >= 0 && static_cast<size_t>(emissiveImageIndex) < textures.size() && textures[emissiveImageIndex]) {
                     textures[emissiveImageIndex]->bind(1);
                     shader.setInt("uEmissiveMap", 1);
                     shader.setBool("uHasEmissive", true);
-                } else {
-                    shader.setBool("uHasEmissive", false);
+                    emissiveBound = true;
                 }
-            } else {
-                 shader.setBool("uHasEmissive", false);
+            }
+            if (!emissiveBound) {
+                shader.setBool("uHasEmissive", false);
             }
 
             // Base color factor
@@ -375,22 +410,50 @@ void Model::drawNode(Node* node, Shader& shader, const glm::mat4& modelMatrix, c
     }
 }
 
+// Helper for case-insensitive comparison
+static std::string toLowerStr(const std::string& s) {
+    std::string result = s;
+    for (auto& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return result;
+}
+
 void Model::playAnimation(const std::string& name, bool loop) {
+    std::string lowerName = toLowerStr(name);
+    
+    // First try exact match
     for (size_t i = 0; i < impl->model.animations.size(); i++) {
         if (impl->model.animations[i].name == name) {
-            currentAnimation = i;
-            currentAnimationName = name;
+            currentAnimation = static_cast<int>(i);
+            currentAnimationName = impl->model.animations[i].name;
             animationLoop = loop;
             animationTime = 0.0f;
-            animationLoopEndFactor = 1.0f; // default: full clip
+            animationLoopEndFactor = 1.0f;
             
-            // Calculate duration
             animationDuration = 0.0f;
             for (const auto& sampler : impl->model.animations[i].samplers) {
                 const auto& accessor = impl->model.accessors[sampler.input];
                 animationDuration = std::max(animationDuration, static_cast<float>(accessor.maxValues[0]));
             }
-            LOG_INFO("Playing animation: " + name + " (Duration: " + std::to_string(animationDuration) + "s)");
+            LOG_INFO("Playing animation: " + currentAnimationName + " (Duration: " + std::to_string(animationDuration) + "s)");
+            return;
+        }
+    }
+    
+    // Try case-insensitive match
+    for (size_t i = 0; i < impl->model.animations.size(); i++) {
+        if (toLowerStr(impl->model.animations[i].name) == lowerName) {
+            currentAnimation = static_cast<int>(i);
+            currentAnimationName = impl->model.animations[i].name;
+            animationLoop = loop;
+            animationTime = 0.0f;
+            animationLoopEndFactor = 1.0f;
+            
+            animationDuration = 0.0f;
+            for (const auto& sampler : impl->model.animations[i].samplers) {
+                const auto& accessor = impl->model.accessors[sampler.input];
+                animationDuration = std::max(animationDuration, static_cast<float>(accessor.maxValues[0]));
+            }
+            LOG_INFO("Playing animation: " + currentAnimationName + " (Duration: " + std::to_string(animationDuration) + "s)");
             return;
         }
     }
