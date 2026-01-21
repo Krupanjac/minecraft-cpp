@@ -731,9 +731,11 @@ private:
         networkManager.update(deltaTime);
         
         // Send local player position to network
+        // Send foot position (camera is at eye level, 1.62m above feet)
         if (networkManager.isOnline() && !uiManager.isMenuOpen()) {
+            glm::vec3 footPos = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
             networkManager.sendLocalPlayerState(
-                camera.getPosition(),
+                footPos,
                 camera.getYaw(),
                 camera.getPitch(),
                 camera.velocity,

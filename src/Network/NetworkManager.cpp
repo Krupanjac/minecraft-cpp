@@ -13,8 +13,8 @@ RemotePlayerEntity::RemotePlayerEntity(uint32_t playerId, const std::string& nam
     , m_playerName(name)
     , m_targetPosition(pos) {
     
-    // Scale for player model
-    scale = glm::vec3(1.0f);
+    // Scale for player model - must match PlayerEntity scale (0.03f)
+    scale = glm::vec3(0.03f);
 }
 
 void RemotePlayerEntity::update(float deltaTime) {
@@ -27,17 +27,46 @@ void RemotePlayerEntity::update(float deltaTime) {
     float t = std::min(1.0f, INTERPOLATION_SPEED * deltaTime);
     position = glm::mix(position, m_targetPosition, t);
     
-    // Interpolate rotation
+    // Interpolate rotation (convert from camera yaw to model rotation, matching PlayerEntity)
+    // PlayerEntity uses: rotation = glm::vec3(0.0f, -camera.getYaw() + 90.0f, 0.0f)
+    // m_targetYaw is the raw camera yaw, so we need to convert it the same way
+    float targetModelYaw = -m_targetYaw + 90.0f;
     float currentYaw = rotation.y;
-    float targetYaw = m_targetYaw;
     
     // Handle yaw wraparound
-    float yawDiff = targetYaw - currentYaw;
+    float yawDiff = targetModelYaw - currentYaw;
     if (yawDiff > 180.0f) yawDiff -= 360.0f;
     if (yawDiff < -180.0f) yawDiff += 360.0f;
     
     rotation.y = currentYaw + yawDiff * t;
-    rotation.x = glm::mix(rotation.x, m_targetPitch, t);
+    // Note: pitch is not typically applied to player body rotation (only head would rotate)
+    rotation.x = 0.0f;
+    
+    // Update animations based on velocity (like PlayerEntity)
+    if (model) {
+        // velocity is set via setTargetVelocity which stores in the inherited 'velocity' member
+        float speed = glm::length(glm::vec2(velocity.x, velocity.z));
+        std::string currentAnim = model->getCurrentAnimation();
+        
+        if (speed > 0.1f) {
+            // Walking/Running
+            if (currentAnim != "walk" && currentAnim != "run" && currentAnim.find("walk") == std::string::npos) {
+                model->playAnimation("walk", true);
+            }
+        } else {
+            // Idle
+            if (currentAnim != "idle" && currentAnim.find("idle") == std::string::npos) {
+                model->playAnimation("idle", true);
+                // If "idle" not found, try "idle1"
+                if (model->getCurrentAnimation() != "idle") {
+                    model->playAnimation("idle1", true);
+                }
+            }
+        }
+        
+        // Update model animation
+        model->updateAnimation(deltaTime);
+    }
 }
 
 // ============== NetworkManager ==============
