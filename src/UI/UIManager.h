@@ -166,8 +166,11 @@ private:
     int width, height;
     Shader uiShader;
     Shader texturedShader;  // For rendering world preview thumbnails
+    Shader blockIconShader; // For rendering 3D isometric block icons
     GLuint vao, vbo;
     GLuint texturedVao, texturedVbo;  // VAO/VBO with texture coords
+    GLuint blockIconVao, blockIconVbo; // VAO/VBO for isometric block cube
+    GLuint blockAtlasTexture = 0;      // Block texture atlas
     
     std::vector<UIElement> elements;
     std::function<void()> onSettingsChanged;
@@ -235,10 +238,14 @@ private:
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
     void drawTexturedRect(float x, float y, float w, float h, GLuint textureId);
     void drawText(float x, float y, float scale, const std::string& text, const glm::vec4& color);
+    void drawBlockIcon(float x, float y, float size, BlockType type); // Draw 3D isometric block
     
     // Helper for vector font
     void drawLine(float x1, float y1, float x2, float y2, const glm::vec4& color);
     
     // Helper to get color for block preview
     glm::vec4 getBlockColor(BlockType type);
+    
+    // Helper to get texture atlas index for a block face
+    int getBlockTextureIndex(BlockType type, int face); // face: 0=top, 1=bottom, 2=side
 };

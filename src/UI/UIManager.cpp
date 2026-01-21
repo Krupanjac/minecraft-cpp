@@ -6,9 +6,10 @@
 #include <algorithm>
 #include <random>
 #include <climits>
+#define STB_IMAGE_IMPLEMENTATION_DONE
 #include <stb_image.h>
 
-UIManager::UIManager() : vao(0), vbo(0), texturedVao(0), texturedVbo(0), width(1280), height(720), showDebug(false), currentFPS(0.0f), currentMenuState(MenuState::MAIN_MENU) {}
+UIManager::UIManager() : vao(0), vbo(0), texturedVao(0), texturedVbo(0), blockIconVao(0), blockIconVbo(0), width(1280), height(720), showDebug(false), currentFPS(0.0f), currentMenuState(MenuState::MAIN_MENU) {}
 
 void UIManager::initialize(int windowWidth, int windowHeight) {
     width = windowWidth;
@@ -61,6 +62,133 @@ void UIManager::initialize(int windowWidth, int windowHeight) {
     )";
     
     texturedShader.loadFromSource(texVertSrc, texFragSrc);
+    
+    // 3D Isometric block icon shader
+    const char* blockIconVertSrc = R"(
+        #version 450 core
+        layout (location = 0) in vec3 aPos;
+        layout (location = 1) in vec2 aTexCoord;
+        layout (location = 2) in vec3 aNormal;
+        layout (location = 3) in float aFaceId;
+        
+        out vec2 TexCoord;
+        out vec3 Normal;
+        out float FaceId;
+        
+        uniform mat4 uProjection;
+        uniform mat4 uModel;
+        
+        void main() {
+            gl_Position = uProjection * uModel * vec4(aPos, 1.0);
+            TexCoord = aTexCoord;
+            Normal = aNormal;
+            FaceId = aFaceId;
+        }
+    )";
+    
+    const char* blockIconFragSrc = R"(
+        #version 450 core
+        in vec2 TexCoord;
+        in vec3 Normal;
+        in float FaceId;
+        
+        out vec4 FragColor;
+        
+        uniform sampler2D uTexture;
+        uniform vec2 uAtlasOffset[3]; // top, side, bottom atlas offsets
+        uniform float uCellSize;
+        
+        void main() {
+            // Select atlas offset based on face
+            int faceIdx = int(FaceId + 0.5);
+            vec2 atlasOffset = uAtlasOffset[faceIdx];
+            
+            // Sample from atlas
+            vec2 atlasUV = atlasOffset + TexCoord * uCellSize;
+            vec4 texColor = texture(uTexture, atlasUV);
+            
+            // Simple lighting based on normal
+            float light = 1.0;
+            if (Normal.y > 0.5) light = 1.0;      // Top - brightest
+            else if (Normal.x > 0.5) light = 0.8;  // Right side
+            else if (Normal.z > 0.5) light = 0.6;  // Front side
+            
+            FragColor = vec4(texColor.rgb * light, texColor.a);
+        }
+    )";
+    
+    blockIconShader.loadFromSource(blockIconVertSrc, blockIconFragSrc);
+    
+    // Setup isometric cube VAO for block icons
+    // Cube vertices: position (3), texcoord (2), normal (3), faceId (1)
+    // Only render 3 visible faces: top, right, front (like Minecraft inventory)
+    float cubeVertices[] = {
+        // Top face (Y+) - faceId = 0
+        -0.5f,  0.5f, -0.5f,  0.0f, 0.0f,  0.0f, 1.0f, 0.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,  1.0f, 0.0f,  0.0f, 1.0f, 0.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,  0.0f, 1.0f, 0.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f, 0.0f,  0.0f, 1.0f, 0.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,  0.0f, 1.0f, 0.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,  0.0f, 1.0f, 0.0f,  0.0f,
+        
+        // Right face (X+) - faceId = 1 (side texture)
+         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+         0.5f,  0.5f, -0.5f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, 1.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+        
+        // Front face (Z+) - faceId = 1 (side texture)
+        -0.5f, -0.5f,  0.5f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f,  1.0f,
+         0.5f, -0.5f,  0.5f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  0.0f, 0.0f, 1.0f,  1.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  0.0f, 0.0f, 1.0f,  1.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,  1.0f,
+    };
+    
+    glGenVertexArrays(1, &blockIconVao);
+    glGenBuffers(1, &blockIconVbo);
+    
+    glBindVertexArray(blockIconVao);
+    glBindBuffer(GL_ARRAY_BUFFER, blockIconVbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    
+    // Position
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
+    // TexCoord
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
+    // Normal
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(5 * sizeof(float)));
+    // FaceId
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(8 * sizeof(float)));
+    
+    glBindVertexArray(0);
+    
+    // Load block atlas texture
+    // Force flip to true so we get Bottom-Up data (OpenGL standard)
+    // This matches what Texture.cpp does, ensuring consistency
+    stbi_set_flip_vertically_on_load(true);
+    int texW, texH, texChannels;
+    unsigned char* data = stbi_load("assets/block_atlas.png", &texW, &texH, &texChannels, 4);
+    if (data) {
+        // No manual flip needed - stbi does it for us
+        glGenTextures(1, &blockAtlasTexture);
+        glBindTexture(GL_TEXTURE_2D, blockAtlasTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texW, texH, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        // Do not unbind here if not necessary, but good practice
+        glBindTexture(GL_TEXTURE_2D, 0);
+        stbi_image_free(data);
+    }
 
     // Setup quad VAO (no texture coords)
     float vertices[] = { 
@@ -1527,24 +1655,30 @@ void UIManager::render() {
                 }
                 
                 if (el.isInventoryItem) {
-                    // Draw slot background (darker)
-                     color = el.isHovered ? glm::vec4(0.5f, 0.5f, 0.5f, 0.9f) : glm::vec4(0.2f, 0.2f, 0.2f, 0.8f);
-                     drawRect(el.x, el.y, el.w, el.h, color);
-                     
-                     // Draw block color
-                     glm::vec4 blkColor = getBlockColor(el.blockType);
-                     drawRect(el.x + 6, el.y + 6, el.w - 12, el.h - 12, blkColor);
-                     
-                     // Draw selection highlight
-                     if (el.blockType == selectedBlock) {
-                         glm::vec4 hl(1.0f, 1.0f, 1.0f, 1.0f);
-                         float t = 4.0f;
-                         drawRect(el.x, el.y, el.w, t, hl); // Top
-                         drawRect(el.x, el.y + el.h - t, el.w, t, hl); // Bottom
-                         drawRect(el.x, el.y, t, el.h, hl); // Left
-                         drawRect(el.x + el.w - t, el.y, t, el.h, hl); // Right
-                     }
-                     continue;
+                    // Draw slot background with border effect
+                    glm::vec4 bgColor = el.isHovered ? glm::vec4(0.4f, 0.4f, 0.5f, 0.95f) : glm::vec4(0.15f, 0.15f, 0.15f, 0.9f);
+                    glm::vec4 innerColor = el.isHovered ? glm::vec4(0.3f, 0.3f, 0.35f, 0.95f) : glm::vec4(0.22f, 0.22f, 0.22f, 0.9f);
+                    
+                    // Outer border
+                    drawRect(el.x - 2, el.y - 2, el.w + 4, el.h + 4, glm::vec4(0.1f, 0.1f, 0.1f, 0.9f));
+                    drawRect(el.x, el.y, el.w, el.h, bgColor);
+                    drawRect(el.x + 2, el.y + 2, el.w - 4, el.h - 4, innerColor);
+                    
+                    // Draw 3D isometric block
+                    if (el.blockType != BlockType::AIR) {
+                        drawBlockIcon(el.x + 4, el.y + 4, el.w - 8, el.blockType);
+                    }
+                    
+                    // Draw selection highlight if this block is in current hotbar slot
+                    if (el.blockType == hotbar[selectedSlot]) {
+                        glm::vec4 hl(0.9f, 0.8f, 0.3f, 1.0f); // Golden highlight
+                        float t = 3.0f;
+                        drawRect(el.x - 2, el.y - 2, el.w + 4, t, hl); // Top
+                        drawRect(el.x - 2, el.y + el.h - t + 2, el.w + 4, t, hl); // Bottom
+                        drawRect(el.x - 2, el.y - 2, t, el.h + 4, hl); // Left
+                        drawRect(el.x + el.w - t + 2, el.y - 2, t, el.h + 4, hl); // Right
+                    }
+                    continue;
                 }
 
                 // Draw button with border for better look
@@ -1660,8 +1794,8 @@ void UIManager::renderHUD() {
     uiShader.setMat4("uProjection", projection);
     
     // Hotbar Settings
-    float slotSize = 40.0f;
-    float gap = 4.0f;
+    float slotSize = 44.0f;  // Slightly larger for better block visibility
+    float gap = 2.0f;
     int slots = 9;
     float totalW = slots * slotSize + (slots - 1) * gap;
     float startX = (width - totalW) / 2.0f;
@@ -1672,19 +1806,28 @@ void UIManager::renderHUD() {
         float x = startX + i * (slotSize + gap);
         float y = startY;
         
-        // Selection highlight
+        // Selection highlight (golden border like Minecraft)
         if (i == selectedSlot) {
-            drawRect(x - 2, y - 2, slotSize + 4, slotSize + 4, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            drawRect(x - 3, y - 3, slotSize + 6, slotSize + 6, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            drawRect(x - 2, y - 2, slotSize + 4, slotSize + 4, glm::vec4(0.9f, 0.8f, 0.3f, 1.0f));
         }
         
-        // Slot background
-        drawRect(x, y, slotSize, slotSize, glm::vec4(0.2f, 0.2f, 0.2f, 0.8f));
+        // Slot background (darker, more opaque)
+        drawRect(x, y, slotSize, slotSize, glm::vec4(0.15f, 0.15f, 0.15f, 0.9f));
         
-        // Item
+        // Inner border for depth effect
+        drawRect(x + 1, y + 1, slotSize - 2, slotSize - 2, glm::vec4(0.25f, 0.25f, 0.25f, 0.9f));
+        
+        // Item - draw 3D isometric block
         BlockType type = hotbar[i];
         if (type != BlockType::AIR) {
-            drawRect(x + 4, y + 4, slotSize - 8, slotSize - 8, getBlockColor(type));
+            drawBlockIcon(x + 2, y + 2, slotSize - 4, type);
         }
+        
+        // Slot number label (small, at bottom)
+        float numX = x + slotSize - 10;
+        float numY = y + slotSize - 12;
+        drawText(numX, numY, 0.4f, std::to_string(i + 1), glm::vec4(0.7f, 0.7f, 0.7f, 0.8f));
     }
     
     // 2. Health Bar (Hearts) - Left above hotbar
@@ -1780,6 +1923,126 @@ void UIManager::drawTexturedRect(float x, float y, float w, float h, GLuint text
     // Switch back to UI shader for subsequent draws
     uiShader.use();
     uiShader.setMat4("uProjection", projection);
+}
+
+int UIManager::getBlockTextureIndex(BlockType type, int face) {
+    // face: 0=top, 1=side, 2=bottom
+    // Returns texture atlas index (0-255 for 16x16 atlas)
+    switch (type) {
+        case BlockType::GRASS:
+            if (face == 0) return 0;       // Top - grass top
+            if (face == 2) return 2;       // Bottom - dirt
+            return 3;                      // Side - grass side
+        case BlockType::DIRT:
+            return 2;                      // All faces - dirt
+        case BlockType::STONE:
+            return 1;                      // All faces - stone
+        case BlockType::SAND:
+            return 18;                     // All faces - sand
+        case BlockType::GRAVEL:
+            return 19;                     // All faces - gravel
+        case BlockType::WOOD:
+            return 4;                      // All faces - planks
+        case BlockType::LEAVES:
+            return 52;                     // All faces - leaves
+        case BlockType::LOG:
+            if (face == 0 || face == 2) return 21; // Top/Bottom - log top
+            return 20;                     // Side - log side
+        case BlockType::SNOW:
+            return 240;                    // All faces - snow
+        case BlockType::SANDSTONE:
+            return 192;                    // All faces - sandstone
+        case BlockType::WATER:
+            return 205;                    // Water texture
+        case BlockType::ICE:
+            return 67;                     // Ice texture
+        case BlockType::BEDROCK:
+            return 17;                     // Bedrock
+        case BlockType::TALL_GRASS:
+            return 39;                     // Tall grass
+        case BlockType::ROSE:
+            return 12;                     // Rose
+        default:
+            return 1;                      // Default to stone
+    }
+}
+
+void UIManager::drawBlockIcon(float x, float y, float size, BlockType type) {
+    if (type == BlockType::AIR || blockAtlasTexture == 0) return;
+    
+    blockIconShader.use();
+    
+    // Setup projection - orthographic with some depth
+    glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f, -100.0f, 100.0f);
+    blockIconShader.setMat4("uProjection", projection);
+    
+    // Setup model matrix - position, scale, and rotate for isometric view
+    glm::mat4 model = glm::mat4(1.0f);
+    // Move to center of the slot
+    model = glm::translate(model, glm::vec3(x + size * 0.5f, y + size * 0.5f, 0.0f));
+    // Scale to fit in slot
+    model = glm::scale(model, glm::vec3(size * 0.6f, size * 0.6f, size * 0.6f));
+    // Rotate for isometric view (like Minecraft inventory) - tilt FORWARD to show top
+    model = glm::rotate(model, glm::radians(-30.0f), glm::vec3(1.0f, 0.0f, 0.0f));  // Tilt forward (top visible)
+    
+    // User requested "rotate cube to left to face me on that edge"
+    // Standard Minecraft view shows Front and Right faces.
+    // +45 deg shows Front+Left.
+    // -45 (315) deg shows Front+Right.
+    model = glm::rotate(model, glm::radians(315.0f), glm::vec3(0.0f, 1.0f, 0.0f));   // Rotate to show Front+Right (standard)
+    
+    blockIconShader.setMat4("uModel", model);
+    
+    // Set atlas texture
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, blockAtlasTexture);
+    blockIconShader.setInt("uTexture", 0);
+    
+    // Set atlas cell size (16x16 atlas)
+    float cellSize = 1.0f / 16.0f;
+    blockIconShader.setFloat("uCellSize", cellSize);
+    
+    // Get texture indices for each face
+    int topIdx = getBlockTextureIndex(type, 0);
+    int sideIdx = getBlockTextureIndex(type, 1);
+    int bottomIdx = getBlockTextureIndex(type, 2);
+    
+    // Calculate atlas offsets for each face
+    auto idxToOffset = [cellSize](int idx) -> glm::vec2 {
+        float col = float(idx % 16);
+        float row = float(idx / 16);
+        row = 15.0f - row; // Flip Y because texture is flipped
+        return glm::vec2(col * cellSize, row * cellSize);
+    };
+    
+    glm::vec2 offsets[3] = {
+        idxToOffset(topIdx),    // top
+        idxToOffset(sideIdx),   // side
+        idxToOffset(bottomIdx)  // bottom
+    };
+    
+    blockIconShader.setVec2("uAtlasOffset[0]", offsets[0]);
+    blockIconShader.setVec2("uAtlasOffset[1]", offsets[1]);
+    blockIconShader.setVec2("uAtlasOffset[2]", offsets[2]);
+    
+    // Enable depth test for proper face ordering
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    
+    glBindVertexArray(blockIconVao);
+    glDrawArrays(GL_TRIANGLES, 0, 18); // 3 faces * 6 vertices
+    glBindVertexArray(0);
+    
+    glDisable(GL_DEPTH_TEST);
+    
+    // IMPORTANT: Reset texture binding to avoid affecting entity rendering
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    
+    // Switch back to UI shader
+    uiShader.use();
+    glm::mat4 uiProjection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
+    uiShader.setMat4("uProjection", uiProjection);
 }
 
 GLuint UIManager::loadWorldPreviewTexture(const std::string& worldName) {
