@@ -1256,7 +1256,7 @@ void UIManager::render() {
                 drawText(titleX, titleY, titleScale, title, glm::vec4(0.4f, 0.9f, 0.4f, 1.0f));
                 
                 // Subtitle
-                std::string subtitle = "A Minecraft Clone";
+                std::string subtitle = "A CPP Voxel Engine Game";
                 float subScale = 2.0f;
                 float subW = subtitle.length() * 6.0f * subScale;
                 float subX = (width - subW) / 2.0f;
