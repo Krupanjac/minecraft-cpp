@@ -18,7 +18,10 @@ enum class MenuState {
     NEW_GAME,
     INVENTORY,
     CONTROLS,
-    MAP
+    MAP,
+    MULTIPLAYER,
+    HOST_GAME,
+    JOIN_GAME
 };
 
 struct UIElement {
@@ -72,6 +75,13 @@ public:
     void setOnSave(std::function<void()> callback) { onSave = callback; }
     void setOnTeleport(std::function<void(float, float)> callback) { onTeleport = callback; }
     void setWorldGenerator(class WorldGenerator* gen) { worldGenerator = gen; }
+    
+    // Multiplayer callbacks
+    void setOnHostGame(std::function<void(std::string, int)> callback) { onHostGame = callback; }
+    void setOnJoinGame(std::function<void(std::string, std::string, int)> callback) { onJoinGame = callback; }
+    void setOnDisconnect(std::function<void()> callback) { onDisconnectGame = callback; }
+    void setNetworkStatus(const std::string& status) { networkStatus = status; }
+    void setIsOnline(bool online) { isOnline = online; }
 
     void toggleDebug() { showDebug = !showDebug; }
 
@@ -125,10 +135,18 @@ private:
     std::function<void(std::string)> onLoadGame;
     std::function<void()> onExit;
     std::function<void()> onSave;
+    std::function<void(std::string, int)> onHostGame;
+    std::function<void(std::string, std::string, int)> onJoinGame;
+    std::function<void()> onDisconnectGame;
     
     // Input state
     std::string newWorldName = "New World";
     std::string newWorldSeed = "12345";
+    std::string playerName = "Player";
+    std::string serverAddress = "127.0.0.1";
+    std::string serverPort = "25565";
+    std::string networkStatus;
+    bool isOnline = false;
     bool lastMousePressed = false;
     bool lastRightMousePressed = false;
     
@@ -141,6 +159,9 @@ private:
     void setupNewGameMenu();
     void setupInventoryMenu();
     void setupMapMenu();
+    void setupMultiplayerMenu();
+    void setupHostGameMenu();
+    void setupJoinGameMenu();
     void generateMapTexture();
     
     // Map data

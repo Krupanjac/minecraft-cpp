@@ -81,6 +81,9 @@ void UIManager::setMenuState(MenuState state) {
         case MenuState::NEW_GAME: setupNewGameMenu(); break;
         case MenuState::INVENTORY: setupInventoryMenu(); break;
         case MenuState::MAP: setupMapMenu(); break;
+        case MenuState::MULTIPLAYER: setupMultiplayerMenu(); break;
+        case MenuState::HOST_GAME: setupHostGameMenu(); break;
+        case MenuState::JOIN_GAME: setupJoinGameMenu(); break;
         case MenuState::NONE: break;
     }
 }
@@ -145,19 +148,23 @@ void UIManager::setupMainMenu() {
     float btnH = 40.0f;
     float gap = 10.0f;
 
-    elements.push_back({centerX - btnW/2, centerY - 100, btnW, btnH, "NEW GAME", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 125, btnW, btnH, "NEW GAME", false, [this]() { 
         setMenuState(MenuState::NEW_GAME); 
     }});
     
-    elements.push_back({centerX - btnW/2, centerY - 100 + btnH + gap, btnW, btnH, "LOAD GAME", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 125 + btnH + gap, btnW, btnH, "LOAD GAME", false, [this]() { 
         setMenuState(MenuState::LOAD_GAME); 
     }});
+    
+    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*2, btnW, btnH, "MULTIPLAYER", false, [this]() { 
+        setMenuState(MenuState::MULTIPLAYER); 
+    }});
 
-    elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*2, btnW, btnH, "SETTINGS", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*3, btnW, btnH, "SETTINGS", false, [this]() { 
         setMenuState(MenuState::SETTINGS); 
     }});
 
-    elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*3, btnW, btnH, "EXIT", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*4, btnW, btnH, "EXIT", false, [this]() { 
         if (onExit) onExit(); 
     }});
 }
@@ -170,22 +177,29 @@ void UIManager::setupInGameMenu() {
     float btnH = 40.0f;
     float gap = 10.0f;
 
-    elements.push_back({centerX - btnW/2, centerY - 50, btnW, btnH, "RESUME", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 75, btnW, btnH, "RESUME", false, [this]() { 
         setMenuState(MenuState::NONE); 
     }});
 
-    elements.push_back({centerX - btnW/2, centerY - 50 + btnH + gap, btnW, btnH, "SAVE GAME", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 75 + btnH + gap, btnW, btnH, "SAVE GAME", false, [this]() { 
         if (onSave) onSave();
     }});
 
-    elements.push_back({centerX - btnW/2, centerY - 50 + (btnH + gap)*2, btnW, btnH, "SETTINGS", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 75 + (btnH + gap)*2, btnW, btnH, "SETTINGS", false, [this]() { 
         setMenuState(MenuState::SETTINGS); 
     }});
-
-    elements.push_back({centerX - btnW/2, centerY - 50 + (btnH + gap)*3, btnW, btnH, "MAIN MENU", false, [this]() { 
-        if (onSave) onSave(); // Auto save on exit to menu
-        setMenuState(MenuState::MAIN_MENU); 
-    }});
+    
+    if (isOnline) {
+        elements.push_back({centerX - btnW/2, centerY - 75 + (btnH + gap)*3, btnW, btnH, "DISCONNECT", false, [this]() { 
+            if (onDisconnectGame) onDisconnectGame();
+            setMenuState(MenuState::MAIN_MENU); 
+        }});
+    } else {
+        elements.push_back({centerX - btnW/2, centerY - 75 + (btnH + gap)*3, btnW, btnH, "MAIN MENU", false, [this]() { 
+            if (onSave) onSave(); // Auto save on exit to menu
+            setMenuState(MenuState::MAIN_MENU); 
+        }});
+    }
 }
 
 void UIManager::setupSettingsMenu() {
@@ -1247,4 +1261,154 @@ void UIManager::setupMapMenu() {
     
     UIElement helpLabel = {centerX - 150, mapY + mapDisplaySize + 55, 300, 20, "Click on map to teleport", false, nullptr};
     elements.push_back(helpLabel);
+}
+
+void UIManager::setupMultiplayerMenu() {
+    elements.clear();
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
+    float btnW = 200.0f;
+    float btnH = 40.0f;
+    float gap = 10.0f;
+    
+    // Title area - just spacing
+    float startY = centerY - 75;
+
+    elements.push_back({centerX - btnW/2, startY, btnW, btnH, "HOST GAME", false, [this]() { 
+        setMenuState(MenuState::HOST_GAME); 
+    }});
+    
+    elements.push_back({centerX - btnW/2, startY + btnH + gap, btnW, btnH, "JOIN GAME", false, [this]() { 
+        setMenuState(MenuState::JOIN_GAME); 
+    }});
+
+    elements.push_back({centerX - btnW/2, startY + (btnH + gap)*2, btnW, btnH, "BACK", false, [this]() { 
+        setMenuState(MenuState::MAIN_MENU); 
+    }});
+}
+
+void UIManager::setupHostGameMenu() {
+    elements.clear();
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
+    float inputW = 300.0f;
+    float inputH = 35.0f;
+    float btnW = 200.0f;
+    float btnH = 40.0f;
+    float gap = 15.0f;
+    float startY = centerY - 100;
+    
+    // Player Name label + input
+    UIElement nameLabel = {centerX - inputW/2, startY, inputW, 20, "Player Name:", false, nullptr};
+    elements.push_back(nameLabel);
+    
+    UIElement nameInput;
+    nameInput.x = centerX - inputW/2;
+    nameInput.y = startY + 22;
+    nameInput.w = inputW;
+    nameInput.h = inputH;
+    nameInput.text = playerName;
+    nameInput.isInput = true;
+    nameInput.textRef = &playerName;
+    elements.push_back(nameInput);
+    
+    // Port label + input
+    UIElement portLabel = {centerX - inputW/2, startY + inputH + gap + 22, inputW, 20, "Port:", false, nullptr};
+    elements.push_back(portLabel);
+    
+    UIElement portInput;
+    portInput.x = centerX - inputW/2;
+    portInput.y = startY + inputH + gap + 44;
+    portInput.w = inputW;
+    portInput.h = inputH;
+    portInput.text = serverPort;
+    portInput.isInput = true;
+    portInput.textRef = &serverPort;
+    elements.push_back(portInput);
+    
+    // Host button
+    elements.push_back({centerX - btnW/2, startY + (inputH + gap)*2 + 60, btnW, btnH, "HOST", false, [this]() {
+        if (onHostGame) {
+            int port = std::stoi(serverPort.empty() ? "25565" : serverPort);
+            onHostGame(playerName, port);
+        }
+    }});
+    
+    // Back button
+    elements.push_back({centerX - btnW/2, startY + (inputH + gap)*2 + 60 + btnH + gap, btnW, btnH, "BACK", false, [this]() { 
+        setMenuState(MenuState::MULTIPLAYER); 
+    }});
+}
+
+void UIManager::setupJoinGameMenu() {
+    elements.clear();
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
+    float inputW = 300.0f;
+    float inputH = 35.0f;
+    float btnW = 200.0f;
+    float btnH = 40.0f;
+    float gap = 15.0f;
+    float startY = centerY - 130;
+    
+    // Player Name label + input
+    UIElement nameLabel = {centerX - inputW/2, startY, inputW, 20, "Player Name:", false, nullptr};
+    elements.push_back(nameLabel);
+    
+    UIElement nameInput;
+    nameInput.x = centerX - inputW/2;
+    nameInput.y = startY + 22;
+    nameInput.w = inputW;
+    nameInput.h = inputH;
+    nameInput.text = playerName;
+    nameInput.isInput = true;
+    nameInput.textRef = &playerName;
+    elements.push_back(nameInput);
+    
+    // Server Address label + input
+    UIElement addrLabel = {centerX - inputW/2, startY + inputH + gap + 22, inputW, 20, "Server Address:", false, nullptr};
+    elements.push_back(addrLabel);
+    
+    UIElement addrInput;
+    addrInput.x = centerX - inputW/2;
+    addrInput.y = startY + inputH + gap + 44;
+    addrInput.w = inputW;
+    addrInput.h = inputH;
+    addrInput.text = serverAddress;
+    addrInput.isInput = true;
+    addrInput.textRef = &serverAddress;
+    elements.push_back(addrInput);
+    
+    // Port label + input
+    UIElement portLabel = {centerX - inputW/2, startY + (inputH + gap)*2 + 44, inputW, 20, "Port:", false, nullptr};
+    elements.push_back(portLabel);
+    
+    UIElement portInput;
+    portInput.x = centerX - inputW/2;
+    portInput.y = startY + (inputH + gap)*2 + 66;
+    portInput.w = inputW;
+    portInput.h = inputH;
+    portInput.text = serverPort;
+    portInput.isInput = true;
+    portInput.textRef = &serverPort;
+    elements.push_back(portInput);
+    
+    // Status display
+    if (!networkStatus.empty()) {
+        UIElement statusLabel = {centerX - inputW/2, startY + (inputH + gap)*3 + 80, inputW, 20, networkStatus, false, nullptr};
+        elements.push_back(statusLabel);
+    }
+    
+    // Join button
+    elements.push_back({centerX - btnW/2, startY + (inputH + gap)*3 + 110, btnW, btnH, "JOIN", false, [this]() {
+        if (onJoinGame) {
+            int port = std::stoi(serverPort.empty() ? "25565" : serverPort);
+            onJoinGame(playerName, serverAddress, port);
+        }
+    }});
+    
+    // Back button
+    elements.push_back({centerX - btnW/2, startY + (inputH + gap)*3 + 110 + btnH + gap, btnW, btnH, "BACK", false, [this]() { 
+        setMenuState(MenuState::MULTIPLAYER); 
+    }});
 }

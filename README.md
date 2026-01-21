@@ -155,7 +155,27 @@ Edit `src/Util/Config.h` to customize:
 - [x] Lighting system (Ambient Occlusion)
 - [ ] Save/load world data
 - [x] Player physics and collision
-- [ ] Multiplayer support
+- [x] Multiplayer support
+
+## Multiplayer
+
+The game supports basic multiplayer functionality:
+
+### Hosting a Game
+1. From the main menu, click **MULTIPLAYER** → **HOST GAME**
+2. Enter your player name and port (default: 25565)
+3. Click **HOST** to start the server and enter the game
+
+### Joining a Game
+1. From the main menu, click **MULTIPLAYER** → **JOIN GAME**
+2. Enter your player name, server address (e.g., `127.0.0.1`), and port
+3. Click **JOIN** to connect
+
+### Features
+- Player position synchronization
+- Block placement/destruction sync across clients
+- Remote player rendering
+- Low-latency TCP networking
 
 ## License
 

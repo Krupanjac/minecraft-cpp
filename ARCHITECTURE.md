@@ -12,12 +12,12 @@ The engine is designed as a modular, high-performance voxel renderer with the fo
 │ Application │
 └──────┬──────┘
        │
-       ├──────────────┬──────────────┬──────────────┬──────────────┐
-       │              │              │              │              │
-   ┌───▼────┐    ┌───▼────┐    ┌───▼────┐    ┌───▼────┐    ┌───▼────┐
-   │  Core  │    │  World │    │  Mesh  │    │ Render │    │  Math  │
-   │ System │    │ System │    │ System │    │ System │    │ System │
-   └────────┘    └────────┘    └────────┘    └────────┘    └────────┘
+       ├──────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+       │              │              │              │              │              │
+   ┌───▼────┐    ┌───▼────┐    ┌───▼────┐    ┌───▼────┐    ┌───▼────┐    ┌───▼────┐
+   │  Core  │    │  World │    │  Mesh  │    │ Render │    │  Math  │    │Network │
+   │ System │    │ System │    │ System │    │ System │    │ System │    │ System │
+   └────────┘    └────────┘    └────────┘    └────────┘    └────────┘    └────────┘
 ```
 
 ## Core System
@@ -350,6 +350,46 @@ Mark GPU_UPLOADED               |
    - Save/load chunks from disk
    - Infinite world support
    - Memory management
+
+## Network System
+
+### Socket (Socket.h/cpp)
+- Cross-platform TCP socket abstraction
+- Windows (Winsock2) and Unix (BSD sockets) support
+- Non-blocking I/O for game loop integration
+- Connection management and data transfer
+
+### Protocol (Protocol.h/cpp)
+- Custom binary protocol for game state
+- Packet types: Connect, Disconnect, PlayerPosition, BlockChange, Chat
+- Big-endian serialization for network byte order
+- PacketBuffer for reading/writing packet data
+
+### GameServer (GameServer.h/cpp)
+- Accepts incoming client connections
+- Manages connected clients list
+- Broadcasts game state changes to all clients
+- Handles player join/leave events
+- Processes incoming packets and routes to handlers
+
+### GameClient (GameClient.h/cpp)
+- Connects to remote server
+- Sends local player state updates
+- Receives and applies remote state changes
+- Manages connection lifecycle
+- Handles server disconnection gracefully
+
+### NetworkManager (NetworkManager.h/cpp)
+- High-level network interface for game
+- Supports HOST (server + local play) and CLIENT modes
+- Manages RemotePlayerEntity instances for other players
+- Integrates with game systems via callbacks
+- Position update throttling (20 Hz)
+
+### RemotePlayerEntity
+- Entity subclass for rendering remote players
+- Position/rotation interpolation for smooth movement
+- Uses shared player model for all remote players
 
 ## References
 

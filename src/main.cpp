@@ -14,6 +14,7 @@
 #include "World/WorldSerializer.h"
 #include "Entity/PlayerEntity.h"
 #include "Entity/ZombieEntity.h"
+#include "Network/NetworkManager.h"
 
 #include <memory>
 #include <iostream>
@@ -202,6 +203,46 @@ public:
         // Give UIManager access to world generator for map
         uiManager.setWorldGenerator(&worldGenerator);
         
+        // Setup multiplayer callbacks
+        uiManager.setOnHostGame([this](std::string playerName, int port) {
+            hostMultiplayerGame(playerName, static_cast<uint16_t>(port));
+        });
+        
+        uiManager.setOnJoinGame([this](std::string playerName, std::string address, int port) {
+            joinMultiplayerGame(playerName, address, static_cast<uint16_t>(port));
+        });
+        
+        uiManager.setOnDisconnect([this]() {
+            networkManager.disconnect();
+            uiManager.setIsOnline(false);
+            uiManager.setNetworkStatus("");
+        });
+        
+        // Setup network callbacks
+        networkManager.setBlockChangeCallback([this](int x, int y, int z, uint8_t blockType) {
+            chunkManager.setBlockAt(x, y, z, Block(static_cast<BlockType>(blockType)));
+        });
+        
+        networkManager.setDisconnectCallback([this](const std::string& reason) {
+            LOG_INFO("Disconnected from server: " + reason);
+            uiManager.setIsOnline(false);
+            uiManager.setNetworkStatus("Disconnected: " + reason);
+            uiManager.setMenuState(MenuState::MAIN_MENU);
+        });
+        
+        networkManager.setConnectedCallback([this]() {
+            if (networkManager.isClient()) {
+                // Client just connected - use server's world seed
+                createWorld("Multiplayer", networkManager.getWorldSeed());
+                glm::vec3 spawn = networkManager.getSpawnPosition();
+                camera.setPosition(spawn);
+            }
+            uiManager.setMenuState(MenuState::NONE);
+            window->setCursorMode(GLFW_CURSOR_DISABLED);
+            uiManager.setIsOnline(true);
+            uiManager.setNetworkStatus("Connected");
+        });
+        
         // Apply initial settings
         applySettings();
         
@@ -210,6 +251,42 @@ public:
         
         LOG_INFO("Application initialized successfully");
         return true;
+    }
+    
+    void hostMultiplayerGame(const std::string& playerName, uint16_t port) {
+        // Create a new world for hosting
+        long seed = static_cast<long>(time(nullptr));
+        createWorld("Multiplayer_" + std::to_string(seed), seed);
+        
+        // Clear zombies for multiplayer (they're single-player only for now)
+        zombies.clear();
+        
+        // Start the server
+        if (networkManager.hostGame(port, seed, camera.getPosition(), playerName)) {
+            uiManager.setMenuState(MenuState::NONE);
+            window->setCursorMode(GLFW_CURSOR_DISABLED);
+            uiManager.setIsOnline(true);
+            uiManager.setNetworkStatus("Hosting on port " + std::to_string(port));
+            LOG_INFO("Hosting multiplayer game on port " + std::to_string(port));
+        } else {
+            uiManager.setNetworkStatus("Failed to start server");
+            LOG_ERROR("Failed to host multiplayer game");
+        }
+    }
+    
+    void joinMultiplayerGame(const std::string& playerName, const std::string& address, uint16_t port) {
+        uiManager.setNetworkStatus("Connecting...");
+        
+        // Clear zombies for multiplayer (they're single-player only for now)
+        zombies.clear();
+        
+        if (networkManager.joinGame(address, port, playerName)) {
+            // Connection initiated - wait for connected callback
+            LOG_INFO("Connecting to " + address + ":" + std::to_string(port));
+        } else {
+            uiManager.setNetworkStatus("Failed to connect");
+            LOG_ERROR("Failed to connect to server");
+        }
     }
 
     void createWorld(const std::string& name, long seed = 12345) {
@@ -502,6 +579,7 @@ public:
         }
         
         LOG_INFO("Application shutting down");
+        networkManager.disconnect();
     }
     
 private:
@@ -514,6 +592,7 @@ private:
     ThreadPool threadPool;
     UIManager uiManager;
     WorldSerializer worldSerializer;
+    Network::NetworkManager networkManager;
     
     std::mutex meshMutex;
     std::vector<std::pair<ChunkPos, MeshData>> pendingMeshes;
@@ -554,6 +633,11 @@ private:
                     int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
                     int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
                     chunkManager.setBlockAt(x, y, z, Block(BlockType::AIR));
+                    
+                    // Broadcast block change to network
+                    if (networkManager.isOnline()) {
+                        networkManager.sendBlockChange(x, y, z, static_cast<uint8_t>(BlockType::AIR));
+                    }
                 }
             } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
                 // Place block
@@ -568,7 +652,13 @@ private:
                     glm::vec3 playerPos = camera.getPosition();
                     glm::vec3 blockPos(x + 0.5f, y + 0.5f, z + 0.5f);
                     if (glm::distance(playerPos, blockPos) > 1.0f) { 
-                        chunkManager.setBlockAt(x, y, z, Block(uiManager.getSelectedBlock()));
+                        BlockType blockType = uiManager.getSelectedBlock();
+                        chunkManager.setBlockAt(x, y, z, Block(blockType));
+                        
+                        // Broadcast block change to network
+                        if (networkManager.isOnline()) {
+                            networkManager.sendBlockChange(x, y, z, static_cast<uint8_t>(blockType));
+                        }
                     }
                 }
             }
@@ -637,6 +727,20 @@ private:
     }
     
     void update(float deltaTime) {
+        // Always update network (even in menu for connection handling)
+        networkManager.update(deltaTime);
+        
+        // Send local player position to network
+        if (networkManager.isOnline() && !uiManager.isMenuOpen()) {
+            networkManager.sendLocalPlayerState(
+                camera.getPosition(),
+                camera.getYaw(),
+                camera.getPitch(),
+                camera.velocity,
+                camera.onGround
+            );
+        }
+        
         if (uiManager.isMenuOpen()) return;
 
         // Day/Night Cycle
@@ -802,39 +906,43 @@ private:
         }
 
         // === Zombies ===
-        // Spawn a few around the player over time (simple, deterministic-ish)
-        zombieSpawnTimer -= deltaTime;
-        if (playerEntity && zombieSpawnTimer <= 0.0f) {
-            zombieSpawnTimer = 8.0f;
-            const size_t MAX_ZOMBIES = 6;
-            if (zombies.size() < MAX_ZOMBIES) {
-                glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
-                // spawn radius ring
-                float a = (float)(zombies.size()) * 2.3999632f; // golden angle
-                float r = 14.0f + (float)(zombies.size()) * 3.0f;
-                int sx = (int)std::floor(playerFeet.x + std::cos(a) * r);
-                int sz = (int)std::floor(playerFeet.z + std::sin(a) * r);
-                // Spawn at the first air block above terrain.
-                // getSurfaceHeight() returns int(height), and terrain fills blocks for worldY < height,
-                // so y==height is usually the first air block already.
-                int sy = worldGenerator.getSurfaceHeight(sx, sz);
-                if (sy < SEA_LEVEL) sy = SEA_LEVEL + 2;
-                zombies.push_back(std::make_unique<ZombieEntity>(glm::vec3((float)sx + 0.5f, (float)sy + 0.05f, (float)sz + 0.5f)));
-            }
-        }
-
-        // Update zombie AI (uses chunkManager for simple collision + camera pos for chasing)
-        if (playerEntity) {
-            glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
-            for (auto& z : zombies) {
-                if (!z) continue;
-                bool attacked = z->updateAI(deltaTime, chunkManager, playerFeet);
-                if (attacked) {
-                    // Apply knockback to player camera velocity as "attack" feedback.
-                    camera.velocity += z->consumeAttackImpulse();
+        // Only spawn zombies in single-player mode to avoid duplicates
+        // In multiplayer, zombies would need to be server-authoritative (future work)
+        if (networkManager.getMode() == Network::NetworkMode::OFFLINE) {
+            // Spawn a few around the player over time (simple, deterministic-ish)
+            zombieSpawnTimer -= deltaTime;
+            if (playerEntity && zombieSpawnTimer <= 0.0f) {
+                zombieSpawnTimer = 8.0f;
+                const size_t MAX_ZOMBIES = 6;
+                if (zombies.size() < MAX_ZOMBIES) {
+                    glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
+                    // spawn radius ring
+                    float a = (float)(zombies.size()) * 2.3999632f; // golden angle
+                    float r = 14.0f + (float)(zombies.size()) * 3.0f;
+                    int sx = (int)std::floor(playerFeet.x + std::cos(a) * r);
+                    int sz = (int)std::floor(playerFeet.z + std::sin(a) * r);
+                    // Spawn at the first air block above terrain.
+                    // getSurfaceHeight() returns int(height), and terrain fills blocks for worldY < height,
+                    // so y==height is usually the first air block already.
+                    int sy = worldGenerator.getSurfaceHeight(sx, sz);
+                    if (sy < SEA_LEVEL) sy = SEA_LEVEL + 2;
+                    zombies.push_back(std::make_unique<ZombieEntity>(glm::vec3((float)sx + 0.5f, (float)sy + 0.05f, (float)sz + 0.5f)));
                 }
             }
-        }
+            
+            // Update zombie AI (uses chunkManager for simple collision + camera pos for chasing)
+            if (playerEntity) {
+                glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
+                for (auto& z : zombies) {
+                    if (!z) continue;
+                    bool attacked = z->updateAI(deltaTime, chunkManager, playerFeet);
+                    if (attacked) {
+                        // Apply knockback to player camera velocity as "attack" feedback.
+                        camera.velocity += z->consumeAttackImpulse();
+                    }
+                }
+            }
+        } // End of OFFLINE mode zombie code
         
         // Generate chunks
         auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), Settings::instance().renderDistance, 10);
@@ -952,6 +1060,12 @@ private:
         // Always render zombies (even in first-person)
         for (auto& z : zombies) {
             if (z) entities.push_back(z.get());
+        }
+        
+        // Render remote players from network
+        auto remotePlayerEntities = networkManager.getRemotePlayerEntities();
+        for (auto* remotePlayer : remotePlayerEntities) {
+            entities.push_back(remotePlayer);
         }
         
         renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight());

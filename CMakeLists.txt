@@ -98,6 +98,11 @@ set(SOURCES
     src/Render/FrameBuffer.cpp
     src/Render/ShadowMap.cpp
     src/Render/PostProcess.cpp
+    src/Network/Socket.cpp
+    src/Network/Protocol.cpp
+    src/Network/GameServer.cpp
+    src/Network/GameClient.cpp
+    src/Network/NetworkManager.cpp
     src/UI/UIManager.cpp
     src/Entity/Entity.cpp
     src/Entity/PlayerEntity.cpp
