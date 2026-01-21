@@ -21,7 +21,8 @@ enum class MenuState {
     MAP,
     MULTIPLAYER,
     HOST_GAME,
-    JOIN_GAME
+    JOIN_GAME,
+    CHAT
 };
 
 struct UIElement {
@@ -83,6 +84,13 @@ public:
     void setNetworkStatus(const std::string& status) { networkStatus = status; }
     void setIsOnline(bool online) { isOnline = online; }
     
+    // Chat
+    void setOnSendChat(std::function<void(const std::string&)> callback) { onSendChat = callback; }
+    void addChatMessage(const std::string& playerName, const std::string& message);
+    bool isChatOpen() const { return currentMenuState == MenuState::CHAT; }
+    void openChat();
+    void closeChat();
+    
     // World state
     void setWorldLoaded(bool loaded) { worldLoaded = loaded; }
     bool isWorldLoaded() const { return worldLoaded; }
@@ -128,6 +136,7 @@ private:
     BlockType selectedBlock = BlockType::STONE; // Deprecated by hotbar, keeping for internal ref if needed, but hotbar[selectedSlot] is primary.
     
     void renderHUD();
+    void renderChat();
 
     int width, height;
     Shader uiShader;
@@ -142,6 +151,16 @@ private:
     std::function<void(std::string, int)> onHostGame;
     std::function<void(std::string, std::string, int)> onJoinGame;
     std::function<void()> onDisconnectGame;
+    std::function<void(const std::string&)> onSendChat;
+    
+    // Chat state
+    std::string chatInput;
+    struct ChatEntry {
+        std::string playerName;
+        std::string message;
+        float timestamp;
+    };
+    std::vector<ChatEntry> chatMessages;
     
     // Input state
     std::string newWorldName = "New World";

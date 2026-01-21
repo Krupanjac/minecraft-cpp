@@ -84,11 +84,20 @@ void UIManager::setMenuState(MenuState state) {
         case MenuState::MULTIPLAYER: setupMultiplayerMenu(); break;
         case MenuState::HOST_GAME: setupHostGameMenu(); break;
         case MenuState::JOIN_GAME: setupJoinGameMenu(); break;
+        case MenuState::CHAT: break; // Chat doesn't use elements system
         case MenuState::NONE: break;
     }
 }
 
 void UIManager::handleCharInput(unsigned int codepoint) {
+    // Handle chat input
+    if (currentMenuState == MenuState::CHAT) {
+        if (codepoint >= 32 && codepoint <= 126) {
+            chatInput += (char)codepoint;
+        }
+        return;
+    }
+    
     if (!isMenuOpen()) return;
     
     for (auto& el : elements) {
@@ -103,6 +112,24 @@ void UIManager::handleCharInput(unsigned int codepoint) {
 }
 
 void UIManager::handleKeyInput(int key) {
+    // Handle chat keys
+    if (currentMenuState == MenuState::CHAT) {
+        if (key == 259) { // GLFW_KEY_BACKSPACE
+            if (!chatInput.empty()) {
+                chatInput.pop_back();
+            }
+        } else if (key == 257) { // GLFW_KEY_ENTER
+            if (!chatInput.empty() && onSendChat) {
+                onSendChat(chatInput);
+                chatInput.clear();
+            }
+            closeChat();
+        } else if (key == 256) { // GLFW_KEY_ESCAPE
+            closeChat();
+        }
+        return;
+    }
+    
     if (!isMenuOpen()) return;
     
     // Handle backspace for text input in any menu
@@ -890,9 +917,10 @@ void UIManager::render() {
     }
     
     // Always render HUD unless in Main Menu / Settings / Load Game (basically if we are 'in game' or 'inventory')
-    // Specifically: NONE (playing) or INVENTORY. Not IN_GAME_MENU (pause).
-    if (currentMenuState == MenuState::NONE || currentMenuState == MenuState::INVENTORY) {
+    // Specifically: NONE (playing) or INVENTORY or CHAT (chat overlay). Not IN_GAME_MENU (pause).
+    if (currentMenuState == MenuState::NONE || currentMenuState == MenuState::INVENTORY || currentMenuState == MenuState::CHAT) {
         renderHUD();
+        renderChat();
     }
 }
 
@@ -1116,16 +1144,16 @@ void UIManager::generateMapTexture() {
             float worldZ = mapCenterZ + (py - mapTextureSize / 2) * mapScale;
             
             // Get height and biome
-            float height = worldGenerator->getHeight(worldX, worldZ);
+            float terrainHeight = worldGenerator->getHeight(worldX, worldZ);
             BiomeType biome = worldGenerator->getBiome(worldX, worldZ);
             
             // Determine color based on biome and height
             unsigned char r, g, b;
             
             // Sea level check
-            if (height < 32) { // SEA_LEVEL
+            if (terrainHeight < 32) { // SEA_LEVEL
                 // Water - deeper = darker blue
-                float depth = (32 - height) / 32.0f;
+                float depth = (32 - terrainHeight) / 32.0f;
                 r = static_cast<unsigned char>(20 + 40 * (1.0f - depth));
                 g = static_cast<unsigned char>(80 + 80 * (1.0f - depth));
                 b = static_cast<unsigned char>(180 + 50 * (1.0f - depth));
@@ -1138,8 +1166,8 @@ void UIManager::generateMapTexture() {
                     case BiomeType::PLAINS:
                         r = 120; g = 180; b = 80;
                         // Height shading
-                        r = static_cast<unsigned char>(r * (0.7f + 0.3f * std::min(height / 100.0f, 1.0f)));
-                        g = static_cast<unsigned char>(g * (0.7f + 0.3f * std::min(height / 100.0f, 1.0f)));
+                        r = static_cast<unsigned char>(r * (0.7f + 0.3f * std::min(terrainHeight / 100.0f, 1.0f)));
+                        g = static_cast<unsigned char>(g * (0.7f + 0.3f * std::min(terrainHeight / 100.0f, 1.0f)));
                         break;
                     case BiomeType::DESERT:
                         r = 220; g = 200; b = 140;
@@ -1147,16 +1175,16 @@ void UIManager::generateMapTexture() {
                     case BiomeType::FOREST:
                         r = 50; g = 130; b = 50;
                         // Darker for dense forest
-                        r = static_cast<unsigned char>(r * (0.8f + 0.2f * std::min(height / 80.0f, 1.0f)));
-                        g = static_cast<unsigned char>(g * (0.8f + 0.2f * std::min(height / 80.0f, 1.0f)));
+                        r = static_cast<unsigned char>(r * (0.8f + 0.2f * std::min(terrainHeight / 80.0f, 1.0f)));
+                        g = static_cast<unsigned char>(g * (0.8f + 0.2f * std::min(terrainHeight / 80.0f, 1.0f)));
                         break;
                     case BiomeType::MOUNTAINS:
                         // Gray stone, whiter at peaks
-                        if (height > 120) {
+                        if (terrainHeight > 120) {
                             // Snow caps
                             r = 240; g = 245; b = 250;
                         } else {
-                            float t = (height - 50.0f) / 70.0f;
+                            float t = (terrainHeight - 50.0f) / 70.0f;
                             r = static_cast<unsigned char>(100 + 80 * t);
                             g = static_cast<unsigned char>(100 + 80 * t);
                             b = static_cast<unsigned char>(110 + 70 * t);
@@ -1287,6 +1315,15 @@ void UIManager::setupHostGameMenu() {
     float gap = 15.0f;
     float startY = centerY - 100;
     
+    // Load last used values from settings
+    auto& settings = Settings::instance();
+    if (playerName.empty() || playerName == "Player") {
+        playerName = settings.lastPlayerName;
+    }
+    if (serverPort.empty() || serverPort == "25565") {
+        serverPort = std::to_string(settings.lastServerPort);
+    }
+    
     // Player Name label + input
     UIElement nameLabel = {centerX - inputW/2, startY, inputW, 20, "Player Name:", false, nullptr};
     elements.push_back(nameLabel);
@@ -1319,6 +1356,9 @@ void UIManager::setupHostGameMenu() {
     elements.push_back({centerX - btnW/2, startY + (inputH + gap)*2 + 60, btnW, btnH, "HOST", false, [this]() {
         if (onHostGame) {
             int port = std::stoi(serverPort.empty() ? "25565" : serverPort);
+            // Save last used values
+            Settings::instance().lastPlayerName = playerName;
+            Settings::instance().lastServerPort = port;
             onHostGame(playerName, port);
         }
     }});
@@ -1339,6 +1379,18 @@ void UIManager::setupJoinGameMenu() {
     float btnH = 40.0f;
     float gap = 15.0f;
     float startY = centerY - 130;
+    
+    // Load last used values from settings
+    auto& settings = Settings::instance();
+    if (playerName.empty() || playerName == "Player") {
+        playerName = settings.lastPlayerName;
+    }
+    if (serverAddress.empty() || serverAddress == "localhost") {
+        serverAddress = settings.lastServerAddress;
+    }
+    if (serverPort.empty() || serverPort == "25565") {
+        serverPort = std::to_string(settings.lastServerPort);
+    }
     
     // Player Name label + input
     UIElement nameLabel = {centerX - inputW/2, startY, inputW, 20, "Player Name:", false, nullptr};
@@ -1392,6 +1444,10 @@ void UIManager::setupJoinGameMenu() {
     elements.push_back({centerX - btnW/2, startY + (inputH + gap)*3 + 110, btnW, btnH, "JOIN", false, [this]() {
         if (onJoinGame) {
             int port = std::stoi(serverPort.empty() ? "25565" : serverPort);
+            // Save last used values
+            Settings::instance().lastPlayerName = playerName;
+            Settings::instance().lastServerAddress = serverAddress;
+            Settings::instance().lastServerPort = port;
             onJoinGame(playerName, serverAddress, port);
         }
     }});
@@ -1400,4 +1456,103 @@ void UIManager::setupJoinGameMenu() {
     elements.push_back({centerX - btnW/2, startY + (inputH + gap)*3 + 110 + btnH + gap, btnW, btnH, "BACK", false, [this]() { 
         setMenuState(MenuState::MULTIPLAYER); 
     }});
+}
+
+void UIManager::addChatMessage(const std::string& senderName, const std::string& message) {
+    ChatEntry entry;
+    entry.playerName = senderName;
+    entry.message = message;
+    entry.timestamp = 0.0f; // Will be updated in render
+    chatMessages.push_back(entry);
+    
+    // Keep only last N messages based on settings
+    int maxMessages = Settings::instance().maxChatMessages;
+    while (chatMessages.size() > static_cast<size_t>(maxMessages)) {
+        chatMessages.erase(chatMessages.begin());
+    }
+}
+
+void UIManager::openChat() {
+    chatInput.clear();
+    currentMenuState = MenuState::CHAT;
+}
+
+void UIManager::closeChat() {
+    chatInput.clear();
+    currentMenuState = MenuState::NONE;
+}
+
+void UIManager::renderChat() {
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    uiShader.use();
+    glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
+    uiShader.setMat4("uProjection", projection);
+    
+    float chatX = 10.0f;
+    float chatY = height - 150.0f; // Above hotbar
+    float lineHeight = 20.0f;
+    float textScale = 1.5f;
+    
+    // Use settings for fade delay
+    float fadeDelay = Settings::instance().chatFadeDelay;
+    
+    // Update timestamps and render recent messages
+    int visibleCount = 0;
+    int maxVisible = 10;
+    
+    // Render messages from bottom to top (newest at bottom)
+    for (int i = static_cast<int>(chatMessages.size()) - 1; i >= 0 && visibleCount < maxVisible; i--) {
+        auto& msg = chatMessages[i];
+        msg.timestamp += 0.016f; // Approximate frame time
+        
+        // Only show recent messages when chat is closed, show all when open
+        bool shouldShow = (currentMenuState == MenuState::CHAT) || (msg.timestamp < fadeDelay);
+        
+        if (shouldShow) {
+            float alpha = 1.0f;
+            if (currentMenuState != MenuState::CHAT && msg.timestamp > fadeDelay - 2.0f) {
+                alpha = (fadeDelay - msg.timestamp) / 2.0f;
+            }
+            
+            float y = chatY - (visibleCount * lineHeight);
+            
+            // Draw background for readability
+            std::string fullMsg = "<" + msg.playerName + "> " + msg.message;
+            float msgWidth = fullMsg.length() * 6.0f * textScale + 10.0f;
+            drawRect(chatX - 5, y - 2, msgWidth, lineHeight, glm::vec4(0.0f, 0.0f, 0.0f, 0.5f * alpha));
+            
+            // Draw player name in yellow, message in white
+            std::string nameStr = "<" + msg.playerName + "> ";
+            drawText(chatX, y, textScale, nameStr, glm::vec4(1.0f, 1.0f, 0.3f, alpha));
+            
+            float nameWidth = nameStr.length() * 6.0f * textScale;
+            drawText(chatX + nameWidth, y, textScale, msg.message, glm::vec4(1.0f, 1.0f, 1.0f, alpha));
+            
+            visibleCount++;
+        }
+    }
+    
+    // Render chat input when chat is open
+    if (currentMenuState == MenuState::CHAT) {
+        float inputY = chatY + lineHeight + 5.0f;
+        float inputW = width * 0.4f;
+        float inputH = 25.0f;
+        
+        // Input background
+        drawRect(chatX - 5, inputY, inputW, inputH, glm::vec4(0.0f, 0.0f, 0.0f, 0.7f));
+        
+        // Input text with cursor
+        std::string displayText = chatInput + "_";
+        drawText(chatX, inputY + 4, textScale, displayText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+        
+        // Help text
+        drawText(chatX, inputY + inputH + 5, 1.2f, "Press ENTER to send, ESC to cancel", glm::vec4(0.7f, 0.7f, 0.7f, 1.0f));
+    }
+    
+    uiShader.unuse();
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
 }

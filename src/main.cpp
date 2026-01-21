@@ -69,6 +69,13 @@ public:
             }
 
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+                // Handle chat close first
+                if (uiManager.isChatOpen()) {
+                    uiManager.closeChat();
+                    window->setCursorMode(GLFW_CURSOR_DISABLED);
+                    return;
+                }
+                
                 // Only allow closing menu to game if a world is loaded
                 if (uiManager.isWorldLoaded()) {
                     bool isMenuOpen = uiManager.isMenuOpen();
@@ -111,6 +118,14 @@ public:
                         window->setCursorMode(GLFW_CURSOR_DISABLED);
                     } else if (uiManager.getMenuState() == MenuState::NONE) {
                         uiManager.setMenuState(MenuState::MAP);
+                        window->setCursorMode(GLFW_CURSOR_NORMAL);
+                    }
+                }
+                
+                // T key opens chat (multiplayer only)
+                if (key == GLFW_KEY_T && networkManager.isOnline()) {
+                    if (uiManager.getMenuState() == MenuState::NONE) {
+                        uiManager.openChat();
                         window->setCursorMode(GLFW_CURSOR_NORMAL);
                     }
                 }
@@ -283,6 +298,15 @@ public:
                 uiManager.timeOfDay = serverTime;
             }
             // Otherwise local time continues and will naturally sync
+        });
+        
+        // Chat callbacks - wire UI to network
+        uiManager.setOnSendChat([this](const std::string& message) {
+            networkManager.sendChatMessage(message);
+        });
+        
+        networkManager.setChatCallback([this](const std::string& playerName, const std::string& message) {
+            uiManager.addChatMessage(playerName, message);
         });
         
         // Apply initial settings

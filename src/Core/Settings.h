@@ -37,6 +37,14 @@ public:
     bool debugWireframe = false; // Render in wireframe
     bool debugShowNormals = false; // Visualize normals as colors
     
+    // Multiplayer settings
+    std::string lastPlayerName = "Player";
+    std::string lastServerAddress = "localhost";
+    int lastServerPort = 25565;
+    bool chatShowTimestamps = false;
+    float chatFadeDelay = 10.0f; // Seconds before messages start fading
+    int maxChatMessages = 100; // Maximum messages to keep in history
+    
     struct KeyBindings {
         int forward = 87;  // W
         int backward = 83; // S
@@ -79,6 +87,13 @@ public:
                     else if (key == "debugShowNormals") debugShowNormals = (value == "1");
                     else if (key == "shadowDistance") shadowDistance = std::stof(value);
                     else if (key == "fullscreen") fullscreen = std::stoi(value);
+                    // Multiplayer
+                    else if (key == "lastPlayerName") lastPlayerName = value;
+                    else if (key == "lastServerAddress") lastServerAddress = value;
+                    else if (key == "lastServerPort") lastServerPort = std::stoi(value);
+                    else if (key == "chatShowTimestamps") chatShowTimestamps = (value == "1");
+                    else if (key == "chatFadeDelay") chatFadeDelay = std::stof(value);
+                    else if (key == "maxChatMessages") maxChatMessages = std::stoi(value);
                     // Keys
                     else if (key == "key_forward") keys.forward = std::stoi(value);
                     else if (key == "key_backward") keys.backward = std::stoi(value);
@@ -116,6 +131,13 @@ public:
         file << "debugWireframe=" << (debugWireframe ? "1" : "0") << "\n";
         file << "debugShowNormals=" << (debugShowNormals ? "1" : "0") << "\n";
         file << "fullscreen=" << fullscreen << "\n";
+        // Multiplayer
+        file << "lastPlayerName=" << lastPlayerName << "\n";
+        file << "lastServerAddress=" << lastServerAddress << "\n";
+        file << "lastServerPort=" << lastServerPort << "\n";
+        file << "chatShowTimestamps=" << (chatShowTimestamps ? "1" : "0") << "\n";
+        file << "chatFadeDelay=" << chatFadeDelay << "\n";
+        file << "maxChatMessages=" << maxChatMessages << "\n";
         
         file << "key_forward=" << keys.forward << "\n";
         file << "key_backward=" << keys.backward << "\n";
