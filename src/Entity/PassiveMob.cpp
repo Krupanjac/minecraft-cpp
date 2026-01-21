@@ -22,7 +22,19 @@ static std::string pickAnimByKeywords(const std::vector<std::string>& names, std
     return "";
 }
 
-PassiveMob::PassiveMob(const glm::vec3& startPos) : Entity(startPos) {
+PassiveMob::PassiveMob(const glm::vec3& startPos) : Entity(startPos), entityId(0) {
+    // Seed RNG from position
+    unsigned int seed = 1337u
+        ^ (unsigned int)(std::abs((int)startPos.x) * 73856093)
+        ^ (unsigned int)(std::abs((int)startPos.z) * 19349663);
+    rng.seed(seed);
+}
+
+PassiveMob::PassiveMob(const glm::vec3& startPos, std::shared_ptr<ModelSystem::Model> cachedModel, EntityId id)
+    : Entity(startPos), entityId(id) {
+    if (cachedModel) {
+        setModel(cachedModel);
+    }
     // Seed RNG from position
     unsigned int seed = 1337u
         ^ (unsigned int)(std::abs((int)startPos.x) * 73856093)

@@ -69,11 +69,29 @@ static std::string pickIdlePreferIdle1(const std::vector<std::string>& names) {
     return names.empty() ? "" : names[0];
 }
 
-ZombieEntity::ZombieEntity(const glm::vec3& startPos) : Entity(startPos) {
+// Original constructor - loads model internally (causes stutter on spawn)
+ZombieEntity::ZombieEntity(const glm::vec3& startPos) : Entity(startPos), entityId(0) {
     std::string modelPath = "assets/models/Zombie/Zombie_Quaternius.gltf";
     auto zombieModel = std::make_shared<ModelSystem::Model>(modelPath);
     setModel(zombieModel);
+    initializeCommon(startPos);
+}
 
+// New constructor with pre-loaded model (no stutter)
+ZombieEntity::ZombieEntity(const glm::vec3& startPos, std::shared_ptr<ModelSystem::Model> cachedModel, EntityId id)
+    : Entity(startPos), entityId(id) {
+    if (cachedModel) {
+        setModel(cachedModel);
+    } else {
+        // Fallback to loading if no cached model provided
+        std::string modelPath = "assets/models/Zombie/Zombie_Quaternius.gltf";
+        auto zombieModel = std::make_shared<ModelSystem::Model>(modelPath);
+        setModel(zombieModel);
+    }
+    initializeCommon(startPos);
+}
+
+void ZombieEntity::initializeCommon(const glm::vec3& startPos) {
     // Quaternius Cube World zombie scale - adjust to be roughly player-sized
     setScale(glm::vec3(0.5f));
 

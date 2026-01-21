@@ -134,6 +134,7 @@ set(SOURCES
     src/Entity/SheepEntity.cpp
     src/Entity/SkeletonEntity.cpp
     src/Entity/MobSpawnManager.cpp
+    src/Entity/EntityManager.cpp
     src/Model/Model.cpp
     ${GLAD_DIR}/src/glad.c
 )

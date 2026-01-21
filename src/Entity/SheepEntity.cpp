@@ -2,9 +2,22 @@
 #include "../Model/Model.h"
 #include "../Core/Logger.h"
 
+// Original constructor - loads model internally (causes stutter)
 SheepEntity::SheepEntity(const glm::vec3& startPos) : PassiveMob(startPos) {
     loadModel();
+    initializeCommon();
     
+    LOG_INFO("Sheep entity created at (" + std::to_string(startPos.x) + ", " + 
+             std::to_string(startPos.y) + ", " + std::to_string(startPos.z) + ")");
+}
+
+// New constructor with pre-loaded model (no stutter)
+SheepEntity::SheepEntity(const glm::vec3& startPos, std::shared_ptr<ModelSystem::Model> cachedModel, EntityId id)
+    : PassiveMob(startPos, cachedModel, id) {
+    initializeCommon();
+}
+
+void SheepEntity::initializeCommon() {
     // Quaternius model scale and rotation
     setScale(glm::vec3(0.5f));
     rotationOffset = glm::vec3(0.0f, 180.0f, 0.0f);
@@ -16,9 +29,6 @@ SheepEntity::SheepEntity(const glm::vec3& startPos) : PassiveMob(startPos) {
     
     pickAnimations();
     setState(State::Idle, 0.5f, 2.0f);
-    
-    LOG_INFO("Sheep entity created at (" + std::to_string(startPos.x) + ", " + 
-             std::to_string(startPos.y) + ", " + std::to_string(startPos.z) + ")");
 }
 
 void SheepEntity::loadModel() {

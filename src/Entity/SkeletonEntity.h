@@ -4,12 +4,21 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <memory>
 
+namespace ModelSystem { class Model; }
 class ChunkManager;
+
+using EntityId = uint32_t;
 
 class SkeletonEntity : public Entity {
 public:
+    // Original constructor (loads model internally - causes stutter)
     SkeletonEntity(const glm::vec3& startPos);
+    
+    // New constructor with pre-loaded model (no stutter)
+    SkeletonEntity(const glm::vec3& startPos, std::shared_ptr<ModelSystem::Model> cachedModel, EntityId id = 0);
+    
     ~SkeletonEntity() override = default;
 
     // Update AI + animation. Returns true if an "attack" happened this frame.
@@ -18,8 +27,16 @@ public:
     glm::vec3 consumeAttackImpulse();
     bool isDead() const { return dead; }
     void takeDamage(float amount);
+    float getHealth() const { return health; }
+    
+    // Entity ID for network sync
+    EntityId getEntityId() const { return entityId; }
 
 private:
+    EntityId entityId = 0;
+    
+    void initializeCommon(const glm::vec3& startPos);
+    
     enum class State { Idle, Wander, Chase };
     State state = State::Idle;
 

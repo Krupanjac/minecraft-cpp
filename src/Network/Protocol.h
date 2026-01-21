@@ -36,6 +36,12 @@ enum class PacketType : uint8_t {
     
     // Server
     SERVER_INFO = 0x40,
+    
+    // Entity/Mob sync (new)
+    ENTITY_SPAWN = 0x50,
+    ENTITY_DESPAWN = 0x51,
+    ENTITY_UPDATE = 0x52,
+    ENTITY_BATCH_UPDATE = 0x53,  // Efficient batch sync
 };
 
 // Packet header (sent before every packet)
@@ -137,6 +143,33 @@ struct TimeSyncPacket {
     uint8_t isPaused;      // Whether day/night cycle is paused
     
     static constexpr PacketType TYPE = PacketType::TIME_SYNC;
+};
+
+// Entity/Mob packets
+struct EntitySpawnPacket {
+    uint32_t entityId;
+    uint8_t mobType;  // MobType enum value
+    float x, y, z;
+    float yaw;
+    
+    static constexpr PacketType TYPE = PacketType::ENTITY_SPAWN;
+};
+
+struct EntityDespawnPacket {
+    uint32_t entityId;
+    
+    static constexpr PacketType TYPE = PacketType::ENTITY_DESPAWN;
+};
+
+struct EntityUpdatePacket {
+    uint32_t entityId;
+    float x, y, z;
+    float velocityX, velocityY, velocityZ;
+    float yaw;
+    float health;
+    uint8_t flags;  // isDead, aiState bits
+    
+    static constexpr PacketType TYPE = PacketType::ENTITY_UPDATE;
 };
 
 // ============== Packet Serialization ==============

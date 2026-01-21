@@ -13,6 +13,7 @@
 #include "UI/UIManager.h"
 #include "World/WorldSerializer.h"
 #include "Entity/PlayerEntity.h"
+#include "Entity/EntityManager.h"
 #include "Entity/ZombieEntity.h"
 #include "Entity/SkeletonEntity.h"
 #include "Entity/PigEntity.h"
@@ -208,11 +209,17 @@ public:
         // Return to main menu callback - reinitialize menu world
         uiManager.setOnReturnToMainMenu([this]() {
             LOG_INFO("Returning to main menu, reinitializing menu world...");
-            zombies.clear(); // Clear any spawned zombies
+            
+            // Clear entities from new system
+            entityManager.clear();
+            
+            // Clear legacy containers
+            zombies.clear();
             skeletons.clear();
             pigs.clear();
             chickens.clear();
             sheep.clear();
+            
             menuWorldInitialized = false; // Force reinitialization
             initializeMenuWorld();
         });
@@ -293,6 +300,7 @@ public:
             uiManager.setNetworkStatus("Disconnected: " + reason);
             uiManager.setWorldLoaded(false);
             // Re-initialize menu world
+            entityManager.clear();
             zombies.clear();
             skeletons.clear();
             pigs.clear();
@@ -360,7 +368,9 @@ public:
         long seed = static_cast<long>(time(nullptr));
         createWorld("Multiplayer_" + std::to_string(seed), seed);
         
-        // Clear mobs for multiplayer (they're single-player only for now)
+        // Clear mobs - multiplayer uses server-authoritative mobs
+        entityManager.clear();
+        entityManager.setNetworkMode(true, false); // Server mode
         zombies.clear();
         skeletons.clear();
         pigs.clear();
@@ -383,7 +393,9 @@ public:
     void joinMultiplayerGame(const std::string& playerName, const std::string& address, uint16_t port) {
         uiManager.setNetworkStatus("Connecting...");
         
-        // Clear mobs for multiplayer (they're single-player only for now)
+        // Clear mobs - client receives mob state from server
+        entityManager.clear();
+        entityManager.setNetworkMode(false, true); // Client mode
         zombies.clear();
         skeletons.clear();
         pigs.clear();
@@ -723,7 +735,22 @@ public:
              LOG_INFO("Could not find ground via raycast, using default height.");
         }
         
-        // Initialize mob spawn manager
+        // Initialize EntityManager (new system - stutter-free)
+        if (useNewEntityManager) {
+            entityManager.initialize(chunkManager, worldGenerator);
+            
+            // Preload models during loading screen to avoid runtime stutters
+            LOG_INFO("Preloading mob models...");
+            renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), 0.95f);
+            window->swapBuffers();
+            window->pollEvents();
+            entityManager.preloadModels();
+            
+            // Set network mode based on current state
+            entityManager.setNetworkMode(networkManager.isHost(), networkManager.isClient());
+        }
+        
+        // Initialize legacy mob spawn manager (fallback)
         mobSpawnManager = std::make_unique<MobSpawnManager>(chunkManager, worldGenerator);
     }
     
@@ -733,6 +760,7 @@ public:
         // Clear existing world
         chunkManager.unloadAll();
         chunkManager.clear();
+        entityManager.clear();
         
         glm::vec3 playerPos;
         long seed;
@@ -746,7 +774,15 @@ public:
             // Initialize player entity at loaded position
             playerEntity = std::make_unique<PlayerEntity>(playerPos);
             
-            // Initialize mob spawn manager for loaded world
+            // Initialize EntityManager for loaded world
+            if (useNewEntityManager) {
+                entityManager.initialize(chunkManager, worldGenerator);
+                if (!entityManager.isModelPreloadComplete()) {
+                    entityManager.preloadModels();
+                }
+            }
+            
+            // Initialize legacy mob spawn manager for loaded world
             mobSpawnManager = std::make_unique<MobSpawnManager>(chunkManager, worldGenerator);
 
             LOG_INFO("World loaded successfully");
@@ -885,12 +921,20 @@ private:
     long currentSeed = 12345;
     
     std::unique_ptr<PlayerEntity> playerEntity;
+    
+    // New EntityManager for stutter-free mob spawning
+    EntityManager entityManager;
+    
+    // Legacy mob containers (kept for backward compatibility during transition)
     std::vector<std::unique_ptr<ZombieEntity>> zombies;
     std::vector<std::unique_ptr<SkeletonEntity>> skeletons;
     std::vector<std::unique_ptr<PigEntity>> pigs;
     std::vector<std::unique_ptr<ChickenEntity>> chickens;
     std::vector<std::unique_ptr<SheepEntity>> sheep;
     std::unique_ptr<MobSpawnManager> mobSpawnManager;
+    
+    // Flag to use new EntityManager vs legacy system
+    bool useNewEntityManager = true;
     
     // Menu background world
     bool menuWorldInitialized = false;
@@ -1241,52 +1285,70 @@ private:
         }
 
         // === Mob Spawning & AI ===
-        // Only spawn mobs in single-player mode to avoid duplicates
-        // In multiplayer, mobs would need to be server-authoritative (future work)
-        if (!skipPlayerControls && networkManager.getMode() == Network::NetworkMode::OFFLINE) {
-            // Use MobSpawnManager for Minecraft-like spawning based on time of day, light, blocks
-            if (mobSpawnManager && playerEntity) {
-                // Convert timeOfDay to normalized 0-1 range (0 = midnight, 0.5 = noon)
-                float normalizedTime = uiManager.timeOfDay / DAY_DURATION;
-                glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
-                
-                mobSpawnManager->update(deltaTime, playerFeet, normalizedTime,
-                                       zombies, skeletons, pigs, chickens, sheep);
-            }
+        // Mobs can run in single-player (offline) or server mode
+        // In client mode, server handles mob state
+        if (!skipPlayerControls) {
+            glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
+            float normalizedTime = uiManager.timeOfDay / DAY_DURATION;
             
-            // Update zombie AI (uses chunkManager for simple collision + camera pos for chasing)
-            if (playerEntity) {
-                glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
-                for (auto& z : zombies) {
-                    if (!z) continue;
-                    bool attacked = z->updateAI(deltaTime, chunkManager, playerFeet);
-                    if (attacked) {
-                        // Apply knockback to player camera velocity as "attack" feedback.
-                        camera.velocity += z->consumeAttackImpulse();
-                    }
-                }
+            if (useNewEntityManager) {
+                // New EntityManager system - handles spawning, AI, despawning with no stutters
+                bool isOfflineOrServer = (networkManager.getMode() == Network::NetworkMode::OFFLINE) || 
+                                          networkManager.isHost();
                 
-                // Update skeleton AI
-                for (auto& s : skeletons) {
-                    if (!s || s->isDead()) continue;
-                    bool attacked = s->updateAI(deltaTime, chunkManager, playerFeet);
-                    if (attacked) {
-                        camera.velocity += s->consumeAttackImpulse();
+                if (isOfflineOrServer) {
+                    // Update EntityManager - returns attack events
+                    auto attacks = entityManager.update(deltaTime, playerFeet, normalizedTime);
+                    
+                    // Apply knockback from attacks
+                    for (const auto& attack : attacks) {
+                        camera.velocity += attack.knockback;
                     }
+                } else if (networkManager.isClient()) {
+                    // Client mode - just render, server handles AI
+                    // EntityManager state comes from server sync packets
                 }
-                
-                // Update passive mobs
-                for (auto& p : pigs) {
-                    if (p && !p->isDead()) p->updateAI(deltaTime, chunkManager);
-                }
-                for (auto& c : chickens) {
-                    if (c && !c->isDead()) c->updateAI(deltaTime, chunkManager);
-                }
-                for (auto& s : sheep) {
-                    if (s && !s->isDead()) s->updateAI(deltaTime, chunkManager);
+            } else {
+                // Legacy system - uses MobSpawnManager (can cause stutters)
+                if (networkManager.getMode() == Network::NetworkMode::OFFLINE) {
+                    if (mobSpawnManager && playerEntity) {
+                        mobSpawnManager->update(deltaTime, playerFeet, normalizedTime,
+                                               zombies, skeletons, pigs, chickens, sheep);
+                    }
+                    
+                    // Update zombie AI
+                    if (playerEntity) {
+                        for (auto& z : zombies) {
+                            if (!z) continue;
+                            bool attacked = z->updateAI(deltaTime, chunkManager, playerFeet);
+                            if (attacked) {
+                                camera.velocity += z->consumeAttackImpulse();
+                            }
+                        }
+                        
+                        // Update skeleton AI
+                        for (auto& s : skeletons) {
+                            if (!s || s->isDead()) continue;
+                            bool attacked = s->updateAI(deltaTime, chunkManager, playerFeet);
+                            if (attacked) {
+                                camera.velocity += s->consumeAttackImpulse();
+                            }
+                        }
+                        
+                        // Update passive mobs
+                        for (auto& p : pigs) {
+                            if (p && !p->isDead()) p->updateAI(deltaTime, chunkManager);
+                        }
+                        for (auto& c : chickens) {
+                            if (c && !c->isDead()) c->updateAI(deltaTime, chunkManager);
+                        }
+                        for (auto& s : sheep) {
+                            if (s && !s->isDead()) s->updateAI(deltaTime, chunkManager);
+                        }
+                    }
                 }
             }
-        } // End of OFFLINE mode zombie code
+        } // End of mob update code
         
         // Generate chunks - always run if world is loaded
         if (continueWorldUpdates) {
@@ -1424,25 +1486,29 @@ private:
             }
         }
 
-        // Always render zombies (even in first-person)
-        for (auto& z : zombies) {
-            if (z) entities.push_back(z.get());
-        }
-        
-        // Render skeletons
-        for (auto& s : skeletons) {
-            if (s && !s->isDead()) entities.push_back(s.get());
-        }
-        
-        // Render passive mobs
-        for (auto& p : pigs) {
-            if (p && !p->isDead()) entities.push_back(p.get());
-        }
-        for (auto& c : chickens) {
-            if (c && !c->isDead()) entities.push_back(c.get());
-        }
-        for (auto& s : sheep) {
-            if (s && !s->isDead()) entities.push_back(s.get());
+        // Get entities from EntityManager (new system) or legacy containers
+        if (useNewEntityManager) {
+            auto managedEntities = entityManager.getAllEntities();
+            entities.insert(entities.end(), managedEntities.begin(), managedEntities.end());
+        } else {
+            // Legacy: render from individual containers
+            for (auto& z : zombies) {
+                if (z) entities.push_back(z.get());
+            }
+            
+            for (auto& s : skeletons) {
+                if (s && !s->isDead()) entities.push_back(s.get());
+            }
+            
+            for (auto& p : pigs) {
+                if (p && !p->isDead()) entities.push_back(p.get());
+            }
+            for (auto& c : chickens) {
+                if (c && !c->isDead()) entities.push_back(c.get());
+            }
+            for (auto& s : sheep) {
+                if (s && !s->isDead()) entities.push_back(s.get());
+            }
         }
         
         // Render remote players from network

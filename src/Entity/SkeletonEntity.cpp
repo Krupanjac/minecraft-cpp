@@ -56,11 +56,28 @@ static bool trySkeletonStepUp(ChunkManager& chunkManager, glm::vec3& pos, float 
     return true;
 }
 
-SkeletonEntity::SkeletonEntity(const glm::vec3& startPos) : Entity(startPos) {
+// Original constructor - loads model internally (causes stutter on spawn)
+SkeletonEntity::SkeletonEntity(const glm::vec3& startPos) : Entity(startPos), entityId(0) {
     std::string modelPath = "assets/models/Skeleton/Skeleton.gltf";
     auto skeletonModel = std::make_shared<ModelSystem::Model>(modelPath);
     setModel(skeletonModel);
+    initializeCommon(startPos);
+}
 
+// New constructor with pre-loaded model (no stutter)
+SkeletonEntity::SkeletonEntity(const glm::vec3& startPos, std::shared_ptr<ModelSystem::Model> cachedModel, EntityId id)
+    : Entity(startPos), entityId(id) {
+    if (cachedModel) {
+        setModel(cachedModel);
+    } else {
+        std::string modelPath = "assets/models/Skeleton/Skeleton.gltf";
+        auto skeletonModel = std::make_shared<ModelSystem::Model>(modelPath);
+        setModel(skeletonModel);
+    }
+    initializeCommon(startPos);
+}
+
+void SkeletonEntity::initializeCommon(const glm::vec3& startPos) {
     // Quaternius model scale
     setScale(glm::vec3(0.5f));
     rotationOffset = glm::vec3(0.0f, 180.0f, 0.0f);

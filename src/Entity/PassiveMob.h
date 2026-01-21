@@ -3,13 +3,18 @@
 #include "Entity.h"
 #include <random>
 #include <string>
+#include <memory>
 
+namespace ModelSystem { class Model; }
 class ChunkManager;
+
+using EntityId = uint32_t;
 
 // Base class for passive mobs (pigs, chickens, sheep, etc.)
 class PassiveMob : public Entity {
 public:
     PassiveMob(const glm::vec3& startPos);
+    PassiveMob(const glm::vec3& startPos, std::shared_ptr<ModelSystem::Model> cachedModel, EntityId id = 0);
     ~PassiveMob() override = default;
 
     // Update AI behavior
@@ -20,8 +25,13 @@ public:
     
     // Apply damage
     void takeDamage(float amount);
+    
+    // Entity ID for network sync
+    EntityId getEntityId() const { return entityId; }
 
 protected:
+    EntityId entityId = 0;
+    
     enum class State { Idle, Wander, Flee };
     State state = State::Idle;
 
