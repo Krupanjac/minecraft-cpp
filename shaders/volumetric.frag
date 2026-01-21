@@ -5,6 +5,7 @@ in vec2 TexCoords;
 
 uniform sampler2D depthMap;
 uniform sampler2D shadowMap;
+uniform sampler2D rtShadowMap;  // Ray tracing shadow output
 uniform mat4 invViewProj;
 uniform mat4 lightSpaceMatrix;
 uniform vec3 lightDir;
@@ -12,6 +13,8 @@ uniform vec3 cameraPos;
 uniform float uIntensity;
 uniform vec3 uLightColor;
 uniform int uUseShadows;
+uniform int uUseRTShadows;      // Use ray traced shadows
+uniform vec3 uRenderOrigin;     // For converting camera-relative to world space
 
 const int STEPS = 48;
 const float MAX_DIST = 150.0;
@@ -22,10 +25,17 @@ vec3 getWorldPos(vec2 uv, float depth) {
     return worldSpace.xyz / worldSpace.w;
 }
 
-// Check if a point is in shadow using the shadow map
-float getShadow(vec3 worldPos) {
+// Check if a point is in shadow using shadow map or ray tracing
+float getShadow(vec3 worldPos, vec2 screenUV) {
     if (uUseShadows == 0) return 0.0; // No shadows = fully lit
     
+    // Use ray traced shadows if available
+    if (uUseRTShadows != 0) {
+        vec4 rtData = texture(rtShadowMap, screenUV);
+        return 1.0 - rtData.r;  // R channel is direct light visibility
+    }
+    
+    // Fall back to shadow map
     vec4 lightSpacePos = lightSpaceMatrix * vec4(worldPos, 1.0);
     vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
     projCoords = projCoords * 0.5 + 0.5;
@@ -75,8 +85,9 @@ void main() {
         float heightFactor = exp(-max(0.0, currentPos.y - 64.0) * 0.01);
         density *= mix(0.5, 1.0, heightFactor);
         
-        // Check shadow - if in shadow, no direct light contribution
-        float shadow = getShadow(currentPos);
+        // Check shadow - use TexCoords for RT shadow lookup (screen-space)
+        // Note: RT shadows are computed per-pixel, so we use the original screen UV
+        float shadow = getShadow(currentPos, TexCoords);
         float lightVisibility = 1.0 - shadow;
         
         // Directional light scattering (Mie scattering approximation)

@@ -68,10 +68,14 @@ bool VoxelRayTracer::initialize(int screenWidth, int screenHeight) {
 }
 
 void VoxelRayTracer::resize(int w, int h) {
-    if (w == width && h == height) return;
+    // Store full resolution
+    int newWidth = useHalfResolution ? w / 2 : w;
+    int newHeight = useHalfResolution ? h / 2 : h;
     
-    width = w;
-    height = h;
+    if (newWidth == width && newHeight == height) return;
+    
+    width = newWidth;
+    height = newHeight;
     createLightingTexture();
 }
 
@@ -167,7 +171,7 @@ void VoxelRayTracer::updateVoxelGrid(ChunkManager& chunkManager, const glm::vec3
 
 GLuint VoxelRayTracer::trace(GLuint depthTexture, const glm::mat4& invViewProj,
                               const glm::vec3& cameraPos, const glm::vec3& lightDir,
-                              const glm::vec3& lightColor) {
+                              const glm::vec3& lightColor, const glm::vec3& renderOrigin) {
     if (!initialized) return 0;
     
     computeShader.use();
@@ -190,6 +194,7 @@ GLuint VoxelRayTracer::trace(GLuint depthTexture, const glm::mat4& invViewProj,
     computeShader.setVec3("lightDir", glm::normalize(lightDir));
     computeShader.setVec3("lightColor", lightColor);
     computeShader.setVec3("voxelGridOrigin", voxelGridOrigin);
+    computeShader.setVec3("renderOrigin", renderOrigin);  // Pass render origin for coordinate conversion
     computeShader.setFloat("voxelSize", 1.0f);  // 1 block = 1 unit
     computeShader.setInt("maxRaySteps", maxRaySteps);
     computeShader.setFloat("rayMaxDistance", rayMaxDistance);

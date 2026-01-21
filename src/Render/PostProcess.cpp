@@ -221,8 +221,11 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         glBindTexture(GL_TEXTURE_2D, depthTexture);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, shadowMapTexture);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, rayTracingTexture);  // RT shadow map
         volumetricShader.setInt("depthMap", 0);
         volumetricShader.setInt("shadowMap", 1);
+        volumetricShader.setInt("rtShadowMap", 2);
         volumetricShader.setMat4("invViewProj", glm::inverse(projection * view));
         volumetricShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
         volumetricShader.setVec3("lightDir", lightDir);
@@ -230,6 +233,7 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         volumetricShader.setFloat("uIntensity", volumetricIntensity);
         volumetricShader.setVec3("uLightColor", lightColor);
         volumetricShader.setInt("uUseShadows", settings.enableShadows ? 1 : 0);
+        volumetricShader.setInt("uUseRTShadows", (settings.enableRayTracing && settings.rtShadows && rayTracingTexture != 0) ? 1 : 0);
         glBindVertexArray(quadVAO);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     } else {

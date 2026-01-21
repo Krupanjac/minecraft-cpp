@@ -58,14 +58,36 @@ void Renderer::onResize(int width, int height) {
     if (mainFBO) mainFBO->resize(width, height);
     if (postProcess) postProcess->resize(width, height);
     if (rayTracer) rayTracer->resize(width, height);
+    
+    // Resize reflection copy textures
+    if (width != reflectionCopyWidth || height != reflectionCopyHeight) {
+        if (reflectionCopyTexture) glDeleteTextures(1, &reflectionCopyTexture);
+        if (reflectionCopyDepth) glDeleteTextures(1, &reflectionCopyDepth);
+        
+        glGenTextures(1, &reflectionCopyTexture);
+        glBindTexture(GL_TEXTURE_2D, reflectionCopyTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        
+        glGenTextures(1, &reflectionCopyDepth);
+        glBindTexture(GL_TEXTURE_2D, reflectionCopyDepth);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        
+        reflectionCopyWidth = width;
+        reflectionCopyHeight = height;
+    }
 }
 
 void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, int windowWidth, int windowHeight) {
     // === CAMERA-RELATIVE RENDERING SETUP ===
     // This prevents floating-point precision issues when far from world origin
-    
-    // Ray tracing output texture (will be filled later if RT is enabled)
-    GLuint rayTracedLighting = 0;
     
     glm::dvec3 cameraPos = glm::dvec3(camera.getPosition());
     
@@ -101,6 +123,49 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
 
     // Update frame counter for upload tracking
     frameCounter++;
+
+    // === RAY TRACING PASS (runs first using previous frame's data) ===
+    // This allows the RT texture to be available during the main render pass
+    GLuint rayTracedLighting = 0;
+    if (rayTracer && Settings::instance().enableRayTracing && !isFirstFrame) {
+        // Update voxel grid around player
+        glm::vec3 playerWorldPos = camera.getPosition();
+        rayTracer->updateVoxelGrid(chunkManager, playerWorldPos);
+        
+        // Set quality settings - optimized for performance
+        int quality = Settings::instance().rayTracingQuality;
+        if (quality == Settings::RT_QUALITY_LOW) {
+            rayTracer->setMaxRaySteps(64);
+            rayTracer->setRayMaxDistance(48.0f);
+            rayTracer->setVoxelGridRadius(32);
+            rayTracer->setHalfResolution(true);  // Use half resolution for low quality
+        } else if (quality == Settings::RT_QUALITY_MEDIUM) {
+            rayTracer->setMaxRaySteps(128);
+            rayTracer->setRayMaxDistance(64.0f);
+            rayTracer->setVoxelGridRadius(48);
+            rayTracer->setHalfResolution(true);  // Use half resolution for medium too
+        } else { // HIGH
+            rayTracer->setMaxRaySteps(256);
+            rayTracer->setRayMaxDistance(96.0f);
+            rayTracer->setVoxelGridRadius(64);
+            rayTracer->setHalfResolution(false); // Full resolution for high quality
+        }
+        
+        // Use previous frame's matrices for reconstruction
+        // This is a common technique - 1-frame latency but works correctly
+        glm::mat4 invPrevViewProj = glm::inverse(prevProjection * prevView);
+        
+        // Trace rays using main FBO's depth from previous frame
+        // Use prevRenderOrigin since we're using previous frame's depth/matrices
+        rayTracedLighting = rayTracer->trace(
+            mainFBO->getDepthTexture(),
+            invPrevViewProj,
+            cameraRelative,
+            lightDirection,
+            glm::vec3(1.0f, 0.9f, 0.7f), // Light color
+            glm::vec3(prevRenderOrigin)   // Render origin from previous frame
+        );
+    }
 
     // Calculate Light Space Matrix
     // Center on player
@@ -330,8 +395,6 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     blockShader.setInt("uUseShadows", Settings::instance().enableShadows ? 1 : 0);
     blockShader.setInt("uShadowMethod", Settings::instance().shadowMethod);
     blockShader.setInt("uUseRTShadows", (Settings::instance().enableRayTracing && Settings::instance().rtShadows) ? 1 : 0);
-    blockShader.setInt("uUseRTAO", (Settings::instance().enableRayTracing && Settings::instance().rtAO) ? 1 : 0);
-    blockShader.setInt("uUseRTSky", (Settings::instance().enableRayTracing && Settings::instance().rtSkyVisibility) ? 1 : 0);
     blockShader.setMat4("uProjection", projection);
     blockShader.setMat4("uView", view);
     blockShader.setMat4("uPrevView", prevView);
@@ -456,6 +519,27 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         modelShader.unuse();
     }
 
+    // Copy scene color and depth for water reflections BEFORE rendering water
+    if (Settings::instance().enableRayTracing && Settings::instance().rtReflections) {
+        // Ensure textures exist
+        if (reflectionCopyTexture == 0 || reflectionCopyWidth != windowWidth || reflectionCopyHeight != windowHeight) {
+            onResize(windowWidth, windowHeight);
+        }
+        
+        // Use glCopyImageSubData for proper texture-to-texture copy (requires OpenGL 4.3+)
+        glCopyImageSubData(
+            mainFBO->getTexture(), GL_TEXTURE_2D, 0, 0, 0, 0,
+            reflectionCopyTexture, GL_TEXTURE_2D, 0, 0, 0, 0,
+            windowWidth, windowHeight, 1
+        );
+        
+        glCopyImageSubData(
+            mainFBO->getDepthTexture(), GL_TEXTURE_2D, 0, 0, 0, 0,
+            reflectionCopyDepth, GL_TEXTURE_2D, 0, 0, 0, 0,
+            windowWidth, windowHeight, 1
+        );
+    }
+
     // Render water chunks
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -467,8 +551,17 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     glActiveTexture(GL_TEXTURE0);
     if (blockAtlas) blockAtlas->bind(0);
     
+    // Bind copied scene color and depth for water reflections
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, reflectionCopyTexture);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, reflectionCopyDepth);
+    
     waterShader.use();
     waterShader.setInt("uTexture", 0);
+    waterShader.setInt("uSceneColor", 4);
+    waterShader.setInt("uSceneDepth", 5);
+    waterShader.setInt("uEnableReflections", (Settings::instance().enableRayTracing && Settings::instance().rtReflections) ? 1 : 0);
     waterShader.setMat4("uProjection", projection);
     waterShader.setMat4("uView", view);
     waterShader.setMat4("uPrevView", prevView);
@@ -528,39 +621,6 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     glDisable(GL_BLEND);
 
     mainFBO->unbind();
-
-    // === Ray Tracing Pass (Optional) ===
-    // Updates voxel grid and traces rays for accurate lighting
-    if (rayTracer && Settings::instance().enableRayTracing) {
-        // Update voxel grid around player
-        glm::vec3 playerWorldPos = camera.getPosition();
-        rayTracer->updateVoxelGrid(chunkManager, playerWorldPos);
-        
-        // Set quality settings
-        int quality = Settings::instance().rayTracingQuality;
-        if (quality == Settings::RT_QUALITY_LOW) {
-            rayTracer->setMaxRaySteps(128);
-            rayTracer->setRayMaxDistance(64.0f);
-        } else if (quality == Settings::RT_QUALITY_MEDIUM) {
-            rayTracer->setMaxRaySteps(256);
-            rayTracer->setRayMaxDistance(128.0f);
-        } else { // HIGH
-            rayTracer->setMaxRaySteps(512);
-            rayTracer->setRayMaxDistance(256.0f);
-        }
-        
-        // Compute inverse view-projection for world position reconstruction
-        glm::mat4 invViewProj = glm::inverse(projection * view);
-        
-        // Trace rays
-        rayTracedLighting = rayTracer->trace(
-            mainFBO->getDepthTexture(),
-            invViewProj,
-            cameraRelative,
-            lightDirection,
-            glm::vec3(1.0f, 0.9f, 0.7f) // Light color
-        );
-    }
 
     // 2. Post Processing Pass
     // Clear default framebuffer

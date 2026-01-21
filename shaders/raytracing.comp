@@ -20,19 +20,24 @@ uniform vec3 lightDir;
 uniform vec3 lightColor;
 uniform ivec3 voxelGridSize;
 uniform vec3 voxelGridOrigin;  // World position of voxel grid corner
+uniform vec3 renderOrigin;     // Camera-relative rendering origin (to convert back to world)
 uniform float voxelSize;       // Size of each voxel in world units
 uniform int maxRaySteps;
 uniform float rayMaxDistance;
+uniform bool enableAO;         // Whether to compute AO (expensive)
 
 // Constants
 const float EPSILON = 0.001;
 const int MAX_BOUNCES = 2;
 
 // Get world position from depth buffer
+// Note: invViewProj gives us camera-relative position, we need to add renderOrigin for true world pos
 vec3 getWorldPos(vec2 uv, float depth) {
     vec4 clipPos = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
-    vec4 worldPos = invViewProj * clipPos;
-    return worldPos.xyz / worldPos.w;
+    vec4 relativePos = invViewProj * clipPos;
+    vec3 cameraRelativePos = relativePos.xyz / relativePos.w;
+    // Convert from camera-relative to actual world position
+    return cameraRelativePos + renderOrigin;
 }
 
 // Convert world position to voxel grid coordinates
@@ -124,7 +129,7 @@ bool rayMarchVoxels(vec3 rayOrigin, vec3 rayDir, float maxDist, out float hitDis
     return false;
 }
 
-// Trace shadow ray towards sun
+// Trace shadow ray towards sun with soft shadows
 float traceShadowRay(vec3 origin, vec3 lightDirection) {
     float hitDist;
     ivec3 hitVoxel;
@@ -133,13 +138,36 @@ float traceShadowRay(vec3 origin, vec3 lightDirection) {
     // Offset origin slightly to avoid self-intersection
     vec3 offsetOrigin = origin + lightDirection * voxelSize * 0.5;
     
+    // Check if we're starting inside the grid
+    ivec3 startVoxel = worldToVoxel(offsetOrigin);
+    bool startedInGrid = isInGrid(startVoxel);
+    
+    // Trace the shadow ray
     if (rayMarchVoxels(offsetOrigin, lightDirection, rayMaxDistance, hitDist, hitVoxel, hitNormal)) {
-        return 0.0;  // In shadow
+        // Hit something - calculate soft shadow based on distance
+        // Closer occluders = harder shadows, distant = softer
+        float softness = smoothstep(0.0, 32.0, hitDist);
+        return softness * 0.2;  // Allow some light through for soft shadows at distance
     }
-    return 1.0;  // Lit
+    
+    // If we started in grid and exited without hitting anything,
+    // we need to check if we're going "upward" toward the light
+    // If lightDir.y > 0 and we exited the top of the grid, assume lit
+    // If we exited the sides, we can't be sure - use partial shadow
+    if (startedInGrid) {
+        // Check exit direction - if primarily upward and light is above, probably lit
+        if (lightDirection.y > 0.3) {
+            return 1.0;  // Light is coming from above, we're likely lit
+        }
+        // Light is more horizontal - we might be in shadow from distant terrain
+        // Return partial shadow to blend with shadow map
+        return 0.7;
+    }
+    
+    return 1.0;  // No hit, fully lit
 }
 
-// Trace sky visibility ray (straight up)
+// Trace sky visibility ray (straight up) with multiple samples for better accuracy
 float traceSkyRay(vec3 origin) {
     float hitDist;
     ivec3 hitVoxel;
@@ -147,45 +175,58 @@ float traceSkyRay(vec3 origin) {
     
     vec3 offsetOrigin = origin + vec3(0.0, voxelSize * 0.5, 0.0);
     
+    // Primary ray straight up
     if (rayMarchVoxels(offsetOrigin, vec3(0.0, 1.0, 0.0), rayMaxDistance, hitDist, hitVoxel, hitNormal)) {
-        return 0.0;  // Under cover
+        // Under cover - calculate how deep we are
+        float coverDepth = min(hitDist / 16.0, 1.0);
+        return coverDepth * 0.3;  // Allow some ambient in caves based on depth
     }
-    return 1.0;  // Can see sky
+    
+    // Check if we exited the grid going up - if so, we can see sky
+    ivec3 startVoxel = worldToVoxel(offsetOrigin);
+    if (isInGrid(startVoxel)) {
+        return 1.0;  // Started in grid, no hit going up = can see sky
+    }
+    
+    return 0.8;  // Outside grid, assume mostly lit
 }
 
-// Simple ambient occlusion via short rays
+// Simple ambient occlusion via short rays - OPTIMIZED
+// Uses only 4 samples with fixed directions for performance and consistency
 float traceAO(vec3 origin, vec3 normal) {
     float ao = 0.0;
-    const int aoSamples = 8;
     
-    // Simple hemisphere sampling
+    // Use fixed sample directions relative to normal for consistent results (no noise)
+    // These are the 4 cardinal directions in the hemisphere
     vec3 tangent = abs(normal.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
     vec3 bitangent = normalize(cross(normal, tangent));
     tangent = cross(bitangent, normal);
     
-    for (int i = 0; i < aoSamples; i++) {
-        // Simple pseudo-random direction in hemisphere
-        float angle = float(i) / float(aoSamples) * 6.28318;
-        float height = 0.3 + 0.7 * fract(sin(float(i) * 12.9898) * 43758.5453);
-        
-        vec3 sampleDir = normalize(
-            normal * height + 
-            tangent * cos(angle) * (1.0 - height) +
-            bitangent * sin(angle) * (1.0 - height)
-        );
-        
+    // Fixed sample directions - no randomness = no noise
+    vec3 sampleDirs[4];
+    sampleDirs[0] = normalize(normal * 0.7 + tangent * 0.7);
+    sampleDirs[1] = normalize(normal * 0.7 - tangent * 0.7);
+    sampleDirs[2] = normalize(normal * 0.7 + bitangent * 0.7);
+    sampleDirs[3] = normalize(normal * 0.7 - bitangent * 0.7);
+    
+    vec3 offsetOrigin = origin + normal * voxelSize * 0.5;
+    float aoRadius = voxelSize * 3.0;  // Shorter range for performance
+    
+    for (int i = 0; i < 4; i++) {
         float hitDist;
         ivec3 hitVoxel;
         vec3 hitNormal;
         
-        vec3 offsetOrigin = origin + normal * voxelSize * 0.5;
-        
-        if (rayMarchVoxels(offsetOrigin, sampleDir, voxelSize * 4.0, hitDist, hitVoxel, hitNormal)) {
-            ao += 1.0 - (hitDist / (voxelSize * 4.0));
+        if (rayMarchVoxels(offsetOrigin, sampleDirs[i], aoRadius, hitDist, hitVoxel, hitNormal)) {
+            // Softer falloff
+            float occl = 1.0 - (hitDist / aoRadius);
+            ao += occl * occl;  // Quadratic falloff for softer AO
         }
     }
     
-    return 1.0 - (ao / float(aoSamples));
+    // Reduce AO strength - multiply by 0.5 for subtler effect
+    float aoStrength = 0.5;
+    return 1.0 - (ao / 4.0) * aoStrength;
 }
 
 void main() {
@@ -199,38 +240,29 @@ void main() {
     // Get depth and world position
     float depth = texelFetch(depthTexture, pixelCoord, 0).r;
     
-    // Sky pixels - full light
+    // Sky pixels - full light, no reflection data
     if (depth >= 0.9999) {
-        imageStore(lightingOutput, pixelCoord, vec4(1.0, 1.0, 0.0, 1.0));
+        imageStore(lightingOutput, pixelCoord, vec4(1.0, 0.0, 0.0, 1.0));
         return;
     }
     
     vec3 worldPos = getWorldPos(uv, depth);
     
-    // Reconstruct normal from depth (simplified - could pass from G-buffer)
-    vec2 texelSize = 1.0 / vec2(outputSize);
-    float depthL = texelFetch(depthTexture, pixelCoord + ivec2(-1, 0), 0).r;
-    float depthR = texelFetch(depthTexture, pixelCoord + ivec2(1, 0), 0).r;
-    float depthU = texelFetch(depthTexture, pixelCoord + ivec2(0, -1), 0).r;
-    float depthD = texelFetch(depthTexture, pixelCoord + ivec2(0, 1), 0).r;
+    // Check if world position is inside voxel grid
+    ivec3 voxelPos = worldToVoxel(worldPos);
+    bool inGrid = isInGrid(voxelPos);
     
-    vec3 posL = getWorldPos(uv + vec2(-texelSize.x, 0.0), depthL);
-    vec3 posR = getWorldPos(uv + vec2(texelSize.x, 0.0), depthR);
-    vec3 posU = getWorldPos(uv + vec2(0.0, -texelSize.y), depthU);
-    vec3 posD = getWorldPos(uv + vec2(0.0, texelSize.y), depthD);
+    // If outside grid, use default lighting (let shadow map handle it)
+    if (!inGrid) {
+        imageStore(lightingOutput, pixelCoord, vec4(1.0, 0.0, 0.0, 1.0));
+        return;
+    }
     
-    vec3 dx = (abs(depthR - depth) < abs(depth - depthL)) ? (posR - worldPos) : (worldPos - posL);
-    vec3 dy = (abs(depthD - depth) < abs(depth - depthU)) ? (posD - worldPos) : (worldPos - posU);
-    vec3 normal = normalize(cross(dx, dy));
-    
-    // Trace rays
+    // Trace shadow ray only - much faster!
     float directLight = traceShadowRay(worldPos, lightDir);
-    float skyVisibility = traceSkyRay(worldPos);
-    float ao = traceAO(worldPos, normal);
     
-    // Combine results
-    // R = direct sunlight, G = sky visibility, B = reserved for bounced light, A = AO
-    vec4 lighting = vec4(directLight, skyVisibility, 0.0, ao);
+    // Output: R = direct light, GBA = reserved for future use (reflections, etc)
+    vec4 lighting = vec4(directLight, 0.0, 0.0, 1.0);
     
     imageStore(lightingOutput, pixelCoord, lighting);
 }

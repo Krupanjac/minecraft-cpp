@@ -17,8 +17,6 @@ uniform sampler2D uRayTracingMap;  // Ray tracing output: R=shadow, G=sky, B=bou
 uniform int uUseShadows;
 uniform int uShadowMethod;         // 0 = Shadow Map, 1 = Ray Traced
 uniform int uUseRTShadows;         // Use RT shadows when available
-uniform int uUseRTAO;              // Use RT ambient occlusion
-uniform int uUseRTSky;             // Use RT sky visibility
 uniform float uAOStrength;
 
 // Debug uniforms
@@ -180,46 +178,39 @@ void main() {
     float skyBrightness = dot(uSkyColor, vec3(0.299, 0.587, 0.114)); // Luminance
     float ambient = clamp(skyBrightness * 0.6, 0.05, 0.4);
     
-    // Calculate Shadow - choose between shadow map and ray tracing
+    // Calculate Shadow
     float shadow = 0.0;
-    float rtAO = 1.0;
-    float rtSkyVisibility = 1.0;
     
     if (uUseShadows != 0) {
         if (uShadowMethod == 1 && uUseRTShadows != 0) {
-            // Ray traced shadows - sample from ray tracing texture
-            // Convert clip space to screen UV
+            // Pure ray traced shadows
             vec2 screenUV = (vCurrentClip.xy / vCurrentClip.w) * 0.5 + 0.5;
             vec4 rtData = texture(uRayTracingMap, screenUV);
             shadow = 1.0 - rtData.r;  // R channel is direct light (0=shadow, 1=lit)
-            
-            if (uUseRTSky != 0) {
-                rtSkyVisibility = rtData.g;  // G channel is sky visibility
-            }
-            if (uUseRTAO != 0) {
-                rtAO = rtData.a;  // A channel is ray traced AO
-            }
         } else {
-            // Shadow map shadows
+            // Shadow map only
             shadow = ShadowCalculation(vFragPosLightSpace, normal, lightDir);
         }
     }
     
-    // Apply AO - combine vertex AO with ray traced AO if available
-    // Use smoothstep for non-linear AO curve
+    // Apply AO - vertex AO only (RT AO removed for performance/quality)
     float aoCurve = smoothstep(0.0, 1.0, vAO);
     float minAO = max(0.0, mix(1.0, 0.25, uAOStrength));
     float aoFactor = mix(minAO, 1.0, aoCurve);
     
-    // Blend in ray traced AO
-    aoFactor *= rtAO;
+    // CINEMATIC LIGHTING - increased contrast and light intensity
+    // Boost direct light contribution for more dramatic look
+    float directLightStrength = 1.0;  // Increased from 0.7
+    float shadowContrast = shadow * 1.2;  // Deeper shadows
+    shadowContrast = clamp(shadowContrast, 0.0, 1.0);
     
-    // Reduce ambient in areas with low sky visibility (caves)
-    float skyAmbientFactor = mix(0.3, 1.0, rtSkyVisibility);
-    ambient *= skyAmbientFactor;
+    // Add slight warm tint to lit areas, cool tint to shadows
+    vec3 warmTint = vec3(1.05, 1.0, 0.95);  // Slight warm
+    vec3 coolTint = vec3(0.95, 0.97, 1.05); // Slight cool
+    vec3 tint = mix(warmTint, coolTint, shadowContrast);
     
-    vec3 lighting = vec3(ambient + (1.0 - shadow) * diffuse * 0.7) * aoFactor;
-    vec3 color = baseColor * lighting;
+    vec3 lighting = vec3(ambient + (1.0 - shadowContrast) * diffuse * directLightStrength) * aoFactor;
+    vec3 color = baseColor * lighting * tint;
     
     // Fog
     float distance = length(vWorldPos - uCameraPos);

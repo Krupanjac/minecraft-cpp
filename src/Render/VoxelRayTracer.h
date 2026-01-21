@@ -28,9 +28,10 @@ public:
     
     // Trace rays and compute lighting
     // Returns the lighting texture ID
+    // renderOrigin is the camera-relative rendering offset (needed to convert back to world space)
     GLuint trace(GLuint depthTexture, const glm::mat4& invViewProj, 
                  const glm::vec3& cameraPos, const glm::vec3& lightDir,
-                 const glm::vec3& lightColor);
+                 const glm::vec3& lightColor, const glm::vec3& renderOrigin);
     
     // Get the output lighting texture
     GLuint getLightingTexture() const { return lightingTexture; }
@@ -38,7 +39,17 @@ public:
     // Settings
     void setMaxRaySteps(int steps) { maxRaySteps = steps; }
     void setRayMaxDistance(float dist) { rayMaxDistance = dist; }
-    void setVoxelGridRadius(int radius) { voxelGridRadius = radius; }
+    void setVoxelGridRadius(int radius) { 
+        if (radius != voxelGridRadius) {
+            voxelGridRadius = radius; 
+            voxelGridSize = voxelGridRadius * 2;
+            if (initialized) {
+                createVoxelTexture(); // Recreate texture with new size
+                lastUpdateChunk = glm::ivec3(INT_MAX); // Force voxel grid update
+            }
+        }
+    }
+    void setHalfResolution(bool half) { useHalfResolution = half; }
     
     // Check if ray tracing is available (compute shader support)
     static bool isSupported();
@@ -55,12 +66,13 @@ private:
     // 3D voxel texture
     GLuint voxelTexture = 0;
     int voxelGridSize = 0;     // Size of the 3D grid (cubic)
-    int voxelGridRadius = 64;  // Radius in blocks from player
+    int voxelGridRadius = 48;  // Radius in blocks from player (smaller = faster)
     glm::vec3 voxelGridOrigin; // World position of grid corner
     
     // Settings
-    int maxRaySteps = 256;
-    float rayMaxDistance = 128.0f;
+    int maxRaySteps = 128;      // Default for medium quality
+    float rayMaxDistance = 64.0f; // Default for medium quality
+    bool useHalfResolution = false; // Render at half res for better performance
     
     // Last update position (to avoid unnecessary updates)
     glm::ivec3 lastUpdateChunk = glm::ivec3(INT_MAX);

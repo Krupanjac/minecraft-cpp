@@ -79,6 +79,12 @@ private:
     std::unique_ptr<ShadowMap> shadowMap;
     std::unique_ptr<PostProcess> postProcess;
     std::unique_ptr<VoxelRayTracer> rayTracer;
+    
+    // Reflection copy texture for water SSR
+    GLuint reflectionCopyTexture = 0;
+    GLuint reflectionCopyDepth = 0;
+    int reflectionCopyWidth = 0;
+    int reflectionCopyHeight = 0;
 
     Frustum frustum;
     Frustum shadowFrustum;

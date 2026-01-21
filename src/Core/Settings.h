@@ -44,6 +44,100 @@ public:
     static constexpr int AA_TAA = 2;
     static constexpr const char* AA_METHOD_NAMES[] = { "None", "FXAA", "TAA" };
     
+    // Graphics presets
+    int graphicsPreset = 2; // Default to Medium
+    static constexpr int PRESET_LOW = 0;
+    static constexpr int PRESET_MEDIUM = 1;
+    static constexpr int PRESET_HIGH = 2;
+    static constexpr int PRESET_RT_LOW = 3;
+    static constexpr int PRESET_RT_MEDIUM = 4;
+    static constexpr int PRESET_RT_HIGH = 5;
+    static constexpr int PRESET_CUSTOM = 6;
+    static constexpr const char* PRESET_NAMES[] = { 
+        "Low", "Medium", "High", 
+        "RT Low", "RT Medium", "RT High",
+        "Custom"
+    };
+    static constexpr int NUM_PRESETS = 7;
+    
+    void applyPreset(int preset) {
+        graphicsPreset = preset;
+        switch (preset) {
+            case PRESET_LOW:
+                renderDistance = 6;
+                enableShadows = true;
+                shadowDistance = 80.0f;
+                shadowMethod = SHADOW_MAP;
+                enableSSAO = false;
+                enableVolumetrics = false;
+                aaMethod = AA_NONE;
+                enableRayTracing = false;
+                break;
+            case PRESET_MEDIUM:
+                renderDistance = 10;
+                enableShadows = true;
+                shadowDistance = 120.0f;
+                shadowMethod = SHADOW_MAP;
+                enableSSAO = true;
+                enableVolumetrics = false;
+                aaMethod = AA_FXAA;
+                enableRayTracing = false;
+                break;
+            case PRESET_HIGH:
+                renderDistance = 16;
+                enableShadows = true;
+                shadowDistance = 160.0f;
+                shadowMethod = SHADOW_MAP;
+                enableSSAO = true;
+                enableVolumetrics = true;
+                aaMethod = AA_TAA;
+                enableRayTracing = false;
+                break;
+            case PRESET_RT_LOW:
+                renderDistance = 8;
+                enableShadows = true;
+                shadowDistance = 100.0f;
+                shadowMethod = SHADOW_RAY_TRACED;
+                enableSSAO = false;
+                enableVolumetrics = false;
+                aaMethod = AA_FXAA;
+                enableRayTracing = true;
+                rayTracingQuality = RT_QUALITY_LOW;
+                rtShadows = true;
+                rtReflections = false;
+                break;
+            case PRESET_RT_MEDIUM:
+                renderDistance = 12;
+                enableShadows = true;
+                shadowDistance = 140.0f;
+                shadowMethod = SHADOW_RAY_TRACED;
+                enableSSAO = true;
+                enableVolumetrics = true;
+                aaMethod = AA_TAA;
+                enableRayTracing = true;
+                rayTracingQuality = RT_QUALITY_MEDIUM;
+                rtShadows = true;
+                rtReflections = true;
+                break;
+            case PRESET_RT_HIGH:
+                renderDistance = 16;
+                enableShadows = true;
+                shadowDistance = 180.0f;
+                shadowMethod = SHADOW_RAY_TRACED;
+                enableSSAO = true;
+                enableVolumetrics = true;
+                aaMethod = AA_TAA;
+                enableRayTracing = true;
+                rayTracingQuality = RT_QUALITY_HIGH;
+                rtShadows = true;
+                rtReflections = true;
+                break;
+            case PRESET_CUSTOM:
+                // Custom - don't change anything
+                break;
+        }
+    }
+    
     // Ray Tracing settings (OpenGL compute shader based)
     bool enableRayTracing = false; // Disabled by default (experimental)
     int rayTracingQuality = 1;     // 0 = Low, 1 = Medium, 2 = High
@@ -52,8 +146,7 @@ public:
     static constexpr int RT_QUALITY_HIGH = 2;
     static constexpr const char* RT_QUALITY_NAMES[] = { "Low", "Medium", "High" };
     bool rtShadows = true;         // Ray traced shadows
-    bool rtAO = true;              // Ray traced ambient occlusion
-    bool rtSkyVisibility = true;   // Ray traced sky visibility (for caves)
+    bool rtReflections = true;    // Ray traced water reflections
     
     int fullscreen = 0; // 0: Windowed, 1: Fullscreen, 2: Borderless
     // Debug visualization options
@@ -131,12 +224,12 @@ public:
                     else if (key == "enableShadows") enableShadows = (value == "1");
                     else if (key == "shadowDistance") shadowDistance = std::stof(value);
                     else if (key == "aaMethod") aaMethod = std::stoi(value);
+                    else if (key == "graphicsPreset") graphicsPreset = std::stoi(value);
                     else if (key == "enableRayTracing") enableRayTracing = (value == "1");
                     else if (key == "rayTracingQuality") rayTracingQuality = std::stoi(value);
                     else if (key == "shadowMethod") shadowMethod = std::stoi(value);
                     else if (key == "rtShadows") rtShadows = (value == "1");
-                    else if (key == "rtAO") rtAO = (value == "1");
-                    else if (key == "rtSkyVisibility") rtSkyVisibility = (value == "1");
+                    else if (key == "rtReflections") rtReflections = (value == "1");
                     else if (key == "debugShowTAA") debugShowTAA = (value == "1");
                     else if (key == "debugNoTexture") debugNoTexture = (value == "1");
                     else if (key == "debugWireframe") debugWireframe = (value == "1");
@@ -188,12 +281,12 @@ public:
         file << "enableShadows=" << (enableShadows ? "1" : "0") << "\n";
         file << "shadowDistance=" << shadowDistance << "\n";
         file << "aaMethod=" << aaMethod << "\n";
+        file << "graphicsPreset=" << graphicsPreset << "\n";
         file << "enableRayTracing=" << (enableRayTracing ? "1" : "0") << "\n";
         file << "rayTracingQuality=" << rayTracingQuality << "\n";
         file << "shadowMethod=" << shadowMethod << "\n";
         file << "rtShadows=" << (rtShadows ? "1" : "0") << "\n";
-        file << "rtAO=" << (rtAO ? "1" : "0") << "\n";
-        file << "rtSkyVisibility=" << (rtSkyVisibility ? "1" : "0") << "\n";
+        file << "rtReflections=" << (rtReflections ? "1" : "0") << "\n";
         file << "debugShowTAA=" << (debugShowTAA ? "1" : "0") << "\n";
         file << "debugNoTexture=" << (debugNoTexture ? "1" : "0") << "\n";
         file << "debugWireframe=" << (debugWireframe ? "1" : "0") << "\n";

@@ -321,7 +321,7 @@ void UIManager::setupVideoSettingsMenu() {
     float colGap = 40.0f;
     float rowHeight = 35.0f;
     float rowGap = 8.0f;
-    float startY = 80.0f;
+    float startY = 120.0f; // Moved down to accommodate preset selector
     float leftCol = width / 2.0f - colWidth - colGap / 2;
     float rightCol = width / 2.0f + colGap / 2;
     
@@ -334,6 +334,29 @@ void UIManager::setupVideoSettingsMenu() {
     title.text = "Video Settings";
     title.isLabel = true;
     elements.push_back(title);
+    
+    // === Graphics Preset Selector (prominent at top) ===
+    UIElement presetLabel;
+    presetLabel.x = width / 2.0f - 200;
+    presetLabel.y = 70;
+    presetLabel.w = 100;
+    presetLabel.h = 30;
+    presetLabel.text = "Preset:";
+    presetLabel.isLabel = true;
+    elements.push_back(presetLabel);
+    
+    UIElement preset;
+    preset.x = width / 2.0f - 90;
+    preset.y = 70;
+    preset.w = 280;
+    preset.h = 30;
+    preset.text = Settings::PRESET_NAMES[s.graphicsPreset];
+    preset.intValueRef = &s.graphicsPreset;
+    preset.onClick = [](){}; // intValueRef handles cycling, applyPreset called in handleClick
+    preset.minVal = 0.0f; 
+    preset.maxVal = float(Settings::NUM_PRESETS - 1);
+    preset.tooltip = "Quick graphics preset - Low/Medium/High or RT variants (click to cycle)";
+    elements.push_back(preset);
     
     // === LEFT COLUMN - Performance ===
     UIElement perfHeader;
@@ -491,24 +514,14 @@ void UIManager::setupVideoSettingsMenu() {
     elements.push_back(rts);
     y += rowHeight + rowGap;
     
-    // RT AO toggle
-    UIElement rtao;
-    rtao.x = leftCol; rtao.y = y; rtao.w = colWidth; rtao.h = rowHeight;
-    rtao.text = "RT AO: " + std::string(s.rtAO ? "ON" : "OFF");
-    rtao.boolValueRef = &s.rtAO;
-    rtao.onClick = [](){};
-    rtao.tooltip = "Ray traced ambient occlusion (requires RT enabled)";
-    elements.push_back(rtao);
-    y += rowHeight + rowGap;
-    
-    // RT Sky Visibility toggle
-    UIElement rtsv;
-    rtsv.x = leftCol; rtsv.y = y; rtsv.w = colWidth; rtsv.h = rowHeight;
-    rtsv.text = "RT Sky: " + std::string(s.rtSkyVisibility ? "ON" : "OFF");
-    rtsv.boolValueRef = &s.rtSkyVisibility;
-    rtsv.onClick = [](){};
-    rtsv.tooltip = "Ray traced sky visibility for caves (requires RT enabled)";
-    elements.push_back(rtsv);
+    // RT Reflections toggle
+    UIElement rtrefl;
+    rtrefl.x = leftCol; rtrefl.y = y; rtrefl.w = colWidth; rtrefl.h = rowHeight;
+    rtrefl.text = "RT Reflections: " + std::string(s.rtReflections ? "ON" : "OFF");
+    rtrefl.boolValueRef = &s.rtReflections;
+    rtrefl.onClick = [](){};
+    rtrefl.tooltip = "Screen-space water reflections (requires RT enabled)";
+    elements.push_back(rtrefl);
     
     // === RIGHT COLUMN - Visual ===
     y = startY;
@@ -1242,6 +1255,12 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             
                             if (el.text.find("Shadows:") != std::string::npos && el.text.find("RT") == std::string::npos) {
                                 el.text = "Shadows: " + std::string(Settings::SHADOW_METHOD_NAMES[*el.intValueRef]);
+                            }
+                            
+                            // Handle preset selector - apply the preset after cycling
+                            if (el.intValueRef == &Settings::instance().graphicsPreset) {
+                                Settings::instance().applyPreset(*el.intValueRef);
+                                el.text = Settings::PRESET_NAMES[*el.intValueRef];
                             }
                             
                             if (onSettingsChanged) onSettingsChanged();
