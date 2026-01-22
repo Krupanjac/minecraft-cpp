@@ -438,6 +438,12 @@ public:
             // Set initial volume from settings
             Audio::AudioManager::instance().setMasterVolume(Settings::instance().masterVolume);
             Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MUSIC, Settings::instance().musicVolume);
+            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::AMBIENT, Settings::instance().ambientVolume);
+            // soundVolume controls BLOCKS, MOBS, PLAYER, and UI categories
+            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::BLOCKS, Settings::instance().soundVolume);
+            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MOBS, Settings::instance().soundVolume);
+            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::PLAYER, Settings::instance().soundVolume);
+            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::UI, Settings::instance().soundVolume);
         }
         
         // Apply initial settings

@@ -1,6 +1,13 @@
-// miniaudio implementation - must be before including the header
+// Disable miniaudio's built-in Vorbis (we'll decode OGG files manually)
+#define MA_NO_VORBIS
+
+// miniaudio implementation
 #define MINIAUDIO_IMPLEMENTATION
 #include "../../external/miniaudio.h"
+
+// stb_vorbis for OGG decoding (header-only mode, implementation in stb_vorbis_impl.c)
+#define STB_VORBIS_HEADER_ONLY
+#include "stb_vorbis.c"
 
 #include "AudioManager.h"
 #include "../Core/Logger.h"
@@ -8,6 +15,7 @@
 #include "../World/Block.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 
 namespace Audio {
@@ -56,6 +64,8 @@ static std::vector<std::unique_ptr<PlayingSound>>* g_playingSounds = nullptr;
 static float g_masterVolume = 1.0f;
 static std::map<SoundCategory, float>* g_categoryVolumes = nullptr;
 static glm::vec3 g_listenerPos{0.0f};
+static glm::vec3 g_listenerForward{0.0f, 0.0f, -1.0f};
+static glm::vec3 g_listenerUp{0.0f, 1.0f, 0.0f};
 
 // Helper to get category volume
 static float getCategoryVolumeStatic(SoundCategory category) {
@@ -70,6 +80,26 @@ static float calculateAttenuationStatic(const glm::vec3& soundPos, float maxDist
     if (distance >= maxDistance) return 0.0f;
     if (distance <= 1.0f) return 1.0f;
     return 1.0f - (distance / maxDistance);
+}
+
+// Helper to calculate stereo pan based on listener orientation
+static void calculateStereoPanStatic(const glm::vec3& soundPos, float& outLeft, float& outRight) {
+    glm::vec3 toSound = soundPos - g_listenerPos;
+    if (glm::length2(toSound) <= 0.0001f) {
+        outLeft = 1.0f;
+        outRight = 1.0f;
+        return;
+    }
+
+    glm::vec3 forward = glm::normalize(g_listenerForward);
+    glm::vec3 up = glm::normalize(g_listenerUp);
+    glm::vec3 right = glm::normalize(glm::cross(forward, up));
+    glm::vec3 dir = glm::normalize(toSound);
+
+    float pan = std::clamp(glm::dot(dir, right), -1.0f, 1.0f);
+    // Equal-power panning
+    outLeft = std::sqrt(0.5f * (1.0f - pan));
+    outRight = std::sqrt(0.5f * (1.0f + pan));
 }
 
 // Audio callback for miniaudio - this runs on audio thread
@@ -88,15 +118,20 @@ void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     
     // Mix all playing sounds
     for (auto& sound : *g_playingSounds) {
-        if (!sound || sound->finished || !sound->data) continue;
+        if (!sound || sound->finished || !sound->data) {
+            continue;
+        }
         
         // Calculate effective volume
         float categoryVol = getCategoryVolumeStatic(sound->category);
         float effectiveVolume = g_masterVolume * categoryVol * sound->volume * sound->fadeVolume;
         
         // Apply 3D attenuation
+        float panLeft = 1.0f;
+        float panRight = 1.0f;
         if (sound->is3D) {
             effectiveVolume *= calculateAttenuationStatic(sound->position);
+            calculateStereoPanStatic(sound->position, panLeft, panRight);
         }
         
         if (effectiveVolume < 0.001f) continue;
@@ -131,8 +166,8 @@ void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
             }
             
             // Apply volume and mix
-            output[frame * 2] += leftSample * effectiveVolume;
-            output[frame * 2 + 1] += rightSample * effectiveVolume;
+            output[frame * 2] += leftSample * effectiveVolume * panLeft;
+            output[frame * 2 + 1] += rightSample * effectiveVolume * panRight;
             
             // Advance position (accounting for pitch would require resampling)
             sound->samplePosition++;
@@ -228,31 +263,59 @@ bool AudioManager::loadSound(SoundType type, const std::string& path) {
         return false;
     }
     
-    // Use miniaudio decoder
-    ma_decoder decoder;
-    ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 44100);
-    
-    if (ma_decoder_init_file(path.c_str(), &decoderConfig, &decoder) != MA_SUCCESS) {
-        LOG_WARNING("Failed to decode audio file: " + path);
-        return false;
-    }
-    
-    // Get total frame count
-    ma_uint64 totalFrames;
-    ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames);
-    
-    // Allocate buffer
     auto soundData = std::make_shared<SoundData>();
-    soundData->sampleRate = decoder.outputSampleRate;
-    soundData->channels = decoder.outputChannels;
-    soundData->samples.resize(totalFrames * decoder.outputChannels);
-    soundData->duration = (float)totalFrames / (float)decoder.outputSampleRate;
     
-    // Read all samples
-    ma_uint64 framesRead;
-    ma_decoder_read_pcm_frames(&decoder, soundData->samples.data(), totalFrames, &framesRead);
+    // Check if it's an OGG file - use stb_vorbis
+    bool isOgg = path.size() >= 4 && 
+                 (path.substr(path.size() - 4) == ".ogg" || path.substr(path.size() - 4) == ".OGG");
     
-    ma_decoder_uninit(&decoder);
+    if (isOgg) {
+        // Use stb_vorbis for OGG files
+        int channels, sampleRate;
+        short* output;
+        int samples = stb_vorbis_decode_filename(path.c_str(), &channels, &sampleRate, &output);
+        
+        if (samples <= 0) {
+            LOG_WARNING("Failed to decode OGG file: " + path);
+            return false;
+        }
+        
+        soundData->sampleRate = sampleRate;
+        soundData->channels = channels;
+        soundData->samples.resize(samples * channels);
+        soundData->duration = (float)samples / (float)sampleRate;
+        
+        // Convert from short to float
+        for (int i = 0; i < samples * channels; i++) {
+            soundData->samples[i] = output[i] / 32768.0f;
+        }
+        
+        free(output);
+    } else {
+        // Use miniaudio decoder for other formats (MP3, WAV, FLAC)
+        ma_decoder decoder;
+        ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, 2, 44100);
+        
+        if (ma_decoder_init_file(path.c_str(), &decoderConfig, &decoder) != MA_SUCCESS) {
+            LOG_WARNING("Failed to decode audio file: " + path);
+            return false;
+        }
+        
+        // Get total frame count
+        ma_uint64 totalFrames;
+        ma_decoder_get_length_in_pcm_frames(&decoder, &totalFrames);
+        
+        soundData->sampleRate = decoder.outputSampleRate;
+        soundData->channels = decoder.outputChannels;
+        soundData->samples.resize(totalFrames * decoder.outputChannels);
+        soundData->duration = (float)totalFrames / (float)decoder.outputSampleRate;
+    
+        // Read all samples
+        ma_uint64 framesRead;
+        ma_decoder_read_pcm_frames(&decoder, soundData->samples.data(), totalFrames, &framesRead);
+    
+        ma_decoder_uninit(&decoder);
+    }
     
     // Store the sound
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -528,6 +591,8 @@ void AudioManager::setListenerPosition(const glm::vec3& pos, const glm::vec3& fo
     m_listenerForward = forward;
     m_listenerUp = up;
     g_listenerPos = pos; // Update global for audio callback
+    g_listenerForward = forward;
+    g_listenerUp = up;
 }
 
 void AudioManager::setUnderwater(bool underwater) {

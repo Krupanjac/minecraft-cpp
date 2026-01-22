@@ -138,6 +138,7 @@ set(SOURCES
     src/Entity/EntityManager.cpp
     src/Model/Model.cpp
     src/Audio/AudioManager.cpp
+    src/Audio/stb_vorbis_impl.c
     ${GLAD_DIR}/src/glad.c
 )
 

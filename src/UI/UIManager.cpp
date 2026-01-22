@@ -1571,6 +1571,7 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::BLOCKS, *el.valueRef);
                             Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MOBS, *el.valueRef);
                             Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::PLAYER, *el.valueRef);
+                            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::UI, *el.valueRef);
                         }
                         else if (el.text.find("Ambient Volume") != std::string::npos) {
                             el.text = "Ambient Volume: " + std::to_string(static_cast<int>(*el.valueRef * 100)) + "%";
@@ -1582,6 +1583,9 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                     if (onSettingsChanged) onSettingsChanged();
                 } else if (!lastMousePressed) {
                     // Button clicks (Rising Edge)
+                    // Play UI click sound for all button interactions
+                    Audio::AudioManager::instance().playSound(Audio::SoundType::UI_CLICK, 0.5f);
+                    
                     if (el.isKeybind) {
                         waitingForKeyBind = true;
                         keyBindPtr = el.keyBindRef;
@@ -1632,8 +1636,6 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             
                             if (onSettingsChanged) onSettingsChanged();
                         } else {
-                            // Play UI click sound
-                            Audio::AudioManager::instance().playSound(Audio::SoundType::UI_CLICK, 0.5f);
                             pendingClick = el.onClick;
                             break; // Stop processing to avoid issues with vector modification
                         }
@@ -3150,6 +3152,7 @@ void UIManager::setupAudioSettingsMenu() {
         Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::BLOCKS, settings.soundVolume);
         Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MOBS, settings.soundVolume);
         Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::PLAYER, settings.soundVolume);
+        Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::UI, settings.soundVolume);
         Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::AMBIENT, settings.ambientVolume);
         Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::WEATHER, settings.ambientVolume);
         setMenuState(MenuState::SETTINGS); 
