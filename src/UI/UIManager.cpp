@@ -200,6 +200,47 @@ void UIManager::initialize(int windowWidth, int windowHeight) {
         glBindTexture(GL_TEXTURE_2D, 0);
         stbi_image_free(data);
     }
+    
+    // Load model preview shader (reuse existing model shaders)
+    if (!modelPreviewShader.loadFromFiles("shaders/model.vert", "shaders/model.frag")) {
+        std::cerr << "Failed to load model preview shader" << std::endl;
+    }
+    
+    // Create preview FBO for model rendering
+    glGenFramebuffers(1, &previewFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, previewFBO);
+    
+    // Create color texture (color output)
+    glGenTextures(1, &previewTexture);
+    glBindTexture(GL_TEXTURE_2D, previewTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, previewWidth, previewHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, previewTexture, 0);
+    
+    // Create velocity texture (shader outputs to location 1)
+    GLuint velocityTexture;
+    glGenTextures(1, &velocityTexture);
+    glBindTexture(GL_TEXTURE_2D, velocityTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, previewWidth, previewHeight, 0, GL_RG, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, velocityTexture, 0);
+    
+    // Set draw buffers for both attachments
+    GLenum drawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, drawBuffers);
+    
+    // Create depth renderbuffer
+    glGenRenderbuffers(1, &previewDepth);
+    glBindRenderbuffer(GL_RENDERBUFFER, previewDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, previewWidth, previewHeight);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, previewDepth);
+    
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "Preview FBO not complete! Status: " << glCheckFramebufferStatus(GL_FRAMEBUFFER) << std::endl;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Setup quad VAO (no texture coords)
     float vertices[] = { 
@@ -247,6 +288,9 @@ void UIManager::initialize(int windowWidth, int windowHeight) {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glBindVertexArray(0);
+
+    // Pre-load the preview model for player settings
+    loadPreviewModel(Settings::instance().playerModelIndex);
 
     setupMainMenu();
 }
@@ -1383,6 +1427,13 @@ glm::vec4 UIManager::getBlockColor(BlockType type) {
 }
 
 void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mousePressed, bool rightMousePressed) {
+    // Update preview model animation and rotation when in player settings
+    if (currentMenuState == MenuState::PLAYER_SETTINGS && previewModel) {
+        previewModel->updateAnimation(deltaTime);
+        previewRotation += deltaTime * 30.0f; // Rotate 30 degrees per second
+        if (previewRotation > 360.0f) previewRotation -= 360.0f;
+    }
+    
     if (!isMenuOpen()) {
         lastMousePressed = mousePressed;
         currentTooltip.clear();
@@ -1675,6 +1726,82 @@ void UIManager::render() {
                     // Draw border
                     drawRect(markerX - 1, markerY - 1, markerSize + 2, 2, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)); // Top
                     drawRect(markerX - 1, markerY + markerSize - 1, markerSize + 2, 2, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)); // Bottom
+                }
+            }
+            
+            // Render 3D model preview for Player Settings
+            if (currentMenuState == MenuState::PLAYER_SETTINGS) {
+                // Load model if needed
+                auto& s = Settings::instance();
+                if (previewModelIndex != s.playerModelIndex || !previewModel) {
+                    loadPreviewModel(s.playerModelIndex);
+                }
+                
+                // Draw the preview texture in the preview card area
+                float previewX = width - 245.0f;
+                float previewY = 200.0f;
+                float previewW = 190.0f;
+                float previewH = 190.0f;
+                
+                if (previewModel && previewTexture != 0) {
+                    // Render model to preview texture
+                    uiShader.unuse();
+                    renderModelPreview();
+                    
+                    // Draw the FBO texture using textured shader
+                    texturedShader.use();
+                    glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
+                    texturedShader.setMat4("uProjection", projection);
+                    
+                    glm::mat4 model = glm::mat4(1.0f);
+                    model = glm::translate(model, glm::vec3(previewX, previewY, 0.0f));
+                    model = glm::scale(model, glm::vec3(previewW, previewH, 1.0f));
+                    texturedShader.setMat4("uModel", model);
+                    
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, previewTexture);
+                    texturedShader.setInt("uTexture", 0);
+                    
+                    // Use flipped texture coordinates for FBO (OpenGL renders upside down)
+                    float flippedVertices[] = {
+                        // pos        // tex (flipped Y)
+                        0.0f, 1.0f,   0.0f, 1.0f,
+                        1.0f, 0.0f,   1.0f, 0.0f,
+                        0.0f, 0.0f,   0.0f, 0.0f,
+                        
+                        0.0f, 1.0f,   0.0f, 1.0f,
+                        1.0f, 1.0f,   1.0f, 1.0f,
+                        1.0f, 0.0f,   1.0f, 0.0f
+                    };
+                    
+                    glBindVertexArray(texturedVao);
+                    glBindBuffer(GL_ARRAY_BUFFER, texturedVbo);
+                    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(flippedVertices), flippedVertices);
+                    glDrawArrays(GL_TRIANGLES, 0, 6);
+                    glBindVertexArray(0);
+                    
+                    // Restore original texture coords
+                    float originalVertices[] = {
+                        0.0f, 1.0f,   0.0f, 0.0f,
+                        1.0f, 0.0f,   1.0f, 1.0f,
+                        0.0f, 0.0f,   0.0f, 1.0f,
+                        0.0f, 1.0f,   0.0f, 0.0f,
+                        1.0f, 1.0f,   1.0f, 0.0f,
+                        1.0f, 0.0f,   1.0f, 1.0f
+                    };
+                    glBindBuffer(GL_ARRAY_BUFFER, texturedVbo);
+                    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(originalVertices), originalVertices);
+                    
+                    // Switch back to UI shader
+                    uiShader.use();
+                    uiShader.setMat4("uProjection", projection);
+                } else {
+                    // Fallback: draw a placeholder if model not loaded
+                    drawRect(previewX, previewY, previewW, previewH, glm::vec4(0.3f, 0.3f, 0.35f, 1.0f));
+                    float textScale = 1.5f;
+                    std::string loadingText = "Loading...";
+                    float textW = loadingText.length() * 6.0f * textScale;
+                    drawText(previewX + (previewW - textW) / 2.0f, previewY + previewH / 2.0f, textScale, loadingText, glm::vec4(0.7f, 0.7f, 0.7f, 1.0f));
                 }
             }
 
@@ -2905,16 +3032,8 @@ void UIManager::setupPlayerSettingsMenu() {
     modelPreviewName.customColor = glm::vec4(0.4f, 0.9f, 0.4f, 1.0f);
     elements.push_back(modelPreviewName);
     
-    // Character visual placeholder text
-    UIElement previewPlaceholder;
-    previewPlaceholder.x = width - 220.0f;
-    previewPlaceholder.y = 280.0f;
-    previewPlaceholder.w = 150.0f;
-    previewPlaceholder.h = 20.0f;
-    previewPlaceholder.text = "[3D Preview]";
-    previewPlaceholder.isLabel = true;
-    previewPlaceholder.customColor = glm::vec4(0.5f, 0.5f, 0.5f, 0.6f);
-    elements.push_back(previewPlaceholder);
+    // Load preview model on menu setup
+    loadPreviewModel(s.playerModelIndex);
     
     // Nickname input
     UIElement nicknameLabel;
@@ -3089,4 +3208,104 @@ void UIManager::renderChat() {
     uiShader.unuse();
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
+}
+void UIManager::loadPreviewModel(int modelIndex) {
+    if (modelIndex < 0 || modelIndex >= Settings::NUM_PLAYER_MODELS) return;
+    if (previewModelIndex == modelIndex && previewModel) return; // Already loaded
+    
+    previewModelIndex = modelIndex;
+    previewRotation = 0.0f;
+    
+    try {
+        std::string path = Settings::PLAYER_MODEL_PATHS[modelIndex];
+        std::cout << "Loading preview model: " << path << std::endl;
+        previewModel = std::make_shared<ModelSystem::Model>(path);
+        std::cout << "Preview model loaded successfully" << std::endl;
+        
+        // Try to play idle animation
+        auto animations = previewModel->getAnimationNames();
+        std::cout << "Available animations: " << animations.size() << std::endl;
+        for (const auto& anim : animations) {
+            std::cout << "  - " << anim << std::endl;
+            // Look for idle animation (case insensitive check)
+            std::string lowerAnim = anim;
+            for (auto& c : lowerAnim) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (lowerAnim.find("idle") != std::string::npos) {
+                previewModel->playAnimation(anim, true);
+                std::cout << "Playing animation: " << anim << std::endl;
+                break;
+            }
+        }
+        // If no idle found, play first animation if available
+        if (previewModel->getCurrentAnimation().empty() && !animations.empty()) {
+            previewModel->playAnimation(animations[0], true);
+            std::cout << "Playing first animation: " << animations[0] << std::endl;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to load preview model: " << e.what() << std::endl;
+        previewModel = nullptr;
+    }
+}
+
+void UIManager::renderModelPreview() {
+    if (!previewModel) return;
+    if (previewFBO == 0 || previewTexture == 0) return;
+    
+    // Save current viewport
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    
+    // Bind preview FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, previewFBO);
+    
+    // Set draw buffers
+    GLenum drawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, drawBuffers);
+    
+    glViewport(0, 0, previewWidth, previewHeight);
+    
+    // Clear with semi-transparent dark background
+    glClearColor(0.1f, 0.1f, 0.15f, 0.9f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    
+    // Setup camera matrices for preview
+    float aspectRatio = (float)previewWidth / (float)previewHeight;
+    glm::mat4 projection = glm::perspective(glm::radians(30.0f), aspectRatio, 0.1f, 100.0f);
+    
+    // Camera position - looking at model from front
+    glm::vec3 cameraPos = glm::vec3(0.0f, 1.0f, 3.5f);
+    glm::vec3 target = glm::vec3(0.0f, 0.8f, 0.0f);
+    glm::mat4 view = glm::lookAt(cameraPos, target, glm::vec3(0.0f, 1.0f, 0.0f));
+    
+    // Model transform with rotation
+    glm::mat4 modelMatrix = glm::mat4(1.0f);
+    modelMatrix = glm::rotate(modelMatrix, glm::radians(previewRotation), glm::vec3(0.0f, 1.0f, 0.0f));
+    modelMatrix = glm::scale(modelMatrix, glm::vec3(1.0f));
+    
+    // Setup shader
+    modelPreviewShader.use();
+    modelPreviewShader.setMat4("uProjection", projection);
+    modelPreviewShader.setMat4("uView", view);
+    modelPreviewShader.setMat4("uPrevView", view);
+    modelPreviewShader.setMat4("uPrevProjection", projection);
+    
+    // Simple lighting from above-front
+    glm::vec3 lightDir = glm::normalize(glm::vec3(0.3f, 1.0f, 0.5f));
+    modelPreviewShader.setVec3("uLightDir", lightDir);
+    modelPreviewShader.setVec3("uCameraPos", cameraPos);
+    modelPreviewShader.setVec4("uBaseColor", glm::vec4(1.0f));
+    modelPreviewShader.setInt("uDebugNoTexture", 0);
+    modelPreviewShader.setInt("uDebugShowNormals", 0);
+    
+    // Draw the model
+    previewModel->draw(modelPreviewShader, modelMatrix, modelMatrix);
+    
+    modelPreviewShader.unuse();
+    
+    // Unbind FBO and restore viewport
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 }

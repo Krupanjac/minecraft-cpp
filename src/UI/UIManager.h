@@ -3,6 +3,7 @@
 #include "../Render/Shader.h"
 #include "../Core/Settings.h"
 #include "../World/Block.h"
+#include "../Model/Model.h"
 #include <vector>
 #include <string>
 #include <functional>
@@ -162,15 +163,28 @@ private:
     
     void renderHUD();
     void renderChat();
+    void renderModelPreview();  // Render 3D character model preview
+    void loadPreviewModel(int modelIndex);  // Load preview model by index
 
     int width, height;
     Shader uiShader;
     Shader texturedShader;  // For rendering world preview thumbnails
     Shader blockIconShader; // For rendering 3D isometric block icons
+    Shader modelPreviewShader; // For rendering 3D character models in UI
     GLuint vao, vbo;
     GLuint texturedVao, texturedVbo;  // VAO/VBO with texture coords
     GLuint blockIconVao, blockIconVbo; // VAO/VBO for isometric block cube
     GLuint blockAtlasTexture = 0;      // Block texture atlas
+    
+    // Model preview state
+    std::shared_ptr<ModelSystem::Model> previewModel;
+    int previewModelIndex = -1;
+    float previewRotation = 0.0f;
+    GLuint previewFBO = 0;  // Framebuffer for model preview
+    GLuint previewTexture = 0;  // Texture for preview render
+    GLuint previewDepth = 0;  // Depth buffer for preview
+    int previewWidth = 200;
+    int previewHeight = 250;
     
     std::vector<UIElement> elements;
     std::function<void()> onSettingsChanged;
