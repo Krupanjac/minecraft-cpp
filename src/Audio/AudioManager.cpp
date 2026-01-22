@@ -85,7 +85,7 @@ static float calculateAttenuationStatic(const glm::vec3& soundPos, float maxDist
 // Helper to calculate stereo pan based on listener orientation
 static void calculateStereoPanStatic(const glm::vec3& soundPos, float& outLeft, float& outRight) {
     glm::vec3 toSound = soundPos - g_listenerPos;
-    if (glm::length2(toSound) <= 0.0001f) {
+    if (glm::dot(toSound, toSound) <= 0.0001f) {
         outLeft = 1.0f;
         outRight = 1.0f;
         return;
