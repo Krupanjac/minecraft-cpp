@@ -347,6 +347,9 @@ void AudioManager::loadAllSounds() {
     // Ambient - Underwater
     loadSoundVariants(SoundType::UNDERWATER_ENTER, base + "ambient/underwater/enter", 3);
     loadSoundVariants(SoundType::UNDERWATER_EXIT, base + "ambient/underwater/exit", 3);
+    // Water ambient (cave water feel)
+    loadSound(SoundType::WATER_AMBIENT, base + "liquid/water.ogg");
+    loadSound(SoundType::WATER_AMBIENT, base + "liquid/water2.ogg");
     
     // Weather
     loadSoundVariants(SoundType::RAIN, base + "ambient/weather/rain", 4);
@@ -367,6 +370,9 @@ void AudioManager::loadAllSounds() {
     loadSoundVariants(SoundType::PLAYER_EAT, base + "random/eat", 3);
     loadSound(SoundType::PLAYER_DRINK, base + "random/drink.ogg");
     loadSound(SoundType::PLAYER_BURP, base + "random/burp.ogg");
+    loadSoundVariants(SoundType::WATER_SWIM, base + "liquid/swim", 4);
+    loadSound(SoundType::WATER_SPLASH, base + "liquid/splash.ogg");
+    loadSound(SoundType::WATER_SPLASH, base + "liquid/splash2.ogg");
     
     // Block dig/break
     loadSoundVariants(SoundType::DIG_GRASS, base + "dig/grass", 4);
@@ -629,13 +635,11 @@ void AudioManager::setThundering(bool thundering) {
 void AudioManager::update(float deltaTime) {
     if (!m_initialized || m_paused) return;
     
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
-    // Update ambient sounds
+    // Update ambient and music outside lock (playSound acquires the mutex)
     updateAmbient(deltaTime);
-    
-    // Update music
     updateMusic(deltaTime);
+
+    std::lock_guard<std::mutex> lock(m_mutex);
     
     // Process each playing sound - handle fading
     for (auto& sound : m_playingSounds) {
@@ -680,6 +684,20 @@ void AudioManager::updateAmbient(float deltaTime) {
             m_ambientTimer = m_nextAmbientTime;
         }
     }
+
+    // Water cave ambient (only when underwater in caves)
+    if (m_inCave && m_underwater) {
+        m_waterAmbientTimer -= deltaTime;
+        if (m_waterAmbientTimer <= 0.0f) {
+            playSound(SoundType::WATER_AMBIENT, 0.4f);
+            std::uniform_real_distribution<float> dist(8.0f, 20.0f);
+            m_nextWaterAmbientTime = dist(m_rng);
+            m_waterAmbientTimer = m_nextWaterAmbientTime;
+        }
+    } else {
+        // Reset timer when not in water caves
+        m_waterAmbientTimer = 0.0f;
+    }
     
     // Random thunder during storms
     if (m_thundering) {
@@ -722,6 +740,7 @@ SoundCategory AudioManager::getCategoryForType(SoundType type) {
         case SoundType::CAVE_AMBIENT:
         case SoundType::UNDERWATER_ENTER:
         case SoundType::UNDERWATER_EXIT:
+        case SoundType::WATER_AMBIENT:
             return SoundCategory::AMBIENT;
             
         case SoundType::RAIN:

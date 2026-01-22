@@ -3,6 +3,7 @@
 #include "../Core/Logger.h"
 #include "../Core/Settings.h"
 #include "../Render/Camera.h"
+#include <algorithm>
 
 PlayerEntity::PlayerEntity(const glm::vec3& startPos) : Entity(startPos) {
     loadModelFromSettings();
@@ -102,10 +103,14 @@ void PlayerEntity::update(float deltaTime) {
                 currentAnim.find("run") == std::string::npos) {
                 model->playAnimation(walkAnim, true);
             }
+            float walkSpeedRef = 5.0f;
+            float animSpeed = std::clamp(speed / walkSpeedRef, 0.75f, 1.4f);
+            model->setAnimationSpeed(animSpeed);
         } else {
             if (currentAnim.find("idle") == std::string::npos) {
                 model->playAnimation(idleAnim, true);
             }
+            model->setAnimationSpeed(1.0f);
         }
     }
 }
@@ -168,17 +173,26 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
             if (currentAnim.find("run") == std::string::npos) {
                 model->playAnimation(runAnim, true);
             }
+            // Match animation speed to sprint velocity
+            float runSpeedRef = 7.0f;
+            float animSpeed = std::clamp(speed / runSpeedRef, 0.85f, 1.6f);
+            model->setAnimationSpeed(animSpeed);
         } else if (speed > 0.1f) {
             // Walking
             if (currentAnim.find("walk") == std::string::npos && currentAnim.find("run") == std::string::npos) {
                 model->playAnimation(walkAnim, true);
             }
+            // Match animation speed to walk velocity
+            float walkSpeedRef = 5.0f;
+            float animSpeed = std::clamp(speed / walkSpeedRef, 0.75f, 1.4f);
+            model->setAnimationSpeed(animSpeed);
         } else {
             // Idle
             if (currentAnim.find("idle") == std::string::npos || 
                 currentAnim.find("jump") != std::string::npos) {
                 model->playAnimation(idleAnim, true);
             }
+            model->setAnimationSpeed(1.0f);
         }
     }
     

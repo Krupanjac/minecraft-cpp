@@ -1738,6 +1738,15 @@ void UIManager::render() {
                 float subW = subtitle.length() * 6.0f * subScale;
                 float subX = (width - subW) / 2.0f;
                 drawText(subX, titleY + titleScale * 12.0f, subScale, subtitle, glm::vec4(0.7f, 0.7f, 0.7f, 1.0f));
+
+                // Main menu tip (persists for session)
+                if (!mainMenuTip.empty()) {
+                    float tipScale = 1.6f;
+                    float tipW = mainMenuTip.length() * 6.0f * tipScale;
+                    float tipX = (width - tipW) / 2.0f;
+                    float tipY = titleY + titleScale * 16.5f;
+                    drawText(tipX, tipY, tipScale, mainMenuTip, glm::vec4(0.85f, 0.85f, 0.85f, 1.0f));
+                }
             }
             
             // Special handling for MAP - render the map using colored rectangles
@@ -3459,4 +3468,26 @@ void UIManager::renderModelPreview() {
     // Unbind FBO and restore viewport
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+}
+
+void UIManager::renderLoadingTip(const std::string& text) {
+    if (text.empty()) return;
+
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    uiShader.use();
+    glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
+    uiShader.setMat4("uProjection", projection);
+
+    float scale = 1.6f;
+    float textW = text.length() * 6.0f * scale;
+    float x = (width - textW) / 2.0f;
+    float y = height * 0.75f;
+    drawText(x, y, scale, text, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f));
+
+    uiShader.unuse();
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
 }

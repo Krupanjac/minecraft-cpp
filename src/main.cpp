@@ -32,6 +32,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <unordered_map>
+#include <random>
 
 class Application {
 public:
@@ -39,7 +40,9 @@ public:
         : camera(glm::vec3(0.0f, 80.0f, 0.0f)),
           threadPool(HardwareInfo::getOptimalThreadCount()),
           lastX(0.0), lastY(0.0), lastSpaceTime(0.0), firstMouse(true),
-          running(true) {
+                    running(true) {
+                std::random_device rd;
+                rng.seed(rd());
     }
     
     ~Application() = default;
@@ -191,6 +194,9 @@ public:
         int fbW, fbH;
         glfwGetFramebufferSize(window->getNative(), &fbW, &fbH);
         uiManager.initialize(fbW, fbH);
+        // Pick a main menu tip for this session
+        mainMenuTip = pickRandomTip();
+        uiManager.setMainMenuTip(mainMenuTip);
         
         // Setup UI Callbacks
         uiManager.setOnNewGame([this](std::string name, long seed) {
@@ -591,6 +597,8 @@ public:
                     if (generatedChunks % 20 == 0) {
                         float progress = static_cast<float>(generatedChunks) / static_cast<float>(totalChunks) * 0.6f;
                         renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
+                        updateLoadingTip();
+                        uiManager.renderLoadingTip(currentLoadingTip);
                         window->swapBuffers();
                         window->pollEvents();
                     }
@@ -621,6 +629,8 @@ public:
             if (meshedCount % 10 == 0) {
                 float progress = 0.6f + (static_cast<float>(meshedCount) / static_cast<float>(totalMeshes)) * 0.4f;
                 renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
+                updateLoadingTip();
+                uiManager.renderLoadingTip(currentLoadingTip);
                 window->swapBuffers();
                 window->pollEvents();
             }
@@ -628,6 +638,8 @@ public:
         
         // Show final 100% loading screen before transitioning
         renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), 1.0f);
+        updateLoadingTip();
+        uiManager.renderLoadingTip(currentLoadingTip);
         window->swapBuffers();
         window->pollEvents();
         
@@ -761,6 +773,8 @@ public:
                     if (generated % 5 == 0) {
                         float progress = static_cast<float>(generated) / static_cast<float>(totalChunks) * 0.5f;
                         renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
+                        updateLoadingTip();
+                        uiManager.renderLoadingTip(currentLoadingTip);
                         window->swapBuffers();
                         window->pollEvents();
                     }
@@ -798,6 +812,8 @@ public:
                 if (progress > 1.0f) progress = 1.0f;
                 
                 renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
+                updateLoadingTip();
+                uiManager.renderLoadingTip(currentLoadingTip);
                 window->swapBuffers();
                 window->pollEvents();
             }
@@ -845,6 +861,8 @@ public:
             // Preload models during loading screen to avoid runtime stutters
             LOG_INFO("Preloading mob models...");
             renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), 0.95f);
+            updateLoadingTip();
+            uiManager.renderLoadingTip(currentLoadingTip);
             window->swapBuffers();
             window->pollEvents();
             entityManager.preloadModels();
@@ -944,7 +962,7 @@ public:
             }
             
             // Handle footstep sounds
-            if (camera.onGround && !camera.isFlying && uiManager.isWorldLoaded()) {
+            if (camera.onGround && !camera.isFlying && uiManager.isWorldLoaded() && !isUnderwater) {
                 float horizontalSpeed = glm::length(glm::vec2(camera.velocity.x, camera.velocity.z));
                 if (horizontalSpeed > 0.5f) {
                     footstepTimer -= deltaTime;
@@ -966,6 +984,26 @@ public:
                     }
                 } else {
                     footstepTimer = 0.0f; // Reset timer when not moving
+                }
+            }
+
+            // Handle swim sounds
+            if (uiManager.isWorldLoaded()) {
+                if (isUnderwater && !wasUnderwater) {
+                    Audio::AudioManager::instance().playSound(Audio::SoundType::WATER_SPLASH, 0.6f);
+                    swimTimer = 0.0f;
+                }
+
+                float swimSpeed = glm::length(glm::vec2(camera.velocity.x, camera.velocity.z));
+                if (isUnderwater && swimSpeed > 0.2f) {
+                    swimTimer -= deltaTime;
+                    if (swimTimer <= 0.0f) {
+                        Audio::AudioManager::instance().playSound(Audio::SoundType::WATER_SWIM, 0.5f);
+                        swimInterval = camera.isSprinting ? 0.45f : 0.7f;
+                        swimTimer = swimInterval;
+                    }
+                } else if (!isUnderwater) {
+                    swimTimer = 0.0f;
                 }
             }
             
@@ -1089,12 +1127,90 @@ private:
     // Audio - footstep timer
     float footstepTimer = 0.0f;
     float footstepInterval = 0.4f; // Time between footstep sounds
+    float swimTimer = 0.0f;
+    float swimInterval = 0.6f;
+    bool isUnderwater = false;
+    bool wasUnderwater = false;
+
+    // Loading tips
+    std::vector<std::string> loadingTips = {
+        "Loading… blaming the compiler just in case.",
+        "If this freezes, it’s probably intentional.",
+        "Optimized enough to still be slow.",
+        "Compiling pixels by hand.",
+        "Please wait while we overthink everything.",
+        "Loading… allocating responsibly.",
+        "No frameworks were harmed in the making of this game.",
+        "This would be faster in C. Oh wait.",
+        "Turning coffee into code.",
+        "Debug mode is a lifestyle choice.",
+        "Loading… counting CPU cycles.",
+        "This game knows what the cache is.",
+        "Multithreading: what could go wrong?",
+        "Yes, this was written from scratch.",
+        "Loading… avoiding unnecessary abstractions.",
+        "If it crashes, it’s a feature.",
+        "Optimized until readability cried.",
+        "Trust the math. Fear the bugs.",
+        "This engine dislikes magic.",
+        "Heap allocations are being judged.",
+        "Loading… probably rebuilding something that worked.",
+        "Because premature optimization is still optimization.",
+        "This loader is faster than the menu.",
+        "One more micro-optimization, surely.",
+        "Running on pure determination and undefined behavior.",
+        "Please wait while we reinvent the wheel.",
+        "Garbage collection? Never heard of her.",
+        "This game respects your CPU. Mostly.",
+        "Loading… manually.",
+        "Somewhere, a profiler is smiling.",
+        "Debugging is just reverse engineering your own code.",
+        "Loading… praying to the memory gods.",
+        "Built with care and mild frustration.",
+        "This engine was tested on real hardware. Regret followed.",
+        "No engines inside the engine.",
+        "Loading… it worked yesterday.",
+        "Undefined behavior detected. Ignoring.",
+        "This project hates unnecessary work. Unlike this loader.",
+        "Every abstraction here pays rent.",
+        "Loading… because computers are complicated.",
+        "Powered by caffeine and stubbornness.",
+        "The dev chose control over sanity.",
+        "Yes, this could be simpler. No, it won’t be.",
+        "Loading… still faster than Java.",
+        "Math is correct. Results may vary.",
+        "This game was optimized before it was fun.",
+        "Trust the process. Question everything else.",
+        "Loading… building character.",
+        "Engine started as a \"small experiment\".",
+        "Almost ready. Probably."
+    };
+    std::string currentLoadingTip;
+    std::string mainMenuTip;
+    double nextLoadingTipSwitchTime = 0.0;
+
+    std::mt19937 rng;
     
     // Menu world cache - O(1) lookup for chunks within session
     long menuWorldSeed = 0; // Set once at startup, reused for entire session
     bool menuSeedInitialized = false;
     std::unordered_map<ChunkPos, std::array<Block, CHUNK_VOLUME>> menuChunkCache;
     bool menuCacheValid = false; // True if cache contains valid data for current seed
+
+    std::string pickRandomTip() {
+        if (loadingTips.empty()) return std::string();
+        std::uniform_int_distribution<size_t> dist(0, loadingTips.size() - 1);
+        return loadingTips[dist(rng)];
+    }
+
+    void updateLoadingTip() {
+        double now = glfwGetTime();
+        if (currentLoadingTip.empty() || now >= nextLoadingTipSwitchTime) {
+            currentLoadingTip = pickRandomTip();
+            std::uniform_real_distribution<double> dist(2.5, 4.5);
+            nextLoadingTipSwitchTime = now + dist(rng);
+        }
+    }
     
     void applySettings() {
         auto& s = Settings::instance();
@@ -1281,6 +1397,30 @@ private:
     void update(float deltaTime) {
         // Always update network (even in menu for connection handling)
         networkManager.update(deltaTime);
+
+        // Update ambient audio state based on player position
+        if (uiManager.isWorldLoaded()) {
+            glm::vec3 headPos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
+            int hx = static_cast<int>(std::floor(headPos.x));
+            int hy = static_cast<int>(std::floor(headPos.y));
+            int hz = static_cast<int>(std::floor(headPos.z));
+
+            Block headBlock = chunkManager.getBlockAt(hx, hy, hz);
+            bool underwater = headBlock.getType() == BlockType::WATER;
+            wasUnderwater = isUnderwater;
+            isUnderwater = underwater;
+
+            Block ceilingBlock = chunkManager.getBlockAt(hx, hy + 2, hz);
+            bool inCave = ceilingBlock.getType() != BlockType::AIR && ceilingBlock.getType() != BlockType::WATER;
+
+            Audio::AudioManager::instance().setUnderwater(underwater);
+            Audio::AudioManager::instance().setInCave(inCave);
+        } else {
+            wasUnderwater = isUnderwater;
+            isUnderwater = false;
+            Audio::AudioManager::instance().setUnderwater(false);
+            Audio::AudioManager::instance().setInCave(false);
+        }
         
         // Update audio system with listener position
         Audio::AudioManager::instance().setListenerPosition(

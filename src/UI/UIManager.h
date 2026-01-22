@@ -84,6 +84,7 @@ public:
     void handleResize(int width, int height);
     void handleCharInput(unsigned int codepoint); // For text input
     void handleKeyInput(int key); // For special keys like Backspace
+    void renderLoadingTip(const std::string& text);
 
     void setMenuState(MenuState state);
     MenuState getMenuState() const { return currentMenuState; }
@@ -104,6 +105,7 @@ public:
     void setOnDisconnect(std::function<void()> callback) { onDisconnectGame = callback; }
     void setNetworkStatus(const std::string& status) { networkStatus = status; }
     void setIsOnline(bool online) { isOnline = online; }
+    void setMainMenuTip(const std::string& tip) { mainMenuTip = tip; }
     
     // Chat
     void setOnSendChat(std::function<void(const std::string&)> callback) { onSendChat = callback; }
@@ -222,6 +224,7 @@ private:
     bool worldLoaded = false;
     bool lastMousePressed = false;
     bool lastRightMousePressed = false;
+    std::string mainMenuTip;
     
     void setupMainMenu();
     void setupInGameMenu();

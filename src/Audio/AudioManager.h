@@ -30,6 +30,7 @@ enum class SoundType {
     CAVE_AMBIENT,
     UNDERWATER_ENTER,
     UNDERWATER_EXIT,
+    WATER_AMBIENT,
     
     // Weather
     RAIN,
@@ -206,6 +207,8 @@ private:
     bool m_thundering = false;
     float m_ambientTimer = 0.0f;
     float m_nextAmbientTime = 30.0f;
+    float m_waterAmbientTimer = 0.0f;
+    float m_nextWaterAmbientTime = 12.0f;
     uint32_t m_rainSound = 0;
     
     // Random
