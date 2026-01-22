@@ -117,9 +117,11 @@ void main() {
     // vTexCoord contains (0..w, 0..h)
     // vCellOrigin contains the atlas UV of the top-left of the texture
     float cellSize = 1.0 / 16.0;
+    vec2 texel = 1.0 / vec2(textureSize(uTexture, 0));
     
-    // Use textureLod to avoid artifacts at tile boundaries due to discontinuous derivatives from fract()
-    vec2 uv = vCellOrigin + fract(vTexCoord) * cellSize;
+    // Inset UVs by 1 texel to prevent atlas bleeding (gaps between block faces)
+    vec2 localUV = fract(vTexCoord);
+    vec2 uv = vCellOrigin + localUV * (vec2(cellSize) - 2.0 * texel) + texel;
     
     vec4 texColor = textureLod(uTexture, uv, 0.0);
     
