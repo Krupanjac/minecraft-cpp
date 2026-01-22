@@ -54,6 +54,8 @@ public:
 
     void renderCrosshair(int windowWidth, int windowHeight);
     void renderLoadingScreen(int windowWidth, int windowHeight, float progress);
+    
+    void setShowCrosshair(bool show) { showCrosshair = show; }
 
     // Access PostProcess for debug/metrics
     PostProcess* getPostProcess() { return postProcess.get(); }
@@ -69,6 +71,7 @@ private:
     Shader modelShader; // New shader for entities
     
     std::unique_ptr<Mesh> crosshairMesh;
+    bool showCrosshair = true;
     std::unique_ptr<Mesh> sunMesh;
     std::unique_ptr<Mesh> starMesh;
     std::unique_ptr<Mesh> cloudMesh;

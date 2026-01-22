@@ -1728,82 +1728,6 @@ void UIManager::render() {
                     drawRect(markerX - 1, markerY + markerSize - 1, markerSize + 2, 2, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)); // Bottom
                 }
             }
-            
-            // Render 3D model preview for Player Settings
-            if (currentMenuState == MenuState::PLAYER_SETTINGS) {
-                // Load model if needed
-                auto& s = Settings::instance();
-                if (previewModelIndex != s.playerModelIndex || !previewModel) {
-                    loadPreviewModel(s.playerModelIndex);
-                }
-                
-                // Draw the preview texture in the preview card area
-                float previewX = width - 245.0f;
-                float previewY = 200.0f;
-                float previewW = 190.0f;
-                float previewH = 190.0f;
-                
-                if (previewModel && previewTexture != 0) {
-                    // Render model to preview texture
-                    uiShader.unuse();
-                    renderModelPreview();
-                    
-                    // Draw the FBO texture using textured shader
-                    texturedShader.use();
-                    glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
-                    texturedShader.setMat4("uProjection", projection);
-                    
-                    glm::mat4 model = glm::mat4(1.0f);
-                    model = glm::translate(model, glm::vec3(previewX, previewY, 0.0f));
-                    model = glm::scale(model, glm::vec3(previewW, previewH, 1.0f));
-                    texturedShader.setMat4("uModel", model);
-                    
-                    glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, previewTexture);
-                    texturedShader.setInt("uTexture", 0);
-                    
-                    // Use flipped texture coordinates for FBO (OpenGL renders upside down)
-                    float flippedVertices[] = {
-                        // pos        // tex (flipped Y)
-                        0.0f, 1.0f,   0.0f, 1.0f,
-                        1.0f, 0.0f,   1.0f, 0.0f,
-                        0.0f, 0.0f,   0.0f, 0.0f,
-                        
-                        0.0f, 1.0f,   0.0f, 1.0f,
-                        1.0f, 1.0f,   1.0f, 1.0f,
-                        1.0f, 0.0f,   1.0f, 0.0f
-                    };
-                    
-                    glBindVertexArray(texturedVao);
-                    glBindBuffer(GL_ARRAY_BUFFER, texturedVbo);
-                    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(flippedVertices), flippedVertices);
-                    glDrawArrays(GL_TRIANGLES, 0, 6);
-                    glBindVertexArray(0);
-                    
-                    // Restore original texture coords
-                    float originalVertices[] = {
-                        0.0f, 1.0f,   0.0f, 0.0f,
-                        1.0f, 0.0f,   1.0f, 1.0f,
-                        0.0f, 0.0f,   0.0f, 1.0f,
-                        0.0f, 1.0f,   0.0f, 0.0f,
-                        1.0f, 1.0f,   1.0f, 0.0f,
-                        1.0f, 0.0f,   1.0f, 1.0f
-                    };
-                    glBindBuffer(GL_ARRAY_BUFFER, texturedVbo);
-                    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(originalVertices), originalVertices);
-                    
-                    // Switch back to UI shader
-                    uiShader.use();
-                    uiShader.setMat4("uProjection", projection);
-                } else {
-                    // Fallback: draw a placeholder if model not loaded
-                    drawRect(previewX, previewY, previewW, previewH, glm::vec4(0.3f, 0.3f, 0.35f, 1.0f));
-                    float textScale = 1.5f;
-                    std::string loadingText = "Loading...";
-                    float textW = loadingText.length() * 6.0f * textScale;
-                    drawText(previewX + (previewW - textW) / 2.0f, previewY + previewH / 2.0f, textScale, loadingText, glm::vec4(0.7f, 0.7f, 0.7f, 1.0f));
-                }
-            }
 
             for (const auto& el : elements) {
                 glm::vec4 color = el.isHovered ? glm::vec4(0.5f, 0.7f, 0.5f, 0.95f) : glm::vec4(0.25f, 0.25f, 0.28f, 0.9f);
@@ -1927,6 +1851,73 @@ void UIManager::render() {
                 float textX = el.x + (el.w - textW) / 2.0f;
                 float textY = el.y + (el.h - 7.0f * textScale) / 2.0f;
                 drawText(textX, textY, textScale, el.text, glm::vec4(1.0f));
+            }
+            
+            // Render 3D model preview for Player Settings - AFTER all UI elements
+            if (currentMenuState == MenuState::PLAYER_SETTINGS && previewModel) {
+                // Use full screen for rendering - no clipping!
+                // Render the 3D model directly to screen
+                uiShader.unuse();
+                
+                // Use full screen viewport - no scissor clipping
+                glViewport(0, 0, width, height);
+                glDisable(GL_SCISSOR_TEST);  // Don't clip!
+                
+                // Clear just depth
+                glEnable(GL_DEPTH_TEST);
+                glDepthMask(GL_TRUE);
+                glClear(GL_DEPTH_BUFFER_BIT);
+                glDisable(GL_BLEND);
+                
+                // Setup camera for 3D preview
+                float aspectRatio = (float)width / (float)height;
+                glm::mat4 proj3D = glm::perspective(glm::radians(30.0f), aspectRatio, 0.1f, 100.0f);
+                
+                // Camera looking at model - pull back so models fit nicely
+                // Half-Life (index 0) needs more distance
+                float camDist = (previewModelIndex == 0) ? 20.0f : 6.0f;
+                float camHeight = (previewModelIndex == 0) ? 4.0f : 1.5f;
+                float targetHeight = (previewModelIndex == 0) ? 2.5f : 0.7f;
+                
+                glm::vec3 camPos = glm::vec3(0.0f, camHeight, camDist);
+                glm::vec3 target = glm::vec3(0.0f, targetHeight, 0.0f);
+                glm::mat4 view3D = glm::lookAt(camPos, target, glm::vec3(0.0f, 1.0f, 0.0f));
+                
+                // Model transform - rotate to face camera
+                glm::mat4 modelMat = glm::mat4(1.0f);
+                modelMat = glm::rotate(modelMat, glm::radians(previewRotation + 180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                
+                // Scale down all models - Half-Life much smaller, others also scaled
+                float modelScale = (previewModelIndex == 0) ? 0.1f : 0.6f;
+                modelMat = glm::scale(modelMat, glm::vec3(modelScale));
+                
+                // Use the model shader
+                modelPreviewShader.use();
+                modelPreviewShader.setMat4("uProjection", proj3D);
+                modelPreviewShader.setMat4("uView", view3D);
+                modelPreviewShader.setMat4("uPrevView", view3D);
+                modelPreviewShader.setMat4("uPrevProjection", proj3D);
+                modelPreviewShader.setVec3("uLightDir", glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f)));
+                modelPreviewShader.setVec3("uCameraPos", camPos);
+                modelPreviewShader.setVec4("uBaseColor", glm::vec4(1.0f));
+                modelPreviewShader.setInt("uDebugNoTexture", 0);
+                modelPreviewShader.setInt("uDebugShowNormals", 0);
+                
+                // Draw the model
+                previewModel->draw(modelPreviewShader, modelMat, modelMat);
+                
+                modelPreviewShader.unuse();
+                
+                // Restore viewport to full screen
+                glViewport(0, 0, width, height);
+                glDisable(GL_SCISSOR_TEST);
+                
+                // Back to UI shader state
+                glDisable(GL_DEPTH_TEST);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                uiShader.use();
+                uiShader.setMat4("uProjection", glm::ortho(0.0f, (float)width, (float)height, 0.0f));
             }
         }
 
@@ -3000,38 +2991,6 @@ void UIManager::setupPlayerSettingsMenu() {
     elements.push_back(title);
     startY += 70.0f;
     
-    // Model Preview Card on the right side
-    UIElement previewCard;
-    previewCard.x = width - 250.0f;
-    previewCard.y = 150.0f;
-    previewCard.w = 200.0f;
-    previewCard.h = 250.0f;
-    previewCard.text = "";
-    previewCard.isCard = true;
-    elements.push_back(previewCard);
-    
-    // Preview label
-    UIElement previewLabel;
-    previewLabel.x = width - 250.0f;
-    previewLabel.y = 130.0f;
-    previewLabel.w = 200.0f;
-    previewLabel.h = 20.0f;
-    previewLabel.text = "Preview";
-    previewLabel.isLabel = true;
-    previewLabel.customColor = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f);
-    elements.push_back(previewLabel);
-    
-    // Model name in preview card
-    UIElement modelPreviewName;
-    modelPreviewName.x = width - 245.0f;
-    modelPreviewName.y = 170.0f;
-    modelPreviewName.w = 190.0f;
-    modelPreviewName.h = 30.0f;
-    modelPreviewName.text = Settings::PLAYER_MODEL_NAMES[s.playerModelIndex];
-    modelPreviewName.isLabel = true;
-    modelPreviewName.customColor = glm::vec4(0.4f, 0.9f, 0.4f, 1.0f);
-    elements.push_back(modelPreviewName);
-    
     // Load preview model on menu setup
     loadPreviewModel(s.playerModelIndex);
     
@@ -3273,16 +3232,17 @@ void UIManager::renderModelPreview() {
     
     // Setup camera matrices for preview
     float aspectRatio = (float)previewWidth / (float)previewHeight;
-    glm::mat4 projection = glm::perspective(glm::radians(30.0f), aspectRatio, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
     
-    // Camera position - looking at model from front
-    glm::vec3 cameraPos = glm::vec3(0.0f, 1.0f, 3.5f);
-    glm::vec3 target = glm::vec3(0.0f, 0.8f, 0.0f);
+    // Camera position - looking at model from front, positioned to see full character
+    // Character models are typically 1.8 units tall, centered at origin
+    glm::vec3 cameraPos = glm::vec3(0.0f, 1.2f, 2.5f);
+    glm::vec3 target = glm::vec3(0.0f, 0.9f, 0.0f);
     glm::mat4 view = glm::lookAt(cameraPos, target, glm::vec3(0.0f, 1.0f, 0.0f));
     
-    // Model transform with rotation
+    // Model transform with rotation - rotate around Y axis and face camera
     glm::mat4 modelMatrix = glm::mat4(1.0f);
-    modelMatrix = glm::rotate(modelMatrix, glm::radians(previewRotation), glm::vec3(0.0f, 1.0f, 0.0f));
+    modelMatrix = glm::rotate(modelMatrix, glm::radians(previewRotation + 180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     modelMatrix = glm::scale(modelMatrix, glm::vec3(1.0f));
     
     // Setup shader

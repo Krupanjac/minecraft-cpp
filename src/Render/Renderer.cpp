@@ -703,6 +703,8 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
 }
 
 void Renderer::renderCrosshair(int windowWidth, int windowHeight) {
+    if (!showCrosshair) return;
+    
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO); // Invert colors

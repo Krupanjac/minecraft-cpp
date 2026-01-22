@@ -1633,7 +1633,12 @@ private:
                            uiManager.getMenuState() == MenuState::LOAD_GAME ||
                            uiManager.getMenuState() == MenuState::SETTINGS ||
                            uiManager.getMenuState() == MenuState::VIDEO_SETTINGS ||
-                           uiManager.getMenuState() == MenuState::CONTROLS);
+                           uiManager.getMenuState() == MenuState::PLAYER_SETTINGS ||
+                           uiManager.getMenuState() == MenuState::CONTROLS ||
+                           uiManager.getMenuState() == MenuState::ABOUT);
+        
+        // Hide crosshair when in any menu
+        renderer.setShowCrosshair(!uiManager.isMenuOpen());
         
         if (inMainMenu) {
             // Render menu background world
