@@ -194,7 +194,9 @@ glm::vec3 MobSpawnManager::findSpawnPosition(const glm::vec3& playerPos, float m
         surfaceY = SEA_LEVEL + 1;
     }
     
-    return glm::vec3(spawnX, static_cast<float>(surfaceY) + 0.05f, spawnZ);
+    // Return position slightly above the block to ensure we don't spawn inside it
+    // surfaceY is the Y coordinate of the solid block, so we spawn at Y+1
+    return glm::vec3(spawnX, static_cast<float>(surfaceY) + 1.05f, spawnZ);
 }
 
 bool MobSpawnManager::isValidHostileSpawn(const glm::vec3& pos, float timeOfDay) const {

@@ -344,9 +344,19 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         glm::vec3 eyeRel = glm::vec3(eyeWorld) - glm::vec3(renderOrigin);
         view = glm::lookAt(eyeRel, targetRel, up);
     } else {
+        // First Person View
+        // Use defaultY (eye height) and view bobbing
+        float bobY = 0.0f;
+        if (!camera.getFlightMode()) {
+            bobY = sin(camera.bobbingTimer) * 0.15f;
+        }
+
+        // Apply offsets to cameraRelative (which is feet position)
+        glm::vec3 eyePos = cameraRelative + glm::vec3(0.0f, camera.defaultY + bobY, 0.0f);
+
         view = glm::lookAt(
-            cameraRelative,                           // Eye position (relative to render origin)
-            cameraRelative + camera.getFront(),       // Look target
+            eyePos,                                   // Eye position (relative to render origin)
+            eyePos + camera.getFront(),               // Look target
             camera.getUp()                            // Up vector
         );
     }

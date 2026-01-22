@@ -1044,10 +1044,61 @@ private:
                     int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y + result.normal.y;
                     int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z + result.normal.z;
                     
-                    // Don't place block inside player
-                    glm::vec3 playerPos = camera.getPosition();
-                    glm::vec3 blockPos(x + 0.5f, y + 0.5f, z + 0.5f);
-                    if (glm::distance(playerPos, blockPos) > 1.0f) { 
+                    // Check intersection with any entity or player to prevent getting stuck
+                    bool entityCollision = false;
+                    
+                    // Block AABB
+                    float bx1 = static_cast<float>(x);
+                    float by1 = static_cast<float>(y);
+                    float bz1 = static_cast<float>(z);
+                    float bx2 = bx1 + 1.0f;
+                    float by2 = by1 + 1.0f;
+                    float bz2 = bz1 + 1.0f;
+
+                    // Function to check AABB overlap
+                    auto checkOverlap = [&](const glm::vec3& pos, float width, float height) -> bool {
+                        float ex1 = pos.x - width/2.0f;
+                        float ey1 = pos.y;
+                        float ez1 = pos.z - width/2.0f;
+                        float ex2 = pos.x + width/2.0f;
+                        float ey2 = pos.y + height;
+                        float ez2 = pos.z + width/2.0f;
+                        
+                        return (bx1 < ex2 && bx2 > ex1) &&
+                               (by1 < ey2 && by2 > ey1) &&
+                               (bz1 < ez2 && bz2 > ez1);
+                    };
+
+                    // Check Player
+                    if (checkOverlap(camera.getPosition(), 0.6f, 1.8f)) {
+                        entityCollision = true;
+                    }
+
+                    // Check Mobs
+                    if (!entityCollision) {
+                         // Collect entities to check
+                         std::vector<Entity*> entities;
+                         if (useNewEntityManager) {
+                             auto managed = entityManager.getAllEntities();
+                             entities.insert(entities.end(), managed.begin(), managed.end());
+                         } else {
+                             for(auto& m : zombies) if(m) entities.push_back(m.get());
+                             for(auto& m : skeletons) if(m && !m->isDead()) entities.push_back(m.get());
+                             for(auto& m : pigs) if(m && !m->isDead()) entities.push_back(m.get());
+                             for(auto& m : chickens) if(m && !m->isDead()) entities.push_back(m.get());
+                             for(auto& m : sheep) if(m && !m->isDead()) entities.push_back(m.get());
+                         }
+                         
+                         for (Entity* e : entities) {
+                             // Assuming standard human/animal size for now (0.6w, 1.8h or smaller)
+                             if (checkOverlap(e->getPosition(), 0.6f, 1.5f)) {
+                                 entityCollision = true;
+                                 break;
+                             }
+                         }
+                    }
+
+                    if (!entityCollision) { 
                         BlockType blockType = uiManager.getSelectedBlock();
                         chunkManager.setBlockAt(x, y, z, Block(blockType));
                         
@@ -1127,9 +1178,9 @@ private:
         networkManager.update(deltaTime);
         
         // Send local player position to network
-        // Send foot position (camera is at eye level, 1.62m above feet)
+        // Send foot position (camera is at FEET level)
         if (networkManager.isOnline() && !uiManager.isMenuOpen()) {
-            glm::vec3 footPos = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
+            glm::vec3 footPos = camera.getPosition();
             networkManager.sendLocalPlayerState(
                 footPos,
                 camera.getYaw(),
@@ -1337,7 +1388,7 @@ private:
         // Mobs can run in single-player (offline) or server mode
         // In client mode, server handles mob state
         if (!skipPlayerControls) {
-            glm::vec3 playerFeet = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
+            glm::vec3 playerFeet = camera.getPosition(); // Camera is at feet
             float normalizedTime = uiManager.timeOfDay / DAY_DURATION;
             
             if (useNewEntityManager) {
@@ -1562,9 +1613,10 @@ private:
         // Sync player entity if it exists
         if (playerEntity) {
             // Visual sync: We want the model to be exactly where the player is.
-            // Camera position is eye pos. Model origin is usually at feet.
-            // Standard height ~1.62m to eyes.
-            glm::vec3 footPos = camera.getPosition() - glm::vec3(0.0f, 1.62f, 0.0f);
+            // Camera position is FEET pos. 
+            // Model origin is usually at feet. 
+            // So we use camera position directly.
+            glm::vec3 footPos = camera.getPosition();
             playerEntity->setPosition(footPos);
             
             // Yaw: Camera yaw 0 is safe, but GLTF might need rotation. 
@@ -1625,10 +1677,11 @@ private:
         
         // Check if in water
         bool inWater = false;
-        glm::vec3 camPos = camera.getPosition();
-        // Check eye level and feet level
-        Block headBlock = chunkManager.getBlockAt(static_cast<int>(floor(camPos.x)), static_cast<int>(floor(camPos.y)), static_cast<int>(floor(camPos.z)));
-        Block feetBlock = chunkManager.getBlockAt(static_cast<int>(floor(camPos.x)), static_cast<int>(floor(camPos.y - 1.5f)), static_cast<int>(floor(camPos.z)));
+        glm::vec3 camPos = camera.getPosition(); // Use feet position
+        
+        // Check eye level (Feet + 1.6) and feet level (Feet)
+        Block headBlock = chunkManager.getBlockAt(static_cast<int>(floor(camPos.x)), static_cast<int>(floor(camPos.y + 1.6f)), static_cast<int>(floor(camPos.z)));
+        Block feetBlock = chunkManager.getBlockAt(static_cast<int>(floor(camPos.x)), static_cast<int>(floor(camPos.y)), static_cast<int>(floor(camPos.z)));
         
         if (headBlock.isWater() || feetBlock.isWater()) {
             inWater = true;
@@ -1703,10 +1756,14 @@ private:
     }
     
     bool checkCollision(const glm::vec3& pos) {
+        // Player Bounding Box relative to feet position
+        // Width: 0.6m (-0.3 to +0.3)
+        // Height: 1.8m (0.0 to 1.8)
+        
         float minX = pos.x - 0.3f;
         float maxX = pos.x + 0.3f;
-        float minY = pos.y - 1.6f;
-        float maxY = pos.y + 0.2f;
+        float minY = pos.y;         // Feet level
+        float maxY = pos.y + 1.8f;  // Head level
         float minZ = pos.z - 0.3f;
         float maxZ = pos.z + 0.3f;
         
