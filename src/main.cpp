@@ -447,8 +447,9 @@ public:
         chickens.clear();
         sheep.clear();
         
-        // Start the server
-        if (networkManager.hostGame(port, seed, camera.getPosition(), playerName)) {
+        // Start the server with player's model index
+        uint8_t modelIdx = static_cast<uint8_t>(Settings::instance().playerModelIndex);
+        if (networkManager.hostGame(port, seed, camera.getPosition(), playerName, modelIdx)) {
             uiManager.setMenuState(MenuState::NONE);
             window->setCursorMode(GLFW_CURSOR_DISABLED);
             uiManager.setIsOnline(true);
@@ -472,7 +473,8 @@ public:
         chickens.clear();
         sheep.clear();
         
-        if (networkManager.joinGame(address, port, playerName)) {
+        uint8_t modelIdx = static_cast<uint8_t>(Settings::instance().playerModelIndex);
+        if (networkManager.joinGame(address, port, playerName, modelIdx)) {
             // Connection initiated - wait for connected callback
             LOG_INFO("Connecting to " + address + ":" + std::to_string(port));
         } else {

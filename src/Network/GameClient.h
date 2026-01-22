@@ -27,7 +27,7 @@ public:
     ~GameClient();
     
     // Connection lifecycle
-    bool connect(const std::string& host, uint16_t port, const std::string& playerName);
+    bool connect(const std::string& host, uint16_t port, const std::string& playerName, uint8_t modelIndex = 0);
     void disconnect();
     bool isConnected() const { return m_state == ConnectionState::CONNECTED; }
     ConnectionState getState() const { return m_state; }

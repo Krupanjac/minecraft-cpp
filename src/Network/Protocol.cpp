@@ -112,14 +112,15 @@ void PacketBuffer::readBytes(void* buffer, size_t size) {
 
 // ============== Serialization Helpers ==============
 
-void serializeConnectRequest(PacketBuffer& buffer, const std::string& playerName) {
+void serializeConnectRequest(PacketBuffer& buffer, const std::string& playerName, uint8_t modelIndex) {
     // Header
     buffer.writeU8(static_cast<uint8_t>(PacketType::CONNECT_REQUEST));
-    buffer.writeU16(2 + 32);  // protocolVersion + playerName
+    buffer.writeU16(2 + 32 + 1);  // protocolVersion + playerName + modelIndex
     
     // Payload
     buffer.writeU16(PROTOCOL_VERSION);
     buffer.writeString(playerName, 32);
+    buffer.writeU8(modelIndex);
 }
 
 void serializeConnectResponse(PacketBuffer& buffer, bool accepted, uint32_t playerId,
@@ -170,10 +171,10 @@ void serializeBlockChange(PacketBuffer& buffer, int x, int y, int z, uint8_t blo
 }
 
 void serializePlayerJoin(PacketBuffer& buffer, uint32_t playerId, const std::string& name,
-                         const glm::vec3& pos, float yaw, float pitch) {
+                         const glm::vec3& pos, float yaw, float pitch, uint8_t modelIndex) {
     // Header
     buffer.writeU8(static_cast<uint8_t>(PacketType::PLAYER_JOIN));
-    buffer.writeU16(4 + 32 + 12 + 8);  // id + name + pos + angles
+    buffer.writeU16(4 + 32 + 12 + 8 + 1);  // id + name + pos + angles + modelIndex
     
     // Payload
     buffer.writeU32(playerId);
@@ -183,6 +184,7 @@ void serializePlayerJoin(PacketBuffer& buffer, uint32_t playerId, const std::str
     buffer.writeFloat(pos.z);
     buffer.writeFloat(yaw);
     buffer.writeFloat(pitch);
+    buffer.writeU8(modelIndex);
 }
 
 void serializePlayerLeave(PacketBuffer& buffer, uint32_t playerId) {

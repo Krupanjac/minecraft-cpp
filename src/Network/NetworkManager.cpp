@@ -1,5 +1,6 @@
 #include "NetworkManager.h"  // Must be included first to handle Windows macros
 #include "../Core/Logger.h"
+#include "../Core/Settings.h"
 #include "../Model/Model.h"
 #include <algorithm>
 
@@ -7,14 +8,20 @@ namespace Network {
 
 // ============== RemotePlayerEntity ==============
 
-RemotePlayerEntity::RemotePlayerEntity(uint32_t playerId, const std::string& name, const glm::vec3& pos)
+RemotePlayerEntity::RemotePlayerEntity(uint32_t playerId, const std::string& name, const glm::vec3& pos, uint8_t modelIndex)
     : Entity(pos)
     , m_playerId(playerId)
     , m_playerName(name)
+    , m_modelIndex(modelIndex)
     , m_targetPosition(pos) {
     
-    // Scale for player model - must match PlayerEntity scale (0.03f)
-    scale = glm::vec3(0.03f);
+    // Scale for player model - must match PlayerEntity scales
+    // Half-Life model (index 0) needs 0.03f, other Quaternius models need 0.5f
+    if (modelIndex == 0) {
+        scale = glm::vec3(0.03f);
+    } else {
+        scale = glm::vec3(0.5f);
+    }
 }
 
 void RemotePlayerEntity::update(float deltaTime) {
@@ -77,7 +84,7 @@ NetworkManager::~NetworkManager() {
     disconnect();
 }
 
-bool NetworkManager::hostGame(uint16_t port, int64_t worldSeed, const glm::vec3& spawnPos, const std::string& playerName) {
+bool NetworkManager::hostGame(uint16_t port, int64_t worldSeed, const glm::vec3& spawnPos, const std::string& playerName, uint8_t modelIndex) {
     if (m_mode != NetworkMode::OFFLINE) {
         LOG_WARNING("Already in a game");
         return false;
@@ -85,7 +92,7 @@ bool NetworkManager::hostGame(uint16_t port, int64_t worldSeed, const glm::vec3&
     
     m_server = std::make_unique<GameServer>();
     
-    if (!m_server->start(port, worldSeed, spawnPos, playerName)) {
+    if (!m_server->start(port, worldSeed, spawnPos, playerName, modelIndex)) {
         LOG_ERROR("Failed to start server");
         m_server.reset();
         return false;
@@ -107,7 +114,7 @@ bool NetworkManager::hostGame(uint16_t port, int64_t worldSeed, const glm::vec3&
     return true;
 }
 
-bool NetworkManager::joinGame(const std::string& host, uint16_t port, const std::string& playerName) {
+bool NetworkManager::joinGame(const std::string& host, uint16_t port, const std::string& playerName, uint8_t modelIndex) {
     if (m_mode != NetworkMode::OFFLINE) {
         LOG_WARNING("Already in a game");
         return false;
@@ -115,7 +122,7 @@ bool NetworkManager::joinGame(const std::string& host, uint16_t port, const std:
     
     m_client = std::make_unique<GameClient>();
     
-    if (!m_client->connect(host, port, playerName)) {
+    if (!m_client->connect(host, port, playerName, modelIndex)) {
         LOG_ERROR("Failed to connect to server");
         m_client.reset();
         return false;
@@ -198,24 +205,32 @@ void NetworkManager::updateRemotePlayerEntities() {
             (*it)->setTargetRotation(player.yaw, player.pitch);
             (*it)->setTargetVelocity(player.velocity);
         } else {
-            // Create new entity
-            auto entity = std::make_unique<RemotePlayerEntity>(player.id, player.name, player.position);
+            // Create new entity with the player's model index
+            auto entity = std::make_unique<RemotePlayerEntity>(player.id, player.name, player.position, player.modelIndex);
             entity->setTargetRotation(player.yaw, player.pitch);
             
-            // Try to load player model if not already loaded
-            if (!m_playerModel) {
+            // Get or load the correct player model for this player's modelIndex
+            int modelIdx = player.modelIndex;
+            if (modelIdx < 0 || modelIdx >= Settings::NUM_PLAYER_MODELS) {
+                modelIdx = 0;  // Default to first model
+            }
+            
+            // Check if model is already cached
+            auto modelIt = m_playerModels.find(modelIdx);
+            if (modelIt == m_playerModels.end()) {
+                // Load model for this index
                 try {
-                    m_playerModel = std::make_shared<ModelSystem::Model>("assets/models/Player/scene.gltf");
+                    auto newModel = std::make_shared<ModelSystem::Model>(Settings::PLAYER_MODEL_PATHS[modelIdx]);
+                    m_playerModels[modelIdx] = newModel;
+                    entity->setModel(newModel);
                 } catch (...) {
-                    // Model loading may fail, that's okay
+                    LOG_ERROR("Failed to load model for player: " + player.name);
                 }
+            } else {
+                entity->setModel(modelIt->second);
             }
             
-            if (m_playerModel) {
-                entity->setModel(m_playerModel);
-            }
-            
-            LOG_INFO("Created entity for player: " + player.name);
+            LOG_INFO("Created entity for player: " + player.name + " with model " + std::to_string(modelIdx));
             m_remotePlayerEntities.push_back(std::move(entity));
         }
     }

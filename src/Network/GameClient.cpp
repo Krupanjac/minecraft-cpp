@@ -12,7 +12,7 @@ GameClient::~GameClient() {
     disconnect();
 }
 
-bool GameClient::connect(const std::string& host, uint16_t port, const std::string& playerName) {
+bool GameClient::connect(const std::string& host, uint16_t port, const std::string& playerName, uint8_t modelIndex) {
     if (m_state == ConnectionState::CONNECTED || m_state == ConnectionState::CONNECTING) {
         LOG_WARNING("Already connected or connecting");
         return false;
@@ -44,9 +44,9 @@ bool GameClient::connect(const std::string& host, uint16_t port, const std::stri
     
     m_socket.setNonBlocking(true);
     
-    // Send connect request
+    // Send connect request with model index
     PacketBuffer connectPacket;
-    serializeConnectRequest(connectPacket, playerName);
+    serializeConnectRequest(connectPacket, playerName, modelIndex);
     sendPacket(connectPacket);
     
     LOG_INFO("Connection request sent, waiting for response...");
@@ -197,6 +197,7 @@ void GameClient::handlePacket(PacketType type, PacketBuffer& buffer) {
             float z = buffer.readFloat();
             float yaw = buffer.readFloat();
             float pitch = buffer.readFloat();
+            uint8_t modelIndex = buffer.readU8();
             
             if (playerId != m_localPlayerId) {
                 std::lock_guard<std::mutex> lock(m_playersMutex);
@@ -206,9 +207,10 @@ void GameClient::handlePacket(PacketType type, PacketBuffer& buffer) {
                 player.position = glm::vec3(x, y, z);
                 player.yaw = yaw;
                 player.pitch = pitch;
+                player.modelIndex = modelIndex;
                 m_remotePlayers[playerId] = player;
                 
-                LOG_INFO("Player joined: " + name + " (ID: " + std::to_string(playerId) + ")");
+                LOG_INFO("Player joined: " + name + " (ID: " + std::to_string(playerId) + ", model: " + std::to_string(modelIndex) + ")");
                 
                 if (m_onPlayerJoin) {
                     m_onPlayerJoin(playerId, name, player.position);

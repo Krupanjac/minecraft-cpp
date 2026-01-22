@@ -26,6 +26,7 @@ struct RemotePlayer {
     bool isFlying = false;
     bool isSprinting = false;
     bool isSneaking = false;
+    uint8_t modelIndex = 0;  // Player's selected character model
 };
 
 // Connected client info (server-side)
@@ -38,6 +39,7 @@ struct ClientConnection {
     float yaw = 0.0f;
     float pitch = 0.0f;
     bool onGround = false;
+    uint8_t modelIndex = 0;  // Player's selected character model
     std::vector<uint8_t> receiveBuffer;
     uint64_t lastPingTime = 0;
     uint64_t latency = 0;
@@ -49,7 +51,7 @@ public:
     ~GameServer();
     
     // Server lifecycle
-    bool start(uint16_t port, int64_t worldSeed, const glm::vec3& spawnPos, const std::string& hostName = "Host");
+    bool start(uint16_t port, int64_t worldSeed, const glm::vec3& spawnPos, const std::string& hostName = "Host", uint8_t hostModelIndex = 0);
     void stop();
     bool isRunning() const { return m_running; }
     
@@ -119,6 +121,7 @@ private:
     float m_hostPitch = 0.0f;
     bool m_hostOnGround = false;
     std::string m_hostName = "Host";
+    uint8_t m_hostModelIndex = 0;
     
     // Server-authoritative time
     float m_timeOfDay = 600.0f;  // Start at noon

@@ -58,6 +58,7 @@ constexpr size_t MAX_PACKET_SIZE = 65535;
 struct ConnectRequestPacket {
     uint16_t protocolVersion;
     char playerName[32];
+    uint8_t modelIndex;  // Player's selected model
     
     static constexpr PacketType TYPE = PacketType::CONNECT_REQUEST;
 };
@@ -95,6 +96,7 @@ struct PlayerJoinPacket {
     char playerName[32];
     float x, y, z;
     float yaw, pitch;
+    uint8_t modelIndex;  // Player's selected model
     
     static constexpr PacketType TYPE = PacketType::PLAYER_JOIN;
 };
@@ -220,14 +222,14 @@ private:
 };
 
 // Helper to serialize common packet types
-void serializeConnectRequest(PacketBuffer& buffer, const std::string& playerName);
+void serializeConnectRequest(PacketBuffer& buffer, const std::string& playerName, uint8_t modelIndex = 0);
 void serializeConnectResponse(PacketBuffer& buffer, bool accepted, uint32_t playerId, 
                               int64_t seed, const glm::vec3& spawn, const std::string& reason = "");
 void serializePlayerPosition(PacketBuffer& buffer, uint32_t playerId, const glm::vec3& pos,
                              float yaw, float pitch, const glm::vec3& velocity, bool onGround);
 void serializeBlockChange(PacketBuffer& buffer, int x, int y, int z, uint8_t blockType);
 void serializePlayerJoin(PacketBuffer& buffer, uint32_t playerId, const std::string& name,
-                         const glm::vec3& pos, float yaw, float pitch);
+                         const glm::vec3& pos, float yaw, float pitch, uint8_t modelIndex = 0);
 void serializePlayerLeave(PacketBuffer& buffer, uint32_t playerId);
 void serializeChatMessage(PacketBuffer& buffer, uint32_t senderId, const std::string& message);
 void serializePing(PacketBuffer& buffer, uint64_t timestamp);

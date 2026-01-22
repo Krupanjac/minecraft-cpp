@@ -11,7 +11,7 @@ GameServer::~GameServer() {
     stop();
 }
 
-bool GameServer::start(uint16_t port, int64_t worldSeed, const glm::vec3& spawnPos, const std::string& hostName) {
+bool GameServer::start(uint16_t port, int64_t worldSeed, const glm::vec3& spawnPos, const std::string& hostName, uint8_t hostModelIndex) {
     if (m_running) {
         LOG_WARNING("Server already running");
         return false;
@@ -48,6 +48,7 @@ bool GameServer::start(uint16_t port, int64_t worldSeed, const glm::vec3& spawnP
     m_spawnPos = spawnPos;
     m_hostPosition = spawnPos;
     m_hostName = hostName;
+    m_hostModelIndex = hostModelIndex;
     m_running = true;
     m_nextPlayerId = 1;
     
@@ -173,7 +174,8 @@ void GameServer::handlePacket(ClientConnection& client, PacketType type, PacketB
             LOG_DEBUG("Processing CONNECT_REQUEST...");
             uint16_t protocolVersion = buffer.readU16();
             std::string playerName = buffer.readString(32);
-            LOG_DEBUG("Player name: " + playerName + ", protocol: " + std::to_string(protocolVersion));
+            uint8_t modelIndex = buffer.readU8();
+            LOG_DEBUG("Player name: " + playerName + ", protocol: " + std::to_string(protocolVersion) + ", model: " + std::to_string(modelIndex));
             
             if (protocolVersion != PROTOCOL_VERSION) {
                 PacketBuffer response;
@@ -187,6 +189,7 @@ void GameServer::handlePacket(ClientConnection& client, PacketType type, PacketB
             client.playerId = m_nextPlayerId++;
             client.playerName = playerName;
             client.position = m_spawnPos;
+            client.modelIndex = modelIndex;
             
             LOG_INFO("Player '" + playerName + "' connected with ID " + std::to_string(client.playerId));
             
@@ -198,14 +201,14 @@ void GameServer::handlePacket(ClientConnection& client, PacketType type, PacketB
             // Send host player info to new client (host is always ID 0)
             {
                 PacketBuffer hostJoin;
-                serializePlayerJoin(hostJoin, 0, m_hostName, m_hostPosition, m_hostYaw, m_hostPitch);
+                serializePlayerJoin(hostJoin, 0, m_hostName, m_hostPosition, m_hostYaw, m_hostPitch, m_hostModelIndex);
                 sendToClient(client, hostJoin);
             }
             
             // Notify existing players about new player
             PacketBuffer joinPacket;
             serializePlayerJoin(joinPacket, client.playerId, client.playerName, 
-                               client.position, client.yaw, client.pitch);
+                               client.position, client.yaw, client.pitch, client.modelIndex);
             broadcastToAll(joinPacket, client.playerId);
             
             // Send existing players to new client
@@ -213,7 +216,7 @@ void GameServer::handlePacket(ClientConnection& client, PacketType type, PacketB
                 if (other->playerId != 0 && other->playerId != client.playerId) {
                     PacketBuffer otherJoin;
                     serializePlayerJoin(otherJoin, other->playerId, other->playerName,
-                                       other->position, other->yaw, other->pitch);
+                                       other->position, other->yaw, other->pitch, other->modelIndex);
                     sendToClient(client, otherJoin);
                 }
             }
@@ -364,6 +367,7 @@ std::vector<RemotePlayer> GameServer::getPlayers() const {
         player.yaw = client->yaw;
         player.pitch = client->pitch;
         player.onGround = client->onGround;
+        player.modelIndex = client->modelIndex;
         players.push_back(player);
     }
     return players;

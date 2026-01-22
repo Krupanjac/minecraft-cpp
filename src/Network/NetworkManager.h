@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include <map>
 
 namespace Network {
 
@@ -19,7 +20,7 @@ enum class NetworkMode {
 // Remote player entity for rendering
 class RemotePlayerEntity : public Entity {
 public:
-    RemotePlayerEntity(uint32_t playerId, const std::string& name, const glm::vec3& pos);
+    RemotePlayerEntity(uint32_t playerId, const std::string& name, const glm::vec3& pos, uint8_t modelIndex = 0);
     ~RemotePlayerEntity() override = default;
     
     void update(float deltaTime) override;
@@ -30,10 +31,12 @@ public:
     
     uint32_t getPlayerId() const { return m_playerId; }
     const std::string& getPlayerName() const { return m_playerName; }
+    uint8_t getModelIndex() const { return m_modelIndex; }
     
 private:
     uint32_t m_playerId;
     std::string m_playerName;
+    uint8_t m_modelIndex;
     
     // Interpolation targets
     glm::vec3 m_targetPosition;
@@ -49,8 +52,8 @@ public:
     ~NetworkManager();
     
     // Mode management
-    bool hostGame(uint16_t port, int64_t worldSeed, const glm::vec3& spawnPos, const std::string& playerName);
-    bool joinGame(const std::string& host, uint16_t port, const std::string& playerName);
+    bool hostGame(uint16_t port, int64_t worldSeed, const glm::vec3& spawnPos, const std::string& playerName, uint8_t modelIndex = 0);
+    bool joinGame(const std::string& host, uint16_t port, const std::string& playerName, uint8_t modelIndex = 0);
     void disconnect();
     
     NetworkMode getMode() const { return m_mode; }
@@ -127,7 +130,7 @@ private:
     
     // Remote player entities
     std::vector<std::unique_ptr<RemotePlayerEntity>> m_remotePlayerEntities;
-    std::shared_ptr<ModelSystem::Model> m_playerModel;  // Shared model for all remote players
+    std::map<int, std::shared_ptr<ModelSystem::Model>> m_playerModels;  // Model cache by index
     
     // Host-mode local player info
     std::string m_localPlayerName;

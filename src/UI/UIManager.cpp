@@ -1431,8 +1431,18 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
     if (currentMenuState == MenuState::PLAYER_SETTINGS && previewModel) {
         previewModel->updateAnimation(deltaTime);
         
-        // Handle drag rotation with momentum
-        if (mousePressed) {
+        // Handle drag rotation with momentum - use LEFT mouse but only if not over UI
+        // Check if mouse is over any UI element
+        bool overUI = false;
+        for (const auto& el : elements) {
+            if (mouseX >= el.x && mouseX <= el.x + el.w &&
+                mouseY >= el.y && mouseY <= el.y + el.h) {
+                overUI = true;
+                break;
+            }
+        }
+        
+        if (mousePressed && !overUI) {
             if (!isDraggingModel) {
                 // Start dragging
                 isDraggingModel = true;
@@ -1446,7 +1456,13 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                 lastDragX = (float)mouseX;
             }
         } else {
-            isDraggingModel = false;
+            if (isDraggingModel && mousePressed) {
+                // Still holding mouse but moved over UI - keep momentum
+                isDraggingModel = false;
+            } else if (!mousePressed) {
+                isDraggingModel = false;
+            }
+            
             // Apply deceleration (momentum decay)
             previewRotation += previewRotationVelocity * deltaTime * 60.0f;
             previewRotationVelocity *= 0.95f;  // Decay factor - adjust for faster/slower stop
@@ -1504,7 +1520,17 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                     
                     if (el.intValueRef) {
                         *el.intValueRef = (int)val;
-                        el.text = "RENDER DIST: " + std::to_string(*el.intValueRef);
+                        // Update text based on which slider it is
+                        if (el.text.find("Render Distance") != std::string::npos)
+                            el.text = "Render Distance: " + std::to_string(*el.intValueRef);
+                        else if (el.text.find("Master") != std::string::npos)
+                            el.text = "Master: " + std::to_string(*el.intValueRef) + "%";
+                        else if (el.text.find("Music") != std::string::npos)
+                            el.text = "Music: " + std::to_string(*el.intValueRef) + "%";
+                        else if (el.text.find("SFX") != std::string::npos)
+                            el.text = "SFX: " + std::to_string(*el.intValueRef) + "%";
+                        else if (el.text.find("Ambient") != std::string::npos)
+                            el.text = "Ambient: " + std::to_string(*el.intValueRef) + "%";
                     } else if (el.valueRef) {
                         *el.valueRef = val;
                         // Update text
@@ -1518,6 +1544,8 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             el.text = "GAMMA: " + std::to_string(*el.valueRef).substr(0, 3);
                         else if (el.text.find("BRIGHTNESS") != std::string::npos)
                             el.text = "BRIGHTNESS: " + std::to_string(*el.valueRef).substr(0, 3);
+                        else if (el.text.find("Shadow Distance") != std::string::npos)
+                            el.text = "Shadow Distance: " + std::to_string((int)*el.valueRef);
                     }
                     
                     if (onSettingsChanged) onSettingsChanged();
