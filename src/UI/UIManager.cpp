@@ -3471,8 +3471,6 @@ void UIManager::renderModelPreview() {
 }
 
 void UIManager::renderLoadingTip(const std::string& text) {
-    if (text.empty()) return;
-
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -3481,11 +3479,22 @@ void UIManager::renderLoadingTip(const std::string& text) {
     glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
     uiShader.setMat4("uProjection", projection);
 
-    float scale = 1.6f;
-    float textW = text.length() * 6.0f * scale;
-    float x = (width - textW) / 2.0f;
-    float y = height * 0.75f;
-    drawText(x, y, scale, text, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f));
+    // Draw "Loading..." text above the progress bar
+    float loadingScale = 2.0f;
+    std::string loadingText = "Loading...";
+    float loadingW = loadingText.length() * 6.0f * loadingScale;
+    float loadingX = (width - loadingW) / 2.0f;
+    float loadingY = height * 0.40f;
+    drawText(loadingX, loadingY, loadingScale, loadingText, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+
+    // Draw tip text below the progress bar
+    if (!text.empty()) {
+        float tipScale = 1.4f;
+        float textW = text.length() * 6.0f * tipScale;
+        float x = (width - textW) / 2.0f;
+        float y = height * 0.65f;
+        drawText(x, y, tipScale, text, glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
+    }
 
     uiShader.unuse();
     glDisable(GL_BLEND);

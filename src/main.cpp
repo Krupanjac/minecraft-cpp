@@ -1131,6 +1131,7 @@ private:
     float swimInterval = 0.6f;
     bool isUnderwater = false;
     bool wasUnderwater = false;
+    bool wasOnGround = true; // For detecting jump
 
     // Loading tips
     std::vector<std::string> loadingTips = {
@@ -1372,7 +1373,22 @@ private:
         bool sneak = window->isKeyPressed(keys.sneak);
         bool down = sneak; // Use sneak key for flying down
 
+        // Track onGround state before processing input for jump detection
+        bool wasOnGroundBefore = camera.onGround;
+        
         camera.processInput(forward, backward, left, right, up, down, sprint, sneak, deltaTime);
+        
+        // Detect jump: was on ground, pressed jump, now not on ground (and not flying)
+        if (wasOnGroundBefore && up && !camera.onGround && !camera.isFlying && uiManager.isWorldLoaded() && !isUnderwater) {
+            // Play footstep sound as jump sound (Minecraft behavior)
+            glm::vec3 playerPos = camera.getPosition();
+            int blockX = static_cast<int>(std::floor(playerPos.x));
+            int blockY = static_cast<int>(std::floor(playerPos.y - 0.1f));
+            int blockZ = static_cast<int>(std::floor(playerPos.z));
+            Block blockBelow = chunkManager.getBlockAt(blockX, blockY, blockZ);
+            Audio::SoundType stepSound = Audio::getStepSoundForBlock(static_cast<uint8_t>(blockBelow.getType()));
+            Audio::AudioManager::instance().playSound(stepSound, 0.6f);
+        }
         
         if (firstMouse) {
             lastX = xpos;

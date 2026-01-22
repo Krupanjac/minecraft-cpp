@@ -683,6 +683,13 @@ void AudioManager::updateAmbient(float deltaTime) {
             m_nextAmbientTime = dist(m_rng);
             m_ambientTimer = m_nextAmbientTime;
         }
+    } else {
+        // Reset timer when leaving cave so it doesn't play immediately upon re-entry
+        // Use a short initial delay when re-entering
+        if (m_ambientTimer <= 0.0f) {
+            std::uniform_real_distribution<float> dist(10.0f, 30.0f);
+            m_ambientTimer = dist(m_rng);
+        }
     }
 
     // Water cave ambient (only when underwater in caves)
@@ -695,8 +702,11 @@ void AudioManager::updateAmbient(float deltaTime) {
             m_waterAmbientTimer = m_nextWaterAmbientTime;
         }
     } else {
-        // Reset timer when not in water caves
-        m_waterAmbientTimer = 0.0f;
+        // Reset timer when not in water caves - use short initial delay upon re-entry
+        if (m_waterAmbientTimer <= 0.0f) {
+            std::uniform_real_distribution<float> dist(3.0f, 8.0f);
+            m_waterAmbientTimer = dist(m_rng);
+        }
     }
     
     // Random thunder during storms
