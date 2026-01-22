@@ -1430,8 +1430,36 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
     // Update preview model animation and rotation when in player settings
     if (currentMenuState == MenuState::PLAYER_SETTINGS && previewModel) {
         previewModel->updateAnimation(deltaTime);
-        previewRotation += deltaTime * 30.0f; // Rotate 30 degrees per second
-        if (previewRotation > 360.0f) previewRotation -= 360.0f;
+        
+        // Handle drag rotation with momentum
+        if (mousePressed) {
+            if (!isDraggingModel) {
+                // Start dragging
+                isDraggingModel = true;
+                lastDragX = (float)mouseX;
+                previewRotationVelocity = 0.0f;  // Stop any existing momentum
+            } else {
+                // Continue dragging - calculate velocity from mouse movement
+                float dragDelta = (float)mouseX - lastDragX;
+                previewRotationVelocity = dragDelta * 2.0f;  // Sensitivity multiplier
+                previewRotation += previewRotationVelocity * deltaTime * 60.0f;
+                lastDragX = (float)mouseX;
+            }
+        } else {
+            isDraggingModel = false;
+            // Apply deceleration (momentum decay)
+            previewRotation += previewRotationVelocity * deltaTime * 60.0f;
+            previewRotationVelocity *= 0.95f;  // Decay factor - adjust for faster/slower stop
+            
+            // Stop when velocity is very small
+            if (std::abs(previewRotationVelocity) < 0.01f) {
+                previewRotationVelocity = 0.0f;
+            }
+        }
+        
+        // Keep rotation in reasonable range
+        while (previewRotation > 360.0f) previewRotation -= 360.0f;
+        while (previewRotation < 0.0f) previewRotation += 360.0f;
     }
     
     if (!isMenuOpen()) {
@@ -1883,9 +1911,9 @@ void UIManager::render() {
                 glm::vec3 target = glm::vec3(0.0f, targetHeight, 0.0f);
                 glm::mat4 view3D = glm::lookAt(camPos, target, glm::vec3(0.0f, 1.0f, 0.0f));
                 
-                // Model transform - rotate to face camera
+                // Model transform - rotate based on user drag
                 glm::mat4 modelMat = glm::mat4(1.0f);
-                modelMat = glm::rotate(modelMat, glm::radians(previewRotation + 180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                modelMat = glm::rotate(modelMat, glm::radians(previewRotation), glm::vec3(0.0f, 1.0f, 0.0f));
                 
                 // Scale down all models - Half-Life much smaller, others also scaled
                 float modelScale = (previewModelIndex == 0) ? 0.1f : 0.6f;

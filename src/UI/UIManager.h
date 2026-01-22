@@ -180,6 +180,9 @@ private:
     std::shared_ptr<ModelSystem::Model> previewModel;
     int previewModelIndex = -1;
     float previewRotation = 0.0f;
+    float previewRotationVelocity = 0.0f;  // For momentum/inertia
+    bool isDraggingModel = false;
+    float lastDragX = 0.0f;
     GLuint previewFBO = 0;  // Framebuffer for model preview
     GLuint previewTexture = 0;  // Texture for preview render
     GLuint previewDepth = 0;  // Depth buffer for preview
