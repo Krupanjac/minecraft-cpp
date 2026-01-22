@@ -187,6 +187,12 @@ public:
     float chatFadeDelay = 10.0f; // Seconds before messages start fading
     int maxChatMessages = 100; // Maximum messages to keep in history
     
+    // Audio settings
+    float masterVolume = 1.0f;
+    float musicVolume = 0.5f;
+    float soundVolume = 1.0f; // Sound effects (blocks, mobs, player)
+    float ambientVolume = 0.7f;
+    
     struct KeyBindings {
         int forward = 87;  // W
         int backward = 83; // S
@@ -248,6 +254,11 @@ public:
                     else if (key == "chatShowTimestamps") chatShowTimestamps = (value == "1");
                     else if (key == "chatFadeDelay") chatFadeDelay = std::stof(value);
                     else if (key == "maxChatMessages") maxChatMessages = std::stoi(value);
+                    // Audio
+                    else if (key == "masterVolume") masterVolume = std::stof(value);
+                    else if (key == "musicVolume") musicVolume = std::stof(value);
+                    else if (key == "soundVolume") soundVolume = std::stof(value);
+                    else if (key == "ambientVolume") ambientVolume = std::stof(value);
                     // Keys
                     else if (key == "key_forward") keys.forward = std::stoi(value);
                     else if (key == "key_backward") keys.backward = std::stoi(value);
@@ -304,6 +315,11 @@ public:
         file << "chatShowTimestamps=" << (chatShowTimestamps ? "1" : "0") << "\n";
         file << "chatFadeDelay=" << chatFadeDelay << "\n";
         file << "maxChatMessages=" << maxChatMessages << "\n";
+        // Audio
+        file << "masterVolume=" << masterVolume << "\n";
+        file << "musicVolume=" << musicVolume << "\n";
+        file << "soundVolume=" << soundVolume << "\n";
+        file << "ambientVolume=" << ambientVolume << "\n";
         
         file << "key_forward=" << keys.forward << "\n";
         file << "key_backward=" << keys.backward << "\n";

@@ -22,6 +22,7 @@
 #include "Entity/SheepEntity.h"
 #include "Entity/MobSpawnManager.h"
 #include "Network/NetworkManager.h"
+#include "Audio/AudioManager.h"
 
 #include <memory>
 #include <iostream>
@@ -114,11 +115,13 @@ public:
                     // In main menu without world - ESC does nothing or goes back in menu hierarchy
                     MenuState currentState = uiManager.getMenuState();
                     if (currentState == MenuState::SETTINGS || currentState == MenuState::VIDEO_SETTINGS ||
-                        currentState == MenuState::CONTROLS || currentState == MenuState::NEW_GAME ||
-                        currentState == MenuState::LOAD_GAME || currentState == MenuState::MULTIPLAYER ||
-                        currentState == MenuState::HOST_GAME || currentState == MenuState::JOIN_GAME) {
+                        currentState == MenuState::AUDIO_SETTINGS || currentState == MenuState::CONTROLS || 
+                        currentState == MenuState::NEW_GAME || currentState == MenuState::LOAD_GAME || 
+                        currentState == MenuState::MULTIPLAYER || currentState == MenuState::HOST_GAME || 
+                        currentState == MenuState::JOIN_GAME || currentState == MenuState::PLAYER_SETTINGS) {
                         // Go back to main menu from sub-menus
-                        if (currentState == MenuState::VIDEO_SETTINGS || currentState == MenuState::CONTROLS) {
+                        if (currentState == MenuState::VIDEO_SETTINGS || currentState == MenuState::CONTROLS ||
+                            currentState == MenuState::AUDIO_SETTINGS || currentState == MenuState::PLAYER_SETTINGS) {
                             uiManager.setMenuState(MenuState::SETTINGS);
                         } else if (currentState == MenuState::HOST_GAME || currentState == MenuState::JOIN_GAME) {
                             uiManager.setMenuState(MenuState::MULTIPLAYER);
@@ -195,6 +198,8 @@ public:
             uiManager.setWorldLoaded(true);
             uiManager.setMenuState(MenuState::NONE);
             window->setCursorMode(GLFW_CURSOR_DISABLED);
+            // Stop menu music
+            Audio::AudioManager::instance().stopMusic(2.0f);
         });
         
         uiManager.setOnLoadGame([this](std::string name) {
@@ -202,6 +207,8 @@ public:
                 uiManager.setWorldLoaded(true);
                 uiManager.setMenuState(MenuState::NONE);
                 window->setCursorMode(GLFW_CURSOR_DISABLED);
+                // Stop menu music
+                Audio::AudioManager::instance().stopMusic(2.0f);
             }
         });
         
@@ -422,6 +429,16 @@ public:
                 );
             }
         });
+        
+        // Initialize audio system
+        if (!Audio::AudioManager::instance().initialize()) {
+            LOG_WARNING("Failed to initialize audio system - continuing without sound");
+        } else {
+            Audio::AudioManager::instance().loadAllSounds();
+            // Set initial volume from settings
+            Audio::AudioManager::instance().setMasterVolume(Settings::instance().masterVolume);
+            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MUSIC, Settings::instance().musicVolume);
+        }
         
         // Apply initial settings
         applySettings();
@@ -919,6 +936,33 @@ public:
                 playerEntity->setVelocity(camera.velocity);
                 playerEntity->updateWithCamera(deltaTime, camera);
             }
+            
+            // Handle footstep sounds
+            if (camera.onGround && !camera.isFlying && uiManager.isWorldLoaded()) {
+                float horizontalSpeed = glm::length(glm::vec2(camera.velocity.x, camera.velocity.z));
+                if (horizontalSpeed > 0.5f) {
+                    footstepTimer -= deltaTime;
+                    if (footstepTimer <= 0.0f) {
+                        // Get block below player
+                        glm::vec3 playerPos = camera.getPosition();
+                        int blockX = static_cast<int>(std::floor(playerPos.x));
+                        int blockY = static_cast<int>(std::floor(playerPos.y - 0.1f));
+                        int blockZ = static_cast<int>(std::floor(playerPos.z));
+                        Block blockBelow = chunkManager.getBlockAt(blockX, blockY, blockZ);
+                        
+                        // Play footstep sound based on block type
+                        Audio::SoundType stepSound = Audio::getStepSoundForBlock(static_cast<uint8_t>(blockBelow.getType()));
+                        Audio::AudioManager::instance().playSound(stepSound, 0.5f);
+                        
+                        // Adjust interval based on sprint
+                        footstepInterval = camera.isSprinting ? 0.3f : 0.45f;
+                        footstepTimer = footstepInterval;
+                    }
+                } else {
+                    footstepTimer = 0.0f; // Reset timer when not moving
+                }
+            }
+            
             if (fpsUpdateTimer >= 0.5f) {
                 displayFPS = fpsAccumulator / frameAccumulator;
                 fpsAccumulator = 0.0f;
@@ -1036,6 +1080,10 @@ private:
         glm::vec3(100.0f, 90.0f, -200.0f)
     };
     
+    // Audio - footstep timer
+    float footstepTimer = 0.0f;
+    float footstepInterval = 0.4f; // Time between footstep sounds
+    
     // Menu world cache - O(1) lookup for chunks within session
     long menuWorldSeed = 0; // Set once at startup, reused for entire session
     bool menuSeedInitialized = false;
@@ -1065,6 +1113,15 @@ private:
                     int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
                     int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
                     int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
+                    
+                    // Get block type before breaking for sound
+                    Block block = chunkManager.getBlockAt(x, y, z);
+                    uint8_t blockTypeVal = static_cast<uint8_t>(block.getType());
+                    
+                    // Play dig sound at block position
+                    Audio::SoundType digSound = Audio::getDigSoundForBlock(blockTypeVal);
+                    Audio::AudioManager::instance().playSoundAt(digSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f));
+                    
                     chunkManager.setBlockAt(x, y, z, Block(BlockType::AIR));
                     
                     // Broadcast block change to network
@@ -1140,6 +1197,10 @@ private:
                         BlockType blockType = uiManager.getSelectedBlock();
                         chunkManager.setBlockAt(x, y, z, Block(blockType));
                         
+                        // Play place sound at block position
+                        Audio::SoundType placeSound = Audio::getPlaceSoundForBlock(static_cast<uint8_t>(blockType));
+                        Audio::AudioManager::instance().playSoundAt(placeSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f));
+                        
                         // Broadcast block change to network
                         if (networkManager.isOnline()) {
                             networkManager.sendBlockChange(x, y, z, static_cast<uint8_t>(blockType));
@@ -1214,6 +1275,14 @@ private:
     void update(float deltaTime) {
         // Always update network (even in menu for connection handling)
         networkManager.update(deltaTime);
+        
+        // Update audio system with listener position
+        Audio::AudioManager::instance().setListenerPosition(
+            camera.getPosition(),
+            camera.getFront(),
+            camera.getUp()
+        );
+        Audio::AudioManager::instance().update(deltaTime);
         
         // Send local player position to network
         // Send foot position (camera is at FEET level)

@@ -3,6 +3,7 @@
 #include "../Core/Logger.h"
 #include "../Model/Model.h"
 #include "../World/ChunkManager.h"
+#include "../Audio/AudioManager.h"
 
 #include <algorithm>
 #include <cctype>
@@ -97,9 +98,22 @@ bool PassiveMob::checkCollision(ChunkManager& chunkManager, const glm::vec3& fee
 
 void PassiveMob::takeDamage(float amount) {
     health -= amount;
+    
+    // Play hurt sound
+    Audio::SoundType hurtSound = getHurtSound();
+    if (hurtSound != Audio::SoundType::NONE) {
+        Audio::AudioManager::instance().playSoundAt(hurtSound, position);
+    }
+    
     if (health <= 0.0f) {
         dead = true;
         health = 0.0f;
+        
+        // Play death sound
+        Audio::SoundType deathSound = getDeathSound();
+        if (deathSound != Audio::SoundType::NONE) {
+            Audio::AudioManager::instance().playSoundAt(deathSound, position);
+        }
     }
 }
 
@@ -109,6 +123,19 @@ void PassiveMob::updateAI(float deltaTime, ChunkManager& chunkManager) {
     // Update animation
     if (model) {
         model->updateAnimation(deltaTime);
+    }
+    
+    // Ambient sounds
+    soundTimer -= deltaTime;
+    if (soundTimer <= 0.0f) {
+        Audio::SoundType ambientSound = getAmbientSound();
+        if (ambientSound != Audio::SoundType::NONE) {
+            Audio::AudioManager::instance().playSoundAt(ambientSound, position, 0.8f);
+        }
+        // Random interval between sounds
+        std::uniform_real_distribution<float> dis(5.0f, 15.0f);
+        nextSoundTime = dis(rng);
+        soundTimer = nextSoundTime;
     }
 
     // === Improved Ground Detection & Physics ===

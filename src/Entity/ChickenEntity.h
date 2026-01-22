@@ -18,6 +18,11 @@ public:
 protected:
     void loadModel() override;
     
+    // Sound overrides
+    Audio::SoundType getAmbientSound() const override { return Audio::SoundType::MOB_CHICKEN_SAY; }
+    Audio::SoundType getHurtSound() const override { return Audio::SoundType::MOB_CHICKEN_HURT; }
+    Audio::SoundType getDeathSound() const override { return Audio::SoundType::MOB_CHICKEN_HURT; }
+    
 private:
     void initializeCommon();
 };

@@ -137,6 +137,7 @@ set(SOURCES
     src/Entity/MobSpawnManager.cpp
     src/Entity/EntityManager.cpp
     src/Model/Model.cpp
+    src/Audio/AudioManager.cpp
     ${GLAD_DIR}/src/glad.c
 )
 

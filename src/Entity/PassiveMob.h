@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Entity.h"
+#include "../Audio/AudioManager.h"
 #include <random>
 #include <string>
 #include <memory>
@@ -50,10 +51,17 @@ protected:
 
     std::string idleAnim;
     std::string walkAnim;
+    
+    // Sound system
+    float soundTimer = 0.0f;
+    float nextSoundTime = 5.0f;
 
     // To be implemented by subclasses
     virtual void loadModel() = 0;
     virtual void pickAnimations();
+    virtual Audio::SoundType getAmbientSound() const { return Audio::SoundType::NONE; }
+    virtual Audio::SoundType getHurtSound() const { return Audio::SoundType::NONE; }
+    virtual Audio::SoundType getDeathSound() const { return Audio::SoundType::NONE; }
     
     void setState(State s, float minTime, float maxTime);
     void chooseRandomWanderDir();

@@ -2,6 +2,7 @@
 #include "../World/WorldSerializer.h"
 #include "../World/WorldGenerator.h"
 #include "../Core/HardwareInfo.h"
+#include "../Audio/AudioManager.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <algorithm>
@@ -311,6 +312,7 @@ void UIManager::setMenuState(MenuState state) {
         case MenuState::IN_GAME_MENU: setupInGameMenu(); break;
         case MenuState::SETTINGS: setupSettingsMenu(); break;
         case MenuState::VIDEO_SETTINGS: setupVideoSettingsMenu(); break;
+        case MenuState::AUDIO_SETTINGS: setupAudioSettingsMenu(); break;
         case MenuState::PLAYER_SETTINGS: setupPlayerSettingsMenu(); break;
         case MenuState::CONTROLS: setupControlsMenu(); break;
         case MenuState::LOAD_GAME: setupLoadGameMenu(); break;
@@ -393,6 +395,10 @@ void UIManager::handleKeyInput(int key) {
 
 void UIManager::setupMainMenu() {
     elements.clear();
+    
+    // Play menu music
+    Audio::AudioManager::instance().playMusic(Audio::SoundType::MUSIC_MENU, true, 2.0f);
+    
     float centerX = width / 2.0f;
     float centerY = height / 2.0f + 30.0f; // Shifted down to make room for title
     float btnW = 280.0f;  // Wider buttons
@@ -477,10 +483,16 @@ void UIManager::setupSettingsMenu() {
     float btnW = 300.0f;
     float btnH = 40.0f;
     float gap = 10.0f;
-    float startY = cy - 120.0f;
+    float startY = cy - 150.0f;
 
     elements.push_back({cx - btnW/2, startY, btnW, btnH, "VIDEO SETTINGS", false, [this]() { 
         setMenuState(MenuState::VIDEO_SETTINGS); 
+    }});
+    startY += btnH + gap;
+    
+    // Audio Settings
+    elements.push_back({cx - btnW/2, startY, btnW, btnH, "AUDIO SETTINGS", false, [this]() {
+        setMenuState(MenuState::AUDIO_SETTINGS);
     }});
     startY += btnH + gap;
 
@@ -1546,6 +1558,25 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             el.text = "BRIGHTNESS: " + std::to_string(*el.valueRef).substr(0, 3);
                         else if (el.text.find("Shadow Distance") != std::string::npos)
                             el.text = "Shadow Distance: " + std::to_string((int)*el.valueRef);
+                        else if (el.text.find("Master Volume") != std::string::npos) {
+                            el.text = "Master Volume: " + std::to_string(static_cast<int>(*el.valueRef * 100)) + "%";
+                            Audio::AudioManager::instance().setMasterVolume(*el.valueRef);
+                        }
+                        else if (el.text.find("Music Volume") != std::string::npos) {
+                            el.text = "Music Volume: " + std::to_string(static_cast<int>(*el.valueRef * 100)) + "%";
+                            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MUSIC, *el.valueRef);
+                        }
+                        else if (el.text.find("Sound Effects") != std::string::npos) {
+                            el.text = "Sound Effects: " + std::to_string(static_cast<int>(*el.valueRef * 100)) + "%";
+                            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::BLOCKS, *el.valueRef);
+                            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MOBS, *el.valueRef);
+                            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::PLAYER, *el.valueRef);
+                        }
+                        else if (el.text.find("Ambient Volume") != std::string::npos) {
+                            el.text = "Ambient Volume: " + std::to_string(static_cast<int>(*el.valueRef * 100)) + "%";
+                            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::AMBIENT, *el.valueRef);
+                            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::WEATHER, *el.valueRef);
+                        }
                     }
                     
                     if (onSettingsChanged) onSettingsChanged();
@@ -1601,6 +1632,8 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             
                             if (onSettingsChanged) onSettingsChanged();
                         } else {
+                            // Play UI click sound
+                            Audio::AudioManager::instance().playSound(Audio::SoundType::UI_CLICK, 0.5f);
                             pendingClick = el.onClick;
                             break; // Stop processing to avoid issues with vector modification
                         }
@@ -3022,6 +3055,105 @@ void UIManager::setupAboutMenu() {
     back.h = 45;
     back.text = "Back";
     back.onClick = [this]() { setMenuState(MenuState::MAIN_MENU); };
+    elements.push_back(back);
+}
+
+void UIManager::setupAudioSettingsMenu() {
+    elements.clear();
+    
+    auto& s = Settings::instance();
+    
+    float centerX = width / 2.0f;
+    float startY = 100.0f;
+    float lineHeight = 55.0f;
+    float sliderW = 400.0f;
+    float sliderH = 30.0f;
+    
+    // Title
+    UIElement title;
+    title.x = centerX - 150;
+    title.y = startY;
+    title.w = 300;
+    title.h = 50;
+    title.text = "AUDIO SETTINGS";
+    elements.push_back(title);
+    startY += 70.0f;
+    
+    // Master Volume
+    UIElement master;
+    master.x = centerX - sliderW/2;
+    master.y = startY;
+    master.w = sliderW;
+    master.h = sliderH;
+    master.text = "Master Volume: " + std::to_string(static_cast<int>(s.masterVolume * 100)) + "%";
+    master.isSlider = true;
+    master.valueRef = &s.masterVolume;
+    master.minVal = 0.0f;
+    master.maxVal = 1.0f;
+    elements.push_back(master);
+    startY += lineHeight;
+    
+    // Music Volume
+    UIElement music;
+    music.x = centerX - sliderW/2;
+    music.y = startY;
+    music.w = sliderW;
+    music.h = sliderH;
+    music.text = "Music Volume: " + std::to_string(static_cast<int>(s.musicVolume * 100)) + "%";
+    music.isSlider = true;
+    music.valueRef = &s.musicVolume;
+    music.minVal = 0.0f;
+    music.maxVal = 1.0f;
+    elements.push_back(music);
+    startY += lineHeight;
+    
+    // Sound Effects Volume
+    UIElement sounds;
+    sounds.x = centerX - sliderW/2;
+    sounds.y = startY;
+    sounds.w = sliderW;
+    sounds.h = sliderH;
+    sounds.text = "Sound Effects: " + std::to_string(static_cast<int>(s.soundVolume * 100)) + "%";
+    sounds.isSlider = true;
+    sounds.valueRef = &s.soundVolume;
+    sounds.minVal = 0.0f;
+    sounds.maxVal = 1.0f;
+    elements.push_back(sounds);
+    startY += lineHeight;
+    
+    // Ambient Volume
+    UIElement ambient;
+    ambient.x = centerX - sliderW/2;
+    ambient.y = startY;
+    ambient.w = sliderW;
+    ambient.h = sliderH;
+    ambient.text = "Ambient Volume: " + std::to_string(static_cast<int>(s.ambientVolume * 100)) + "%";
+    ambient.isSlider = true;
+    ambient.valueRef = &s.ambientVolume;
+    ambient.minVal = 0.0f;
+    ambient.maxVal = 1.0f;
+    elements.push_back(ambient);
+    startY += lineHeight + 20.0f;
+    
+    // Back button
+    UIElement back;
+    back.x = centerX - 150;
+    back.y = startY;
+    back.w = 300;
+    back.h = 45;
+    back.text = "Back";
+    back.onClick = [this]() { 
+        // Apply audio settings
+        auto& settings = Settings::instance();
+        Audio::AudioManager::instance().setMasterVolume(settings.masterVolume);
+        Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MUSIC, settings.musicVolume);
+        Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::BLOCKS, settings.soundVolume);
+        Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MOBS, settings.soundVolume);
+        Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::PLAYER, settings.soundVolume);
+        Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::AMBIENT, settings.ambientVolume);
+        Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::WEATHER, settings.ambientVolume);
+        setMenuState(MenuState::SETTINGS); 
+    };
     elements.push_back(back);
 }
 
