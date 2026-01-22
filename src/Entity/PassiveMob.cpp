@@ -111,16 +111,48 @@ void PassiveMob::updateAI(float deltaTime, ChunkManager& chunkManager) {
         model->updateAnimation(deltaTime);
     }
 
-    // Gravity
-    velocity.y -= 25.0f * deltaTime;
-    velocity.y = std::max(velocity.y, -50.0f);
-
-    // Check ground
-    glm::vec3 feetCheck = position + glm::vec3(0.0f, velocity.y * deltaTime - 0.1f, 0.0f);
-    if (checkCollision(chunkManager, feetCheck)) {
+    // === Improved Ground Detection & Physics ===
+    // First, find the ground below us
+    int blockX = static_cast<int>(std::floor(position.x));
+    int blockZ = static_cast<int>(std::floor(position.z));
+    int blockY = static_cast<int>(std::floor(position.y));
+    
+    // Find ground level by scanning down
+    float groundY = -1000.0f;
+    for (int y = blockY + 2; y >= blockY - 5 && y >= 0; --y) {
+        Block below = chunkManager.getBlockAt(blockX, y - 1, blockZ);
+        Block at = chunkManager.getBlockAt(blockX, y, blockZ);
+        if (below.isSolid() && !at.isSolid()) {
+            groundY = static_cast<float>(y);
+            break;
+        }
+    }
+    
+    // Check if on ground
+    float feetY = position.y;
+    if (groundY > -900.0f && feetY <= groundY + 0.05f && feetY >= groundY - 0.5f) {
+        // Snap to ground
+        position.y = groundY;
         velocity.y = 0.0f;
         onGround = true;
+    } else if (groundY > -900.0f && feetY > groundY + 0.1f) {
+        // In air, apply gravity
+        velocity.y -= 25.0f * deltaTime;
+        velocity.y = std::max(velocity.y, -50.0f);
+        position.y += velocity.y * deltaTime;
+        onGround = false;
+        
+        // Don't go below ground
+        if (position.y < groundY) {
+            position.y = groundY;
+            velocity.y = 0.0f;
+            onGround = true;
+        }
     } else {
+        // No ground found, apply gravity
+        velocity.y -= 25.0f * deltaTime;
+        velocity.y = std::max(velocity.y, -50.0f);
+        position.y += velocity.y * deltaTime;
         onGround = false;
     }
 
@@ -162,7 +194,8 @@ void PassiveMob::updateAI(float deltaTime, ChunkManager& chunkManager) {
         glm::vec3 newPos = position + glm::vec3(moveVec.x, 0.0f, moveVec.z);
         
         if (!checkCollision(chunkManager, newPos)) {
-            position = newPos;
+            position.x = newPos.x;
+            position.z = newPos.z;
             
             // Rotate to face movement direction
             float targetYaw = glm::degrees(std::atan2(-moveVec.x, -moveVec.z));
@@ -178,10 +211,7 @@ void PassiveMob::updateAI(float deltaTime, ChunkManager& chunkManager) {
         }
     }
 
-    // Apply vertical movement
-    position.y += velocity.y * deltaTime;
-
-    // Clamp to ground
+    // Clamp to minimum height (fallback safety)
     if (position.y < 1.0f) {
         position.y = 1.0f;
         velocity.y = 0.0f;

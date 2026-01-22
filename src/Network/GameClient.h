@@ -60,6 +60,9 @@ public:
     using DisconnectCallback = std::function<void(const std::string& reason)>;
     using ConnectedCallback = std::function<void()>;
     using TimeSyncCallback = std::function<void(float timeOfDay, bool isPaused)>;
+    using EntitySpawnCallback = std::function<void(uint32_t entityId, uint8_t mobType, const glm::vec3& pos, float yaw)>;
+    using EntityDespawnCallback = std::function<void(uint32_t entityId)>;
+    using EntityUpdateCallback = std::function<void(uint32_t entityId, const glm::vec3& pos, const glm::vec3& vel, float yaw, float health, uint8_t flags)>;
     
     void setBlockChangeCallback(BlockChangeCallback cb) { m_onBlockChange = std::move(cb); }
     void setPlayerJoinCallback(PlayerJoinCallback cb) { m_onPlayerJoin = std::move(cb); }
@@ -68,6 +71,9 @@ public:
     void setDisconnectCallback(DisconnectCallback cb) { m_onDisconnect = std::move(cb); }
     void setConnectedCallback(ConnectedCallback cb) { m_onConnected = std::move(cb); }
     void setTimeSyncCallback(TimeSyncCallback cb) { m_onTimeSync = std::move(cb); }
+    void setEntitySpawnCallback(EntitySpawnCallback cb) { m_onEntitySpawn = std::move(cb); }
+    void setEntityDespawnCallback(EntityDespawnCallback cb) { m_onEntityDespawn = std::move(cb); }
+    void setEntityUpdateCallback(EntityUpdateCallback cb) { m_onEntityUpdate = std::move(cb); }
     
 private:
     void processPackets();
@@ -105,6 +111,9 @@ private:
     DisconnectCallback m_onDisconnect;
     ConnectedCallback m_onConnected;
     TimeSyncCallback m_onTimeSync;
+    EntitySpawnCallback m_onEntitySpawn;
+    EntityDespawnCallback m_onEntityDespawn;
+    EntityUpdateCallback m_onEntityUpdate;
 };
 
 } // namespace Network

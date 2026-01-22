@@ -8,6 +8,7 @@
 #include <thread>
 #include <mutex>
 #include <functional>
+#include <memory>
 
 namespace Server {
 
@@ -89,6 +90,9 @@ private:
     
     std::unique_ptr<Network::GameServer> m_server;
     std::atomic<bool> m_running{false};
+    
+    // NOTE: Entity/mob spawning requires the game client (hosted server mode)
+    // Dedicated server handles networking - mobs spawn on host and sync to clients
     
     // Timing
     std::chrono::steady_clock::time_point m_startTime;

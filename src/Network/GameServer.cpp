@@ -396,6 +396,51 @@ void GameServer::broadcastTimeSync(float timeOfDay, bool isPaused) {
     broadcastToAll(packet);
 }
 
+void GameServer::broadcastEntitySpawn(uint32_t entityId, uint8_t mobType, const glm::vec3& pos, float yaw) {
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
+    
+    PacketBuffer packet;
+    // Write packet header manually
+    packet.writeU8(static_cast<uint8_t>(PacketType::ENTITY_SPAWN));
+    packet.writeU32(entityId);
+    packet.writeU8(mobType);
+    packet.writeFloat(pos.x);
+    packet.writeFloat(pos.y);
+    packet.writeFloat(pos.z);
+    packet.writeFloat(yaw);
+    
+    broadcastToAll(packet);
+}
+
+void GameServer::broadcastEntityDespawn(uint32_t entityId) {
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
+    
+    PacketBuffer packet;
+    packet.writeU8(static_cast<uint8_t>(PacketType::ENTITY_DESPAWN));
+    packet.writeU32(entityId);
+    
+    broadcastToAll(packet);
+}
+
+void GameServer::broadcastEntityUpdate(uint32_t entityId, const glm::vec3& pos, const glm::vec3& vel, float yaw, float health, uint8_t flags) {
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
+    
+    PacketBuffer packet;
+    packet.writeU8(static_cast<uint8_t>(PacketType::ENTITY_UPDATE));
+    packet.writeU32(entityId);
+    packet.writeFloat(pos.x);
+    packet.writeFloat(pos.y);
+    packet.writeFloat(pos.z);
+    packet.writeFloat(vel.x);
+    packet.writeFloat(vel.y);
+    packet.writeFloat(vel.z);
+    packet.writeFloat(yaw);
+    packet.writeFloat(health);
+    packet.writeU8(flags);
+    
+    broadcastToAll(packet);
+}
+
 size_t GameServer::getPlayerCount() const {
     std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
     return std::count_if(m_clients.begin(), m_clients.end(),

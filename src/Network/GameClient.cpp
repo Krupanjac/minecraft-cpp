@@ -293,6 +293,47 @@ void GameClient::handlePacket(PacketType type, PacketBuffer& buffer) {
             break;
         }
         
+        case PacketType::ENTITY_SPAWN: {
+            uint32_t entityId = buffer.readU32();
+            uint8_t mobType = buffer.readU8();
+            float x = buffer.readFloat();
+            float y = buffer.readFloat();
+            float z = buffer.readFloat();
+            float yaw = buffer.readFloat();
+            
+            if (m_onEntitySpawn) {
+                m_onEntitySpawn(entityId, mobType, glm::vec3(x, y, z), yaw);
+            }
+            break;
+        }
+        
+        case PacketType::ENTITY_DESPAWN: {
+            uint32_t entityId = buffer.readU32();
+            
+            if (m_onEntityDespawn) {
+                m_onEntityDespawn(entityId);
+            }
+            break;
+        }
+        
+        case PacketType::ENTITY_UPDATE: {
+            uint32_t entityId = buffer.readU32();
+            float x = buffer.readFloat();
+            float y = buffer.readFloat();
+            float z = buffer.readFloat();
+            float velX = buffer.readFloat();
+            float velY = buffer.readFloat();
+            float velZ = buffer.readFloat();
+            float yaw = buffer.readFloat();
+            float health = buffer.readFloat();
+            uint8_t flags = buffer.readU8();
+            
+            if (m_onEntityUpdate) {
+                m_onEntityUpdate(entityId, glm::vec3(x, y, z), glm::vec3(velX, velY, velZ), yaw, health, flags);
+            }
+            break;
+        }
+        
         default:
             LOG_WARNING("Unknown packet type: " + std::to_string(static_cast<int>(type)));
             break;

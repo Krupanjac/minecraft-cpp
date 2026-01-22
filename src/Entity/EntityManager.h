@@ -122,6 +122,10 @@ public:
     void queueSpawn(MobType type, const glm::vec3& position, EntityId id = INVALID_ENTITY_ID);
     void spawnImmediate(MobType type, const glm::vec3& position, EntityId id = INVALID_ENTITY_ID);
     
+    // Network spawning (for clients receiving entity spawns from server)
+    void spawnFromNetwork(MobType type, const glm::vec3& position, EntityId id, float yaw);
+    void despawnById(EntityId id);
+    
     // Entity access (read-only for rendering)
     std::vector<Entity*> getAllEntities() const;
     std::vector<Entity*> getEntitiesInRadius(const glm::vec3& center, float radius) const;
@@ -144,6 +148,18 @@ public:
     
     // Server: Get entity states to broadcast
     std::vector<NetworkEntityState> getEntityStatesForSync() const;
+    
+    // Server: Get newly spawned entities (clears the list after returning)
+    struct SpawnEvent {
+        EntityId id;
+        MobType type;
+        glm::vec3 position;
+        float yaw;
+    };
+    std::vector<SpawnEvent> consumeSpawnEvents();
+    
+    // Server: Get recently despawned entity IDs (clears the list after returning)
+    std::vector<EntityId> consumeDespawnEvents();
     
     // Client: Apply entity states from server
     void applyEntityStates(const std::vector<NetworkEntityState>& states);
@@ -197,6 +213,10 @@ private:
     // Network mode
     bool isServer = false;
     bool isClient = false;
+    
+    // Network event tracking (for broadcasting to clients)
+    std::vector<SpawnEvent> pendingSpawnEvents;
+    std::vector<EntityId> pendingDespawnEvents;
     
     // Activation levels for performance
     enum class ActivationLevel {

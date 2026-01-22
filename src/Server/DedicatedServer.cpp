@@ -59,9 +59,7 @@ bool DedicatedServer::start() {
     });
     
     m_server->setBlockChangeCallback([this](int x, int y, int z, uint8_t blockType, uint32_t playerId) {
-        // Silence unused parameter warnings
         (void)x; (void)y; (void)z; (void)blockType; (void)playerId;
-        // Could log block changes if verbose logging is enabled
     });
     
     m_server->setChatCallback([this](uint32_t senderId, const std::string& message) {
@@ -83,6 +81,7 @@ bool DedicatedServer::start() {
     
     log("INFO", "Server started successfully!");
     log("INFO", "Listening on port " + std::to_string(m_config.port));
+    log("INFO", "Note: Mobs spawn on the hosting client and sync to other players.");
     
     return true;
 }
@@ -151,7 +150,7 @@ void DedicatedServer::updateStats(float deltaTime) {
 
 ServerStats DedicatedServer::getStats() const {
     std::lock_guard<std::mutex> lock(m_statsMutex);
-    return m_stats;  // Return a copy
+    return m_stats;
 }
 
 void DedicatedServer::syncTime() {
@@ -163,12 +162,10 @@ void DedicatedServer::syncTime() {
 void DedicatedServer::executeCommand(const std::string& command) {
     if (command.empty()) return;
     
-    // Parse command
     std::istringstream iss(command);
     std::string cmd;
     iss >> cmd;
     
-    // Convert to lowercase
     std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     
     if (cmd == "help") {
@@ -244,7 +241,6 @@ void DedicatedServer::executeCommand(const std::string& command) {
         log("INFO", "Players: " + std::to_string(m_stats.playersOnline) + "/" + 
             std::to_string(m_config.maxPlayers));
         
-        // Format uptime
         int hours = static_cast<int>(m_stats.uptimeSeconds / 3600);
         int minutes = static_cast<int>((static_cast<int>(m_stats.uptimeSeconds) % 3600) / 60);
         int seconds = static_cast<int>(m_stats.uptimeSeconds) % 60;
@@ -268,7 +264,6 @@ void DedicatedServer::broadcastMessage(const std::string& message) {
 }
 
 void DedicatedServer::kickPlayer(uint32_t playerId, const std::string& reason) {
-    // TODO: Implement proper kick functionality in GameServer
     log("INFO", "Kicked player " + std::to_string(playerId) + ": " + reason);
 }
 
@@ -293,7 +288,7 @@ std::vector<Network::RemotePlayer> DedicatedServer::getPlayers() const {
 
 std::vector<LogEntry> DedicatedServer::getLogs() const {
     std::lock_guard<std::mutex> lock(m_logMutex);
-    return m_logs;  // Return a copy for thread safety
+    return m_logs;
 }
 
 void DedicatedServer::log(const std::string& level, const std::string& message) {
@@ -310,7 +305,6 @@ void DedicatedServer::log(const std::string& level, const std::string& message) 
         }
     }
     
-    // Also log to system logger
     if (level == "ERROR") {
         LOG_ERROR("[Server] " + message);
     } else if (level == "WARN") {
@@ -319,7 +313,6 @@ void DedicatedServer::log(const std::string& level, const std::string& message) 
         LOG_INFO("[Server] " + message);
     }
     
-    // Call callback
     if (m_onLog) {
         m_onLog(level, message);
     }

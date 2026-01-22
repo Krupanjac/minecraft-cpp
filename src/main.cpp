@@ -344,6 +344,36 @@ public:
             // Otherwise local time continues and will naturally sync
         });
         
+        // Entity sync callbacks (for clients receiving host's entity states)
+        networkManager.setEntitySpawnCallback([this](uint32_t entityId, uint8_t mobType, const glm::vec3& pos, float yaw) {
+            if (!useNewEntityManager) return;
+            // Spawn entity on client side
+            entityManager.spawnFromNetwork(static_cast<MobType>(mobType), pos, entityId, yaw);
+        });
+        
+        networkManager.setEntityDespawnCallback([this](uint32_t entityId) {
+            if (!useNewEntityManager) return;
+            entityManager.despawnById(entityId);
+        });
+        
+        networkManager.setEntityUpdateCallback([this](uint32_t entityId, const glm::vec3& pos, const glm::vec3& vel, float yaw, float health, uint8_t flags) {
+            if (!useNewEntityManager) return;
+            // Update entity state on client
+            Entity* entity = entityManager.getEntityById(entityId);
+            if (entity) {
+                entity->setPosition(pos);
+                entity->setVelocity(vel);
+                entity->setRotation(glm::vec3(0.0f, yaw, 0.0f));
+                // flags bit 0 = isDead
+                if (flags & 0x01) {
+                    entityManager.killEntity(entityId);
+                }
+            }
+            // Note: If entity doesn't exist, we ignore the update.
+            // The server will send ENTITY_SPAWN first for new entities.
+            // If we missed the spawn (e.g., joined late), we'll get it on the next spawn broadcast.
+        });
+        
         // Chat callbacks - wire UI to network
         uiManager.setOnSendChat([this](const std::string& message) {
             networkManager.sendChatMessage(message);
@@ -351,6 +381,25 @@ public:
         
         networkManager.setChatCallback([this](const std::string& playerName, const std::string& message) {
             uiManager.addChatMessage(playerName, message);
+        });
+        
+        // Player join callback - send all existing entities to new player
+        networkManager.setPlayerJoinCallback([this](uint32_t playerId, const std::string& name) {
+            if (!useNewEntityManager) return;
+            
+            // Send all existing entity spawns to the new player
+            // (broadcasts go to all players, but that's fine - they'll just update positions)
+            auto entityStates = entityManager.getEntityStatesForSync();
+            LOG_INFO("Syncing " + std::to_string(entityStates.size()) + " entities to new player " + name);
+            
+            for (const auto& state : entityStates) {
+                networkManager.broadcastEntitySpawn(
+                    state.id,
+                    static_cast<uint8_t>(state.type),
+                    state.position,
+                    state.yaw
+                );
+            }
         });
         
         // Apply initial settings
@@ -1296,6 +1345,15 @@ private:
                 bool isOfflineOrServer = (networkManager.getMode() == Network::NetworkMode::OFFLINE) || 
                                           networkManager.isHost();
                 
+                static bool loggedOnce = false;
+                if (!loggedOnce && networkManager.isOnline()) {
+                    LOG_INFO("EntityManager: isOfflineOrServer=" + std::to_string(isOfflineOrServer) + 
+                             ", mode=" + std::to_string(static_cast<int>(networkManager.getMode())) +
+                             ", isHost=" + std::to_string(networkManager.isHost()) +
+                             ", isClient=" + std::to_string(networkManager.isClient()));
+                    loggedOnce = true;
+                }
+                
                 if (isOfflineOrServer) {
                     // Update EntityManager - returns attack events
                     auto attacks = entityManager.update(deltaTime, playerFeet, normalizedTime);
@@ -1303,6 +1361,44 @@ private:
                     // Apply knockback from attacks
                     for (const auto& attack : attacks) {
                         camera.velocity += attack.knockback;
+                    }
+                    
+                    // If hosting, broadcast entity events to clients
+                    if (networkManager.isHost()) {
+                        // Broadcast spawn events immediately
+                        auto spawnEvents = entityManager.consumeSpawnEvents();
+                        for (const auto& spawn : spawnEvents) {
+                            networkManager.broadcastEntitySpawn(
+                                spawn.id,
+                                static_cast<uint8_t>(spawn.type),
+                                spawn.position,
+                                spawn.yaw
+                            );
+                        }
+                        
+                        // Broadcast despawn events immediately
+                        auto despawnEvents = entityManager.consumeDespawnEvents();
+                        for (EntityId id : despawnEvents) {
+                            networkManager.broadcastEntityDespawn(id);
+                        }
+                        
+                        // Broadcast position updates at 10Hz
+                        static float entitySyncTimer = 0.0f;
+                        entitySyncTimer += deltaTime;
+                        if (entitySyncTimer >= 0.1f) { // 10Hz sync rate
+                            entitySyncTimer = 0.0f;
+                            
+                            // Get all entity states and broadcast them
+                            auto entityStates = entityManager.getEntityStatesForSync();
+                            for (const auto& state : entityStates) {
+                                uint8_t flags = state.isDead ? 1 : 0;
+                                
+                                networkManager.broadcastEntityUpdate(
+                                    state.id,
+                                    state.position, state.velocity, state.yaw, state.health, flags
+                                );
+                            }
+                        }
                     }
                 } else if (networkManager.isClient()) {
                     // Client mode - just render, server handles AI

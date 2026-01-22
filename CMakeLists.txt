@@ -127,6 +127,7 @@ set(SOURCES
     src/UI/UIManager.cpp
     src/Entity/Entity.cpp
     src/Entity/PlayerEntity.cpp
+    src/Entity/EntityManager.cpp
     src/Entity/ZombieEntity.cpp
     src/Entity/PassiveMob.cpp
     src/Entity/PigEntity.cpp

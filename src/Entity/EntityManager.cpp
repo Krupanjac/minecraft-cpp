@@ -121,41 +121,174 @@ void EntityManager::spawnImmediate(MobType type, const glm::vec3& position, Enti
     
     // Get cached model
     auto model = getModelForType(type);
+    if (!model) {
+        LOG_ERROR("EntityManager: Model not loaded for type " + std::to_string(static_cast<int>(type)) + 
+                  " - ensure preloadModels() was called");
+        return;
+    }
+    
+    LOG_INFO("EntityManager: Spawning mob type " + std::to_string(static_cast<int>(type)) + 
+             " at (" + std::to_string(position.x) + ", " + std::to_string(position.y) + ", " + std::to_string(position.z) + 
+             ") ID=" + std::to_string(entityId));
+    
+    float yaw = 0.0f;  // Track yaw for spawn event
     
     switch (type) {
         case MobType::ZOMBIE: {
             auto zombie = std::make_unique<ZombieEntity>(position, model, entityId);
+            yaw = zombie->getRotation().y;
             entities.idMap[entityId] = zombie.get();
             entities.zombies.push_back(std::move(zombie));
             break;
         }
         case MobType::SKELETON: {
             auto skeleton = std::make_unique<SkeletonEntity>(position, model, entityId);
+            yaw = skeleton->getRotation().y;
             entities.idMap[entityId] = skeleton.get();
             entities.skeletons.push_back(std::move(skeleton));
             break;
         }
         case MobType::PIG: {
             auto pig = std::make_unique<PigEntity>(position, model, entityId);
+            yaw = pig->getRotation().y;
             entities.idMap[entityId] = pig.get();
             entities.pigs.push_back(std::move(pig));
             break;
         }
         case MobType::CHICKEN: {
             auto chicken = std::make_unique<ChickenEntity>(position, model, entityId);
+            yaw = chicken->getRotation().y;
             entities.idMap[entityId] = chicken.get();
             entities.chickens.push_back(std::move(chicken));
             break;
         }
         case MobType::SHEEP: {
             auto sheep = std::make_unique<SheepEntity>(position, model, entityId);
+            yaw = sheep->getRotation().y;
             entities.idMap[entityId] = sheep.get();
             entities.sheep.push_back(std::move(sheep));
             break;
         }
         default:
             LOG_WARNING("Unknown mob type: " + std::to_string(static_cast<int>(type)));
+            return;  // Don't record spawn event for unknown type
+    }
+    
+    // Record spawn event for network broadcast (if server)
+    if (isServer) {
+        pendingSpawnEvents.push_back({entityId, type, position, yaw});
+    }
+}
+
+void EntityManager::spawnFromNetwork(MobType type, const glm::vec3& position, EntityId id, float yaw) {
+    // Check if entity already exists
+    if (entities.idMap.find(id) != entities.idMap.end()) {
+        // Already spawned, just update position
+        Entity* entity = entities.idMap[id];
+        entity->setPosition(position);
+        entity->setRotation(glm::vec3(0.0f, yaw, 0.0f));
+        return;
+    }
+    
+    // Get cached model
+    auto model = getModelForType(type);
+    if (!model) {
+        LOG_ERROR("EntityManager::spawnFromNetwork: Model not loaded for type " + std::to_string(static_cast<int>(type)));
+        return;
+    }
+    
+    LOG_INFO("EntityManager: Network spawn mob type " + std::to_string(static_cast<int>(type)) + 
+             " ID=" + std::to_string(id) + " at (" + 
+             std::to_string(position.x) + ", " + std::to_string(position.y) + ", " + std::to_string(position.z) + ")");
+    
+    switch (type) {
+        case MobType::ZOMBIE: {
+            auto zombie = std::make_unique<ZombieEntity>(position, model, id);
+            zombie->setRotation(glm::vec3(0.0f, yaw, 0.0f));
+            entities.idMap[id] = zombie.get();
+            entities.zombies.push_back(std::move(zombie));
             break;
+        }
+        case MobType::SKELETON: {
+            auto skeleton = std::make_unique<SkeletonEntity>(position, model, id);
+            skeleton->setRotation(glm::vec3(0.0f, yaw, 0.0f));
+            entities.idMap[id] = skeleton.get();
+            entities.skeletons.push_back(std::move(skeleton));
+            break;
+        }
+        case MobType::PIG: {
+            auto pig = std::make_unique<PigEntity>(position, model, id);
+            pig->setRotation(glm::vec3(0.0f, yaw, 0.0f));
+            entities.idMap[id] = pig.get();
+            entities.pigs.push_back(std::move(pig));
+            break;
+        }
+        case MobType::CHICKEN: {
+            auto chicken = std::make_unique<ChickenEntity>(position, model, id);
+            chicken->setRotation(glm::vec3(0.0f, yaw, 0.0f));
+            entities.idMap[id] = chicken.get();
+            entities.chickens.push_back(std::move(chicken));
+            break;
+        }
+        case MobType::SHEEP: {
+            auto sheep = std::make_unique<SheepEntity>(position, model, id);
+            sheep->setRotation(glm::vec3(0.0f, yaw, 0.0f));
+            entities.idMap[id] = sheep.get();
+            entities.sheep.push_back(std::move(sheep));
+            break;
+        }
+        default:
+            LOG_WARNING("spawnFromNetwork: Unknown mob type: " + std::to_string(static_cast<int>(type)));
+            break;
+    }
+}
+
+void EntityManager::despawnById(EntityId id) {
+    auto it = entities.idMap.find(id);
+    if (it == entities.idMap.end()) return;
+    
+    entities.idMap.erase(it);
+    
+    // Record despawn event for network broadcast (if server)
+    if (isServer) {
+        pendingDespawnEvents.push_back(id);
+    }
+    
+    // Find and remove from type-specific container
+    // Check zombies
+    for (auto zit = entities.zombies.begin(); zit != entities.zombies.end(); ++zit) {
+        if ((*zit)->getEntityId() == id) {
+            entities.zombies.erase(zit);
+            return;
+        }
+    }
+    // Check skeletons
+    for (auto sit = entities.skeletons.begin(); sit != entities.skeletons.end(); ++sit) {
+        if ((*sit)->getEntityId() == id) {
+            entities.skeletons.erase(sit);
+            return;
+        }
+    }
+    // Check pigs
+    for (auto pit = entities.pigs.begin(); pit != entities.pigs.end(); ++pit) {
+        if ((*pit)->getEntityId() == id) {
+            entities.pigs.erase(pit);
+            return;
+        }
+    }
+    // Check chickens
+    for (auto cit = entities.chickens.begin(); cit != entities.chickens.end(); ++cit) {
+        if ((*cit)->getEntityId() == id) {
+            entities.chickens.erase(cit);
+            return;
+        }
+    }
+    // Check sheep
+    for (auto shit = entities.sheep.begin(); shit != entities.sheep.end(); ++shit) {
+        if ((*shit)->getEntityId() == id) {
+            entities.sheep.erase(shit);
+            return;
+        }
     }
 }
 
@@ -204,7 +337,9 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     auto& zombies = entities.zombies;
     for (auto it = zombies.begin(); it != zombies.end();) {
         if (shouldDespawn((*it)->getPosition())) {
-            entities.idMap.erase((*it)->getEntityId());
+            EntityId id = (*it)->getEntityId();
+            if (isServer) pendingDespawnEvents.push_back(id);
+            entities.idMap.erase(id);
             it = zombies.erase(it);
             despawned++;
         } else {
@@ -216,7 +351,9 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     auto& skeletons = entities.skeletons;
     for (auto it = skeletons.begin(); it != skeletons.end();) {
         if ((*it)->isDead() || shouldDespawn((*it)->getPosition())) {
-            entities.idMap.erase((*it)->getEntityId());
+            EntityId id = (*it)->getEntityId();
+            if (isServer) pendingDespawnEvents.push_back(id);
+            entities.idMap.erase(id);
             it = skeletons.erase(it);
             despawned++;
         } else {
@@ -228,7 +365,9 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     auto& pigs = entities.pigs;
     for (auto it = pigs.begin(); it != pigs.end();) {
         if ((*it)->isDead() || shouldDespawn((*it)->getPosition())) {
-            entities.idMap.erase((*it)->getEntityId());
+            EntityId id = (*it)->getEntityId();
+            if (isServer) pendingDespawnEvents.push_back(id);
+            entities.idMap.erase(id);
             it = pigs.erase(it);
             despawned++;
         } else {
@@ -240,7 +379,9 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     auto& chickens = entities.chickens;
     for (auto it = chickens.begin(); it != chickens.end();) {
         if ((*it)->isDead() || shouldDespawn((*it)->getPosition())) {
-            entities.idMap.erase((*it)->getEntityId());
+            EntityId id = (*it)->getEntityId();
+            if (isServer) pendingDespawnEvents.push_back(id);
+            entities.idMap.erase(id);
             it = chickens.erase(it);
             despawned++;
         } else {
@@ -252,7 +393,9 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     auto& sheep = entities.sheep;
     for (auto it = sheep.begin(); it != sheep.end();) {
         if ((*it)->isDead() || shouldDespawn((*it)->getPosition())) {
-            entities.idMap.erase((*it)->getEntityId());
+            EntityId id = (*it)->getEntityId();
+            if (isServer) pendingDespawnEvents.push_back(id);
+            entities.idMap.erase(id);
             it = sheep.erase(it);
             despawned++;
         } else {
@@ -280,7 +423,15 @@ std::vector<EntityManager::AttackEvent> EntityManager::update(
     
     std::vector<AttackEvent> attacks;
     
-    if (!chunkManager) return attacks;
+    if (!chunkManager) {
+        LOG_WARNING("EntityManager::update - chunkManager is null!");
+        return attacks;
+    }
+    
+    if (!worldGenerator) {
+        LOG_WARNING("EntityManager::update - worldGenerator is null!");
+        return attacks;
+    }
     
     // Process spawn queue (limited per frame to avoid stutters)
     processSpawnQueue(config.maxSpawnsPerFrame);
@@ -299,6 +450,7 @@ std::vector<EntityManager::AttackEvent> EntityManager::update(
             hostileSpawnTimer = config.spawnCheckInterval;
             
             if (getHostileCount() < config.maxHostileMobs) {
+                bool spawned = false;
                 for (int i = 0; i < 3; ++i) { // Multiple attempts
                     glm::vec3 spawnPos = findSpawnPosition(playerPos, config.minSpawnDistance, config.spawnRadius);
                     if (isValidHostileSpawn(spawnPos, timeOfDay)) {
@@ -306,6 +458,7 @@ std::vector<EntityManager::AttackEvent> EntityManager::update(
                         std::uniform_int_distribution<int> dist(0, 2);
                         MobType type = (dist(rng) <= 1) ? MobType::ZOMBIE : MobType::SKELETON;
                         queueSpawn(type, spawnPos);
+                        spawned = true;
                         break;
                     }
                 }
@@ -525,6 +678,18 @@ void EntityManager::setNetworkMode(bool server, bool client) {
     isClient = client;
     LOG_INFO("EntityManager network mode: server=" + std::to_string(server) + 
              ", client=" + std::to_string(client));
+}
+
+std::vector<EntityManager::SpawnEvent> EntityManager::consumeSpawnEvents() {
+    std::vector<SpawnEvent> events = std::move(pendingSpawnEvents);
+    pendingSpawnEvents.clear();
+    return events;
+}
+
+std::vector<EntityId> EntityManager::consumeDespawnEvents() {
+    std::vector<EntityId> events = std::move(pendingDespawnEvents);
+    pendingDespawnEvents.clear();
+    return events;
 }
 
 std::vector<NetworkEntityState> EntityManager::getEntityStatesForSync() const {
@@ -769,13 +934,8 @@ bool EntityManager::isValidHostileSpawn(const glm::vec3& pos, float timeOfDay) c
 }
 
 bool EntityManager::isValidPassiveSpawn(const glm::vec3& pos, float timeOfDay) const {
-    int light = getLightLevel(pos, timeOfDay);
-    
-    bool isDawnOrDusk = (timeOfDay > 0.2f && timeOfDay < 0.3f) ||
-                        (timeOfDay > 0.7f && timeOfDay < 0.8f);
-    bool isUnderground = (light == 0);
-    
-    if (!isDawnOrDusk && !isUnderground && light > 11) return false;
+    // Passive mobs spawn during daytime on grass/dirt/snow
+    // They can also spawn underground (caves) at any time
     
     if (!hasSolidGround(pos)) return false;
     if (!hasHeadroom(pos, 1.5f)) return false;

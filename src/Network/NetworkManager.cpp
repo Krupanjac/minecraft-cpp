@@ -270,6 +270,24 @@ void NetworkManager::sendTimeSync(float timeOfDay, bool isPaused) {
     }
 }
 
+void NetworkManager::broadcastEntitySpawn(uint32_t entityId, uint8_t mobType, const glm::vec3& pos, float yaw) {
+    if (m_mode == NetworkMode::HOST && m_server) {
+        m_server->broadcastEntitySpawn(entityId, mobType, pos, yaw);
+    }
+}
+
+void NetworkManager::broadcastEntityDespawn(uint32_t entityId) {
+    if (m_mode == NetworkMode::HOST && m_server) {
+        m_server->broadcastEntityDespawn(entityId);
+    }
+}
+
+void NetworkManager::broadcastEntityUpdate(uint32_t entityId, const glm::vec3& pos, const glm::vec3& vel, float yaw, float health, uint8_t flags) {
+    if (m_mode == NetworkMode::HOST && m_server) {
+        m_server->broadcastEntityUpdate(entityId, pos, vel, yaw, health, flags);
+    }
+}
+
 std::vector<RemotePlayerEntity*> NetworkManager::getRemotePlayerEntities() {
     std::vector<RemotePlayerEntity*> entities;
     entities.reserve(m_remotePlayerEntities.size());
@@ -359,6 +377,10 @@ void NetworkManager::setupServerCallbacks() {
         if (m_onChat) {
             m_onChat("Server", name + " joined the game");
         }
+        // Call player join callback so host can send entity states
+        if (m_onPlayerJoin) {
+            m_onPlayerJoin(playerId, name);
+        }
     });
     
     m_server->setPlayerLeaveCallback([this](uint32_t playerId) {
@@ -439,6 +461,24 @@ void NetworkManager::setupClientCallbacks() {
     m_client->setTimeSyncCallback([this](float timeOfDay, bool isPaused) {
         if (m_onTimeSync) {
             m_onTimeSync(timeOfDay, isPaused);
+        }
+    });
+    
+    m_client->setEntitySpawnCallback([this](uint32_t entityId, uint8_t mobType, const glm::vec3& pos, float yaw) {
+        if (m_onEntitySpawn) {
+            m_onEntitySpawn(entityId, mobType, pos, yaw);
+        }
+    });
+    
+    m_client->setEntityDespawnCallback([this](uint32_t entityId) {
+        if (m_onEntityDespawn) {
+            m_onEntityDespawn(entityId);
+        }
+    });
+    
+    m_client->setEntityUpdateCallback([this](uint32_t entityId, const glm::vec3& pos, const glm::vec3& vel, float yaw, float health, uint8_t flags) {
+        if (m_onEntityUpdate) {
+            m_onEntityUpdate(entityId, pos, vel, yaw, health, flags);
         }
     });
 }

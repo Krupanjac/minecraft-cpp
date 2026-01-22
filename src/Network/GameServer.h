@@ -64,6 +64,11 @@ public:
     void broadcastChatMessage(const std::string& message);
     void broadcastTimeSync(float timeOfDay, bool isPaused);
     
+    // Entity sync - call from host to sync mobs to clients
+    void broadcastEntitySpawn(uint32_t entityId, uint8_t mobType, const glm::vec3& pos, float yaw);
+    void broadcastEntityDespawn(uint32_t entityId);
+    void broadcastEntityUpdate(uint32_t entityId, const glm::vec3& pos, const glm::vec3& vel, float yaw, float health, uint8_t flags);
+    
     // Update host player position (broadcasts to all clients)
     void updateHostPosition(const glm::vec3& position, float yaw, float pitch,
                            const glm::vec3& velocity, bool onGround);
