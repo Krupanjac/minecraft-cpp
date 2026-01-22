@@ -175,12 +175,8 @@ void main() {
     float skyBrightness = dot(uSkyColor, vec3(0.299, 0.587, 0.114));
     float ambient = clamp(skyBrightness * 0.6, 0.1, 0.5);
     
-    // Apply AO
-    float aoCurve = smoothstep(0.0, 1.0, vAO);
-    float minAO = max(0.0, mix(1.0, 0.5, uAOStrength));
-    float aoFactor = mix(minAO, 1.0, aoCurve); // Less AO on water
-    
-    vec3 lighting = vec3(ambient + diffuse * 0.5) * aoFactor;
+    // Water should not have AO - it's transparent and shouldn't receive corner shadows
+    vec3 lighting = vec3(ambient + diffuse * 0.5);
     vec3 waterColor = baseColor * lighting;
     
     // Blend water color with reflection based on fresnel

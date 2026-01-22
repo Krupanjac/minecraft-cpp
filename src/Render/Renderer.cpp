@@ -665,16 +665,16 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
 
     // 3. UI / Overlays (Rendered directly to screen)
     
-    // Underwater overlay
+    // Underwater overlay - apply blue tint when camera is inside water
     glm::vec3 camPos = camera.getPosition();
-    // Simple check: get block at camera position
-    // We need to access chunkManager here
-    auto chunk = chunkManager.getChunkAt(camPos);
+    // Add eye height offset to check at eye level, not feet
+    glm::vec3 eyePos = camPos + glm::vec3(0.0f, camera.defaultY, 0.0f);
+    auto chunk = chunkManager.getChunkAt(eyePos);
     if (chunk) {
         glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(chunk->getPosition());
-        int lx = static_cast<int>(floor(camPos.x)) - static_cast<int>(chunkOrigin.x);
-        int ly = static_cast<int>(floor(camPos.y)) - static_cast<int>(chunkOrigin.y);
-        int lz = static_cast<int>(floor(camPos.z)) - static_cast<int>(chunkOrigin.z);
+        int lx = static_cast<int>(floor(eyePos.x)) - static_cast<int>(chunkOrigin.x);
+        int ly = static_cast<int>(floor(eyePos.y)) - static_cast<int>(chunkOrigin.y);
+        int lz = static_cast<int>(floor(eyePos.z)) - static_cast<int>(chunkOrigin.z);
         
         if (lx >= 0 && lx < CHUNK_SIZE && ly >= 0 && ly < CHUNK_HEIGHT && lz >= 0 && lz < CHUNK_SIZE) {
             if (chunk->getBlock(lx, ly, lz).isWater()) {
@@ -685,7 +685,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
                 crosshairShader.use();
                 glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 1.0f)); // Full screen quad
                 crosshairShader.setMat4("uModel", model);
-                crosshairShader.setVec4("uColor", glm::vec4(0.0f, 0.2f, 0.8f, 0.4f)); // Blue tint
+                crosshairShader.setVec4("uColor", glm::vec4(0.0f, 0.3f, 0.7f, 0.35f)); // Blue tint
                 
                 // Use sun mesh (quad) for overlay
                 sunMesh->bind();

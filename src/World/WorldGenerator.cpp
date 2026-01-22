@@ -177,12 +177,13 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
     // ========== BIOME SELECTION ==========
     
     // OCEAN (reduce inland water: require strong ocean continentalness OR very low height)
-    if ((continentalness < -0.30f && height < (float)SEA_LEVEL + 1.0f) || height < (float)SEA_LEVEL - 3.0f) {
+    // Don't classify rivers as ocean - check riverMask first
+    if (riverMask < 0.3f && ((continentalness < -0.30f && height < (float)SEA_LEVEL + 1.0f) || height < (float)SEA_LEVEL - 5.0f)) {
         return BiomeType::OCEAN;
     }
 
-    // RIVERS (river-like water channels)
-    if (riverMask > 0.55f && height < (float)SEA_LEVEL + 3.0f) {
+    // RIVERS (river-like water channels) - lowered threshold to match terrain carving
+    if (riverMask > 0.3f && height < (float)SEA_LEVEL + 2.0f) {
         return BiomeType::RIVER;
     }
     
@@ -344,15 +345,12 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
 
                         if (blockType == BlockType::SNOW && worldY < SEA_LEVEL) blockType = BlockType::ICE;
                     } else if (worldY < SEA_LEVEL) {
+                        // Fill water to sea level - this covers open water bodies
                         if (biome == BiomeType::SNOWY_TUNDRA && worldY == SEA_LEVEL - 1) blockType = BlockType::ICE;
                         else blockType = BlockType::WATER;
                     }
-                } else {
-                    // Cave generation
-                    if (worldY < SEA_LEVEL && globalCaveWaterBias > 0.0f) {
-                        blockType = BlockType::WATER;
-                    }
                 }
+                // Caves are just air - no water in caves at all
                 
                 chunk->setBlock(x, y, z, Block(blockType));
             }
@@ -607,8 +605,20 @@ float WorldGenerator::getHeight(float x, float z) const {
     // Don't let rivers carve huge gashes through mountain cores
     riverMask *= (1.0f - mountainFactor * 0.85f);
 
-    float riverBed = (float)SEA_LEVEL - 2.0f;
-    finalHeight = lerp(finalHeight, riverBed, riverMask);
+    // River bed should be below sea level so water fills properly
+    // Use a fixed river bed depth and force terrain down when riverMask is strong
+    float riverBed = (float)SEA_LEVEL - 3.0f;  // River beds at Y=29
+    
+    if (riverMask > 0.3f) {
+        // Strong river influence - force terrain below water level
+        // The stronger the riverMask, the deeper we carve
+        float carveDepth = riverMask * 4.0f;  // Max 4 blocks below riverBed
+        float targetHeight = riverBed - (riverMask - 0.3f) * 2.0f;
+        finalHeight = std::min(finalHeight, targetHeight);
+    } else if (riverMask > 0.0f) {
+        // Gentle river influence - smooth transition to river banks
+        finalHeight = lerp(finalHeight, riverBed + 2.0f, riverMask / 0.3f * 0.5f);
+    }
 
     // Prevent random inland lakes: keep most land above sea level unless we're in a river.
     if (continentalness > 0.00f && riverMask < 0.15f) {

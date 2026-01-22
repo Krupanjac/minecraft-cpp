@@ -105,6 +105,12 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
             if (gy >= CHUNK_HEIGHT && neighbors[2]) return neighbors[2]->getBlock(gx, gy - CHUNK_HEIGHT, gz);
             if (gz < 0 && neighbors[5]) return neighbors[5]->getBlock(gx, gy, gz + CHUNK_SIZE);
             if (gz >= CHUNK_SIZE && neighbors[4]) return neighbors[4]->getBlock(gx, gy, gz - CHUNK_SIZE);
+            // Neighbor chunk not loaded - assume water below sea level to prevent ugly side faces
+            // SEA_LEVEL = 32, chunk world Y is chunk->getPosition().y * CHUNK_HEIGHT
+            int worldY = static_cast<int>(chunk->getPosition().y) * CHUNK_HEIGHT + gy;
+            if (worldY < 32) {
+                return Block(BlockType::WATER);
+            }
             return Block(BlockType::AIR);
         }
         return chunk->getBlock(gx, gy, gz);
@@ -268,36 +274,43 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     quad.material = material;
                     quad.data = data;
                     
-                    // Calculate AO
-                    // For LOD > 0, we can simplify AO or just sample at corners
-                    // We'll use the same logic but with 'step' for neighbor checks
+                    // Calculate AO - skip for water and ice (transparent blocks shouldn't have AO)
+                    bool skipAO = (material == static_cast<u8>(BlockType::WATER) || material == static_cast<u8>(BlockType::ICE));
                     
-                    int u_vec[3] = {0}; u_vec[u_axis] = step;
-                    int v_vec[3] = {0}; v_vec[v_axis] = step;
-                    int n_vec[3] = {nx * step, ny * step, nz * step};
-                    int neg_u[3] = {-u_vec[0], -u_vec[1], -u_vec[2]};
-                    int neg_v[3] = {-v_vec[0], -v_vec[1], -v_vec[2]};
-                    
-                    // V0: (0, 0) -> Block (0, 0), check -u, -v
-                    quad.ao[0] = calculateVertexAO(chunk, quad.x, quad.y, quad.z, neg_u, neg_v, neighbors);
-                    
-                    // V1: (w, 0) -> Block (w-1, 0), check +u, -v
-                    int bx = quad.x + (quad.w - step)*u_vec[0]/step;
-                    int by = quad.y + (quad.w - step)*u_vec[1]/step;
-                    int bz = quad.z + (quad.w - step)*u_vec[2]/step;
-                    quad.ao[1] = calculateVertexAO(chunk, bx, by, bz, u_vec, neg_v, neighbors);
-                    
-                    // V2: (w, h) -> Block (w-1, h-1), check +u, +v
-                    bx = quad.x + (quad.w - step)*u_vec[0]/step + (quad.h - step)*v_vec[0]/step;
-                    by = quad.y + (quad.w - step)*u_vec[1]/step + (quad.h - step)*v_vec[1]/step;
-                    bz = quad.z + (quad.w - step)*u_vec[2]/step + (quad.h - step)*v_vec[2]/step;
-                    quad.ao[2] = calculateVertexAO(chunk, bx, by, bz, u_vec, v_vec, neighbors);
-                    
-                    // V3: (0, h) -> Block (0, h-1), check -u, +v
-                    bx = quad.x + (quad.h - step)*v_vec[0]/step;
-                    by = quad.y + (quad.h - step)*v_vec[1]/step;
-                    bz = quad.z + (quad.h - step)*v_vec[2]/step;
-                    quad.ao[3] = calculateVertexAO(chunk, bx, by, bz, neg_u, v_vec, neighbors);
+                    if (skipAO) {
+                        // Full brightness for water/ice - no ambient occlusion
+                        quad.ao[0] = quad.ao[1] = quad.ao[2] = quad.ao[3] = 3;
+                    } else {
+                        // For LOD > 0, we can simplify AO or just sample at corners
+                        // We'll use the same logic but with 'step' for neighbor checks
+                        
+                        int u_vec[3] = {0}; u_vec[u_axis] = step;
+                        int v_vec[3] = {0}; v_vec[v_axis] = step;
+                        int n_vec[3] = {nx * step, ny * step, nz * step};
+                        int neg_u[3] = {-u_vec[0], -u_vec[1], -u_vec[2]};
+                        int neg_v[3] = {-v_vec[0], -v_vec[1], -v_vec[2]};
+                        
+                        // V0: (0, 0) -> Block (0, 0), check -u, -v
+                        quad.ao[0] = calculateVertexAO(chunk, quad.x, quad.y, quad.z, neg_u, neg_v, neighbors);
+                        
+                        // V1: (w, 0) -> Block (w-1, 0), check +u, -v
+                        int bx = quad.x + (quad.w - step)*u_vec[0]/step;
+                        int by = quad.y + (quad.w - step)*u_vec[1]/step;
+                        int bz = quad.z + (quad.w - step)*u_vec[2]/step;
+                        quad.ao[1] = calculateVertexAO(chunk, bx, by, bz, u_vec, neg_v, neighbors);
+                        
+                        // V2: (w, h) -> Block (w-1, h-1), check +u, +v
+                        bx = quad.x + (quad.w - step)*u_vec[0]/step + (quad.h - step)*v_vec[0]/step;
+                        by = quad.y + (quad.w - step)*u_vec[1]/step + (quad.h - step)*v_vec[1]/step;
+                        bz = quad.z + (quad.w - step)*u_vec[2]/step + (quad.h - step)*v_vec[2]/step;
+                        quad.ao[2] = calculateVertexAO(chunk, bx, by, bz, u_vec, v_vec, neighbors);
+                        
+                        // V3: (0, h) -> Block (0, h-1), check -u, +v
+                        bx = quad.x + (quad.h - step)*v_vec[0]/step;
+                        by = quad.y + (quad.h - step)*v_vec[1]/step;
+                        bz = quad.z + (quad.h - step)*v_vec[2]/step;
+                        quad.ao[3] = calculateVertexAO(chunk, bx, by, bz, neg_u, v_vec, neighbors);
+                    }
                     
                     addQuad(quad, meshData);
                     
