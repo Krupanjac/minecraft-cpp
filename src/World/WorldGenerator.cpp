@@ -221,6 +221,14 @@ bool WorldGenerator::isCave(float x, float y, float z) const {
         return false;
     }
     
+    // Don't carve caves through underwater areas (oceans/rivers)
+    // Check if the surface at this X,Z is below sea level - if so, no caves here
+    int surfaceHeight = getSurfaceHeight(static_cast<int>(x), static_cast<int>(z));
+    if (surfaceHeight < SEA_LEVEL && y < SEA_LEVEL) {
+        // This column is underwater - don't create caves that would drain the water
+        return false;
+    }
+    
     // 1. Cheese Caves (Large Rooms)
     // Use lower frequency noise for large open areas
     float cheese = noise3D(x * 0.012f, y * 0.012f, z * 0.012f);

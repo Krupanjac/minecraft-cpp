@@ -1,11 +1,22 @@
 #include "UIManager.h"
 #include "../World/WorldSerializer.h"
 #include "../World/WorldGenerator.h"
+#include "../Core/HardwareInfo.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <algorithm>
 #include <random>
 #include <climits>
+
+// Prevent Windows min/max macros from interfering with std::min/max
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#undef min
+#undef max
+#endif
+
 #define STB_IMAGE_IMPLEMENTATION_DONE
 #include <stb_image.h>
 
@@ -344,29 +355,37 @@ void UIManager::setupMainMenu() {
     float btnH = 50.0f;   // Taller buttons
     float gap = 12.0f;    // More spacing
 
-    elements.push_back({centerX - btnW/2, centerY - 125, btnW, btnH, "Singleplayer", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 95, btnW, btnH, "Singleplayer", false, [this]() { 
         setMenuState(MenuState::NEW_GAME); 
     }});
     
-    elements.push_back({centerX - btnW/2, centerY - 125 + btnH + gap, btnW, btnH, "Load World", false, [this]() { 
-        setMenuState(MenuState::LOAD_GAME); 
-    }});
-    
-    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*2, btnW, btnH, "Multiplayer", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 95 + (btnH + gap), btnW, btnH, "Multiplayer", false, [this]() { 
         setMenuState(MenuState::MULTIPLAYER); 
     }});
 
-    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*3, btnW, btnH, "Options", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 95 + (btnH + gap)*2, btnW, btnH, "Options", false, [this]() { 
         setMenuState(MenuState::SETTINGS); 
     }});
     
-    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*4, btnW, btnH, "About", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 95 + (btnH + gap)*3, btnW, btnH, "About", false, [this]() { 
         setMenuState(MenuState::ABOUT); 
     }});
 
-    elements.push_back({centerX - btnW/2, centerY - 125 + (btnH + gap)*5, btnW, btnH, "Quit Game", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 95 + (btnH + gap)*4, btnW, btnH, "Quit Game", false, [this]() { 
         if (onExit) onExit(); 
     }});
+    
+    // Player card in top-right corner
+    UIElement playerCard;
+    playerCard.x = width - 220.0f;
+    playerCard.y = 20.0f;
+    playerCard.w = 200.0f;
+    playerCard.h = 60.0f;
+    playerCard.text = Settings::instance().playerNickname;
+    playerCard.isCard = true;
+    playerCard.tooltip = "Click to edit player settings";
+    playerCard.onClick = [this]() { setMenuState(MenuState::PLAYER_SETTINGS); };
+    elements.push_back(playerCard);
 }
 
 void UIManager::setupInGameMenu() {
@@ -605,51 +624,54 @@ void UIManager::setupVideoSettingsMenu() {
     rt.x = leftCol; rt.y = y; rt.w = colWidth; rt.h = rowHeight;
     rt.text = "Ray Tracing: " + std::string(s.enableRayTracing ? "ON" : "OFF");
     rt.boolValueRef = &s.enableRayTracing;
-    rt.onClick = [](){};
+    rt.onClick = [this]() { setupVideoSettingsMenu(); }; // Refresh menu to show/hide RT options
     rt.tooltip = "Experimental voxel ray tracing (OpenGL 4.3+)";
     elements.push_back(rt);
     y += rowHeight + rowGap;
     
-    // Ray Tracing quality selector
-    UIElement rtq;
-    rtq.x = leftCol; rtq.y = y; rtq.w = colWidth; rtq.h = rowHeight;
-    rtq.text = "RT Quality: " + std::string(Settings::RT_QUALITY_NAMES[s.rayTracingQuality]);
-    rtq.intValueRef = &s.rayTracingQuality;
-    rtq.onClick = [](){};  // intValueRef handles cycling
-    rtq.minVal = 0.0f; rtq.maxVal = 2.0f;  // Low=0, Medium=1, High=2
-    rtq.tooltip = "Ray tracing quality (Low/Medium/High)";
-    elements.push_back(rtq);
-    y += rowHeight + rowGap;
-    
-    // Shadow Method selector
-    UIElement sm;
-    sm.x = leftCol; sm.y = y; sm.w = colWidth; sm.h = rowHeight;
-    sm.text = "Shadows: " + std::string(Settings::SHADOW_METHOD_NAMES[s.shadowMethod]);
-    sm.intValueRef = &s.shadowMethod;
-    sm.onClick = [](){};
-    sm.minVal = 0.0f; sm.maxVal = 1.0f;  // ShadowMap=0, RayTraced=1
-    sm.tooltip = "Shadow method (Shadow Map = fast, Ray Traced = accurate)";
-    elements.push_back(sm);
-    y += rowHeight + rowGap;
-    
-    // RT Shadows toggle
-    UIElement rts;
-    rts.x = leftCol; rts.y = y; rts.w = colWidth; rts.h = rowHeight;
-    rts.text = "RT Shadows: " + std::string(s.rtShadows ? "ON" : "OFF");
-    rts.boolValueRef = &s.rtShadows;
-    rts.onClick = [](){};
-    rts.tooltip = "Ray traced shadows (requires RT enabled)";
-    elements.push_back(rts);
-    y += rowHeight + rowGap;
-    
-    // RT Reflections toggle
-    UIElement rtrefl;
-    rtrefl.x = leftCol; rtrefl.y = y; rtrefl.w = colWidth; rtrefl.h = rowHeight;
-    rtrefl.text = "RT Reflections: " + std::string(s.rtReflections ? "ON" : "OFF");
-    rtrefl.boolValueRef = &s.rtReflections;
-    rtrefl.onClick = [](){};
-    rtrefl.tooltip = "Screen-space water reflections (requires RT enabled)";
-    elements.push_back(rtrefl);
+    // Only show RT sub-options when Ray Tracing is enabled
+    if (s.enableRayTracing) {
+        // Ray Tracing quality selector
+        UIElement rtq;
+        rtq.x = leftCol; rtq.y = y; rtq.w = colWidth; rtq.h = rowHeight;
+        rtq.text = "RT Quality: " + std::string(Settings::RT_QUALITY_NAMES[s.rayTracingQuality]);
+        rtq.intValueRef = &s.rayTracingQuality;
+        rtq.onClick = [](){};  // intValueRef handles cycling
+        rtq.minVal = 0.0f; rtq.maxVal = 2.0f;  // Low=0, Medium=1, High=2
+        rtq.tooltip = "Ray tracing quality (Low/Medium/High)";
+        elements.push_back(rtq);
+        y += rowHeight + rowGap;
+        
+        // Shadow Method selector
+        UIElement sm;
+        sm.x = leftCol; sm.y = y; sm.w = colWidth; sm.h = rowHeight;
+        sm.text = "Shadows: " + std::string(Settings::SHADOW_METHOD_NAMES[s.shadowMethod]);
+        sm.intValueRef = &s.shadowMethod;
+        sm.onClick = [](){};
+        sm.minVal = 0.0f; sm.maxVal = 1.0f;  // ShadowMap=0, RayTraced=1
+        sm.tooltip = "Shadow method (Shadow Map = fast, Ray Traced = accurate)";
+        elements.push_back(sm);
+        y += rowHeight + rowGap;
+        
+        // RT Shadows toggle
+        UIElement rts;
+        rts.x = leftCol; rts.y = y; rts.w = colWidth; rts.h = rowHeight;
+        rts.text = "RT Shadows: " + std::string(s.rtShadows ? "ON" : "OFF");
+        rts.boolValueRef = &s.rtShadows;
+        rts.onClick = [](){};
+        rts.tooltip = "Ray traced shadows (requires RT enabled)";
+        elements.push_back(rts);
+        y += rowHeight + rowGap;
+        
+        // RT Reflections toggle
+        UIElement rtrefl;
+        rtrefl.x = leftCol; rtrefl.y = y; rtrefl.w = colWidth; rtrefl.h = rowHeight;
+        rtrefl.text = "RT Reflections: " + std::string(s.rtReflections ? "ON" : "OFF");
+        rtrefl.boolValueRef = &s.rtReflections;
+        rtrefl.onClick = [](){};
+        rtrefl.tooltip = "Screen-space water reflections (requires RT enabled)";
+        elements.push_back(rtrefl);
+    }
     
     // === RIGHT COLUMN - Visual ===
     y = startY;
@@ -774,6 +796,57 @@ void UIManager::setupVideoSettingsMenu() {
     back.text = "Back";
     back.onClick = [this]() { setMenuState(MenuState::SETTINGS); };
     elements.push_back(back);
+    
+    // Hardware info labels in bottom-left corner
+    auto cpuInfo = HardwareInfo::getCPUInfo();
+    auto memInfo = HardwareInfo::getMemoryInfo();
+    auto& gpuInfo = HardwareInfo::getGPUInfo();
+    
+    float infoY = height - 100.0f;
+    float infoX = 20.0f;
+    float infoH = 18.0f;
+    
+    UIElement cpuLabel;
+    cpuLabel.x = infoX;
+    cpuLabel.y = infoY;
+    cpuLabel.w = 500.0f;
+    cpuLabel.h = infoH;
+    cpuLabel.text = "CPU: " + cpuInfo.name;
+    cpuLabel.isLabel = true;
+    cpuLabel.customColor = glm::vec4(0.5f, 0.5f, 0.5f, 0.8f);
+    elements.push_back(cpuLabel);
+    
+    UIElement coreLabel;
+    coreLabel.x = infoX;
+    coreLabel.y = infoY + infoH;
+    coreLabel.w = 500.0f;
+    coreLabel.h = infoH;
+    coreLabel.text = std::to_string(cpuInfo.physicalCores) + " cores / " + 
+                     std::to_string(cpuInfo.logicalCores) + " threads | " +
+                     std::to_string(memInfo.totalPhysicalMB / 1024) + " GB RAM";
+    coreLabel.isLabel = true;
+    coreLabel.customColor = glm::vec4(0.5f, 0.5f, 0.5f, 0.8f);
+    elements.push_back(coreLabel);
+    
+    UIElement gpuLabel;
+    gpuLabel.x = infoX;
+    gpuLabel.y = infoY + infoH * 2;
+    gpuLabel.w = 500.0f;
+    gpuLabel.h = infoH;
+    gpuLabel.text = "GPU: " + gpuInfo.renderer;
+    gpuLabel.isLabel = true;
+    gpuLabel.customColor = glm::vec4(0.5f, 0.5f, 0.5f, 0.8f);
+    elements.push_back(gpuLabel);
+    
+    UIElement glLabel;
+    glLabel.x = infoX;
+    glLabel.y = infoY + infoH * 3;
+    glLabel.w = 500.0f;
+    glLabel.h = infoH;
+    glLabel.text = "OpenGL: " + gpuInfo.version;
+    glLabel.isLabel = true;
+    glLabel.customColor = glm::vec4(0.5f, 0.5f, 0.5f, 0.8f);
+    elements.push_back(glLabel);
 }
 
 std::string getKeyName(int key) {
@@ -1077,15 +1150,39 @@ void UIManager::setupNewGameMenu() {
     title.y = 50;
     title.w = 240;
     title.h = 35;
-    title.text = "Create New World";
+    title.text = "Singleplayer";
     title.isLabel = true;
     elements.push_back(title);
     
     float centerX = width / 2.0f;
-    float centerY = height / 2.0f - 40;
+    float centerY = height / 2.0f - 20;
     float inputW = 320.0f;
     float inputH = 45.0f;
     float gap = 20.0f;
+    
+    // Load World bar at top (above input fields)
+    UIElement loadWorldBtn;
+    loadWorldBtn.x = centerX - inputW / 2;
+    loadWorldBtn.y = 100;
+    loadWorldBtn.w = inputW;
+    loadWorldBtn.h = 50;
+    loadWorldBtn.text = "Load Existing World";
+    loadWorldBtn.tooltip = "Load a previously saved world";
+    loadWorldBtn.onClick = [this]() { 
+        setMenuState(MenuState::LOAD_GAME);
+    };
+    elements.push_back(loadWorldBtn);
+    
+    // Divider label
+    UIElement dividerLabel;
+    dividerLabel.x = centerX - 100;
+    dividerLabel.y = 165;
+    dividerLabel.w = 200;
+    dividerLabel.h = 20;
+    dividerLabel.text = "-- Or Create New --";
+    dividerLabel.isLabel = true;
+    dividerLabel.customColor = glm::vec4(0.6f, 0.6f, 0.6f, 1.0f);
+    elements.push_back(dividerLabel);
     
     // Seed constraints
     constexpr long MAX_SEED = 999999999L;
@@ -1104,7 +1201,7 @@ void UIManager::setupNewGameMenu() {
     // World Name Label
     UIElement nameLabel;
     nameLabel.x = centerX - inputW / 2;
-    nameLabel.y = centerY - 80;
+    nameLabel.y = centerY - 60;
     nameLabel.w = inputW;
     nameLabel.h = 20;
     nameLabel.text = "World Name:";
@@ -1114,7 +1211,7 @@ void UIManager::setupNewGameMenu() {
     // World Name Input
     UIElement nameField;
     nameField.x = centerX - inputW / 2;
-    nameField.y = centerY - 55;
+    nameField.y = centerY - 35;
     nameField.w = inputW;
     nameField.h = inputH;
     nameField.text = nameInput;
@@ -1126,7 +1223,7 @@ void UIManager::setupNewGameMenu() {
     // Seed Label
     UIElement seedLabel;
     seedLabel.x = centerX - inputW / 2;
-    seedLabel.y = centerY + 10;
+    seedLabel.y = centerY + 30;
     seedLabel.w = inputW;
     seedLabel.h = 20;
     seedLabel.text = "World Seed:";
@@ -1136,7 +1233,7 @@ void UIManager::setupNewGameMenu() {
     // Seed Input
     UIElement seedField;
     seedField.x = centerX - inputW / 2;
-    seedField.y = centerY + 35;
+    seedField.y = centerY + 55;
     seedField.w = inputW;
     seedField.h = inputH;
     seedField.text = seedInput;
@@ -1148,7 +1245,7 @@ void UIManager::setupNewGameMenu() {
     // Seed hint
     UIElement seedHint;
     seedHint.x = centerX - inputW / 2;
-    seedHint.y = centerY + 85;
+    seedHint.y = centerY + 105;
     seedHint.w = inputW;
     seedHint.h = 18;
     seedHint.text = "Leave empty or use numbers only";
@@ -1158,15 +1255,16 @@ void UIManager::setupNewGameMenu() {
 
     // Create World Button
     UIElement createBtn;
-    createBtn.x = centerX - 120;
-    createBtn.y = centerY + 130;
-    createBtn.w = 240;
+    createBtn.x = centerX - inputW / 2;
+    createBtn.y = centerY + 140;
+    createBtn.w = inputW;
     createBtn.h = 50;
     createBtn.text = "Create World";
     createBtn.tooltip = "Generate and enter a new world";
     createBtn.onClick = [this]() { 
         long seed = 0;
-        std::string seedStr = *elements[4].textRef; // seedField is element 4
+        // Element indices: title=0, loadWorldBtn=1, dividerLabel=2, nameLabel=3, nameField=4, seedLabel=5, seedField=6
+        std::string seedStr = *elements[6].textRef; // seedField is element 6
         
         // Filter non-numeric characters
         std::string cleanSeed;
@@ -1192,7 +1290,7 @@ void UIManager::setupNewGameMenu() {
             seed = dis(gen);
         }
         
-        if (onNewGame) onNewGame(*elements[2].textRef, seed); // nameField is element 2
+        if (onNewGame) onNewGame(*elements[4].textRef, seed); // nameField is element 4
         setMenuState(MenuState::NONE);
     };
     elements.push_back(createBtn);
@@ -2357,35 +2455,33 @@ void UIManager::setupMultiplayerMenu() {
     title.isLabel = true;
     elements.push_back(title);
     
-    // Card-style buttons
-    float cardW = 300.0f;
-    float cardH = 80.0f;
-    float gap = 25.0f;
-    float startY = height / 2.0f - cardH - gap/2;
+    // Consistent button styling (matching main menu)
+    float btnW = 280.0f;
+    float btnH = 50.0f;
+    float gap = 12.0f;
+    float startY = height / 2.0f - btnH - gap/2;
     
-    // Host Game Card
-    UIElement hostCard;
-    hostCard.x = centerX - cardW/2;
-    hostCard.y = startY;
-    hostCard.w = cardW;
-    hostCard.h = cardH;
-    hostCard.text = "Host Game";
-    hostCard.isCard = true;
-    hostCard.tooltip = "Create a server for others to join";
-    hostCard.onClick = [this]() { setMenuState(MenuState::HOST_GAME); };
-    elements.push_back(hostCard);
+    // Host Game Button
+    UIElement hostBtn;
+    hostBtn.x = centerX - btnW/2;
+    hostBtn.y = startY;
+    hostBtn.w = btnW;
+    hostBtn.h = btnH;
+    hostBtn.text = "Host Game";
+    hostBtn.tooltip = "Create a server for others to join";
+    hostBtn.onClick = [this]() { setMenuState(MenuState::HOST_GAME); };
+    elements.push_back(hostBtn);
     
-    // Join Game Card
-    UIElement joinCard;
-    joinCard.x = centerX - cardW/2;
-    joinCard.y = startY + cardH + gap;
-    joinCard.w = cardW;
-    joinCard.h = cardH;
-    joinCard.text = "Join Game";
-    joinCard.isCard = true;
-    joinCard.tooltip = "Connect to an existing server";
-    joinCard.onClick = [this]() { setMenuState(MenuState::JOIN_GAME); };
-    elements.push_back(joinCard);
+    // Join Game Button
+    UIElement joinBtn;
+    joinBtn.x = centerX - btnW/2;
+    joinBtn.y = startY + btnH + gap;
+    joinBtn.w = btnW;
+    joinBtn.h = btnH;
+    joinBtn.text = "Join Game";
+    joinBtn.tooltip = "Connect to an existing server";
+    joinBtn.onClick = [this]() { setMenuState(MenuState::JOIN_GAME); };
+    elements.push_back(joinBtn);
 
     // Back button
     UIElement back;
@@ -2417,36 +2513,33 @@ void UIManager::setupHostGameMenu() {
     float gap = 20.0f;
     float startY = height / 2.0f - 100;
     
-    // Load last used values from settings
+    // Load values from settings - use playerNickname from Player Settings
     auto& settings = Settings::instance();
-    if (playerName.empty() || playerName == "Player") {
-        playerName = settings.lastPlayerName;
-    }
+    playerName = settings.playerNickname; // Always use Player Settings nickname
     if (serverPort.empty() || serverPort == "25565") {
         serverPort = std::to_string(settings.lastServerPort);
     }
     
-    // Player Name Label
+    // Player Name display (read-only, shows from Player Settings)
     UIElement nameLabel;
     nameLabel.x = centerX - inputW/2;
     nameLabel.y = startY;
     nameLabel.w = inputW;
     nameLabel.h = 20;
-    nameLabel.text = "Your Name:";
+    nameLabel.text = "Your Name (from Player Settings):";
     nameLabel.isLabel = true;
     elements.push_back(nameLabel);
     
-    // Player Name Input
-    UIElement nameInput;
-    nameInput.x = centerX - inputW/2;
-    nameInput.y = startY + 25;
-    nameInput.w = inputW;
-    nameInput.h = inputH;
-    nameInput.text = playerName;
-    nameInput.isInput = true;
-    nameInput.textRef = &playerName;
-    nameInput.tooltip = "Name shown to other players";
-    elements.push_back(nameInput);
+    // Player Name display (non-editable)
+    UIElement nameDisplay;
+    nameDisplay.x = centerX - inputW/2;
+    nameDisplay.y = startY + 25;
+    nameDisplay.w = inputW;
+    nameDisplay.h = inputH;
+    nameDisplay.text = settings.playerNickname;
+    nameDisplay.isLabel = true;
+    nameDisplay.customColor = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
+    elements.push_back(nameDisplay);
     
     // Port Label
     UIElement portLabel;
@@ -2520,11 +2613,9 @@ void UIManager::setupJoinGameMenu() {
     float btnH = 50.0f;
     float startY = height / 2.0f - 140;
     
-    // Load last used values from settings
+    // Load values from settings - use playerNickname from Player Settings
     auto& settings = Settings::instance();
-    if (playerName.empty() || playerName == "Player") {
-        playerName = settings.lastPlayerName;
-    }
+    playerName = settings.playerNickname; // Always use Player Settings nickname
     if (serverAddress.empty() || serverAddress == "localhost") {
         serverAddress = settings.lastServerAddress;
     }
@@ -2532,27 +2623,26 @@ void UIManager::setupJoinGameMenu() {
         serverPort = std::to_string(settings.lastServerPort);
     }
     
-    // Player Name Label
+    // Player Name display (read-only, shows from Player Settings)
     UIElement nameLabel;
     nameLabel.x = centerX - inputW/2;
     nameLabel.y = startY;
     nameLabel.w = inputW;
     nameLabel.h = 20;
-    nameLabel.text = "Your Name:";
+    nameLabel.text = "Your Name (from Player Settings):";
     nameLabel.isLabel = true;
     elements.push_back(nameLabel);
     
-    // Player Name Input
-    UIElement nameInput;
-    nameInput.x = centerX - inputW/2;
-    nameInput.y = startY + 25;
-    nameInput.w = inputW;
-    nameInput.h = inputH;
-    nameInput.text = playerName;
-    nameInput.isInput = true;
-    nameInput.textRef = &playerName;
-    nameInput.tooltip = "Name shown to other players";
-    elements.push_back(nameInput);
+    // Player Name display (non-editable)
+    UIElement nameDisplay;
+    nameDisplay.x = centerX - inputW/2;
+    nameDisplay.y = startY + 25;
+    nameDisplay.w = inputW;
+    nameDisplay.h = inputH;
+    nameDisplay.text = settings.playerNickname;
+    nameDisplay.isLabel = true;
+    nameDisplay.customColor = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
+    elements.push_back(nameDisplay);
     
     // Server Address Label
     UIElement addrLabel;
@@ -2769,7 +2859,7 @@ void UIManager::setupPlayerSettingsMenu() {
     float centerX = width / 2.0f;
     float startY = 80.0f;
     float lineHeight = 50.0f;
-    float btnW = 400.0f;
+    float btnW = 280.0f;
     float btnH = 40.0f;
     
     // Title
@@ -2783,9 +2873,52 @@ void UIManager::setupPlayerSettingsMenu() {
     elements.push_back(title);
     startY += 70.0f;
     
+    // Model Preview Card on the right side
+    UIElement previewCard;
+    previewCard.x = width - 250.0f;
+    previewCard.y = 150.0f;
+    previewCard.w = 200.0f;
+    previewCard.h = 250.0f;
+    previewCard.text = "";
+    previewCard.isCard = true;
+    elements.push_back(previewCard);
+    
+    // Preview label
+    UIElement previewLabel;
+    previewLabel.x = width - 250.0f;
+    previewLabel.y = 130.0f;
+    previewLabel.w = 200.0f;
+    previewLabel.h = 20.0f;
+    previewLabel.text = "Preview";
+    previewLabel.isLabel = true;
+    previewLabel.customColor = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f);
+    elements.push_back(previewLabel);
+    
+    // Model name in preview card
+    UIElement modelPreviewName;
+    modelPreviewName.x = width - 245.0f;
+    modelPreviewName.y = 170.0f;
+    modelPreviewName.w = 190.0f;
+    modelPreviewName.h = 30.0f;
+    modelPreviewName.text = Settings::PLAYER_MODEL_NAMES[s.playerModelIndex];
+    modelPreviewName.isLabel = true;
+    modelPreviewName.customColor = glm::vec4(0.4f, 0.9f, 0.4f, 1.0f);
+    elements.push_back(modelPreviewName);
+    
+    // Character visual placeholder text
+    UIElement previewPlaceholder;
+    previewPlaceholder.x = width - 220.0f;
+    previewPlaceholder.y = 280.0f;
+    previewPlaceholder.w = 150.0f;
+    previewPlaceholder.h = 20.0f;
+    previewPlaceholder.text = "[3D Preview]";
+    previewPlaceholder.isLabel = true;
+    previewPlaceholder.customColor = glm::vec4(0.5f, 0.5f, 0.5f, 0.6f);
+    elements.push_back(previewPlaceholder);
+    
     // Nickname input
     UIElement nicknameLabel;
-    nicknameLabel.x = centerX - 200;
+    nicknameLabel.x = 80.0f;
     nicknameLabel.y = startY;
     nicknameLabel.w = 150;
     nicknameLabel.h = 30;
@@ -2794,7 +2927,7 @@ void UIManager::setupPlayerSettingsMenu() {
     elements.push_back(nicknameLabel);
     
     UIElement nicknameInput;
-    nicknameInput.x = centerX - 40;
+    nicknameInput.x = 240.0f;
     nicknameInput.y = startY - 5;
     nicknameInput.w = 240;
     nicknameInput.h = btnH;
@@ -2807,7 +2940,7 @@ void UIManager::setupPlayerSettingsMenu() {
     
     // Player Model selection
     UIElement modelLabel;
-    modelLabel.x = centerX - 200;
+    modelLabel.x = 80.0f;
     modelLabel.y = startY;
     modelLabel.w = 150;
     modelLabel.h = 30;
@@ -2819,7 +2952,7 @@ void UIManager::setupPlayerSettingsMenu() {
     // Model buttons - cycle through available models
     for (int i = 0; i < Settings::NUM_PLAYER_MODELS; i++) {
         UIElement modelBtn;
-        modelBtn.x = centerX - btnW / 2;
+        modelBtn.x = 80.0f;
         modelBtn.y = startY;
         modelBtn.w = btnW;
         modelBtn.h = btnH;
@@ -2836,7 +2969,7 @@ void UIManager::setupPlayerSettingsMenu() {
         modelBtn.onClick = [this, modelIndex]() {
             Settings::instance().playerModelIndex = modelIndex;
             if (onSettingsChanged) onSettingsChanged();
-            setupPlayerSettingsMenu(); // Refresh to show selection
+            setupPlayerSettingsMenu(); // Refresh to show selection and preview
         };
         
         elements.push_back(modelBtn);

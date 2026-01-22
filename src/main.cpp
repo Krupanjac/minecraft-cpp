@@ -4,6 +4,7 @@
 #include "Core/Logger.h"
 #include "Core/ThreadPool.h"
 #include "Core/Settings.h"
+#include "Core/HardwareInfo.h"
 #include "Render/Renderer.h"
 #include "Render/Camera.h"
 #include "World/ChunkManager.h"
@@ -35,7 +36,7 @@ class Application {
 public:
     Application() 
         : camera(glm::vec3(0.0f, 80.0f, 0.0f)),
-          threadPool(THREAD_POOL_SIZE),
+          threadPool(HardwareInfo::getOptimalThreadCount()),
           lastX(0.0), lastY(0.0), lastSpaceTime(0.0), firstMouse(true),
           running(true) {
     }
@@ -45,12 +46,32 @@ public:
     bool initialize() {
         LOG_INFO("Initializing Minecraft C++ Engine");
         
+        // Log hardware information
+        auto cpuInfo = HardwareInfo::getCPUInfo();
+        auto memInfo = HardwareInfo::getMemoryInfo();
+        LOG_INFO("CPU: " + cpuInfo.name);
+        LOG_INFO("CPU Cores: " + std::to_string(cpuInfo.physicalCores) + " physical, " + std::to_string(cpuInfo.logicalCores) + " logical");
+        LOG_INFO("RAM: " + std::to_string(memInfo.totalPhysicalMB) + " MB total, " + std::to_string(memInfo.availablePhysicalMB) + " MB available");
+        LOG_INFO("Thread pool size: " + std::to_string(HardwareInfo::getOptimalThreadCount()));
+        
         try {
             window = std::make_unique<Window>(1280, 720, "Minecraft C++");
         } catch (const std::exception& e) {
             LOG_ERROR("Failed to create window: " + std::string(e.what()));
             return false;
         }
+        
+        // Get GPU info now that OpenGL context is created
+        const char* glRenderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+        const char* glVendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+        const char* glVersion = reinterpret_cast<const char*>(glGetString(GL_VERSION));
+        HardwareInfo::setGPUInfo(
+            glRenderer ? glRenderer : "Unknown GPU",
+            glVendor ? glVendor : "Unknown",
+            glVersion ? glVersion : "Unknown"
+        );
+        LOG_INFO("GPU: " + std::string(glRenderer ? glRenderer : "Unknown"));
+        LOG_INFO("OpenGL: " + std::string(glVersion ? glVersion : "Unknown"));
         
         // Start with cursor visible for menu
         window->setCursorMode(GLFW_CURSOR_NORMAL);
@@ -463,6 +484,10 @@ public:
     void initializeMenuWorld() {
         LOG_INFO("Initializing menu background world...");
         
+        // CRITICAL: Wait for all pending thread pool tasks to complete before clearing
+        // This prevents race conditions where game world chunks get mixed with menu world
+        threadPool.wait();
+        
         // Clear any existing world data first
         chunkManager.unloadAll();
         chunkManager.clear();
@@ -617,10 +642,14 @@ public:
         currentSeed = seed;
         currentWorldName = name.empty() ? "World_" + std::to_string(seed) : name;
         
-        // Set seed
+        // CRITICAL: Wait for all pending thread pool tasks to complete before clearing
+        // This prevents race conditions where old world chunks get inserted after clear()
+        threadPool.wait();
+        
+        // Set seed BEFORE clearing so any residual generation uses new seed
         worldGenerator.setSeed(static_cast<unsigned int>(seed));
         
-        // Clear existing world
+        // Clear existing world data
         chunkManager.unloadAll();
         chunkManager.clear(); // Clear preloaded data too
         renderer.clear(); // Clear GPU buffers from previous world
@@ -806,9 +835,13 @@ public:
     bool loadWorld(const std::string& name = "world.dat") {
         LOG_INFO("Loading world: " + name);
         
+        // CRITICAL: Wait for all pending thread pool tasks to complete before clearing
+        threadPool.wait();
+        
         // Clear existing world
         chunkManager.unloadAll();
         chunkManager.clear();
+        renderer.clear();
         entityManager.clear();
         
         glm::vec3 playerPos;
