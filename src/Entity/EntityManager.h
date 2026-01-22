@@ -240,6 +240,7 @@ private:
     int getLightLevel(const glm::vec3& pos, float timeOfDay) const;
     bool hasSolidGround(const glm::vec3& pos) const;
     bool hasHeadroom(const glm::vec3& pos, float height) const;
+    bool hasSideClearance(const glm::vec3& pos, int radius, int heightBlocks) const;
     
     // AI update helpers
     void updateEntityAI(float deltaTime, const glm::vec3& playerPos, std::vector<AttackEvent>& attacks);

@@ -876,7 +876,8 @@ glm::vec3 EntityManager::findSpawnPosition(const glm::vec3& playerPos, float min
         surfaceY = SEA_LEVEL + 1;
     }
     
-    return glm::vec3(spawnX, static_cast<float>(surfaceY) + 0.05f, spawnZ);
+    // Spawn above the surface block to avoid embedding mobs in terrain
+    return glm::vec3(spawnX, static_cast<float>(surfaceY) + 0.1f, spawnZ);
 }
 
 int EntityManager::getLightLevel(const glm::vec3& pos, float timeOfDay) const {
@@ -923,12 +924,31 @@ bool EntityManager::hasHeadroom(const glm::vec3& pos, float height) const {
     return true;
 }
 
+bool EntityManager::hasSideClearance(const glm::vec3& pos, int radius, int heightBlocks) const {
+    int x = static_cast<int>(std::floor(pos.x));
+    int baseY = static_cast<int>(std::floor(pos.y));
+    int z = static_cast<int>(std::floor(pos.z));
+
+    for (int dy = 0; dy < heightBlocks; ++dy) {
+        for (int dx = -radius; dx <= radius; ++dx) {
+            for (int dz = -radius; dz <= radius; ++dz) {
+                if (dx == 0 && dz == 0) continue; // skip center column
+                if (std::abs(dx) + std::abs(dz) > 1) continue; // cardinal neighbors only
+                Block block = chunkManager->getBlockAt(x + dx, baseY + dy, z + dz);
+                if (block.isSolid()) return false;
+            }
+        }
+    }
+    return true;
+}
+
 bool EntityManager::isValidHostileSpawn(const glm::vec3& pos, float timeOfDay) const {
     int light = getLightLevel(pos, timeOfDay);
     if (light > 7) return false;
     
     if (!hasSolidGround(pos)) return false;
     if (!hasHeadroom(pos, 2.0f)) return false;
+    if (!hasSideClearance(pos, 1, 2)) return false;
     
     int x = static_cast<int>(std::floor(pos.x));
     int y = static_cast<int>(std::floor(pos.y)) - 1;
@@ -946,6 +966,7 @@ bool EntityManager::isValidPassiveSpawn(const glm::vec3& pos, float timeOfDay) c
     
     if (!hasSolidGround(pos)) return false;
     if (!hasHeadroom(pos, 1.5f)) return false;
+    if (!hasSideClearance(pos, 1, 2)) return false;
     
     int x = static_cast<int>(std::floor(pos.x));
     int y = static_cast<int>(std::floor(pos.y)) - 1;

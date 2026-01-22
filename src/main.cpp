@@ -894,7 +894,8 @@ public:
             std::string blockName = "None";
             
             // Increase raycast distance to ensure we hit the ground even from high up
-            auto result = chunkManager.rayCast(camera.getPosition(), camera.getFront(), 100.0f);
+            glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
+            auto result = chunkManager.rayCast(eyePos, camera.getFront(), 100.0f);
             if (result.hit) {
                 glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
                 int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
@@ -1022,7 +1023,8 @@ private:
         if (action == GLFW_PRESS) {
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
                 // Break block
-                auto result = chunkManager.rayCast(camera.getPosition(), camera.getFront(), 5.0f);
+                glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
+                auto result = chunkManager.rayCast(eyePos, camera.getFront(), 5.0f);
                 if (result.hit) {
                     glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
                     int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
@@ -1037,7 +1039,8 @@ private:
                 }
             } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
                 // Place block
-                auto result = chunkManager.rayCast(camera.getPosition(), camera.getFront(), 5.0f);
+                glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
+                auto result = chunkManager.rayCast(eyePos, camera.getFront(), 5.0f);
                 if (result.hit) {
                     glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
                     int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x + result.normal.x;
