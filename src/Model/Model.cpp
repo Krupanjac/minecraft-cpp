@@ -26,11 +26,105 @@ struct Model::Impl {
     tinygltf::TinyGLTF loader;
 };
 
+Model::Model() : impl(std::make_unique<Impl>()) {
+    // Private constructor for cloning - impl will be shared
+}
+
 Model::Model(const std::string& path) : impl(std::make_unique<Impl>()) {
     loadModel(path);
 }
 
 Model::~Model() = default;
+
+std::unique_ptr<Node> Model::cloneNode(const Node* src) const {
+    if (!src) return nullptr;
+    
+    auto dst = std::make_unique<Node>();
+    dst->index = src->index;
+    dst->translation = src->translation;
+    dst->rotation = src->rotation;
+    dst->scale = src->scale;
+    dst->bindTranslation = src->bindTranslation;
+    dst->bindRotation = src->bindRotation;
+    dst->bindScale = src->bindScale;
+    dst->matrix = src->matrix;
+    dst->useTRS = src->useTRS;
+    dst->localTransform = src->localTransform;
+    dst->globalTransform = src->globalTransform;
+    // Share mesh primitives (GPU resources)
+    dst->primitives = src->primitives;
+    
+    // Clone children recursively
+    for (const auto& child : src->children) {
+        auto clonedChild = cloneNode(child.get());
+        if (clonedChild) {
+            clonedChild->parent = dst.get();
+            dst->children.push_back(std::move(clonedChild));
+        }
+    }
+    
+    return dst;
+}
+
+std::shared_ptr<Model> Model::clone() const {
+    auto cloned = std::shared_ptr<Model>(new Model());
+    
+    // Share the tinygltf impl (contains animation data)
+    cloned->impl = std::make_unique<Impl>();
+    cloned->impl->model = impl->model;  // Copy the tinygltf model data
+    
+    // Share textures (GPU resources)
+    cloned->textures = textures;
+    
+    // Clone node tree (for independent transforms/animation state)
+    cloned->nodeMap.resize(nodeMap.size(), nullptr);
+    for (const auto& rootNode : nodes) {
+        auto clonedRoot = cloneNode(rootNode.get());
+        if (clonedRoot) {
+            cloned->nodes.push_back(std::move(clonedRoot));
+        }
+    }
+    
+    // Rebuild nodeMap for cloned nodes
+    std::function<void(Node*)> rebuildNodeMap = [&](Node* node) {
+        if (!node) return;
+        if (node->index >= 0 && static_cast<size_t>(node->index) < cloned->nodeMap.size()) {
+            cloned->nodeMap[node->index] = node;
+        }
+        for (auto& child : node->children) {
+            rebuildNodeMap(child.get());
+        }
+    };
+    for (auto& rootNode : cloned->nodes) {
+        rebuildNodeMap(rootNode.get());
+    }
+    
+    // Copy skins (reference same joint indices but independent matrices)
+    cloned->skins = skins;
+    cloned->activeSkin = activeSkin;
+    
+    // Initialize independent animation state
+    cloned->jointMatrices.resize(jointMatrices.size(), glm::mat4(1.0f));
+    cloned->prevJointMatrices.resize(prevJointMatrices.size(), glm::mat4(1.0f));
+    cloned->prevNodeGlobalTransforms.resize(prevNodeGlobalTransforms.size(), glm::mat4(1.0f));
+    
+    // Reset animation state (clone starts with no animation)
+    cloned->currentAnimation = -1;
+    cloned->currentAnimationName = "";
+    cloned->animationLoop = true;
+    cloned->animationTime = 0.0f;
+    cloned->animationDuration = 0.0f;
+    cloned->animationSpeed = 1.0f;
+    cloned->animationLoopEndFactor = 1.0f;
+    cloned->lockRootMotionXZ = false;
+    cloned->rootMotionNodeIndex = -1;
+    cloned->lockRootXZMask.clear();
+    
+    // Reload skins for the cloned model
+    cloned->loadSkins();
+    
+    return cloned;
+}
 
 void Model::loadModel(const std::string& path) {
     std::string err;

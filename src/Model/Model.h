@@ -49,6 +49,9 @@ class Model {
 public:
     Model(const std::string& path);
     ~Model();
+    
+    // Create a clone with independent animation state but shared GPU resources
+    std::shared_ptr<Model> clone() const;
 
     void draw(Shader& shader, const glm::mat4& modelMatrix, const glm::mat4& prevModelMatrix);
     void updateAnimation(float deltaTime);
@@ -67,6 +70,12 @@ public:
     bool getLockRootMotionXZ() const { return lockRootMotionXZ; }
 
 private:
+    // Private constructor for cloning
+    Model();
+    
+    // Clone helper
+    std::unique_ptr<Node> cloneNode(const Node* src) const;
+    
     // Root nodes of the scene
     std::vector<std::unique_ptr<Node>> nodes;
     

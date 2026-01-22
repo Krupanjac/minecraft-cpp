@@ -94,14 +94,21 @@ float EntityManager::getModelPreloadProgress() const {
 }
 
 std::shared_ptr<ModelSystem::Model> EntityManager::getModelForType(MobType type) {
+    // Clone the cached model so each entity has independent animation state
+    std::shared_ptr<ModelSystem::Model> cached = nullptr;
     switch (type) {
-        case MobType::ZOMBIE: return modelCache.zombie;
-        case MobType::SKELETON: return modelCache.skeleton;
-        case MobType::PIG: return modelCache.pig;
-        case MobType::CHICKEN: return modelCache.chicken;
-        case MobType::SHEEP: return modelCache.sheep;
+        case MobType::ZOMBIE: cached = modelCache.zombie; break;
+        case MobType::SKELETON: cached = modelCache.skeleton; break;
+        case MobType::PIG: cached = modelCache.pig; break;
+        case MobType::CHICKEN: cached = modelCache.chicken; break;
+        case MobType::SHEEP: cached = modelCache.sheep; break;
         default: return nullptr;
     }
+    
+    if (cached) {
+        return cached->clone();
+    }
+    return nullptr;
 }
 
 EntityId EntityManager::generateEntityId() {
