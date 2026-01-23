@@ -27,6 +27,7 @@ struct RemotePlayer {
     bool isSprinting = false;
     bool isSneaking = false;
     uint8_t modelIndex = 0;  // Player's selected character model
+    uint8_t heldItem = 0;    // Currently held item type
 };
 
 // Connected client info (server-side)
@@ -40,6 +41,7 @@ struct ClientConnection {
     float pitch = 0.0f;
     bool onGround = false;
     uint8_t modelIndex = 0;  // Player's selected character model
+    uint8_t heldItem = 0;    // Currently held item type
     std::vector<uint8_t> receiveBuffer;
     uint64_t lastPingTime = 0;
     uint64_t latency = 0;
@@ -73,7 +75,7 @@ public:
     
     // Update host player position (broadcasts to all clients)
     void updateHostPosition(const glm::vec3& position, float yaw, float pitch,
-                           const glm::vec3& velocity, bool onGround);
+                           const glm::vec3& velocity, bool onGround, uint8_t heldItem = 0);
     
     // Time management (server-authoritative)
     void setTimeOfDay(float time) { m_timeOfDay = time; }
@@ -120,6 +122,7 @@ private:
     float m_hostYaw = 0.0f;
     float m_hostPitch = 0.0f;
     bool m_hostOnGround = false;
+    uint8_t m_hostHeldItem = 0;
     std::string m_hostName = "Host";
     uint8_t m_hostModelIndex = 0;
     

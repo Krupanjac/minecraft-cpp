@@ -113,6 +113,7 @@ struct PlayerPositionPacket {
     float yaw, pitch;
     float velocityX, velocityY, velocityZ;
     uint8_t onGround;
+    uint8_t heldItemType;  // ItemType enum value for tool/weapon being held
     
     static constexpr PacketType TYPE = PacketType::PLAYER_POSITION;
 };
@@ -226,7 +227,8 @@ void serializeConnectRequest(PacketBuffer& buffer, const std::string& playerName
 void serializeConnectResponse(PacketBuffer& buffer, bool accepted, uint32_t playerId, 
                               int64_t seed, const glm::vec3& spawn, const std::string& reason = "");
 void serializePlayerPosition(PacketBuffer& buffer, uint32_t playerId, const glm::vec3& pos,
-                             float yaw, float pitch, const glm::vec3& velocity, bool onGround);
+                             float yaw, float pitch, const glm::vec3& velocity, bool onGround, 
+                             uint8_t heldItem = 0);
 void serializeBlockChange(PacketBuffer& buffer, int x, int y, int z, uint8_t blockType);
 void serializePlayerJoin(PacketBuffer& buffer, uint32_t playerId, const std::string& name,
                          const glm::vec3& pos, float yaw, float pitch, uint8_t modelIndex = 0);

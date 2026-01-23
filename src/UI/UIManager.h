@@ -3,6 +3,7 @@
 #include "../Render/Shader.h"
 #include "../Core/Settings.h"
 #include "../World/Block.h"
+#include "../World/Item.h"
 #include "../Model/Model.h"
 #include <vector>
 #include <string>
@@ -122,8 +123,13 @@ public:
 
     void updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos, const glm::vec3& playerVel, float taaMotion = 0.0f, float taaHistoryWeight = 0.0f);
 
-    BlockType getSelectedBlock() const { return hotbar[selectedSlot]; }
+    BlockType getSelectedBlock() const { return hotbarSlots[selectedSlot].blockType; }
+    ItemType getSelectedItem() const { return hotbarSlots[selectedSlot].isItem ? hotbarSlots[selectedSlot].itemStack.type : ItemType::NONE; }
+    bool isSelectedSlotItem() const { return hotbarSlots[selectedSlot].isItem; }
+    const HotbarSlot& getSelectedHotbarSlot() const { return hotbarSlots[selectedSlot]; }
     void selectHotbarSlot(int slot) { if (slot >= 0 && slot < 9) selectedSlot = slot; }
+    void setHotbarSlot(int slot, BlockType block) { if (slot >= 0 && slot < 9) hotbarSlots[slot] = HotbarSlot(block); }
+    void setHotbarSlot(int slot, ItemType item) { if (slot >= 0 && slot < 9) hotbarSlots[slot] = HotbarSlot(item); }
 
     // HUD Stats
     int playerHealth = 20; // 0-20 (10 hearts)
@@ -131,7 +137,9 @@ public:
     float playerXP = 0.0f; // 0.0 - 1.0
     int playerLevel = 0;
     
-    // Hotbar
+    // Hotbar - now supports both blocks and items
+    HotbarSlot hotbarSlots[9];
+    // Legacy block array for backwards compatibility
     BlockType hotbar[9] = { 
         BlockType::STONE, BlockType::DIRT, BlockType::WOOD, BlockType::LEAVES, 
         BlockType::SAND, BlockType::GRAVEL, BlockType::GRASS, BlockType::WATER, BlockType::AIR 
@@ -141,6 +149,11 @@ public:
     // Debug controls
     float timeOfDay = 0.0f; // 0-1200
     bool isDayNightPaused = false;
+    
+    // Game mode
+    bool isCreativeMode = true; // Starts in creative (flying enabled)
+    bool isSurvivalMode() const { return !isCreativeMode; }
+    void setGameMode(bool creative) { isCreativeMode = creative; }
 
 private:
     MenuState currentMenuState = MenuState::MAIN_MENU;
@@ -168,6 +181,7 @@ private:
     void renderChat();
     void renderModelPreview();  // Render 3D character model preview
     void loadPreviewModel(int modelIndex);  // Load preview model by index
+    void initializeHotbar();    // Initialize hotbar with default items
 
     int width, height;
     Shader uiShader;

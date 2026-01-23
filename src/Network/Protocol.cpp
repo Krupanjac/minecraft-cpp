@@ -140,10 +140,11 @@ void serializeConnectResponse(PacketBuffer& buffer, bool accepted, uint32_t play
 }
 
 void serializePlayerPosition(PacketBuffer& buffer, uint32_t playerId, const glm::vec3& pos,
-                             float yaw, float pitch, const glm::vec3& velocity, bool onGround) {
+                             float yaw, float pitch, const glm::vec3& velocity, bool onGround,
+                             uint8_t heldItem) {
     // Header
     buffer.writeU8(static_cast<uint8_t>(PacketType::PLAYER_POSITION));
-    buffer.writeU16(4 + 12 + 8 + 12 + 1);  // id + pos + angles + vel + onGround
+    buffer.writeU16(4 + 12 + 8 + 12 + 1 + 1);  // id + pos + angles + vel + onGround + heldItem
     
     // Payload
     buffer.writeU32(playerId);
@@ -156,6 +157,7 @@ void serializePlayerPosition(PacketBuffer& buffer, uint32_t playerId, const glm:
     buffer.writeFloat(velocity.y);
     buffer.writeFloat(velocity.z);
     buffer.writeU8(onGround ? 1 : 0);
+    buffer.writeU8(heldItem);
 }
 
 void serializeBlockChange(PacketBuffer& buffer, int x, int y, int z, uint8_t blockType) {

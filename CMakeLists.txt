@@ -106,6 +106,7 @@ set(SOURCES
     src/World/ChunkManager.cpp
     src/World/WorldGenerator.cpp
     src/World/WorldSerializer.cpp
+    src/World/Item.cpp
     src/Mesh/MeshBuilder.cpp
     src/Mesh/Mesh.cpp
     src/Render/Shader.cpp
@@ -118,6 +119,7 @@ set(SOURCES
     src/Render/ShadowMap.cpp
     src/Render/PostProcess.cpp
     src/Render/VoxelRayTracer.cpp
+    src/Render/HeldItemRenderer.cpp
     src/Network/Socket.cpp
     src/Network/Protocol.cpp
     src/Network/GameServer.cpp

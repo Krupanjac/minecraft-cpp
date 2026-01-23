@@ -7,8 +7,10 @@
 #include "Core/HardwareInfo.h"
 #include "Render/Renderer.h"
 #include "Render/Camera.h"
+#include "Render/HeldItemRenderer.h"
 #include "World/ChunkManager.h"
 #include "World/WorldGenerator.h"
+#include "World/Item.h"
 #include "Mesh/MeshBuilder.h"
 #include "Util/Config.h"
 #include "UI/UIManager.h"
@@ -184,6 +186,11 @@ public:
         if (!renderer.initialize(window->getWidth(), window->getHeight())) {
             LOG_ERROR("Failed to initialize renderer");
             return false;
+        }
+        
+        // Initialize held item renderer
+        if (!heldItemRenderer.initialize()) {
+            LOG_WARNING("Failed to initialize held item renderer");
         }
         
         // Apply initial settings
@@ -1080,6 +1087,7 @@ private:
     UIManager uiManager;
     WorldSerializer worldSerializer;
     Network::NetworkManager networkManager;
+    HeldItemRenderer heldItemRenderer;
     
     std::mutex meshMutex;
     std::vector<std::pair<ChunkPos, MeshData>> pendingMeshes;
@@ -1092,6 +1100,21 @@ private:
     // Game State
     std::string currentWorldName = "New World";
     long currentSeed = 12345;
+    
+    // Player health for local player
+    float playerHealth = 20.0f;
+    float playerMaxHealth = 20.0f;
+    float playerInvulnerabilityTimer = 0.0f;
+    
+    // Combat state
+    float attackCooldown = 0.0f;
+    float lastAttackTime = 0.0f;
+    
+    // Block breaking state (for survival mode)
+    bool isBreakingBlock = false;
+    float blockBreakProgress = 0.0f;
+    glm::ivec3 breakingBlockPos = glm::ivec3(0);
+    BlockType breakingBlockType = BlockType::AIR;
     
     std::unique_ptr<PlayerEntity> playerEntity;
     
@@ -1228,31 +1251,152 @@ private:
 
         if (action == GLFW_PRESS) {
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                // Break block
-                glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
-                auto result = chunkManager.rayCast(eyePos, camera.getFront(), 5.0f);
-                if (result.hit) {
-                    glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
-                    int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
-                    int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
-                    int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
+                // Get current held item
+                ItemType heldItem = uiManager.getSelectedItem();
+                bool isHoldingTool = heldItem != ItemType::NONE;
+                bool isSword = isHoldingTool && ItemRegistry::getCategory(heldItem) == ToolCategory::SWORD;
+                
+                // Trigger swing animation
+                heldItemRenderer.triggerSwing();
+                
+                // First, try to attack an entity
+                bool attackedEntity = false;
+                if (attackCooldown <= 0.0f) {
+                    glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
+                    float attackRange = 4.0f; // Reach distance for attacks
                     
-                    // Get block type before breaking for sound
-                    Block block = chunkManager.getBlockAt(x, y, z);
-                    uint8_t blockTypeVal = static_cast<uint8_t>(block.getType());
+                    // Find closest entity in attack range
+                    Entity* targetEntity = nullptr;
+                    float closestDist = attackRange;
                     
-                    // Play dig sound at block position
-                    Audio::SoundType digSound = Audio::getDigSoundForBlock(blockTypeVal);
-                    Audio::AudioManager::instance().playSoundAt(digSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f));
+                    std::vector<Entity*> entities;
+                    if (useNewEntityManager) {
+                        entities = entityManager.getAllEntities();
+                    } else {
+                        for(auto& m : zombies) if(m) entities.push_back(m.get());
+                        for(auto& m : skeletons) if(m && !m->isDead()) entities.push_back(m.get());
+                        for(auto& m : pigs) if(m && !m->isDead()) entities.push_back(m.get());
+                        for(auto& m : chickens) if(m && !m->isDead()) entities.push_back(m.get());
+                        for(auto& m : sheep) if(m && !m->isDead()) entities.push_back(m.get());
+                    }
                     
-                    chunkManager.setBlockAt(x, y, z, Block(BlockType::AIR));
+                    // Also check remote players
+                    auto remotePlayers = networkManager.getRemotePlayerEntities();
+                    for (auto* rp : remotePlayers) {
+                        entities.push_back(rp);
+                    }
                     
-                    // Broadcast block change to network
-                    if (networkManager.isOnline()) {
-                        networkManager.sendBlockChange(x, y, z, static_cast<uint8_t>(BlockType::AIR));
+                    for (Entity* e : entities) {
+                        if (e->isDead()) continue;
+                        
+                        // Check if entity is in front of player and within range
+                        glm::vec3 toEntity = e->getPosition() + glm::vec3(0.0f, 0.9f, 0.0f) - eyePos; // Aim at chest
+                        float dist = glm::length(toEntity);
+                        
+                        if (dist < closestDist) {
+                            // Check if entity is roughly in front (within ~60 degree cone)
+                            float dot = glm::dot(glm::normalize(toEntity), camera.getFront());
+                            if (dot > 0.5f) {
+                                // Additional AABB check for more accuracy
+                                glm::vec3 entityMin = e->getPosition() - glm::vec3(0.3f, 0.0f, 0.3f);
+                                glm::vec3 entityMax = e->getPosition() + glm::vec3(0.3f, 1.8f, 0.3f);
+                                
+                                // Ray-box intersection
+                                glm::vec3 rayDir = camera.getFront();
+                                float tMin = 0.0f, tMax = attackRange;
+                                
+                                for (int i = 0; i < 3; ++i) {
+                                    if (std::abs(rayDir[i]) < 0.0001f) {
+                                        if (eyePos[i] < entityMin[i] || eyePos[i] > entityMax[i]) {
+                                            tMin = attackRange + 1.0f; // Miss
+                                        }
+                                    } else {
+                                        float t1 = (entityMin[i] - eyePos[i]) / rayDir[i];
+                                        float t2 = (entityMax[i] - eyePos[i]) / rayDir[i];
+                                        if (t1 > t2) std::swap(t1, t2);
+                                        tMin = std::max(tMin, t1);
+                                        tMax = std::min(tMax, t2);
+                                    }
+                                }
+                                
+                                if (tMin <= tMax && tMin < closestDist) {
+                                    closestDist = tMin;
+                                    targetEntity = e;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Attack the target entity if found
+                    if (targetEntity) {
+                        attackedEntity = true;
+                        
+                        // Calculate damage
+                        float damage = ItemRegistry::instance().getAttackDamage(heldItem);
+                        float knockback = ItemRegistry::instance().getKnockback(heldItem);
+                        
+                        // Apply damage
+                        glm::vec3 knockbackDir = glm::normalize(targetEntity->getPosition() - camera.getPosition());
+                        knockbackDir.y = 0.0f;
+                        if (glm::length(knockbackDir) > 0.001f) {
+                            knockbackDir = glm::normalize(knockbackDir);
+                        }
+                        
+                        targetEntity->takeDamage(damage, knockbackDir * knockback * 10.0f);
+                        
+                        // Play hit sound
+                        Audio::AudioManager::instance().playSoundAt(Audio::SoundType::PLAYER_HURT, targetEntity->getPosition());
+                        
+                        // Set attack cooldown based on weapon
+                        const auto& props = ItemRegistry::instance().getProperties(heldItem);
+                        attackCooldown = 1.0f / props.attackSpeed;
+                        
+                        LOG_INFO("Attacked entity for " + std::to_string(damage) + " damage");
+                    }
+                }
+                
+                // If we didn't attack an entity, try to break a block
+                if (!attackedEntity) {
+                    // In creative mode, instant break
+                    // In survival mode, need to hold to break (handled in update)
+                    if (uiManager.isCreativeMode) {
+                        // Instant break in creative
+                        glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
+                        auto result = chunkManager.rayCast(eyePos, camera.getFront(), 5.0f);
+                        if (result.hit) {
+                            glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
+                            int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
+                            int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
+                            int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
+                            
+                            // Get block type before breaking for sound
+                            Block block = chunkManager.getBlockAt(x, y, z);
+                            uint8_t blockTypeVal = static_cast<uint8_t>(block.getType());
+                            
+                            // Play dig sound at block position
+                            Audio::SoundType digSound = Audio::getDigSoundForBlock(blockTypeVal);
+                            Audio::AudioManager::instance().playSoundAt(digSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f));
+                            
+                            chunkManager.setBlockAt(x, y, z, Block(BlockType::AIR));
+                            
+                            // Broadcast block change to network
+                            if (networkManager.isOnline()) {
+                                networkManager.sendBlockChange(x, y, z, static_cast<uint8_t>(BlockType::AIR));
+                            }
+                        }
+                    } else {
+                        // Start breaking in survival mode - actual breaking happens in update()
+                        isBreakingBlock = true;
                     }
                 }
             } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+                // Check if holding an item that can't place blocks
+                if (uiManager.isSelectedSlotItem()) {
+                    // Holding a tool/item - can't place blocks with right click
+                    // Could add "use" functionality here for certain items
+                    return;
+                }
+                
                 // Place block
                 glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
                 auto result = chunkManager.rayCast(eyePos, camera.getFront(), 5.0f);
@@ -1330,6 +1474,12 @@ private:
                         }
                     }
                 }
+            }
+        } else if (action == GLFW_RELEASE) {
+            if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                // Stop breaking block
+                isBreakingBlock = false;
+                blockBreakProgress = 0.0f;
             }
         }
     }
@@ -1413,6 +1563,91 @@ private:
     void update(float deltaTime) {
         // Always update network (even in menu for connection handling)
         networkManager.update(deltaTime);
+        
+        // Update attack cooldown
+        if (attackCooldown > 0.0f) {
+            attackCooldown -= deltaTime;
+            if (attackCooldown < 0.0f) attackCooldown = 0.0f;
+        }
+        
+        // Update player invulnerability
+        if (playerInvulnerabilityTimer > 0.0f) {
+            playerInvulnerabilityTimer -= deltaTime;
+            if (playerInvulnerabilityTimer < 0.0f) playerInvulnerabilityTimer = 0.0f;
+        }
+        
+        // Update held item from current hotbar selection
+        ItemType currentHeldItem = uiManager.getSelectedItem();
+        heldItemRenderer.setHeldItem(currentHeldItem);
+        
+        // Update held item renderer
+        bool isMoving = glm::length(glm::vec2(camera.velocity.x, camera.velocity.z)) > 0.5f;
+        heldItemRenderer.update(deltaTime, camera.velocity, camera.onGround, isMoving);
+        
+        // Handle survival mode block breaking
+        if (isBreakingBlock && !uiManager.isCreativeMode && uiManager.isWorldLoaded()) {
+            glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
+            auto result = chunkManager.rayCast(eyePos, camera.getFront(), 5.0f);
+            
+            if (result.hit) {
+                glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
+                int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
+                int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
+                int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
+                
+                // Check if target block changed
+                if (breakingBlockPos != glm::ivec3(x, y, z)) {
+                    breakingBlockPos = glm::ivec3(x, y, z);
+                    blockBreakProgress = 0.0f;
+                    breakingBlockType = chunkManager.getBlockAt(x, y, z).getType();
+                }
+                
+                // Calculate break speed based on tool
+                float baseBreakTime = getBlockBreakTime(breakingBlockType);
+                float toolMultiplier = ItemRegistry::instance().getMiningMultiplier(currentHeldItem, breakingBlockType);
+                float effectiveBreakTime = baseBreakTime / toolMultiplier;
+                
+                // Progress breaking
+                blockBreakProgress += deltaTime / effectiveBreakTime;
+                
+                // Trigger mining animation
+                heldItemRenderer.setMining(true);
+                
+                // Play dig hit sound periodically
+                static float digSoundTimer = 0.0f;
+                digSoundTimer += deltaTime;
+                if (digSoundTimer >= 0.25f) {
+                    Audio::SoundType digHitSound = Audio::getDigSoundForBlock(static_cast<uint8_t>(breakingBlockType));
+                    Audio::AudioManager::instance().playSoundAt(digHitSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f), 0.3f);
+                    digSoundTimer = 0.0f;
+                }
+                
+                // Check if block is broken
+                if (blockBreakProgress >= 1.0f) {
+                    // Break the block
+                    Audio::SoundType digSound = Audio::getDigSoundForBlock(static_cast<uint8_t>(breakingBlockType));
+                    Audio::AudioManager::instance().playSoundAt(digSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f));
+                    
+                    chunkManager.setBlockAt(x, y, z, Block(BlockType::AIR));
+                    
+                    // Broadcast block change to network
+                    if (networkManager.isOnline()) {
+                        networkManager.sendBlockChange(x, y, z, static_cast<uint8_t>(BlockType::AIR));
+                    }
+                    
+                    blockBreakProgress = 0.0f;
+                }
+            } else {
+                // No block in range, reset progress
+                blockBreakProgress = 0.0f;
+                heldItemRenderer.setMining(false);
+            }
+        } else {
+            heldItemRenderer.setMining(false);
+        }
+        
+        // Sync player health to UI
+        uiManager.playerHealth = static_cast<int>(playerHealth);
 
         // Update ambient audio state based on player position
         if (uiManager.isWorldLoaded()) {
@@ -1450,12 +1685,14 @@ private:
         // Send foot position (camera is at FEET level)
         if (networkManager.isOnline() && !uiManager.isMenuOpen()) {
             glm::vec3 footPos = camera.getPosition();
+            uint8_t heldItemId = static_cast<uint8_t>(uiManager.getSelectedItem());
             networkManager.sendLocalPlayerState(
                 footPos,
                 camera.getYaw(),
                 camera.getPitch(),
                 camera.velocity,
-                camera.onGround
+                camera.onGround,
+                heldItemId
             );
         }
         
@@ -1943,6 +2180,29 @@ private:
         // Clean up any GPU meshes for chunks that have been unloaded by ChunkManager
         renderer.cleanUnusedMeshes(chunkManager);
         
+        // Render held items for remote players (third-person view)
+        if (uiManager.isWorldLoaded()) {
+            Shader& modelShader = renderer.getModelShader();
+            for (auto* remotePlayer : remotePlayerEntities) {
+                uint8_t heldItemId = remotePlayer->getHeldItem();
+                if (heldItemId != 0) {
+                    ItemType itemType = static_cast<ItemType>(heldItemId);
+                    // Use rotation.y as yaw (rotation is stored as euler angles)
+                    float playerYaw = remotePlayer->getRotation().y;
+                    heldItemRenderer.renderThirdPerson(modelShader, camera, remotePlayer->getPosition(), 
+                                                       playerYaw, itemType, 
+                                                       window->getWidth(), window->getHeight());
+                }
+            }
+        }
+        
+        // Render held item in first-person view (only when not in menu and in first person)
+        if (!camera.isThirdPerson() && uiManager.isWorldLoaded() && !uiManager.isMenuOpen()) {
+            // Get the model shader from renderer for held item
+            Shader& modelShader = renderer.getModelShader();
+            heldItemRenderer.renderFirstPerson(modelShader, camera, window->getWidth(), window->getHeight());
+        }
+        
         uiManager.render();
     }
     
@@ -2050,6 +2310,97 @@ private:
             }
         }
         return false;
+    }
+    
+    // Get base break time for a block type (in seconds, with bare hands)
+    float getBlockBreakTime(BlockType type) const {
+        switch (type) {
+            // Instant break
+            case BlockType::AIR:
+            case BlockType::TALL_GRASS:
+            case BlockType::ROSE:
+                return 0.0f;
+            
+            // Very soft
+            case BlockType::LEAVES:
+                return 0.35f;
+            
+            // Soft blocks (shovel effective)
+            case BlockType::DIRT:
+            case BlockType::GRASS:
+            case BlockType::SAND:
+            case BlockType::GRAVEL:
+            case BlockType::SNOW:
+                return 0.75f;
+            
+            // Wood (axe effective)
+            case BlockType::WOOD:
+            case BlockType::LOG:
+                return 3.0f;
+            
+            // Stone (pickaxe effective)
+            case BlockType::STONE:
+            case BlockType::SANDSTONE:
+                return 7.5f;
+            
+            // Ice (pickaxe effective, but breaks easily)
+            case BlockType::ICE:
+                return 0.7f;
+            
+            // Water (can't break)
+            case BlockType::WATER:
+                return 100000.0f;
+            
+            // Bedrock (unbreakable)
+            case BlockType::BEDROCK:
+                return 100000.0f;
+            
+            default:
+                return 1.5f;
+        }
+    }
+    
+    // Take damage as the player
+    void playerTakeDamage(float amount, const glm::vec3& knockbackDir = glm::vec3(0.0f)) {
+        if (playerInvulnerabilityTimer > 0.0f || playerHealth <= 0.0f) {
+            return;
+        }
+        
+        playerHealth -= amount;
+        playerInvulnerabilityTimer = 0.5f; // Half second of immunity
+        
+        // Play hurt sound
+        Audio::AudioManager::instance().playSound(Audio::SoundType::PLAYER_HURT, 0.8f);
+        
+        // Apply knockback
+        if (glm::length(knockbackDir) > 0.001f) {
+            glm::vec3 normalizedKnockback = glm::normalize(knockbackDir);
+            camera.velocity += normalizedKnockback * 8.0f;
+            camera.velocity.y += 4.0f;
+        }
+        
+        if (playerHealth <= 0.0f) {
+            playerHealth = 0.0f;
+            onPlayerDeath();
+        }
+        
+        // Update UI
+        uiManager.playerHealth = static_cast<int>(playerHealth);
+    }
+    
+    void onPlayerDeath() {
+        LOG_INFO("Player died!");
+        // TODO: Implement respawn logic
+        // For now, just reset health and position
+        playerHealth = playerMaxHealth;
+        uiManager.playerHealth = static_cast<int>(playerHealth);
+        
+        // Respawn at world spawn
+        int spawnX = 0;
+        int spawnZ = 0;
+        int terrainHeight = worldGenerator.getSurfaceHeight(spawnX, spawnZ);
+        camera.setPosition(glm::vec3(spawnX, terrainHeight + 2.0f, spawnZ));
+        camera.velocity = glm::vec3(0.0f);
     }
 };
 

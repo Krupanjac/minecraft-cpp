@@ -256,11 +256,12 @@ void GameServer::handlePacket(ClientConnection& client, PacketType type, PacketB
             client.velocity.y = buffer.readFloat();
             client.velocity.z = buffer.readFloat();
             client.onGround = buffer.readU8() != 0;
+            client.heldItem = buffer.readU8();
             
             // Broadcast to other clients
             PacketBuffer posPacket;
             serializePlayerPosition(posPacket, client.playerId, client.position,
-                                   client.yaw, client.pitch, client.velocity, client.onGround);
+                                   client.yaw, client.pitch, client.velocity, client.onGround, client.heldItem);
             broadcastToAll(posPacket, client.playerId);
             break;
         }
@@ -452,17 +453,18 @@ size_t GameServer::getPlayerCount() const {
 }
 
 void GameServer::updateHostPosition(const glm::vec3& position, float yaw, float pitch,
-                                    const glm::vec3& velocity, bool onGround) {
+                                    const glm::vec3& velocity, bool onGround, uint8_t heldItem) {
     m_hostPosition = position;
     m_hostYaw = yaw;
     m_hostPitch = pitch;
     m_hostVelocity = velocity;
     m_hostOnGround = onGround;
+    m_hostHeldItem = heldItem;
     
     // Broadcast host position to all clients
     std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
     PacketBuffer posPacket;
-    serializePlayerPosition(posPacket, 0, m_hostPosition, m_hostYaw, m_hostPitch, m_hostVelocity, m_hostOnGround);
+    serializePlayerPosition(posPacket, 0, m_hostPosition, m_hostYaw, m_hostPitch, m_hostVelocity, m_hostOnGround, m_hostHeldItem);
     broadcastToAll(posPacket);
 }
 

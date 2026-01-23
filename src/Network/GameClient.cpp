@@ -248,6 +248,7 @@ void GameClient::handlePacket(PacketType type, PacketBuffer& buffer) {
             float velY = buffer.readFloat();
             float velZ = buffer.readFloat();
             bool onGround = buffer.readU8() != 0;
+            uint8_t heldItem = buffer.readU8();
             
             if (playerId != m_localPlayerId) {
                 std::lock_guard<std::mutex> lock(m_playersMutex);
@@ -258,6 +259,7 @@ void GameClient::handlePacket(PacketType type, PacketBuffer& buffer) {
                     it->second.yaw = yaw;
                     it->second.pitch = pitch;
                     it->second.onGround = onGround;
+                    it->second.heldItem = heldItem;
                 }
             }
             break;
@@ -367,11 +369,11 @@ void GameClient::sendPing() {
 }
 
 void GameClient::sendPosition(const glm::vec3& pos, float yaw, float pitch,
-                              const glm::vec3& velocity, bool onGround) {
+                              const glm::vec3& velocity, bool onGround, uint8_t heldItem) {
     if (!isConnected()) return;
     
     PacketBuffer packet;
-    serializePlayerPosition(packet, m_localPlayerId, pos, yaw, pitch, velocity, onGround);
+    serializePlayerPosition(packet, m_localPlayerId, pos, yaw, pitch, velocity, onGround, heldItem);
     sendPacket(packet);
 }
 

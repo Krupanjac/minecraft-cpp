@@ -1,5 +1,6 @@
 #include "Entity.h"
 #include "../Model/Model.h"
+#include "../Core/Logger.h"
 
 Entity::Entity(const glm::vec3& position)
     : position(position),
@@ -20,10 +21,58 @@ void Entity::update(float deltaTime) {
     // Basic physics integration could go here, or be handled by subclasses/physics engine
     position += velocity * deltaTime;
     
+    // Update invulnerability timer
+    if (invulnerabilityTimer > 0.0f) {
+        invulnerabilityTimer -= deltaTime;
+        if (invulnerabilityTimer < 0.0f) {
+            invulnerabilityTimer = 0.0f;
+        }
+    }
+    
+    // Update damage flash timer
+    if (damageFlashTimer > 0.0f) {
+        damageFlashTimer -= deltaTime;
+        if (damageFlashTimer < 0.0f) {
+            damageFlashTimer = 0.0f;
+        }
+    }
+    
     // Update model animations if applicable
     if (model) {
         model->updateAnimation(deltaTime);
     }
+}
+
+void Entity::takeDamage(float amount, const glm::vec3& knockbackDir) {
+    if (isInvulnerable() || isDead()) {
+        return;
+    }
+    
+    health -= amount;
+    invulnerabilityTimer = INVULNERABILITY_DURATION;
+    damageFlashTimer = 0.3f; // Red flash duration
+    
+    // Apply knockback
+    if (glm::length(knockbackDir) > 0.001f) {
+        glm::vec3 normalizedKnockback = glm::normalize(knockbackDir);
+        velocity += normalizedKnockback * 8.0f; // Knockback strength
+        velocity.y += 4.0f; // Add upward component
+    }
+    
+    if (health <= 0.0f) {
+        health = 0.0f;
+        onDeath();
+    }
+}
+
+void Entity::heal(float amount) {
+    health = std::min(health + amount, maxHealth);
+}
+
+void Entity::onDeath() {
+    // Base implementation - subclasses can override for death effects
+    LOG_INFO("Entity died at position: " + std::to_string(position.x) + ", " + 
+             std::to_string(position.y) + ", " + std::to_string(position.z));
 }
 
 void Entity::render(Shader& shader) {

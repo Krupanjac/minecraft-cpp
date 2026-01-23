@@ -28,15 +28,18 @@ public:
     void setTargetPosition(const glm::vec3& pos) { m_targetPosition = pos; }
     void setTargetRotation(float yaw, float pitch) { m_targetYaw = yaw; m_targetPitch = pitch; }
     void setTargetVelocity(const glm::vec3& vel) { velocity = vel; }
+    void setHeldItem(uint8_t item) { m_heldItem = item; }
     
     uint32_t getPlayerId() const { return m_playerId; }
     const std::string& getPlayerName() const { return m_playerName; }
     uint8_t getModelIndex() const { return m_modelIndex; }
+    uint8_t getHeldItem() const { return m_heldItem; }
     
 private:
     uint32_t m_playerId;
     std::string m_playerName;
     uint8_t m_modelIndex;
+    uint8_t m_heldItem = 0;
     
     // Interpolation targets
     glm::vec3 m_targetPosition;
@@ -66,7 +69,7 @@ public:
     
     // Send local player state (call frequently)
     void sendLocalPlayerState(const glm::vec3& pos, float yaw, float pitch,
-                              const glm::vec3& velocity, bool onGround);
+                              const glm::vec3& velocity, bool onGround, uint8_t heldItem = 0);
     
     // Send block change
     void sendBlockChange(int x, int y, int z, uint8_t blockType);

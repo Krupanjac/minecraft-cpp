@@ -292,8 +292,36 @@ void UIManager::initialize(int windowWidth, int windowHeight) {
 
     // Pre-load the preview model for player settings
     loadPreviewModel(Settings::instance().playerModelIndex);
+    
+    // Initialize hotbar with default items
+    initializeHotbar();
 
     setupMainMenu();
+}
+
+void UIManager::initializeHotbar() {
+    // Default hotbar layout: some blocks and some tools
+    // First 5 slots: blocks
+    hotbarSlots[0] = HotbarSlot(BlockType::STONE);
+    hotbarSlots[1] = HotbarSlot(BlockType::DIRT);
+    hotbarSlots[2] = HotbarSlot(BlockType::WOOD);
+    hotbarSlots[3] = HotbarSlot(BlockType::LEAVES);
+    hotbarSlots[4] = HotbarSlot(BlockType::SAND);
+    
+    // Slots 5-8: tools
+    hotbarSlots[5] = HotbarSlot(ItemType::SWORD_DIAMOND);
+    hotbarSlots[6] = HotbarSlot(ItemType::PICKAXE_DIAMOND);
+    hotbarSlots[7] = HotbarSlot(ItemType::AXE_DIAMOND);
+    hotbarSlots[8] = HotbarSlot(ItemType::SHOVEL_DIAMOND);
+    
+    // Keep legacy hotbar array in sync
+    for (int i = 0; i < 9; ++i) {
+        if (!hotbarSlots[i].isItem) {
+            hotbar[i] = hotbarSlots[i].blockType;
+        } else {
+            hotbar[i] = BlockType::AIR; // Items show AIR in legacy array
+        }
+    }
 }
 
 void UIManager::handleResize(int w, int h) {

@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include "../Render/Shader.h"
+#include "../World/Item.h"
 
 namespace ModelSystem {
     class Model;
@@ -37,6 +38,30 @@ public:
 
     void setModel(std::shared_ptr<ModelSystem::Model> newModel) { this->model = newModel; }
 
+    // Health system
+    float getHealth() const { return health; }
+    float getMaxHealth() const { return maxHealth; }
+    void setHealth(float h) { health = std::max(0.0f, std::min(h, maxHealth)); }
+    void setMaxHealth(float mh) { maxHealth = mh; if (health > maxHealth) health = maxHealth; }
+    bool isDead() const { return health <= 0.0f; }
+    
+    // Damage handling
+    virtual void takeDamage(float amount, const glm::vec3& knockbackDir = glm::vec3(0.0f));
+    virtual void heal(float amount);
+    virtual void onDeath();
+    
+    // Combat - damage immunity after being hit
+    bool isInvulnerable() const { return invulnerabilityTimer > 0.0f; }
+    float getInvulnerabilityTimer() const { return invulnerabilityTimer; }
+    
+    // Held item (for players and humanoid mobs)
+    ItemType getHeldItem() const { return heldItem; }
+    void setHeldItem(ItemType item) { heldItem = item; }
+    
+    // Entity ID for networking
+    uint32_t getEntityId() const { return entityId; }
+    void setEntityId(uint32_t id) { entityId = id; }
+
 protected:
     glm::vec3 position;
     glm::vec3 rotation; // Euler angles in degrees
@@ -49,6 +74,21 @@ protected:
     glm::vec3 prevScale;
 
     std::shared_ptr<ModelSystem::Model> model;
+    
+    // Health system
+    float health = 20.0f;
+    float maxHealth = 20.0f;
+    float invulnerabilityTimer = 0.0f;
+    static constexpr float INVULNERABILITY_DURATION = 0.5f; // Half second of immunity after damage
+    
+    // Damage flash effect
+    float damageFlashTimer = 0.0f;
+    
+    // Held item
+    ItemType heldItem = ItemType::NONE;
+    
+    // Network ID
+    uint32_t entityId = 0;
     
     // Helper to build model matrix
     glm::mat4 getModelMatrix() const;

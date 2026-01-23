@@ -41,7 +41,7 @@ public:
     
     // Send local player state
     void sendPosition(const glm::vec3& pos, float yaw, float pitch, 
-                      const glm::vec3& velocity, bool onGround);
+                      const glm::vec3& velocity, bool onGround, uint8_t heldItem = 0);
     void sendBlockChange(int x, int y, int z, uint8_t blockType);
     void sendChatMessage(const std::string& message);
     

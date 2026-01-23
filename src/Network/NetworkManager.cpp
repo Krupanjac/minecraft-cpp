@@ -204,6 +204,7 @@ void NetworkManager::updateRemotePlayerEntities() {
             (*it)->setTargetPosition(player.position);
             (*it)->setTargetRotation(player.yaw, player.pitch);
             (*it)->setTargetVelocity(player.velocity);
+            (*it)->setHeldItem(player.heldItem);
         } else {
             // Create new entity with the player's model index
             auto entity = std::make_unique<RemotePlayerEntity>(player.id, player.name, player.position, player.modelIndex);
@@ -246,7 +247,7 @@ void NetworkManager::updateRemotePlayerEntities() {
 }
 
 void NetworkManager::sendLocalPlayerState(const glm::vec3& pos, float yaw, float pitch,
-                                          const glm::vec3& velocity, bool onGround) {
+                                          const glm::vec3& velocity, bool onGround, uint8_t heldItem) {
     // Throttle position updates
     if (m_positionUpdateTimer < POSITION_UPDATE_INTERVAL) {
         return;
@@ -254,10 +255,10 @@ void NetworkManager::sendLocalPlayerState(const glm::vec3& pos, float yaw, float
     m_positionUpdateTimer = 0.0f;
     
     if (m_mode == NetworkMode::CLIENT && m_client && m_client->isConnected()) {
-        m_client->sendPosition(pos, yaw, pitch, velocity, onGround);
+        m_client->sendPosition(pos, yaw, pitch, velocity, onGround, heldItem);
     } else if (m_mode == NetworkMode::HOST && m_server) {
         // Host broadcasts their position to all connected clients
-        m_server->updateHostPosition(pos, yaw, pitch, velocity, onGround);
+        m_server->updateHostPosition(pos, yaw, pitch, velocity, onGround, heldItem);
     }
 }
 
