@@ -94,7 +94,22 @@ public:
             if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
                 double currentTime = glfwGetTime();
                 if (currentTime - lastSpaceTime < 0.3) {
-                    camera.toggleFlightMode();
+                    // Double-space toggles between creative and survival mode
+                    uiManager.isCreativeMode = !uiManager.isCreativeMode;
+                    
+                    if (uiManager.isCreativeMode) {
+                        // Entering creative mode - enable flight
+                        if (!camera.getFlightMode()) {
+                            camera.toggleFlightMode();
+                        }
+                        LOG_INFO("Switched to Creative Mode");
+                    } else {
+                        // Entering survival mode - disable flight
+                        if (camera.getFlightMode()) {
+                            camera.toggleFlightMode();
+                        }
+                        LOG_INFO("Switched to Survival Mode");
+                    }
                 }
                 lastSpaceTime = currentTime;
             }
@@ -2179,6 +2194,9 @@ private:
         renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight());
         // Clean up any GPU meshes for chunks that have been unloaded by ChunkManager
         renderer.cleanUnusedMeshes(chunkManager);
+        
+        // Blit depth buffer to default framebuffer so held items can properly occlude/be occluded
+        renderer.blitDepthToScreen(window->getWidth(), window->getHeight());
         
         // Render held items for remote players (third-person view)
         if (uiManager.isWorldLoaded()) {

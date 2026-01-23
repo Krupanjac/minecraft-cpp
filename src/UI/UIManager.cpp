@@ -2226,6 +2226,15 @@ void UIManager::renderHUD() {
     // Progress
     drawRect(startX, xpY, totalW * playerXP, xpH, glm::vec4(0.2f, 0.9f, 0.2f, 1.0f));
     
+    // 5. Game Mode Indicator (top-left corner)
+    std::string modeText = isCreativeMode ? "Creative Mode" : "Survival Mode";
+    glm::vec4 modeColor = isCreativeMode ? glm::vec4(0.3f, 0.8f, 1.0f, 0.9f) : glm::vec4(1.0f, 0.6f, 0.2f, 0.9f);
+    
+    // Draw background for better visibility
+    float modeTextWidth = modeText.length() * 8.0f * 0.5f;  // Approximate text width
+    drawRect(8.0f, 8.0f, modeTextWidth + 10.0f, 22.0f, glm::vec4(0.0f, 0.0f, 0.0f, 0.5f));
+    drawText(13.0f, 12.0f, 0.5f, modeText, modeColor);
+    
     uiShader.unuse();
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);

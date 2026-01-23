@@ -59,6 +59,9 @@ public:
 
     // Access PostProcess for debug/metrics
     PostProcess* getPostProcess() { return postProcess.get(); }
+    
+    // Blit depth buffer from mainFBO to default framebuffer for post-render drawing with depth
+    void blitDepthToScreen(int windowWidth, int windowHeight);
 
 private:
     Shader blockShader;

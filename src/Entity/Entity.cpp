@@ -52,6 +52,8 @@ void Entity::takeDamage(float amount, const glm::vec3& knockbackDir) {
     invulnerabilityTimer = INVULNERABILITY_DURATION;
     damageFlashTimer = 0.3f; // Red flash duration
     
+    LOG_INFO("Entity took " + std::to_string(amount) + " damage, health now: " + std::to_string(health));
+    
     // Apply knockback
     if (glm::length(knockbackDir) > 0.001f) {
         glm::vec3 normalizedKnockback = glm::normalize(knockbackDir);

@@ -282,32 +282,38 @@ void HeldItemRenderer::renderThirdPerson(Shader& shader, const Camera& camera,
     if (!model) return;
     
     // Calculate hand position based on player position and rotation
-    // The right hand is roughly:
-    // - 0.3 units to the right of center
-    // - 0.9 units above feet (chest height)
-    // - 0.2 units in front
+    // Player yaw: 0 = looking at +Z, 90 = looking at -X, 180 = looking at -Z, 270 = looking at +X
+    // Convert to radians and calculate direction vectors
     float yawRad = glm::radians(playerYaw);
-    glm::vec3 rightDir = glm::vec3(-std::sin(yawRad), 0.0f, std::cos(yawRad));
-    glm::vec3 forwardDir = glm::vec3(std::cos(yawRad), 0.0f, std::sin(yawRad));
     
+    // Forward direction (where player is facing)
+    glm::vec3 forwardDir = glm::vec3(-std::sin(yawRad), 0.0f, std::cos(yawRad));
+    // Right direction (perpendicular to forward, to player's right side)
+    glm::vec3 rightDir = glm::vec3(std::cos(yawRad), 0.0f, std::sin(yawRad));
+    
+    // The right hand is roughly:
+    // - 0.35 units to the right of center
+    // - 0.7 units above feet (hand height)
+    // - 0.2 units in front
     glm::vec3 handPos = playerPos;
-    handPos.y += 0.9f;  // Chest height
-    handPos += rightDir * 0.4f;  // To the right
-    handPos += forwardDir * 0.2f;  // Slightly forward
+    handPos.y += 0.7f;  // Hand height
+    handPos += rightDir * 0.35f;  // To the right
+    handPos += forwardDir * 0.2f;  // In front
     
     // Build model matrix
     glm::mat4 modelMatrix = glm::mat4(1.0f);
     modelMatrix = glm::translate(modelMatrix, handPos);
     
     // Rotate to face the same direction as the player
-    modelMatrix = glm::rotate(modelMatrix, -yawRad, glm::vec3(0.0f, 1.0f, 0.0f));
+    // Yaw rotation around Y axis
+    modelMatrix = glm::rotate(modelMatrix, yawRad + glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     
-    // Tilt the tool forward/down like it's being held
-    modelMatrix = glm::rotate(modelMatrix, glm::radians(-30.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    modelMatrix = glm::rotate(modelMatrix, glm::radians(20.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    // Tilt the tool down and slightly rotated like being held
+    modelMatrix = glm::rotate(modelMatrix, glm::radians(-60.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    modelMatrix = glm::rotate(modelMatrix, glm::radians(15.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     
     // Scale appropriately for third person
-    modelMatrix = glm::scale(modelMatrix, glm::vec3(0.35f));
+    modelMatrix = glm::scale(modelMatrix, glm::vec3(0.3f));
     
     // Set up shader
     shader.use();
@@ -321,6 +327,14 @@ void HeldItemRenderer::renderThirdPerson(Shader& shader, const Camera& camera,
     shader.setMat4("uView", view);
     shader.setMat4("uProjection", projection);
     shader.setVec3("uViewPos", camera.getPosition());
+    shader.setVec3("uCameraPos", camera.getPosition());
+    shader.setVec3("uLightDir", glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f)));
+    shader.setVec4("uBaseColor", glm::vec4(1.0f));
+    
+    // Enable depth testing AND depth writing so tool properly occludes/is occluded
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);  // Enable depth writing
     
     // Draw the model
     model->draw(shader, modelMatrix, modelMatrix);
