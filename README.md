@@ -39,6 +39,37 @@ A Minecraft-like voxel engine built from scratch in C++20 with OpenGL 4.5+. Feat
 - CMake 3.15+
 - OpenGL 4.5+ capable GPU
 
+## Linux (Debian/Ubuntu) Setup
+
+Install system dependencies (OpenGL + X11 + build tools):
+
+```bash
+sudo apt update
+sudo apt install -y \
+    build-essential \
+    cmake \
+    pkg-config \
+    libgl1-mesa-dev \
+    libglx-dev \
+    libgl-dev \
+    mesa-common-dev \
+    libx11-dev \
+    libxrandr-dev \
+    libxi-dev \
+    libxinerama-dev \
+    libxcursor-dev \
+    libxxf86vm-dev
+```
+
+Then configure and build:
+
+```bash
+mkdir -p build
+cd build
+cmake ..
+cmake --build . --config Release
+```
+
 ## Dependencies
 
 The project uses:

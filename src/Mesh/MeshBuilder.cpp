@@ -1,5 +1,6 @@
 #include "MeshBuilder.h"
 #include "../Util/Config.h"
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <tuple>

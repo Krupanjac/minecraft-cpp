@@ -1,33 +1,49 @@
 #!/bin/bash
-# Setup script to generate GLAD files
 
-echo "Setting up GLAD OpenGL loader..."
+set -e
 
-# Check if Python is available
-if ! command -v python3 &> /dev/null; then
-    echo "Error: Python 3 is required but not found"
-    echo "Please install Python 3 and try again"
+echo "Setting up GLAD OpenGL loader for Debian..."
+
+# Check python3
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "❌ Python3 not found. Install it with:"
+    echo "sudo apt install python3"
     exit 1
 fi
 
-# Install glad-generator if not present
-pip3 install glad 2>/dev/null || pip install glad 2>/dev/null
+# Check pip
+if ! command -v pip3 >/dev/null 2>&1; then
+    echo "pip3 not found. Installing python3-pip..."
+    sudo apt update
+    sudo apt install -y python3-pip python3-venv
+i
 
-# Generate GLAD files
+# Create virtual environment if not exists
+if [ ! -d "glad_venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv glad_venv
+fi
+
+# Activate venv
+source glad_venv/bin/activate
+
+# Upgrade pip
+pip install --upgrade pip
+
+# Install glad
+pip install glad
+
+# Create output directory
+mkdir -p external/glad
+
 echo "Generating GLAD files for OpenGL 4.5 Core..."
-python3 -m glad --generator=c --out-path=external/glad --profile=core --api="gl=4.5" 2>/dev/null || \
-python -m glad --generator=c --out-path=external/glad --profile=core --api="gl=4.5"
+python -m glad \
+  --generator=c \
+  --profile=core \
+  --api="gl=4.5" \
+  --out-path=external/glad
 
-if [ $? -eq 0 ]; then
-    echo "GLAD files generated successfully!"
-    echo "Files created in external/glad/"
-else
-    echo "Error: Failed to generate GLAD files"
-    echo ""
-    echo "Alternative method:"
-    echo "1. Visit https://glad.dav1d.de/"
-    echo "2. Select: Language=C/C++, Specification=OpenGL, gl=4.5, Profile=Core"
-    echo "3. Click 'Generate'"
-    echo "4. Extract the zip to external/glad/"
-    exit 1
-fi
+echo "✅ GLAD files generated successfully!"
+echo "Location: external/glad"
+
+deactivate

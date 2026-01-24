@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/home/krupanjac/Documents/minecraft-cpp/_deps/tinygltf-build",
+  "command": "/usr/bin/c++  -I/home/krupanjac/Documents/minecraft-cpp/_deps/stb-src -std=c++11 -Wall -Wextra -pedantic -o CMakeFiles/loader_example.dir/loader_example.cc.o -c /home/krupanjac/Documents/minecraft-cpp/_deps/tinygltf-src/loader_example.cc",
+  "file": "/home/krupanjac/Documents/minecraft-cpp/_deps/tinygltf-src/loader_example.cc",
+  "output": "_deps/tinygltf-build/CMakeFiles/loader_example.dir/loader_example.cc.o"
+},
+{
+  "directory": "/home/krupanjac/Documents/minecraft-cpp/_deps/tinygltf-build",
+  "command": "/usr/bin/c++  -I/home/krupanjac/Documents/minecraft-cpp/_deps/stb-src -std=c++11 -Wall -Wextra -pedantic -o CMakeFiles/tinygltf.dir/tiny_gltf.cc.o -c /home/krupanjac/Documents/minecraft-cpp/_deps/tinygltf-src/tiny_gltf.cc",
+  "file": "/home/krupanjac/Documents/minecraft-cpp/_deps/tinygltf-src/tiny_gltf.cc",
+  "output": "_deps/tinygltf-build/CMakeFiles/tinygltf.dir/tiny_gltf.cc.o"
+}
+]
