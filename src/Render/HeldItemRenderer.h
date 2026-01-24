@@ -60,6 +60,13 @@ public:
                            const glm::vec3& playerPos, float playerYaw, ItemType item,
                            int screenWidth, int screenHeight);
     
+    // NEW: Render held item attached to player's hand bone transform
+    // handWorldTransform is the world-space transform of the right hand bone
+    // This is the proper way to render weapons that follow player animations
+    void renderThirdPersonWithBone(Shader& shader, const Camera& camera,
+                                   const glm::mat4& handWorldTransform, ItemType item,
+                                   int screenWidth, int screenHeight);
+    
     // Get the model for the current item (for third-person rendering)
     std::shared_ptr<ModelSystem::Model> getCurrentModel() const;
     

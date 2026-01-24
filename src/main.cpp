@@ -1326,8 +1326,13 @@ private:
                 bool isHoldingTool = heldItem != ItemType::NONE;
                 bool isSword = isHoldingTool && ItemRegistry::getCategory(heldItem) == ToolCategory::SWORD;
                 
-                // Trigger swing animation
+                // Trigger swing animation for first person view
                 heldItemRenderer.triggerSwing();
+                
+                // Trigger attack animation for third person view
+                if (playerEntity) {
+                    playerEntity->playAttackAnimation();
+                }
                 
                 // First, try to attack an entity
                 bool attackedEntity = false;
@@ -1649,6 +1654,11 @@ private:
         // Update held item from current hotbar selection
         ItemType currentHeldItem = uiManager.getSelectedItem();
         heldItemRenderer.setHeldItem(currentHeldItem);
+        
+        // Sync held item to playerEntity for animation purposes
+        if (playerEntity) {
+            playerEntity->setHeldItem(currentHeldItem);
+        }
         
         // Update held item renderer
         bool isMoving = glm::length(glm::vec2(camera.velocity.x, camera.velocity.z)) > 0.5f;
@@ -2254,18 +2264,46 @@ private:
         // Blit depth buffer to default framebuffer so held items can properly occlude/be occluded
         renderer.blitDepthToScreen(window->getWidth(), window->getHeight());
         
-        // Render held items for remote players (third-person view)
+        // Render held items for players (third-person view)
         if (uiManager.isWorldLoaded()) {
             Shader& modelShader = renderer.getModelShader();
+            
+            // Render held items for remote players using bone-based attachment
             for (auto* remotePlayer : remotePlayerEntities) {
                 uint8_t heldItemId = remotePlayer->getHeldItem();
                 if (heldItemId != 0) {
                     ItemType itemType = static_cast<ItemType>(heldItemId);
-                    // Use rotation.y as yaw (rotation is stored as euler angles)
-                    float playerYaw = remotePlayer->getRotation().y;
-                    heldItemRenderer.renderThirdPerson(modelShader, camera, remotePlayer->getPosition(), 
-                                                       playerYaw, itemType, 
-                                                       window->getWidth(), window->getHeight());
+                    
+                    // Use bone-based rendering if supported
+                    if (remotePlayer->supportsHoldAnimations()) {
+                        glm::mat4 handTransform = remotePlayer->getRightHandTransform();
+                        heldItemRenderer.renderThirdPersonWithBone(modelShader, camera, handTransform, itemType,
+                                                                   window->getWidth(), window->getHeight());
+                    } else {
+                        // Fallback to simple position-based rendering
+                        float playerYaw = remotePlayer->getRotation().y;
+                        heldItemRenderer.renderThirdPerson(modelShader, camera, remotePlayer->getPosition(), 
+                                                           playerYaw, itemType, 
+                                                           window->getWidth(), window->getHeight());
+                    }
+                }
+            }
+            
+            // Render local player's held item in third-person view
+            if (camera.isThirdPerson() && playerEntity) {
+                ItemType currentHeldItem = uiManager.getSelectedItem();
+                if (currentHeldItem != ItemType::NONE) {
+                    if (playerEntity->supportsHoldAnimations()) {
+                        glm::mat4 handTransform = playerEntity->getRightHandTransform();
+                        heldItemRenderer.renderThirdPersonWithBone(modelShader, camera, handTransform, currentHeldItem,
+                                                                   window->getWidth(), window->getHeight());
+                    } else {
+                        // Fallback for non-Quaternius models
+                        float playerYaw = playerEntity->getRotation().y;
+                        heldItemRenderer.renderThirdPerson(modelShader, camera, playerEntity->getPosition(), 
+                                                           playerYaw, currentHeldItem, 
+                                                           window->getWidth(), window->getHeight());
+                    }
                 }
             }
         }

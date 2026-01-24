@@ -68,6 +68,17 @@ public:
     // Root-motion control: if enabled, lock the skeleton root node's XZ translation to bind pose.
     void setLockRootMotionXZ(bool lock) { lockRootMotionXZ = lock; }
     bool getLockRootMotionXZ() const { return lockRootMotionXZ; }
+    
+    // Bone/node retrieval for attaching items to skeleton
+    // Returns the global transform of a node by name (e.g., "Fist.R" for right hand)
+    // Returns identity matrix if node not found
+    glm::mat4 getNodeGlobalTransform(const std::string& nodeName) const;
+    
+    // Check if a node with the given name exists
+    bool hasNode(const std::string& nodeName) const;
+    
+    // Get all node names (useful for debugging)
+    std::vector<std::string> getNodeNames() const;
 
 private:
     // Private constructor for cloning

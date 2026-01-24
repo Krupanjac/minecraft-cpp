@@ -2,6 +2,7 @@
 #include "../Core/Logger.h"
 #include "../Core/Settings.h"
 #include "../Model/Model.h"
+#include "../World/Item.h"
 #include <algorithm>
 
 namespace Network {
@@ -22,6 +23,68 @@ RemotePlayerEntity::RemotePlayerEntity(uint32_t playerId, const std::string& nam
     } else {
         scale = glm::vec3(0.5f);
     }
+}
+
+void RemotePlayerEntity::initializeAnimations() {
+    if (m_animationsInitialized || !model) return;
+    
+    auto anims = model->getAnimationNames();
+    
+    // Default animation names
+    m_idleAnim = "Idle";
+    m_walkAnim = "Walk";
+    m_runAnim = "Run";
+    m_idleHoldAnim = "Idle_Hold";
+    m_walkHoldAnim = "Walk_Hold";
+    m_runHoldAnim = "Run_Hold";
+    m_idleAttackAnim = "Idle_Attack";
+    m_runAttackAnim = "Run_Attack";
+    m_punchAnim = "Punch";
+    m_deathAnim = "Death";
+    m_rightHandBone = "Fist.R";
+    m_hasHoldAnimations = false;
+    
+    auto toLower = [](const std::string& s) {
+        std::string result = s;
+        for (auto& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return result;
+    };
+    
+    for (const auto& name : anims) {
+        std::string lower = toLower(name);
+        
+        if (lower == "idle") m_idleAnim = name;
+        else if (lower == "walk") m_walkAnim = name;
+        else if (lower == "run") m_runAnim = name;
+        else if (lower == "idle_hold" || lower == "idlehold") { 
+            m_idleHoldAnim = name; 
+            m_hasHoldAnimations = true;
+        }
+        else if (lower == "walk_hold" || lower == "walkhold") m_walkHoldAnim = name;
+        else if (lower == "run_hold" || lower == "runhold") m_runHoldAnim = name;
+        else if (lower == "idle_attack" || lower == "idleattack") m_idleAttackAnim = name;
+        else if (lower == "run_attack" || lower == "runattack") m_runAttackAnim = name;
+        else if (lower == "punch") m_punchAnim = name;
+        else if (lower == "death") m_deathAnim = name;
+    }
+    
+    // Check if model has the right hand bone
+    if (model->hasNode("Fist.R")) {
+        m_rightHandBone = "Fist.R";
+    } else if (model->hasNode("Hand.R")) {
+        m_rightHandBone = "Hand.R";
+    } else if (model->hasNode("RightHand")) {
+        m_rightHandBone = "RightHand";
+    }
+    
+    m_animationsInitialized = true;
+    LOG_INFO("RemotePlayer " + m_playerName + " animations initialized: hasHold=" + std::to_string(m_hasHoldAnimations));
+}
+
+void RemotePlayerEntity::setHeldItem(uint8_t item) {
+    m_heldItem = item;
+    // Also update the Entity's heldItem for animation logic
+    heldItem = static_cast<ItemType>(item);
 }
 
 void RemotePlayerEntity::update(float deltaTime) {
@@ -51,29 +114,130 @@ void RemotePlayerEntity::update(float deltaTime) {
     
     // Update animations based on velocity (like PlayerEntity)
     if (model) {
-        // velocity is set via setTargetVelocity which stores in the inherited 'velocity' member
-        float speed = glm::length(glm::vec2(velocity.x, velocity.z));
-        std::string currentAnim = model->getCurrentAnimation();
-        
-        if (speed > 0.1f) {
-            // Walking/Running
-            if (currentAnim != "walk" && currentAnim != "run" && currentAnim.find("walk") == std::string::npos) {
-                model->playAnimation("walk", true);
-            }
-        } else {
-            // Idle
-            if (currentAnim != "idle" && currentAnim.find("idle") == std::string::npos) {
-                model->playAnimation("idle", true);
-                // If "idle" not found, try "idle1"
-                if (model->getCurrentAnimation() != "idle") {
-                    model->playAnimation("idle1", true);
-                }
-            }
+        // Initialize animations if not done yet
+        if (!m_animationsInitialized) {
+            initializeAnimations();
         }
         
         // Update model animation
         model->updateAnimation(deltaTime);
+        
+        // If dead, only play death animation
+        if (m_isDead) {
+            return;
+        }
+        
+        // Update attack animation timer
+        if (m_isAttacking && m_attackAnimTimer > 0.0f) {
+            m_attackAnimTimer -= deltaTime;
+            if (m_attackAnimTimer <= 0.0f) {
+                m_isAttacking = false;
+                m_attackAnimTimer = 0.0f;
+            } else {
+                // Still in attack animation, don't change
+                return;
+            }
+        }
+        
+        // velocity is set via setTargetVelocity which stores in the inherited 'velocity' member
+        float speed = glm::length(glm::vec2(velocity.x, velocity.z));
+        std::string currentAnim = model->getCurrentAnimation();
+        
+        // Convert to lowercase for comparison
+        auto toLower = [](const std::string& s) {
+            std::string result = s;
+            for (auto& c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            return result;
+        };
+        std::string currentAnimLower = toLower(currentAnim);
+        
+        // Check if holding an item
+        bool isHoldingItem = (m_heldItem != 0) && m_hasHoldAnimations;
+        
+        if (speed > 4.0f) {
+            // Running
+            std::string targetAnim = isHoldingItem ? m_runHoldAnim : m_runAnim;
+            bool needsChange = (currentAnimLower.find("run") == std::string::npos);
+            if (!needsChange && isHoldingItem && currentAnimLower.find("hold") == std::string::npos) needsChange = true;
+            if (!needsChange && !isHoldingItem && currentAnimLower.find("hold") != std::string::npos) needsChange = true;
+            
+            if (needsChange) {
+                model->playAnimation(targetAnim, true);
+            }
+        } else if (speed > 0.1f) {
+            // Walking
+            std::string targetAnim = isHoldingItem ? m_walkHoldAnim : m_walkAnim;
+            bool needsChange = (currentAnimLower.find("walk") == std::string::npos && 
+                               currentAnimLower.find("run") == std::string::npos);
+            if (!needsChange && isHoldingItem && currentAnimLower.find("hold") == std::string::npos) needsChange = true;
+            if (!needsChange && !isHoldingItem && currentAnimLower.find("hold") != std::string::npos) needsChange = true;
+            
+            if (needsChange) {
+                model->playAnimation(targetAnim, true);
+            }
+        } else {
+            // Idle
+            std::string targetAnim = isHoldingItem ? m_idleHoldAnim : m_idleAnim;
+            bool needsChange = (currentAnimLower.find("idle") == std::string::npos);
+            if (!needsChange && isHoldingItem && currentAnimLower.find("hold") == std::string::npos) needsChange = true;
+            if (!needsChange && !isHoldingItem && currentAnimLower.find("hold") != std::string::npos) needsChange = true;
+            
+            if (needsChange) {
+                model->playAnimation(targetAnim, true);
+            }
+        }
     }
+}
+
+glm::mat4 RemotePlayerEntity::getRightHandTransform() const {
+    if (!model) {
+        return glm::mat4(1.0f);
+    }
+    
+    // Get the bone transform from the model
+    glm::mat4 boneTransform = model->getNodeGlobalTransform(m_rightHandBone);
+    
+    // Build the entity's model matrix
+    glm::mat4 entityMatrix = getModelMatrix();
+    
+    // Combine: entity transform * bone transform
+    return entityMatrix * boneTransform;
+}
+
+void RemotePlayerEntity::playAttackAnimation() {
+    if (!model || m_isDead) return;
+    
+    m_isAttacking = true;
+    m_attackAnimTimer = 0.4f; // Attack animation duration
+    
+    // Choose attack animation based on current state
+    float speed = glm::length(glm::vec2(velocity.x, velocity.z));
+    bool isHoldingItem = (m_heldItem != 0);
+    
+    std::string attackAnim;
+    if (isHoldingItem) {
+        // Use attack animations for held items
+        if (speed > 4.0f) {
+            attackAnim = m_runAttackAnim;
+        } else {
+            attackAnim = m_idleAttackAnim;
+        }
+    } else {
+        // Punch animation when no item held
+        attackAnim = m_punchAnim;
+    }
+    
+    model->playAnimation(attackAnim, false);
+}
+
+void RemotePlayerEntity::playDeathAnimation() {
+    if (!model) return;
+    
+    m_isDead = true;
+    m_isAttacking = false;
+    m_attackAnimTimer = 0.0f;
+    
+    model->playAnimation(m_deathAnim, false);
 }
 
 // ============== NetworkManager ==============

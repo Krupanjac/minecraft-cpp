@@ -340,6 +340,72 @@ void HeldItemRenderer::renderThirdPerson(Shader& shader, const Camera& camera,
     model->draw(shader, modelMatrix, modelMatrix);
 }
 
+void HeldItemRenderer::renderThirdPersonWithBone(Shader& shader, const Camera& camera,
+                                                  const glm::mat4& handWorldTransform, ItemType item,
+                                                  int screenWidth, int screenHeight) {
+    if (item == ItemType::NONE) {
+        return;
+    }
+    
+    // Get the model for this item
+    auto it = m_modelCache.find(item);
+    if (it == m_modelCache.end()) {
+        // Try to load it
+        auto model = const_cast<HeldItemRenderer*>(this)->loadToolModel(item);
+        if (!model) return;
+        it = m_modelCache.find(item);
+    }
+    
+    auto toolModel = it->second;
+    if (!toolModel) return;
+    
+    // Start with the hand bone's world transform
+    glm::mat4 modelMatrix = handWorldTransform;
+    
+    // Apply local adjustments to position the tool correctly in the hand
+    // These offsets are tuned for the Quaternius character models with Fist.R bone
+    // The bone transform includes entity scale (0.5f), so the tool needs to be scaled
+    // relative to that
+    
+    // Rotate the tool to align with hand orientation and point FORWARD
+    // The tool should point in the direction the player is facing
+    // Rotate 90 degrees around Y to turn from right to forward
+    modelMatrix = glm::rotate(modelMatrix, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)); // Turn to face forward
+    modelMatrix = glm::rotate(modelMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // Tilt down into hand
+    
+    // Offset to position in palm
+    modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 0.0f, 0.05f));
+    
+    // Scale appropriately for third person
+    // The tool models are quite large, need significant scaling down
+    // Note: The scale is relative to the player model scale (0.5 for Quaternius)
+    modelMatrix = glm::scale(modelMatrix, glm::vec3(0.6f));  // Adjusted for better visibility
+    
+    // Set up shader
+    shader.use();
+    shader.setMat4("uModel", modelMatrix);
+    shader.setMat4("uPrevModel", modelMatrix);
+    
+    glm::mat4 view = camera.getViewMatrix();
+    glm::mat4 projection = glm::perspective(glm::radians(camera.getFov()), 
+                                            static_cast<float>(screenWidth) / static_cast<float>(screenHeight), 
+                                            0.1f, 1000.0f);
+    shader.setMat4("uView", view);
+    shader.setMat4("uProjection", projection);
+    shader.setVec3("uViewPos", camera.getPosition());
+    shader.setVec3("uCameraPos", camera.getPosition());
+    shader.setVec3("uLightDir", glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f)));
+    shader.setVec4("uBaseColor", glm::vec4(1.0f));
+    
+    // Enable depth testing AND depth writing so tool properly occludes/is occluded
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);  // Enable depth writing
+    
+    // Draw the model
+    toolModel->draw(shader, modelMatrix, modelMatrix);
+}
+
 std::shared_ptr<ModelSystem::Model> HeldItemRenderer::getCurrentModel() const {
     if (m_currentItem == ItemType::NONE) {
         return nullptr;

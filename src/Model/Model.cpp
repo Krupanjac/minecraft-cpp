@@ -725,4 +725,36 @@ void Model::updateAnimation(float deltaTime) {
     }
 }
 
+glm::mat4 Model::getNodeGlobalTransform(const std::string& nodeName) const {
+    // Search through all nodes in nodeMap to find the one with matching name
+    for (size_t i = 0; i < impl->model.nodes.size(); ++i) {
+        if (impl->model.nodes[i].name == nodeName) {
+            if (i < nodeMap.size() && nodeMap[i]) {
+                return nodeMap[i]->globalTransform;
+            }
+        }
+    }
+    
+    // Not found, return identity
+    return glm::mat4(1.0f);
+}
+
+bool Model::hasNode(const std::string& nodeName) const {
+    for (const auto& node : impl->model.nodes) {
+        if (node.name == nodeName) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<std::string> Model::getNodeNames() const {
+    std::vector<std::string> names;
+    names.reserve(impl->model.nodes.size());
+    for (const auto& node : impl->model.nodes) {
+        names.push_back(node.name);
+    }
+    return names;
+}
+
 }

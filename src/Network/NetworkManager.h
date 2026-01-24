@@ -28,12 +28,29 @@ public:
     void setTargetPosition(const glm::vec3& pos) { m_targetPosition = pos; }
     void setTargetRotation(float yaw, float pitch) { m_targetYaw = yaw; m_targetPitch = pitch; }
     void setTargetVelocity(const glm::vec3& vel) { velocity = vel; }
-    void setHeldItem(uint8_t item) { m_heldItem = item; }
+    void setHeldItem(uint8_t item);
     
     uint32_t getPlayerId() const { return m_playerId; }
     const std::string& getPlayerName() const { return m_playerName; }
     uint8_t getModelIndex() const { return m_modelIndex; }
     uint8_t getHeldItem() const { return m_heldItem; }
+    
+    // Get the global transform of the right hand bone (for attaching held items)
+    glm::mat4 getRightHandTransform() const;
+    
+    // Check if the model supports Hold animations
+    bool supportsHoldAnimations() const { return m_hasHoldAnimations; }
+    
+    // Initialize animations after model is set
+    void initializeAnimations();
+    
+    // Attack animation control
+    void playAttackAnimation();
+    bool isPlayingAttackAnimation() const { return m_isAttacking; }
+    
+    // Death animation control  
+    void playDeathAnimation();
+    bool isPlayingDeathAnimation() const { return m_isDead; }
     
 private:
     uint32_t m_playerId;
@@ -47,6 +64,28 @@ private:
     float m_targetPitch = 0.0f;
     
     static constexpr float INTERPOLATION_SPEED = 15.0f;
+    
+    // Animation names
+    std::string m_idleAnim = "Idle";
+    std::string m_walkAnim = "Walk";
+    std::string m_runAnim = "Run";
+    std::string m_idleHoldAnim = "Idle_Hold";
+    std::string m_walkHoldAnim = "Walk_Hold";
+    std::string m_runHoldAnim = "Run_Hold";
+    std::string m_idleAttackAnim = "Idle_Attack";
+    std::string m_runAttackAnim = "Run_Attack";
+    std::string m_punchAnim = "Punch";
+    std::string m_deathAnim = "Death";
+    std::string m_rightHandBone = "Fist.R";
+    bool m_hasHoldAnimations = false;
+    bool m_animationsInitialized = false;
+    
+    // Attack state
+    bool m_isAttacking = false;
+    float m_attackAnimTimer = 0.0f;
+    
+    // Death state
+    bool m_isDead = false;
 };
 
 class NetworkManager {

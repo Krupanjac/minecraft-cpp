@@ -47,13 +47,35 @@ void PlayerEntity::pickAnimations() {
     
     auto anims = model->getAnimationNames();
     
-    // Default animation names
+    // Default animation names (base)
     idleAnim = "Idle";
     walkAnim = "Walk";
     runAnim = "Run";
     jumpAnim = "Jump";
     jumpIdleAnim = "Jump_Idle";
     jumpLandAnim = "Jump_Land";
+    
+    // Hold animations (with item)
+    idleHoldAnim = "Idle_Hold";
+    walkHoldAnim = "Walk_Hold";
+    runHoldAnim = "Run_Hold";
+    
+    // Attack animations
+    idleAttackAnim = "Idle_Attack";
+    runAttackAnim = "Run_Attack";
+    punchAnim = "Punch";
+    
+    // Other animations
+    deathAnim = "Death";
+    duckAnim = "Duck";
+    hitReactAnim = "HitReact";
+    noAnim = "No";
+    waveAnim = "Wave";
+    yesAnim = "Yes";
+    
+    // Default hand bone for Quaternius models
+    rightHandBone = "Fist.R";
+    hasHoldAnimations = false;
     
     // Look for best matches (case-insensitive)
     auto toLower = [](const std::string& s) {
@@ -64,16 +86,54 @@ void PlayerEntity::pickAnimations() {
     
     for (const auto& name : anims) {
         std::string lower = toLower(name);
+        
+        // Base animations
         if (lower == "idle") idleAnim = name;
         else if (lower == "walk") walkAnim = name;
         else if (lower == "run") runAnim = name;
         else if (lower == "jump") jumpAnim = name;
         else if (lower == "jump_idle" || lower == "jumpidle") jumpIdleAnim = name;
         else if (lower == "jump_land" || lower == "jumpland") jumpLandAnim = name;
+        
+        // Hold animations
+        else if (lower == "idle_hold" || lower == "idlehold") { 
+            idleHoldAnim = name; 
+            hasHoldAnimations = true;
+        }
+        else if (lower == "walk_hold" || lower == "walkhold") walkHoldAnim = name;
+        else if (lower == "run_hold" || lower == "runhold") runHoldAnim = name;
+        
+        // Attack animations
+        else if (lower == "idle_attack" || lower == "idleattack") idleAttackAnim = name;
+        else if (lower == "run_attack" || lower == "runattack") runAttackAnim = name;
+        else if (lower == "punch") punchAnim = name;
+        
+        // Other animations
+        else if (lower == "death") deathAnim = name;
+        else if (lower == "duck") duckAnim = name;
+        else if (lower == "hitreact" || lower == "hit_react") hitReactAnim = name;
+        else if (lower == "no") noAnim = name;
+        else if (lower == "wave") waveAnim = name;
+        else if (lower == "yes") yesAnim = name;
     }
     
-    LOG_INFO("Player animations: idle='" + idleAnim + "' walk='" + walkAnim + "' run='" + runAnim + 
-             "' jump='" + jumpAnim + "' jumpIdle='" + jumpIdleAnim + "' jumpLand='" + jumpLandAnim + "'");
+    // Check if model has the right hand bone
+    if (model->hasNode("Fist.R")) {
+        rightHandBone = "Fist.R";
+    } else if (model->hasNode("Hand.R")) {
+        rightHandBone = "Hand.R";
+    } else if (model->hasNode("RightHand")) {
+        rightHandBone = "RightHand";
+    }
+    
+    LOG_INFO("Player animations found:");
+    LOG_INFO("  Base: idle='" + idleAnim + "' walk='" + walkAnim + "' run='" + runAnim + "'");
+    LOG_INFO("  Jump: jump='" + jumpAnim + "' jumpIdle='" + jumpIdleAnim + "' jumpLand='" + jumpLandAnim + "'");
+    if (hasHoldAnimations) {
+        LOG_INFO("  Hold: idleHold='" + idleHoldAnim + "' walkHold='" + walkHoldAnim + "' runHold='" + runHoldAnim + "'");
+        LOG_INFO("  Attack: idleAttack='" + idleAttackAnim + "' runAttack='" + runAttackAnim + "' punch='" + punchAnim + "'");
+    }
+    LOG_INFO("  Right hand bone: '" + rightHandBone + "'");
 }
 
 static std::string toLowerPlayer(const std::string& s) {
@@ -94,21 +154,34 @@ void PlayerEntity::update(float deltaTime) {
         float speed = glm::length(glm::vec2(velocity.x, velocity.z));
         std::string currentAnim = toLowerPlayer(model->getCurrentAnimation());
         
+        // Check if holding an item (for Hold animations)
+        bool isHoldingItem = (heldItem != ItemType::NONE) && hasHoldAnimations;
+        
         // Update animation
         model->updateAnimation(deltaTime);
         
         // Simple state machine for animation switching (no camera info)
         if (speed > 0.1f) {
-            if (currentAnim.find("walk") == std::string::npos && 
-                currentAnim.find("run") == std::string::npos) {
-                model->playAnimation(walkAnim, true);
+            std::string targetAnim = isHoldingItem ? walkHoldAnim : walkAnim;
+            bool needsChange = (currentAnim.find("walk") == std::string::npos && 
+                               currentAnim.find("run") == std::string::npos);
+            if (!needsChange && isHoldingItem && currentAnim.find("hold") == std::string::npos) needsChange = true;
+            if (!needsChange && !isHoldingItem && currentAnim.find("hold") != std::string::npos) needsChange = true;
+            
+            if (needsChange) {
+                model->playAnimation(targetAnim, true);
             }
             float walkSpeedRef = 5.0f;
             float animSpeed = std::clamp(speed / walkSpeedRef, 0.75f, 1.4f);
             model->setAnimationSpeed(animSpeed);
         } else {
-            if (currentAnim.find("idle") == std::string::npos) {
-                model->playAnimation(idleAnim, true);
+            std::string targetAnim = isHoldingItem ? idleHoldAnim : idleAnim;
+            bool needsChange = (currentAnim.find("idle") == std::string::npos);
+            if (!needsChange && isHoldingItem && currentAnim.find("hold") == std::string::npos) needsChange = true;
+            if (!needsChange && !isHoldingItem && currentAnim.find("hold") != std::string::npos) needsChange = true;
+            
+            if (needsChange) {
+                model->playAnimation(targetAnim, true);
             }
             model->setAnimationSpeed(1.0f);
         }
@@ -129,8 +202,28 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
     std::string currentAnim = toLowerPlayer(model->getCurrentAnimation());
     bool onGround = camera.onGround;
     
+    // Check if holding an item (for Hold animations)
+    bool isHoldingItem = (heldItem != ItemType::NONE) && hasHoldAnimations;
+    
     // Update animation time
     model->updateAnimation(deltaTime);
+    
+    // If dead, only play death animation
+    if (isDead) {
+        return;
+    }
+    
+    // Update attack animation timer
+    if (isAttacking && attackAnimTimer > 0.0f) {
+        attackAnimTimer -= deltaTime;
+        if (attackAnimTimer <= 0.0f) {
+            isAttacking = false;
+            attackAnimTimer = 0.0f;
+        } else {
+            // Still in attack animation, don't change
+            return;
+        }
+    }
     
     // Detect jump start (transition from ground to air with upward velocity)
     if (wasOnGround && !onGround && velocity.y > 0.1f) {
@@ -169,32 +262,98 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
     } else if (onGround && jumpAnimTimer <= 0.0f) {
         // On ground and not in landing animation
         if (speed > 4.0f && camera.isSprinting) {
-            // Running
-            if (currentAnim.find("run") == std::string::npos) {
-                model->playAnimation(runAnim, true);
+            // Running (with or without item)
+            std::string targetAnim = isHoldingItem ? runHoldAnim : runAnim;
+            if (currentAnim.find("run") == std::string::npos || 
+                (isHoldingItem && currentAnim.find("hold") == std::string::npos) ||
+                (!isHoldingItem && currentAnim.find("hold") != std::string::npos)) {
+                model->playAnimation(targetAnim, true);
             }
             // Match animation speed to sprint velocity
             float runSpeedRef = 7.0f;
             float animSpeed = std::clamp(speed / runSpeedRef, 0.85f, 1.6f);
             model->setAnimationSpeed(animSpeed);
         } else if (speed > 0.1f) {
-            // Walking
-            if (currentAnim.find("walk") == std::string::npos && currentAnim.find("run") == std::string::npos) {
-                model->playAnimation(walkAnim, true);
+            // Walking (with or without item)
+            std::string targetAnim = isHoldingItem ? walkHoldAnim : walkAnim;
+            bool needsChange = (currentAnim.find("walk") == std::string::npos && currentAnim.find("run") == std::string::npos);
+            // Also switch if hold state changed
+            if (!needsChange && isHoldingItem && currentAnim.find("hold") == std::string::npos) needsChange = true;
+            if (!needsChange && !isHoldingItem && currentAnim.find("hold") != std::string::npos) needsChange = true;
+            
+            if (needsChange) {
+                model->playAnimation(targetAnim, true);
             }
             // Match animation speed to walk velocity
             float walkSpeedRef = 5.0f;
             float animSpeed = std::clamp(speed / walkSpeedRef, 0.75f, 1.4f);
             model->setAnimationSpeed(animSpeed);
         } else {
-            // Idle
-            if (currentAnim.find("idle") == std::string::npos || 
-                currentAnim.find("jump") != std::string::npos) {
-                model->playAnimation(idleAnim, true);
+            // Idle (with or without item)
+            std::string targetAnim = isHoldingItem ? idleHoldAnim : idleAnim;
+            bool needsChange = (currentAnim.find("idle") == std::string::npos || 
+                                currentAnim.find("jump") != std::string::npos);
+            // Also switch if hold state changed
+            if (!needsChange && isHoldingItem && currentAnim.find("hold") == std::string::npos) needsChange = true;
+            if (!needsChange && !isHoldingItem && currentAnim.find("hold") != std::string::npos) needsChange = true;
+            
+            if (needsChange) {
+                model->playAnimation(targetAnim, true);
             }
             model->setAnimationSpeed(1.0f);
         }
     }
     
     wasOnGround = onGround;
+}
+
+glm::mat4 PlayerEntity::getRightHandTransform() const {
+    if (!model) {
+        return glm::mat4(1.0f);
+    }
+    
+    // Get the bone transform from the model
+    glm::mat4 boneTransform = model->getNodeGlobalTransform(rightHandBone);
+    
+    // Build the entity's model matrix
+    glm::mat4 entityMatrix = getModelMatrix();
+    
+    // Combine: entity transform * bone transform
+    return entityMatrix * boneTransform;
+}
+
+void PlayerEntity::playAttackAnimation() {
+    if (!model || isDead) return;
+    
+    isAttacking = true;
+    attackAnimTimer = 0.4f; // Attack animation duration
+    
+    // Choose attack animation based on current state
+    float speed = glm::length(glm::vec2(velocity.x, velocity.z));
+    bool isHoldingItem = (heldItem != ItemType::NONE);
+    
+    std::string attackAnim;
+    if (isHoldingItem) {
+        // Use attack animations for held items
+        if (speed > 4.0f) {
+            attackAnim = runAttackAnim;
+        } else {
+            attackAnim = idleAttackAnim;
+        }
+    } else {
+        // Punch animation when no item held
+        attackAnim = punchAnim;
+    }
+    
+    model->playAnimation(attackAnim, false);
+}
+
+void PlayerEntity::playDeathAnimation() {
+    if (!model) return;
+    
+    isDead = true;
+    isAttacking = false;
+    attackAnimTimer = 0.0f;
+    
+    model->playAnimation(deathAnim, false);
 }
