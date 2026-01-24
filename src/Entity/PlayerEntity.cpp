@@ -213,6 +213,28 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
         return;
     }
     
+    // Update hit react timer
+    if (isHitReacting && hitReactTimer > 0.0f) {
+        hitReactTimer -= deltaTime;
+        if (hitReactTimer <= 0.0f) {
+            isHitReacting = false;
+            hitReactTimer = 0.0f;
+        } else {
+            return;  // Don't interrupt hit react animation
+        }
+    }
+    
+    // Update emote timer
+    if (isEmoting && emoteTimer > 0.0f) {
+        emoteTimer -= deltaTime;
+        if (emoteTimer <= 0.0f) {
+            isEmoting = false;
+            emoteTimer = 0.0f;
+        } else {
+            return;  // Don't interrupt emote animation
+        }
+    }
+    
     // Update attack animation timer
     if (isAttacking && attackAnimTimer > 0.0f) {
         attackAnimTimer -= deltaTime;
@@ -354,6 +376,67 @@ void PlayerEntity::playDeathAnimation() {
     isDead = true;
     isAttacking = false;
     attackAnimTimer = 0.0f;
+    isHitReacting = false;
+    hitReactTimer = 0.0f;
+    isEmoting = false;
+    emoteTimer = 0.0f;
     
     model->playAnimation(deathAnim, false);
+}
+
+void PlayerEntity::playHitReactAnimation() {
+    if (!model || isDead || isAttacking) return;
+    
+    isHitReacting = true;
+    hitReactTimer = 0.3f;
+    
+    model->playAnimation(hitReactAnim, false);
+}
+
+void PlayerEntity::playDuckAnimation(bool loop) {
+    if (!model || isDead) return;
+    
+    isDuckingState = true;
+    isEmoting = false;
+    emoteTimer = 0.0f;
+    
+    model->playAnimation(duckAnim, loop);
+}
+
+void PlayerEntity::stopDuckAnimation() {
+    isDuckingState = false;
+    // Animation will transition back to idle/walk in update
+}
+
+void PlayerEntity::playWaveAnimation() {
+    if (!model || isDead) return;
+    
+    isEmoting = true;
+    emoteTimer = 2.0f;  // Wave animation duration
+    isAttacking = false;
+    attackAnimTimer = 0.0f;
+    
+    model->playAnimation(waveAnim, false);
+}
+
+void PlayerEntity::playYesAnimation() {
+    if (!model || isDead) return;
+    
+    isEmoting = true;
+    emoteTimer = 1.5f;  // Yes animation duration
+    isAttacking = false;
+    attackAnimTimer = 0.0f;
+    
+    model->playAnimation(yesAnim, false);
+}
+
+void PlayerEntity::playNoAnimation() {
+    if (!model || isDead) return;
+    
+    isEmoting = true;
+    emoteTimer = 1.5f;  // No animation duration
+    isAttacking = false;
+    attackAnimTimer = 0.0f;
+    
+    model->playAnimation(noAnim, false);
 }

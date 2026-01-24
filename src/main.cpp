@@ -2054,29 +2054,29 @@ private:
                         for (auto& z : zombies) {
                             if (!z) continue;
                             bool attacked = z->updateAI(deltaTime, chunkManager, playerFeet);
-                            if (attacked) {
+                            if (attacked && !z->isDead()) {
                                 camera.velocity += z->consumeAttackImpulse();
                             }
                         }
                         
                         // Update skeleton AI
                         for (auto& s : skeletons) {
-                            if (!s || s->isDead()) continue;
+                            if (!s) continue;
                             bool attacked = s->updateAI(deltaTime, chunkManager, playerFeet);
-                            if (attacked) {
+                            if (attacked && !s->isDead()) {
                                 camera.velocity += s->consumeAttackImpulse();
                             }
                         }
                         
-                        // Update passive mobs
+                        // Update passive mobs (always update for death timer)
                         for (auto& p : pigs) {
-                            if (p && !p->isDead()) p->updateAI(deltaTime, chunkManager);
+                            if (p) p->updateAI(deltaTime, chunkManager);
                         }
                         for (auto& c : chickens) {
-                            if (c && !c->isDead()) c->updateAI(deltaTime, chunkManager);
+                            if (c) c->updateAI(deltaTime, chunkManager);
                         }
                         for (auto& s : sheep) {
-                            if (s && !s->isDead()) s->updateAI(deltaTime, chunkManager);
+                            if (s) s->updateAI(deltaTime, chunkManager);
                         }
                     }
                 }
@@ -2231,23 +2231,23 @@ private:
             auto managedEntities = entityManager.getAllEntities();
             entities.insert(entities.end(), managedEntities.begin(), managedEntities.end());
         } else {
-            // Legacy: render from individual containers
+            // Legacy: render from individual containers (include dead mobs for death fade)
             for (auto& z : zombies) {
                 if (z) entities.push_back(z.get());
             }
             
             for (auto& s : skeletons) {
-                if (s && !s->isDead()) entities.push_back(s.get());
+                if (s) entities.push_back(s.get());
             }
             
             for (auto& p : pigs) {
-                if (p && !p->isDead()) entities.push_back(p.get());
+                if (p) entities.push_back(p.get());
             }
             for (auto& c : chickens) {
-                if (c && !c->isDead()) entities.push_back(c.get());
+                if (c) entities.push_back(c.get());
             }
             for (auto& s : sheep) {
-                if (s && !s->isDead()) entities.push_back(s.get());
+                if (s) entities.push_back(s.get());
             }
         }
         

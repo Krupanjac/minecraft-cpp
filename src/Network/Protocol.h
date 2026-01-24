@@ -123,6 +123,20 @@ struct PlayerStatePacket {
     uint8_t isFlying;
     uint8_t isSprinting;
     uint8_t isSneaking;
+    uint8_t animationState;  // Animation state for player sync
+    
+    // Animation state constants (same as EntityUpdatePacket)
+    static constexpr uint8_t ANIM_IDLE = 0;
+    static constexpr uint8_t ANIM_WALK = 1;
+    static constexpr uint8_t ANIM_RUN = 2;
+    static constexpr uint8_t ANIM_ATTACK = 3;
+    static constexpr uint8_t ANIM_DEATH = 4;
+    static constexpr uint8_t ANIM_HIT_REACT = 5;
+    static constexpr uint8_t ANIM_JUMP = 6;
+    static constexpr uint8_t ANIM_DUCK = 7;
+    static constexpr uint8_t ANIM_WAVE = 8;
+    static constexpr uint8_t ANIM_YES = 9;
+    static constexpr uint8_t ANIM_NO = 10;
     
     static constexpr PacketType TYPE = PacketType::PLAYER_STATE;
 };
@@ -170,7 +184,30 @@ struct EntityUpdatePacket {
     float velocityX, velocityY, velocityZ;
     float yaw;
     float health;
-    uint8_t flags;  // isDead, aiState bits
+    uint8_t flags;  // Bit flags: isDead (0x01), isAttacking (0x02), isHitReacting (0x04), isEmoting (0x08)
+    uint8_t animationId;  // Animation being played (for network sync)
+    
+    // Animation ID constants
+    static constexpr uint8_t ANIM_IDLE = 0;
+    static constexpr uint8_t ANIM_WALK = 1;
+    static constexpr uint8_t ANIM_RUN = 2;
+    static constexpr uint8_t ANIM_ATTACK = 3;
+    static constexpr uint8_t ANIM_DEATH = 4;
+    static constexpr uint8_t ANIM_HIT_REACT = 5;
+    static constexpr uint8_t ANIM_JUMP = 6;
+    static constexpr uint8_t ANIM_IDLE_EATING = 7;
+    static constexpr uint8_t ANIM_IDLE_PECK = 8;
+    static constexpr uint8_t ANIM_WAVE = 9;
+    static constexpr uint8_t ANIM_YES = 10;
+    static constexpr uint8_t ANIM_NO = 11;
+    static constexpr uint8_t ANIM_DUCK = 12;
+    
+    // Flag bit masks
+    static constexpr uint8_t FLAG_DEAD = 0x01;
+    static constexpr uint8_t FLAG_ATTACKING = 0x02;
+    static constexpr uint8_t FLAG_HIT_REACTING = 0x04;
+    static constexpr uint8_t FLAG_EMOTING = 0x08;
+    static constexpr uint8_t FLAG_FLEEING = 0x10;
     
     static constexpr PacketType TYPE = PacketType::ENTITY_UPDATE;
 };

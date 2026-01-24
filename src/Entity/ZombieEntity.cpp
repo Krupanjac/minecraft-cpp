@@ -118,14 +118,22 @@ void ZombieEntity::pickAnimations() {
     }
 
     // Try to find best matches in the Zombie glTF
+    // Zombie has: Attack, Death, HitRecieve, Idle, Jump, Run, Walk
     idleAnim = pickIdlePreferIdle1(names);
     walkAnim = pickWalkAnimPreferWalk(names);
+    runAnim = pickAnimByKeywords(names, {"run"});
+    attackAnim = pickAnimByKeywords(names, {"attack"});
+    deathAnim = pickAnimByKeywords(names, {"death"});
+    hitReceiveAnim = pickAnimByKeywords(names, {"hitrecieve", "hitreceive", "hit"});
+    jumpAnim = pickAnimByKeywords(names, {"jump"});
 
     // Fallbacks
     if (idleAnim.empty()) idleAnim = names[0];
     if (walkAnim.empty()) walkAnim = (names.size() > 1) ? names[1] : names[0];
+    if (runAnim.empty()) runAnim = walkAnim;
 
-    LOG_INFO("Zombie animations: idle='" + idleAnim + "' walk='" + walkAnim + "'");
+    LOG_INFO("Zombie animations: idle='" + idleAnim + "' walk='" + walkAnim + "' run='" + runAnim + 
+             "' attack='" + attackAnim + "' death='" + deathAnim + "' hit='" + hitReceiveAnim + "' jump='" + jumpAnim + "'");
 
     model->playAnimation(idleAnim, true);
 }
@@ -147,6 +155,65 @@ glm::vec3 ZombieEntity::consumeAttackImpulse() {
     glm::vec3 out = attackImpulse;
     attackImpulse = glm::vec3(0.0f);
     return out;
+}
+
+void ZombieEntity::takeDamage(float amount, const glm::vec3& knockbackDir) {
+    if (dead) return;
+    
+    health -= amount;
+    
+    // Apply knockback
+    if (glm::length(knockbackDir) > 0.001f) {
+        velocity += knockbackDir;
+        velocity.y += 4.0f;
+    }
+    
+    // Play hit reaction animation
+    if (!dead && !hitReceiveAnim.empty() && model) {
+        playHitReceiveAnimation();
+    }
+    
+    if (health <= 0.0f) {
+        health = 0.0f;
+        dead = true;
+        playDeathAnimation();
+    }
+}
+
+void ZombieEntity::playAttackAnimation() {
+    if (!model || dead) return;
+    
+    isAttacking = true;
+    attackAnimTimer = 0.6f; // Attack animation duration
+    
+    if (!attackAnim.empty()) {
+        model->playAnimation(attackAnim, false);
+    }
+}
+
+void ZombieEntity::playDeathAnimation() {
+    if (!model) return;
+    
+    dead = true;
+    isAttacking = false;
+    attackAnimTimer = 0.0f;
+    isHitReacting = false;
+    hitReactTimer = 0.0f;
+    
+    if (!deathAnim.empty()) {
+        model->playAnimation(deathAnim, false);
+    }
+}
+
+void ZombieEntity::playHitReceiveAnimation() {
+    if (!model || dead) return;
+    
+    isHitReacting = true;
+    hitReactTimer = 0.3f; // Brief hit reaction
+    
+    if (!hitReceiveAnim.empty()) {
+        model->playAnimation(hitReceiveAnim, false);
+    }
 }
 
 static bool tryStepUp(ChunkManager& chunkManager, glm::vec3& pos, float dx, float dz) {
@@ -301,6 +368,18 @@ static std::vector<glm::vec3> findPathAStar(ChunkManager& cm, const glm::vec3& s
 }
 
 bool ZombieEntity::updateAI(float deltaTime, ChunkManager& chunkManager, const glm::vec3& playerPos) {
+    // If dead, only update death timer and animation
+    if (dead) {
+        deathTimer += deltaTime;
+        // Calculate fade alpha after stay time
+        if (deathTimer > DEATH_STAY_TIME) {
+            float fadeProgress = (deathTimer - DEATH_STAY_TIME) / DEATH_FADE_TIME;
+            deathFadeAlpha = std::max(0.0f, 1.0f - fadeProgress);
+        }
+        if (model) model->updateAnimation(deltaTime);
+        return false;
+    }
+    
     // Track previous transform for motion vectors (TAA stability)
     prevPosition = position;
     prevRotation = rotation;
@@ -308,6 +387,21 @@ bool ZombieEntity::updateAI(float deltaTime, ChunkManager& chunkManager, const g
 
     attackImpulse = glm::vec3(0.0f);
     bool attacked = false;
+    
+    // Update animation timers
+    if (isAttacking && attackAnimTimer > 0.0f) {
+        attackAnimTimer -= deltaTime;
+        if (attackAnimTimer <= 0.0f) {
+            isAttacking = false;
+        }
+    }
+    
+    if (isHitReacting && hitReactTimer > 0.0f) {
+        hitReactTimer -= deltaTime;
+        if (hitReactTimer <= 0.0f) {
+            isHitReacting = false;
+        }
+    }
 
     attackCooldown = std::max(0.0f, attackCooldown - deltaTime);
     stateTimer -= deltaTime;
@@ -404,11 +498,12 @@ bool ZombieEntity::updateAI(float deltaTime, ChunkManager& chunkManager, const g
     }
 
     // Very simple "attack": apply knockback impulse when close enough
-    if (state == State::Chase && distXZ < ATTACK_RANGE && attackCooldown <= 0.0f) {
+    if (state == State::Chase && distXZ < ATTACK_RANGE && attackCooldown <= 0.0f && !isAttacking) {
         glm::vec3 away = (distXZ > 0.001f) ? glm::normalize(glm::vec3(-toPlayer.x, 0.0f, -toPlayer.z)) : glm::vec3(0.0f, 0.0f, 1.0f);
         attackImpulse = away * 3.5f + glm::vec3(0.0f, 2.0f, 0.0f);
         attackCooldown = 1.2f;
         attacked = true;
+        playAttackAnimation();
     }
 
     // === Player-like physics & collision ===
@@ -478,31 +573,36 @@ bool ZombieEntity::updateAI(float deltaTime, ChunkManager& chunkManager, const g
 
     position = pos;
 
-    // Animation switching (reuse same logic style as PlayerEntity)
+    // Animation switching - prioritize special animations
     if (model) {
-        float horizSpeed = glm::length(glm::vec2(dir.x, dir.z)) * speed;
         std::string currentAnim = model->getCurrentAnimation();
+        
+        // Don't interrupt special animations
+        if (isAttacking || isHitReacting) {
+            // Keep current special animation playing
+            return attacked;
+        }
+        
+        float horizSpeed = glm::length(glm::vec2(dir.x, dir.z)) * speed;
+        
         if (horizSpeed > 0.05f) {
-            // Cut walk loop to 1/3 to avoid long forward drift in this glTF (root motion baked in).
-            model->setAnimationLoopEndFactor(1.0f / 5.0f);
-            // Hard fix: lock root-motion XZ so the mesh doesn't drift ahead of the entity.
+            // Choose run vs walk based on chase state
+            std::string targetAnim = (state == State::Chase && !runAnim.empty()) ? runAnim : walkAnim;
+            
+            // Lock root-motion XZ so the mesh doesn't drift ahead of the entity
             model->setLockRootMotionXZ(true);
-            // Match stride cadence to actual movement speed to reduce foot sliding.
-            // (Reference: ~1.25 was our chase speed; scale around that.)
-            float animSpeed = std::clamp(speed / 1.25f, 0.8f, 1.0f);
+            // Match stride cadence to actual movement speed
+            float animSpeed = std::clamp(speed / 1.25f, 0.8f, 1.2f);
             model->setAnimationSpeed(animSpeed);
-            if (!walkAnim.empty() && currentAnim != walkAnim) model->playAnimation(walkAnim, true);
+            if (!targetAnim.empty() && currentAnim != targetAnim) model->playAnimation(targetAnim, true);
         } else {
-            model->setAnimationLoopEndFactor(1.0f);
             model->setLockRootMotionXZ(false);
             model->setAnimationSpeed(1.0f);
             if (!idleAnim.empty() && currentAnim != idleAnim) model->playAnimation(idleAnim, true);
         }
     }
 
-    // Update animation time (without Entity::update's position integration)
+    // Update animation time
     if (model) model->updateAnimation(deltaTime);
     return attacked;
 }
-
-

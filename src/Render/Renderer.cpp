@@ -495,11 +495,16 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         modelShader.setVec3("uLightDir", lightDirection);
         modelShader.setVec3("uCameraPos", cameraRelative);
         modelShader.setVec4("uBaseColor", glm::vec4(1.0f)); // Default white
+        modelShader.setFloat("uAlphaMultiplier", 1.0f); // Default full opacity
         // Debug flags
         modelShader.setInt("uDebugNoTexture", Settings::instance().debugNoTexture ? 1 : 0);
         modelShader.setInt("uDebugShowNormals", Settings::instance().debugShowNormals ? 1 : 0);
         for (auto* entity : entities) {
             if (!entity) continue;
+            
+            // Set death fade alpha for this entity
+            float fadeAlpha = entity->getDeathFadeAlpha();
+            modelShader.setFloat("uAlphaMultiplier", fadeAlpha);
 
             // Render in camera-relative space WITHOUT mutating the entity transform.
             // Also compute a previous model matrix for correct motion vectors (TAA stability).

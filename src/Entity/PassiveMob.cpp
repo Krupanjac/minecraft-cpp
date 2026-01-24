@@ -51,13 +51,25 @@ void PassiveMob::pickAnimations() {
         return;
     }
 
+    // Pig/Sheep have: Death, Headbutt, Idle, Idle_Eating, Jump_Loop, Jump_Start, Run, Walk
+    // Chicken has: Attack, Death, Idle, Idle_Peck, Run
     idleAnim = pickAnimByKeywords(names, {"idle"});
-    walkAnim = pickAnimByKeywords(names, {"walk", "run"});
+    walkAnim = pickAnimByKeywords(names, {"walk"});
+    runAnim = pickAnimByKeywords(names, {"run"});
+    deathAnim = pickAnimByKeywords(names, {"death"});
+    idleEatingAnim = pickAnimByKeywords(names, {"idle_eating", "idleeating", "eating"});
+    headbuttAnim = pickAnimByKeywords(names, {"headbutt"});
+    jumpStartAnim = pickAnimByKeywords(names, {"jump_start", "jumpstart"});
+    jumpLoopAnim = pickAnimByKeywords(names, {"jump_loop", "jumploop"});
+    attackAnim = pickAnimByKeywords(names, {"attack"});
+    idlePeckAnim = pickAnimByKeywords(names, {"idle_peck", "idlepeck", "peck"});
 
     if (idleAnim.empty()) idleAnim = names[0];
     if (walkAnim.empty()) walkAnim = (names.size() > 1) ? names[1] : names[0];
+    if (runAnim.empty()) runAnim = walkAnim;
 
-    LOG_INFO("PassiveMob animations: idle='" + idleAnim + "' walk='" + walkAnim + "'");
+    LOG_INFO("PassiveMob animations: idle='" + idleAnim + "' walk='" + walkAnim + "' run='" + runAnim +
+             "' death='" + deathAnim + "' idleEating='" + idleEatingAnim + "' headbutt='" + headbuttAnim + "'");
     model->playAnimation(idleAnim, true);
 }
 
@@ -96,8 +108,16 @@ bool PassiveMob::checkCollision(ChunkManager& chunkManager, const glm::vec3& fee
     return false;
 }
 
-void PassiveMob::takeDamage(float amount) {
+void PassiveMob::takeDamage(float amount, const glm::vec3& knockbackDir) {
+    if (dead) return;
+    
     health -= amount;
+    
+    // Apply knockback
+    if (glm::length(knockbackDir) > 0.001f) {
+        velocity += knockbackDir;
+        velocity.y += 4.0f;
+    }
     
     // Play hurt sound
     Audio::SoundType hurtSound = getHurtSound();
@@ -109,20 +129,50 @@ void PassiveMob::takeDamage(float amount) {
         dead = true;
         health = 0.0f;
         
-        // Play death sound
+        // Play death sound and animation
         Audio::SoundType deathSound = getDeathSound();
         if (deathSound != Audio::SoundType::NONE) {
             Audio::AudioManager::instance().playSoundAt(deathSound, position);
         }
+        
+        playDeathAnimation();
+    }
+}
+
+void PassiveMob::playDeathAnimation() {
+    if (!model) return;
+    
+    dead = true;
+    isDeathPlaying = true;
+    
+    if (!deathAnim.empty()) {
+        model->playAnimation(deathAnim, false);
     }
 }
 
 void PassiveMob::updateAI(float deltaTime, ChunkManager& chunkManager) {
-    if (dead) return;
+    // If dead, only update death timer and animation
+    if (dead) {
+        deathTimer += deltaTime;
+        if (deathTimer > DEATH_STAY_TIME) {
+            float fadeProgress = (deathTimer - DEATH_STAY_TIME) / DEATH_FADE_TIME;
+            deathFadeAlpha = std::max(0.0f, 1.0f - fadeProgress);
+        }
+        if (model) model->updateAnimation(deltaTime);
+        return;
+    }
 
     // Update animation
     if (model) {
         model->updateAnimation(deltaTime);
+    }
+    
+    // Update idle eating timer
+    if (isIdleEating && idleEatingTimer > 0.0f) {
+        idleEatingTimer -= deltaTime;
+        if (idleEatingTimer <= 0.0f) {
+            isIdleEating = false;
+        }
     }
     
     // Ambient sounds
@@ -185,13 +235,23 @@ void PassiveMob::updateAI(float deltaTime, ChunkManager& chunkManager) {
 
     // State machine
     stateTimer -= deltaTime;
-    if (stateTimer <= 0.0f) {
+    if (stateTimer <= 0.0f && !isIdleEating) {
         std::uniform_real_distribution<float> dis(0.0f, 1.0f);
         float r = dis(rng);
         if (state == State::Idle) {
-            if (r < 0.6f) {
+            if (r < 0.5f) {
                 setState(State::Wander, 2.0f, 5.0f);
                 if (model) model->playAnimation(walkAnim, true);
+            } else if (r < 0.65f && !idleEatingAnim.empty()) {
+                // Start idle eating animation (sheep/pigs)
+                isIdleEating = true;
+                idleEatingTimer = 3.0f + dis(rng) * 2.0f;
+                if (model) model->playAnimation(idleEatingAnim, true);
+            } else if (r < 0.8f && !idlePeckAnim.empty()) {
+                // Start idle pecking animation (chickens)
+                isIdleEating = true;  // Reuse the timer mechanism
+                idleEatingTimer = 2.0f + dis(rng) * 1.5f;
+                if (model) model->playAnimation(idlePeckAnim, true);
             } else {
                 setState(State::Idle, 1.0f, 3.0f);
             }
@@ -213,6 +273,12 @@ void PassiveMob::updateAI(float deltaTime, ChunkManager& chunkManager) {
     float speed = (state == State::Flee) ? fleeSpeed : moveSpeed;
 
     if (state == State::Wander || state == State::Flee) {
+        // If fleeing and we have a run animation, switch to it
+        if (state == State::Flee && !runAnim.empty()) {
+            if (model && model->getCurrentAnimation() != runAnim) {
+                model->playAnimation(runAnim, true);
+            }
+        }
         moveVec = desiredDir * speed * deltaTime;
     }
 

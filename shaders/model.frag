@@ -21,6 +21,7 @@ uniform int uDebugShowNormals;
 
 uniform vec3 uLightDir;
 uniform vec3 uCameraPos;
+uniform float uAlphaMultiplier; // For death fade effect
 
 void main() {
     vec4 albedo = uBaseColor;
@@ -63,7 +64,9 @@ void main() {
     
     vec3 finalColor = ambient + diffuse + emission;
     
-    FragColor = vec4(finalColor, albedo.a);
+    float finalAlpha = albedo.a * uAlphaMultiplier;
+    if (finalAlpha < 0.01) discard;
+    FragColor = vec4(finalColor, finalAlpha);
     
     vec2 a = (vCurrentClip.xy / vCurrentClip.w) * 0.5 + 0.5;
     vec2 b = (vPrevClip.xy / vPrevClip.w) * 0.5 + 0.5;

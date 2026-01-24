@@ -23,9 +23,14 @@ public:
 
     // Check if mob is dead
     bool isDead() const { return dead; }
+    float getDeathFadeAlpha() const override { return deathFadeAlpha; }
+    bool shouldBeRemoved() const { return dead && deathTimer >= (DEATH_STAY_TIME + DEATH_FADE_TIME); }
     
     // Apply damage
-    void takeDamage(float amount);
+    void takeDamage(float amount, const glm::vec3& knockbackDir = glm::vec3(0.0f)) override;
+    
+    // Play death animation
+    void playDeathAnimation();
     
     // Entity ID for network sync
     EntityId getEntityId() const { return entityId; }
@@ -43,6 +48,12 @@ protected:
     float health = 10.0f;
     float maxHealth = 10.0f;
     
+    // Death fade-out
+    float deathTimer = 0.0f;
+    float deathFadeAlpha = 1.0f;
+    static constexpr float DEATH_STAY_TIME = 2.0f;
+    static constexpr float DEATH_FADE_TIME = 1.5f;
+    
     float moveSpeed = 2.0f;
     float fleeSpeed = 4.0f;
 
@@ -51,6 +62,19 @@ protected:
 
     std::string idleAnim;
     std::string walkAnim;
+    std::string runAnim;
+    std::string deathAnim;
+    std::string idleEatingAnim;  // Idle_Eating for pig/sheep
+    std::string headbuttAnim;    // Headbutt for pig/sheep
+    std::string jumpStartAnim;   // Jump_Start for pig/sheep
+    std::string jumpLoopAnim;    // Jump_Loop for pig/sheep
+    std::string attackAnim;      // Attack for chicken
+    std::string idlePeckAnim;    // Idle_Peck for chicken
+    
+    // Animation state
+    bool isDeathPlaying = false;
+    bool isIdleEating = false;
+    float idleEatingTimer = 0.0f;
     
     // Sound system
     float soundTimer = 0.0f;

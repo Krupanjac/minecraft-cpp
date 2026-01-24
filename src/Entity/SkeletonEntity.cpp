@@ -103,14 +103,21 @@ void SkeletonEntity::pickAnimations() {
         return;
     }
 
+    // Skeleton has: Attack, Death, HitRecieve, Idle, Jump, Run, Walk
     idleAnim = pickAnimByKeywordsSkel(names, {"idle"});
     walkAnim = pickAnimByKeywordsSkel(names, {"walk"});
+    runAnim = pickAnimByKeywordsSkel(names, {"run"});
     attackAnim = pickAnimByKeywordsSkel(names, {"attack"});
+    deathAnim = pickAnimByKeywordsSkel(names, {"death"});
+    hitReceiveAnim = pickAnimByKeywordsSkel(names, {"hitrecieve", "hitreceive", "hit"});
+    jumpAnim = pickAnimByKeywordsSkel(names, {"jump"});
 
     if (idleAnim.empty()) idleAnim = names[0];
     if (walkAnim.empty()) walkAnim = (names.size() > 1) ? names[1] : names[0];
+    if (runAnim.empty()) runAnim = walkAnim;
 
-    LOG_INFO("Skeleton animations: idle='" + idleAnim + "' walk='" + walkAnim + "' attack='" + attackAnim + "'");
+    LOG_INFO("Skeleton animations: idle='" + idleAnim + "' walk='" + walkAnim + "' run='" + runAnim +
+             "' attack='" + attackAnim + "' death='" + deathAnim + "' hit='" + hitReceiveAnim + "' jump='" + jumpAnim + "'");
     model->playAnimation(idleAnim, true);
 }
 
@@ -133,16 +140,76 @@ glm::vec3 SkeletonEntity::consumeAttackImpulse() {
     return out;
 }
 
-void SkeletonEntity::takeDamage(float amount) {
+void SkeletonEntity::takeDamage(float amount, const glm::vec3& knockbackDir) {
+    if (dead) return;
+    
     health -= amount;
+    
+    // Apply knockback
+    if (glm::length(knockbackDir) > 0.001f) {
+        velocity += knockbackDir;
+        velocity.y += 4.0f;
+    }
+    
+    // Play hit reaction animation
+    if (!dead && !hitReceiveAnim.empty() && model) {
+        playHitReceiveAnimation();
+    }
+    
     if (health <= 0.0f) {
         dead = true;
         health = 0.0f;
+        playDeathAnimation();
+    }
+}
+
+void SkeletonEntity::playAttackAnimation() {
+    if (!model || dead) return;
+    
+    isAttacking = true;
+    attackAnimTimer = 0.6f;
+    
+    if (!attackAnim.empty()) {
+        model->playAnimation(attackAnim, false);
+    }
+}
+
+void SkeletonEntity::playDeathAnimation() {
+    if (!model) return;
+    
+    dead = true;
+    isAttacking = false;
+    attackAnimTimer = 0.0f;
+    isHitReacting = false;
+    hitReactTimer = 0.0f;
+    
+    if (!deathAnim.empty()) {
+        model->playAnimation(deathAnim, false);
+    }
+}
+
+void SkeletonEntity::playHitReceiveAnimation() {
+    if (!model || dead) return;
+    
+    isHitReacting = true;
+    hitReactTimer = 0.3f;
+    
+    if (!hitReceiveAnim.empty()) {
+        model->playAnimation(hitReceiveAnim, false);
     }
 }
 
 bool SkeletonEntity::updateAI(float deltaTime, ChunkManager& chunkManager, const glm::vec3& playerPos) {
-    if (dead) return false;
+    // If dead, only update death timer and animation
+    if (dead) {
+        deathTimer += deltaTime;
+        if (deathTimer > DEATH_STAY_TIME) {
+            float fadeProgress = (deathTimer - DEATH_STAY_TIME) / DEATH_FADE_TIME;
+            deathFadeAlpha = std::max(0.0f, 1.0f - fadeProgress);
+        }
+        if (model) model->updateAnimation(deltaTime);
+        return false;
+    }
     
     prevPosition = position;
     prevRotation = rotation;
@@ -150,6 +217,21 @@ bool SkeletonEntity::updateAI(float deltaTime, ChunkManager& chunkManager, const
 
     attackImpulse = glm::vec3(0.0f);
     bool attacked = false;
+    
+    // Update animation timers
+    if (isAttacking && attackAnimTimer > 0.0f) {
+        attackAnimTimer -= deltaTime;
+        if (attackAnimTimer <= 0.0f) {
+            isAttacking = false;
+        }
+    }
+    
+    if (isHitReacting && hitReactTimer > 0.0f) {
+        hitReactTimer -= deltaTime;
+        if (hitReactTimer <= 0.0f) {
+            isHitReacting = false;
+        }
+    }
 
     attackCooldown = std::max(0.0f, attackCooldown - deltaTime);
     stateTimer -= deltaTime;
@@ -206,11 +288,12 @@ bool SkeletonEntity::updateAI(float deltaTime, ChunkManager& chunkManager, const
     }
 
     // Attack when close
-    if (state == State::Chase && distXZ < ATTACK_RANGE && attackCooldown <= 0.0f) {
+    if (state == State::Chase && distXZ < ATTACK_RANGE && attackCooldown <= 0.0f && !isAttacking) {
         glm::vec3 away = (distXZ > 0.001f) ? glm::normalize(glm::vec3(-toPlayer.x, 0.0f, -toPlayer.z)) : glm::vec3(0.0f, 0.0f, 1.0f);
         attackImpulse = away * 4.0f + glm::vec3(0.0f, 2.5f, 0.0f);
         attackCooldown = 1.0f;
         attacked = true;
+        playAttackAnimation();
     }
 
     // Physics
@@ -256,24 +339,34 @@ bool SkeletonEntity::updateAI(float deltaTime, ChunkManager& chunkManager, const
 
     position = pos;
 
-    // Animation
+    // Animation - prioritize special animations
     if (model) {
-        float horizSpeed = glm::length(glm::vec2(dir.x, dir.z)) * speed;
         std::string currentAnim = model->getCurrentAnimation();
+        
+        // Don't interrupt special animations
+        if (isAttacking || isHitReacting) {
+            return attacked;
+        }
+        
+        float horizSpeed = glm::length(glm::vec2(dir.x, dir.z)) * speed;
+        
         if (horizSpeed > 0.05f) {
-            model->setAnimationLoopEndFactor(1.0f / 3.0f);
+            // Choose run vs walk based on chase state
+            std::string targetAnim = (state == State::Chase && !runAnim.empty()) ? runAnim : walkAnim;
+            
             model->setLockRootMotionXZ(true);
-            float animSpeed = std::clamp(speed / 1.4f, 0.8f, 1.0f);
+            float animSpeed = std::clamp(speed / 1.4f, 0.8f, 1.2f);
             model->setAnimationSpeed(animSpeed);
-            if (!walkAnim.empty() && currentAnim != walkAnim) model->playAnimation(walkAnim, true);
+            if (!targetAnim.empty() && currentAnim != targetAnim) model->playAnimation(targetAnim, true);
         } else {
-            model->setAnimationLoopEndFactor(1.0f);
             model->setLockRootMotionXZ(false);
             model->setAnimationSpeed(1.0f);
             if (!idleAnim.empty() && currentAnim != idleAnim) model->playAnimation(idleAnim, true);
         }
-        model->updateAnimation(deltaTime);
     }
+    
+    // Update animation
+    if (model) model->updateAnimation(deltaTime);
 
     return attacked;
 }

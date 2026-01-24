@@ -26,8 +26,15 @@ public:
 
     glm::vec3 consumeAttackImpulse();
     bool isDead() const { return dead; }
-    void takeDamage(float amount);
+    void takeDamage(float amount, const glm::vec3& knockbackDir = glm::vec3(0.0f)) override;
     float getHealth() const { return health; }
+    float getDeathFadeAlpha() const override { return deathFadeAlpha; }
+    bool shouldBeRemoved() const { return dead && deathTimer >= (DEATH_STAY_TIME + DEATH_FADE_TIME); }
+    
+    // Play specific animations
+    void playAttackAnimation();
+    void playDeathAnimation();
+    void playHitReceiveAnimation();
     
     // Entity ID for network sync
     EntityId getEntityId() const { return entityId; }
@@ -53,7 +60,23 @@ private:
 
     std::string idleAnim;
     std::string walkAnim;
+    std::string runAnim;
     std::string attackAnim;
+    std::string deathAnim;
+    std::string hitReceiveAnim;
+    std::string jumpAnim;
+    
+    // Animation state
+    bool isAttacking = false;
+    float attackAnimTimer = 0.0f;
+    bool isHitReacting = false;
+    float hitReactTimer = 0.0f;
+    
+    // Death fade-out
+    float deathTimer = 0.0f;
+    float deathFadeAlpha = 1.0f;
+    static constexpr float DEATH_STAY_TIME = 2.0f;
+    static constexpr float DEATH_FADE_TIME = 1.5f;
 
     // Simple pathfinding
     float pathReplanTimer = 0.0f;

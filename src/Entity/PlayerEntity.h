@@ -30,6 +30,21 @@ public:
     void playDeathAnimation();
     bool isPlayingDeathAnimation() const { return isDead; }
     void resetDeathState() { isDead = false; }
+    
+    // Hit react animation control (when taking damage)
+    void playHitReactAnimation();
+    bool isPlayingHitReact() const { return isHitReacting; }
+    
+    // Duck animation control (crouching)
+    void playDuckAnimation(bool loop = true);
+    void stopDuckAnimation();
+    bool isDucking() const { return isDuckingState; }
+    
+    // Emote animations (Wave, Yes, No)
+    void playWaveAnimation();
+    void playYesAnimation();
+    void playNoAnimation();
+    bool isPlayingEmote() const { return isEmoting; }
 
 private:
     int currentModelIndex = -1;
@@ -78,6 +93,17 @@ private:
     
     // Death state
     bool isDead = false;
+    
+    // Hit react state
+    bool isHitReacting = false;
+    float hitReactTimer = 0.0f;
+    
+    // Duck state
+    bool isDuckingState = false;
+    
+    // Emote state
+    bool isEmoting = false;
+    float emoteTimer = 0.0f;
     
     void pickAnimations();
 };

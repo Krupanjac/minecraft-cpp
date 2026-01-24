@@ -314,9 +314,15 @@ void MobSpawnManager::despawnFarMobs(std::vector<std::unique_ptr<T>>& mobs,
     mobs.erase(
         std::remove_if(mobs.begin(), mobs.end(),
             [&playerPos, maxDistSq](const std::unique_ptr<T>& mob) {
+                // Remove if too far away
                 glm::vec3 diff = mob->getPosition() - playerPos;
                 float distSq = diff.x * diff.x + diff.z * diff.z; // XZ distance only
-                return distSq > maxDistSq;
+                if (distSq > maxDistSq) return true;
+                
+                // Remove if death fade is complete
+                if (mob->shouldBeRemoved()) return true;
+                
+                return false;
             }),
         mobs.end());
 }

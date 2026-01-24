@@ -45,6 +45,9 @@ public:
     void setMaxHealth(float mh) { maxHealth = mh; if (health > maxHealth) health = maxHealth; }
     bool isDead() const { return health <= 0.0f; }
     
+    // Death fade for rendering
+    virtual float getDeathFadeAlpha() const { return 1.0f; }
+    
     // Damage handling
     virtual void takeDamage(float amount, const glm::vec3& knockbackDir = glm::vec3(0.0f));
     virtual void heal(float amount);
