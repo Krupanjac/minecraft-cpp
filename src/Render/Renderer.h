@@ -54,6 +54,7 @@ public:
 
     void renderCrosshair(int windowWidth, int windowHeight);
     void renderLoadingScreen(int windowWidth, int windowHeight, float progress);
+    void renderBlockBreakOverlay(const Camera& camera, const glm::ivec3& blockPos, float progress, int windowWidth, int windowHeight);
     
     void setShowCrosshair(bool show) { showCrosshair = show; }
 
@@ -72,12 +73,18 @@ private:
     Shader starShader;
     Shader cloudShader;
     Shader modelShader; // New shader for entities
+    Shader destroyOverlayShader; // Shader for block destruction overlay
     
     std::unique_ptr<Mesh> crosshairMesh;
     bool showCrosshair = true;
     std::unique_ptr<Mesh> sunMesh;
     std::unique_ptr<Mesh> starMesh;
     std::unique_ptr<Mesh> cloudMesh;
+    std::unique_ptr<Mesh> destroyOverlayMesh; // Mesh for block destruction overlay
+    GLuint destroyOverlayVAO = 0;
+    GLuint destroyOverlayVBO = 0;
+    GLuint destroyOverlayEBO = 0;
+    int destroyOverlayIndexCount = 0;
     std::unique_ptr<Texture> blockAtlas;
     
     // Post Processing
@@ -127,4 +134,5 @@ private:
     void renderStars(const Camera& camera, int windowWidth, int windowHeight);
     void initClouds();
     void renderClouds(const Camera& camera, int windowWidth, int windowHeight, const glm::mat4& lightSpaceMatrix);
+    void initDestroyOverlay();
 };

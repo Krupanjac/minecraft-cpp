@@ -2264,6 +2264,11 @@ private:
         // Blit depth buffer to default framebuffer so held items can properly occlude/be occluded
         renderer.blitDepthToScreen(window->getWidth(), window->getHeight());
         
+        // Render block break overlay when breaking blocks in survival mode
+        if (isBreakingBlock && !uiManager.isCreativeMode && blockBreakProgress > 0.0f) {
+            renderer.renderBlockBreakOverlay(camera, breakingBlockPos, blockBreakProgress, window->getWidth(), window->getHeight());
+        }
+        
         // Render held items for players (third-person view)
         if (uiManager.isWorldLoaded()) {
             Shader& modelShader = renderer.getModelShader();

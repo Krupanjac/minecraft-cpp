@@ -9,7 +9,7 @@ ItemRegistry& ItemRegistry::instance() {
 
 ItemRegistry::ItemRegistry() {
     // Base path for tool models
-    const std::string basePath = "assets/Cube World - Aug 2023/Tools/glTF/";
+    const std::string basePath = "assets/models/Tools/";
     
     // === SWORDS ===
     // Swords deal bonus damage but don't mine effectively

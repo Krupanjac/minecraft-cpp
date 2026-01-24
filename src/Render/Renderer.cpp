@@ -23,6 +23,7 @@ bool Renderer::initialize(int windowWidth, int windowHeight) {
     initSun();
     initStars();
     initClouds();
+    initDestroyOverlay();
 
     blockAtlas = std::make_unique<Texture>("assets/block_atlas.png");
 
@@ -826,6 +827,10 @@ bool Renderer::loadShaders() {
         LOG_ERROR("Failed to load model shader");
         success = false;
     }
+    if (!destroyOverlayShader.loadFromFiles("shaders/destroy_overlay.vert", "shaders/destroy_overlay.frag")) {
+        LOG_ERROR("Failed to load destroy overlay shader");
+        success = false;
+    }
     // Create simple shader for crosshair inline or load from file
     // For simplicity, we'll use a very basic shader source here
     const char* crosshairVert = R"(
@@ -1441,4 +1446,180 @@ void Renderer::blitDepthToScreen(int windowWidth, int windowHeight) {
                       0, 0, windowWidth, windowHeight,
                       GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::initDestroyOverlay() {
+    // Create a simple cube mesh for the destruction overlay
+    // We'll render each face slightly offset from the block to prevent z-fighting
+    // The mesh uses position + texcoord format
+    
+    // Create VAO/VBO for overlay
+    destroyOverlayMesh = std::make_unique<Mesh>();
+    
+    // 6 faces with 4 vertices each = 24 vertices total, 36 indices
+    // Format: position (3), texcoord (2)
+    std::vector<float> vertices;
+    std::vector<unsigned int> indices;
+    
+    // Small offset to prevent z-fighting
+    const float o = 0.001f;
+    
+    // Cube faces - each face is slightly larger than 1x1x1 to cover the block
+    // Front face (Z+)
+    vertices.insert(vertices.end(), {0.0f-o, 0.0f-o, 1.0f+o,  0.0f, 0.0f});
+    vertices.insert(vertices.end(), {1.0f+o, 0.0f-o, 1.0f+o,  1.0f, 0.0f});
+    vertices.insert(vertices.end(), {1.0f+o, 1.0f+o, 1.0f+o,  1.0f, 1.0f});
+    vertices.insert(vertices.end(), {0.0f-o, 1.0f+o, 1.0f+o,  0.0f, 1.0f});
+    
+    // Back face (Z-)
+    vertices.insert(vertices.end(), {1.0f+o, 0.0f-o, 0.0f-o,  0.0f, 0.0f});
+    vertices.insert(vertices.end(), {0.0f-o, 0.0f-o, 0.0f-o,  1.0f, 0.0f});
+    vertices.insert(vertices.end(), {0.0f-o, 1.0f+o, 0.0f-o,  1.0f, 1.0f});
+    vertices.insert(vertices.end(), {1.0f+o, 1.0f+o, 0.0f-o,  0.0f, 1.0f});
+    
+    // Right face (X+)
+    vertices.insert(vertices.end(), {1.0f+o, 0.0f-o, 1.0f+o,  0.0f, 0.0f});
+    vertices.insert(vertices.end(), {1.0f+o, 0.0f-o, 0.0f-o,  1.0f, 0.0f});
+    vertices.insert(vertices.end(), {1.0f+o, 1.0f+o, 0.0f-o,  1.0f, 1.0f});
+    vertices.insert(vertices.end(), {1.0f+o, 1.0f+o, 1.0f+o,  0.0f, 1.0f});
+    
+    // Left face (X-)
+    vertices.insert(vertices.end(), {0.0f-o, 0.0f-o, 0.0f-o,  0.0f, 0.0f});
+    vertices.insert(vertices.end(), {0.0f-o, 0.0f-o, 1.0f+o,  1.0f, 0.0f});
+    vertices.insert(vertices.end(), {0.0f-o, 1.0f+o, 1.0f+o,  1.0f, 1.0f});
+    vertices.insert(vertices.end(), {0.0f-o, 1.0f+o, 0.0f-o,  0.0f, 1.0f});
+    
+    // Top face (Y+)
+    vertices.insert(vertices.end(), {0.0f-o, 1.0f+o, 1.0f+o,  0.0f, 0.0f});
+    vertices.insert(vertices.end(), {1.0f+o, 1.0f+o, 1.0f+o,  1.0f, 0.0f});
+    vertices.insert(vertices.end(), {1.0f+o, 1.0f+o, 0.0f-o,  1.0f, 1.0f});
+    vertices.insert(vertices.end(), {0.0f-o, 1.0f+o, 0.0f-o,  0.0f, 1.0f});
+    
+    // Bottom face (Y-)
+    vertices.insert(vertices.end(), {0.0f-o, 0.0f-o, 0.0f-o,  0.0f, 0.0f});
+    vertices.insert(vertices.end(), {1.0f+o, 0.0f-o, 0.0f-o,  1.0f, 0.0f});
+    vertices.insert(vertices.end(), {1.0f+o, 0.0f-o, 1.0f+o,  1.0f, 1.0f});
+    vertices.insert(vertices.end(), {0.0f-o, 0.0f-o, 1.0f+o,  0.0f, 1.0f});
+    
+    // Indices for 6 faces (2 triangles per face)
+    for (unsigned int face = 0; face < 6; face++) {
+        unsigned int base = face * 4;
+        indices.push_back(base + 0);
+        indices.push_back(base + 1);
+        indices.push_back(base + 2);
+        indices.push_back(base + 0);
+        indices.push_back(base + 2);
+        indices.push_back(base + 3);
+    }
+    
+    // Create OpenGL buffers
+    GLuint vao, vbo, ebo;
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
+    
+    glBindVertexArray(vao);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+    
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    
+    // TexCoord attribute
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    
+    glBindVertexArray(0);
+    
+    // Store in a simple way - we'll use raw OpenGL calls for this overlay
+    // Store VAO in a member variable (we'll add it)
+    destroyOverlayVAO = vao;
+    destroyOverlayVBO = vbo;
+    destroyOverlayEBO = ebo;
+    destroyOverlayIndexCount = static_cast<int>(indices.size());
+}
+
+void Renderer::renderBlockBreakOverlay(const Camera& camera, const glm::ivec3& blockPos, float progress, int windowWidth, int windowHeight) {
+    if (progress <= 0.0f || progress > 1.0f) return;
+    if (!blockAtlas) return;
+    
+    // Calculate which destruction stage texture to use (0-9 based on progress)
+    // Progress 0.0-1.0 maps to stages 0-9
+    int stage = static_cast<int>(progress * 10.0f);
+    stage = std::min(stage, 9); // Clamp to max stage 9
+    
+    // Destruction textures are in the last row of the atlas, first 10 textures
+    // Atlas is 16x16, so last row is row 15 (index 240-255)
+    // Destruction textures are at indices 240, 241, 242, ... 249
+    int textureIndex = 240 + stage;
+    
+    // Calculate atlas offset
+    const float atlasSize = 16.0f;
+    const float cellSize = 1.0f / atlasSize;
+    float col = static_cast<float>(textureIndex % 16);
+    float row = static_cast<float>(textureIndex / 16);
+    // Flip row because OpenGL UV origin is bottom-left
+    row = 15.0f - row;
+    glm::vec2 atlasOffset(col * cellSize, row * cellSize);
+    
+    // Setup matrices
+    glm::mat4 projection = glm::perspective(glm::radians(Settings::instance().fov), 
+                                            static_cast<float>(windowWidth) / windowHeight, 
+                                            0.1f, 1000.0f);
+    
+    // Use camera-relative rendering for precision
+    glm::vec3 cameraPos = camera.getPosition();
+    glm::vec3 blockPosF = glm::vec3(blockPos);
+    
+    // Create view matrix looking from camera
+    glm::mat4 view;
+    if (camera.isThirdPerson()) {
+        // Third person view setup
+        glm::vec3 targetWorld = cameraPos + glm::vec3(0.0f, camera.defaultY, 0.0f);
+        glm::vec3 eyeWorld = targetWorld - camera.getFront() * camera.thirdPersonDistance + glm::vec3(0.0f, 0.2f, 0.0f);
+        view = glm::lookAt(eyeWorld, targetWorld, glm::vec3(0.0f, 1.0f, 0.0f));
+    } else {
+        glm::vec3 eyePos = cameraPos + glm::vec3(0.0f, camera.defaultY, 0.0f);
+        view = glm::lookAt(eyePos, eyePos + camera.getFront(), glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+    
+    // Model matrix positions the overlay cube at the block position
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), blockPosF);
+    
+    // Setup rendering state
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL); // Use LEQUAL to render on top of existing geometry at same depth
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_CULL_FACE); // Render both sides
+    
+    // Use the destroy overlay shader
+    destroyOverlayShader.use();
+    destroyOverlayShader.setMat4("uModel", model);
+    destroyOverlayShader.setMat4("uView", view);
+    destroyOverlayShader.setMat4("uProjection", projection);
+    destroyOverlayShader.setVec2("uAtlasOffset", atlasOffset);
+    destroyOverlayShader.setFloat("uCellSize", cellSize);
+    
+    // Bind block atlas texture
+    glActiveTexture(GL_TEXTURE0);
+    blockAtlas->bind(0);
+    destroyOverlayShader.setInt("uTexture", 0);
+    
+    // Draw the overlay cube
+    glBindVertexArray(destroyOverlayVAO);
+    glDrawElements(GL_TRIANGLES, destroyOverlayIndexCount, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+    
+    destroyOverlayShader.unuse();
+    
+    // Restore state
+    glDepthFunc(GL_LESS);
+    glDisable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
 }
