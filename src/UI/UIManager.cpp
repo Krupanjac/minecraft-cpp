@@ -1,9 +1,11 @@
 #include "UIManager.h"
+#include "Console.h"
 #include "../World/WorldSerializer.h"
 #include "../World/WorldGenerator.h"
 #include "../Core/HardwareInfo.h"
 #include "../Audio/AudioManager.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <GLFW/glfw3.h>
 #include <iostream>
 #include <algorithm>
 #include <random>
@@ -351,6 +353,7 @@ void UIManager::setMenuState(MenuState state) {
         case MenuState::HOST_GAME: setupHostGameMenu(); break;
         case MenuState::JOIN_GAME: setupJoinGameMenu(); break;
         case MenuState::ABOUT: setupAboutMenu(); break;
+        case MenuState::DEATH_SCREEN: setupDeathScreen(); break;
         case MenuState::CHAT: break; // Chat doesn't use elements system
         case MenuState::NONE: break;
     }
@@ -474,27 +477,33 @@ void UIManager::setupInGameMenu() {
     float btnH = 40.0f;
     float gap = 10.0f;
 
-    elements.push_back({centerX - btnW/2, centerY - 75, btnW, btnH, "RESUME", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 100, btnW, btnH, "RESUME", false, [this]() { 
         setMenuState(MenuState::NONE); 
     }});
 
-    elements.push_back({centerX - btnW/2, centerY - 75 + btnH + gap, btnW, btnH, "SAVE GAME", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 100 + btnH + gap, btnW, btnH, "SAVE GAME", false, [this]() { 
         if (onSave) onSave();
     }});
 
-    elements.push_back({centerX - btnW/2, centerY - 75 + (btnH + gap)*2, btnW, btnH, "SETTINGS", false, [this]() { 
+    elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*2, btnW, btnH, "SETTINGS", false, [this]() { 
         setMenuState(MenuState::SETTINGS); 
     }});
     
+    // Respawn button - kill self to test death screen
+    elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*3, btnW, btnH, "RESPAWN", false, [this]() { 
+        // This triggers death and respawn
+        if (onRespawn) onRespawn();
+    }});
+    
     if (isOnline) {
-        elements.push_back({centerX - btnW/2, centerY - 75 + (btnH + gap)*3, btnW, btnH, "DISCONNECT", false, [this]() { 
+        elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*4, btnW, btnH, "DISCONNECT", false, [this]() { 
             if (onDisconnectGame) onDisconnectGame();
             worldLoaded = false;
             if (onReturnToMainMenu) onReturnToMainMenu();
             setMenuState(MenuState::MAIN_MENU); 
         }});
     } else {
-        elements.push_back({centerX - btnW/2, centerY - 75 + (btnH + gap)*3, btnW, btnH, "MAIN MENU", false, [this]() { 
+        elements.push_back({centerX - btnW/2, centerY - 100 + (btnH + gap)*4, btnW, btnH, "MAIN MENU", false, [this]() { 
             if (onSave) onSave(); // Auto save on exit to menu
             worldLoaded = false;
             if (onReturnToMainMenu) onReturnToMainMenu();
@@ -1106,6 +1115,13 @@ void UIManager::setupControlsMenu() {
     info7.text = "M: Open map";
     info7.isLabel = true;
     elements.push_back(info7);
+    y += 30;
+    
+    UIElement info8;
+    info8.x = rightCol; info8.y = y; info8.w = colWidth; info8.h = 25;
+    info8.text = "~: Toggle console";
+    info8.isLabel = true;
+    elements.push_back(info8);
     
     // Instruction
     UIElement inst;
@@ -1223,6 +1239,40 @@ void UIManager::setupLoadGameMenu() {
     back.text = "Back";
     back.onClick = [this]() { setMenuState(MenuState::MAIN_MENU); };
     elements.push_back(back);
+}
+
+void UIManager::setupDeathScreen() {
+    elements.clear();
+    
+    float centerX = width / 2.0f;
+    float centerY = height / 2.0f;
+    float btnW = 200.0f;
+    float btnH = 50.0f;
+    float gap = 15.0f;
+    
+    // "You Died!" title - will be rendered specially in render()
+    UIElement title;
+    title.x = centerX - 100;
+    title.y = centerY - 120;
+    title.w = 200;
+    title.h = 50;
+    title.text = "YOU DIED";
+    title.isLabel = true;
+    title.customColor = glm::vec4(0.8f, 0.1f, 0.1f, 1.0f); // Dark red
+    elements.push_back(title);
+    
+    // Respawn button
+    elements.push_back({centerX - btnW/2, centerY, btnW, btnH, "RESPAWN", false, [this]() { 
+        if (onRespawn) onRespawn();
+        setMenuState(MenuState::NONE);
+    }});
+    
+    // Main Menu button
+    elements.push_back({centerX - btnW/2, centerY + btnH + gap, btnW, btnH, "MAIN MENU", false, [this]() { 
+        worldLoaded = false;
+        if (onReturnToMainMenu) onReturnToMainMenu();
+        setMenuState(MenuState::MAIN_MENU);
+    }});
 }
 
 void UIManager::setupNewGameMenu() {
@@ -3533,6 +3583,74 @@ void UIManager::renderLoadingTip(const std::string& text) {
         drawText(x, y, tipScale, text, glm::vec4(0.8f, 0.8f, 0.8f, 1.0f));
     }
 
+    uiShader.unuse();
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+}
+
+void UIManager::renderConsole() {
+    auto& console = Console::instance();
+    if (!console.isVisible()) return;
+    
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    uiShader.use();
+    glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
+    uiShader.setMat4("uProjection", projection);
+    
+    // Console dimensions
+    float consoleHeight = height * 0.4f;  // 40% of screen height
+    float padding = 8.0f;
+    float lineHeight = 16.0f;
+    float fontScale = 1.5f;
+    int visibleLines = static_cast<int>((consoleHeight - padding * 3 - lineHeight) / lineHeight);
+    
+    // Background
+    drawRect(0, 0, (float)width, consoleHeight, glm::vec4(0.05f, 0.05f, 0.1f, 0.92f));
+    
+    // Border at bottom
+    drawRect(0, consoleHeight - 2, (float)width, 2, glm::vec4(0.3f, 0.3f, 0.5f, 1.0f));
+    
+    // Input area background
+    float inputY = consoleHeight - lineHeight - padding;
+    drawRect(padding, inputY, width - padding * 2, lineHeight, glm::vec4(0.1f, 0.1f, 0.15f, 1.0f));
+    
+    // Get messages from console
+    const auto& messages = console.getMessages();
+    int scrollOffset = console.getScrollOffset();
+    
+    int startIdx = std::max(0, (int)messages.size() - visibleLines - scrollOffset);
+    int endIdx = std::min((int)messages.size(), startIdx + visibleLines);
+    
+    float y = padding;
+    for (int i = startIdx; i < endIdx; i++) {
+        const auto& entry = messages[i];
+        drawText(padding, y, fontScale, entry.text, entry.color);
+        y += lineHeight;
+    }
+    
+    // Scroll indicator
+    if (messages.size() > (size_t)visibleLines) {
+        float scrollPercent = 1.0f - (float)scrollOffset / (float)(messages.size() - visibleLines);
+        float indicatorH = std::max(20.0f, (consoleHeight - lineHeight - padding * 3) * visibleLines / messages.size());
+        float indicatorY = padding + (consoleHeight - lineHeight - padding * 3 - indicatorH) * scrollPercent;
+        drawRect(width - 8, indicatorY, 4, indicatorH, glm::vec4(0.5f, 0.5f, 0.6f, 0.7f));
+    }
+    
+    // Render input prompt with cursor
+    std::string prompt = "> " + console.getInputText();
+    
+    // Cursor blink
+    static float lastTime = 0.0f;
+    float currentTime = static_cast<float>(glfwGetTime());
+    if (fmod(currentTime, 1.0f) < 0.5f) {
+        prompt.insert(2 + console.getCursorPos(), "|");
+    }
+    
+    drawText(padding + 4, inputY + 2, fontScale, prompt, glm::vec4(0.9f, 0.9f, 0.9f, 1.0f));
+    
     uiShader.unuse();
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);

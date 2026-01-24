@@ -89,6 +89,14 @@ void Window::setMouseButtonCallback(std::function<void(int, int, int)> callback)
     });
 }
 
+void Window::setScrollCallback(std::function<void(double, double)> callback) {
+    windowData.scrollCallback = callback;
+    glfwSetScrollCallback(window, [](GLFWwindow* win, double xoffset, double yoffset) {
+        auto data = static_cast<WindowData*>(glfwGetWindowUserPointer(win));
+        if (data && data->scrollCallback) data->scrollCallback(xoffset, yoffset);
+    });
+}
+
 void Window::setFramebufferSizeCallback(std::function<void(int, int)> callback) {
     windowData.framebufferSizeCallback = callback;
     windowData.windowRef = this;  // Store reference to update width/height

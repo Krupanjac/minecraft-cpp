@@ -127,6 +127,7 @@ set(SOURCES
     src/Network/NetworkManager.cpp
     src/Server/DedicatedServer.cpp
     src/UI/UIManager.cpp
+    src/UI/Console.cpp
     src/Entity/Entity.cpp
     src/Entity/PlayerEntity.cpp
     src/Entity/EntityManager.cpp
@@ -215,9 +216,11 @@ target_link_libraries(minecraft_server PRIVATE
 
 # Platform-specific settings for server
 if(WIN32)
-    target_compile_definitions(minecraft_server PRIVATE _CRT_SECURE_NO_WARNINGS)
+    target_compile_definitions(minecraft_server PRIVATE _CRT_SECURE_NO_WARNINGS SERVER_BUILD)
     target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32)
     target_link_libraries(minecraft_server PRIVATE ws2_32)
+else()
+    target_compile_definitions(minecraft_server PRIVATE SERVER_BUILD)
 endif()
 
 # Copy assets and shaders to build directory

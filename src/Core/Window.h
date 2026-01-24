@@ -28,6 +28,7 @@ public:
     void setCharCallback(std::function<void(unsigned int)> callback);
     void setCursorPosCallback(std::function<void(double, double)> callback);
     void setMouseButtonCallback(std::function<void(int, int, int)> callback);
+    void setScrollCallback(std::function<void(double, double)> callback);
     void setFramebufferSizeCallback(std::function<void(int, int)> callback);
     
     void setCursorMode(int mode);
@@ -49,6 +50,7 @@ private:
         std::function<void(unsigned int)> charCallback;
         std::function<void(double, double)> cursorPosCallback;
         std::function<void(int, int, int)> mouseButtonCallback;
+        std::function<void(double, double)> scrollCallback;
         std::function<void(int, int)> framebufferSizeCallback;
         Window* windowRef = nullptr;  // Reference for updating width/height on resize
     };

@@ -343,7 +343,7 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     // Despawn zombies
     auto& zombies = entities.zombies;
     for (auto it = zombies.begin(); it != zombies.end();) {
-        if (shouldDespawn((*it)->getPosition())) {
+        if ((*it)->isDead() || shouldDespawn((*it)->getPosition())) {
             EntityId id = (*it)->getEntityId();
             if (isServer) pendingDespawnEvents.push_back(id);
             entities.idMap.erase(id);

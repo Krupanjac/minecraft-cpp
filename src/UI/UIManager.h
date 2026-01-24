@@ -27,7 +27,8 @@ enum class MenuState {
     HOST_GAME,
     JOIN_GAME,
     CHAT,
-    ABOUT
+    ABOUT,
+    DEATH_SCREEN
 };
 
 struct UIElement {
@@ -99,6 +100,7 @@ public:
     void setOnTeleport(std::function<void(float, float)> callback) { onTeleport = callback; }
     void setWorldGenerator(class WorldGenerator* gen) { worldGenerator = gen; }
     void setOnReturnToMainMenu(std::function<void()> callback) { onReturnToMainMenu = callback; }
+    void setOnRespawn(std::function<void()> callback) { onRespawn = callback; }
     
     // Multiplayer callbacks
     void setOnHostGame(std::function<void(std::string, int)> callback) { onHostGame = callback; }
@@ -122,6 +124,9 @@ public:
     void toggleDebug() { showDebug = !showDebug; }
 
     void updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos, const glm::vec3& playerVel, float taaMotion = 0.0f, float taaHistoryWeight = 0.0f);
+    
+    // Console rendering
+    void renderConsole();
 
     BlockType getSelectedBlock() const { return hotbarSlots[selectedSlot].blockType; }
     ItemType getSelectedItem() const { return hotbarSlots[selectedSlot].isItem ? hotbarSlots[selectedSlot].itemStack.type : ItemType::NONE; }
@@ -213,6 +218,7 @@ private:
     std::function<void()> onExit;
     std::function<void()> onSave;
     std::function<void()> onReturnToMainMenu;
+    std::function<void()> onRespawn;
     std::function<void(std::string, int)> onHostGame;
     std::function<void(std::string, std::string, int)> onJoinGame;
     std::function<void()> onDisconnectGame;
@@ -255,6 +261,7 @@ private:
     void setupHostGameMenu();
     void setupJoinGameMenu();
     void setupAboutMenu();
+    void setupDeathScreen();
     void generateMapTexture();
     
     // Map data

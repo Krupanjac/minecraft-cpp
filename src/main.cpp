@@ -14,6 +14,7 @@
 #include "Mesh/MeshBuilder.h"
 #include "Util/Config.h"
 #include "UI/UIManager.h"
+#include "UI/Console.h"
 #include "World/WorldSerializer.h"
 #include "Entity/PlayerEntity.h"
 #include "Entity/EntityManager.h"
@@ -83,10 +84,55 @@ public:
         window->setCursorMode(GLFW_CURSOR_NORMAL);
         
         window->setMouseButtonCallback([this](int button, int action, int mods) {
+            // Handle console mouse input first
+            if (Console::instance().isVisible()) {
+                double mx, my;
+                glfwGetCursorPos(window->getNative(), &mx, &my);
+                Console::instance().handleMouseButton(button, action, mx, my, window->getHeight());
+                // Don't return - still allow game to process if needed
+            }
             onMouseButton(button, action, mods);
         });
         
-        window->setKeyCallback([this](int key, int, int action, int) {
+        window->setCursorPosCallback([this](double xpos, double ypos) {
+            // Handle console mouse move for text selection
+            if (Console::instance().isVisible() && Console::instance().isSelecting()) {
+                Console::instance().handleMouseMove(xpos, ypos, window->getHeight());
+            }
+            // Normal mouse movement handled elsewhere
+        });
+        
+        window->setScrollCallback([this](double xoffset, double yoffset) {
+            // Handle console scroll
+            if (Console::instance().isVisible()) {
+                Console::instance().handleScroll(yoffset);
+                return;
+            }
+            // Default scroll - hotbar
+            if (!uiManager.isMenuOpen()) {
+                int slot = uiManager.selectedSlot;
+                if (yoffset > 0) {
+                    slot = (slot - 1 + 9) % 9;
+                } else if (yoffset < 0) {
+                    slot = (slot + 1) % 9;
+                }
+                uiManager.selectHotbarSlot(slot);
+            }
+        });
+        
+        window->setKeyCallback([this](int key, int scancode, int action, int mods) {
+            // Console toggle with ` or ~ (grave accent key)
+            if (key == GLFW_KEY_GRAVE_ACCENT && action == GLFW_PRESS) {
+                Console::instance().toggle();
+                return;
+            }
+            
+            // If console is open, route input to it
+            if (Console::instance().isVisible()) {
+                Console::instance().handleKeyInput(key, action, mods);
+                return;
+            }
+            
             if (action == GLFW_PRESS || action == GLFW_REPEAT) {
                 uiManager.handleKeyInput(key);
             }
@@ -189,6 +235,14 @@ public:
         });
         
         window->setCharCallback([this](unsigned int codepoint) {
+            // Don't handle backtick character (it toggles the console)
+            if (codepoint == '`' || codepoint == '~') return;
+            
+            // If console is open, route input to it
+            if (Console::instance().isVisible()) {
+                Console::instance().handleCharInput(codepoint);
+                return;
+            }
             uiManager.handleCharInput(codepoint);
         });
         
@@ -252,6 +306,15 @@ public:
             WorldSerializer::saveScreenshot(currentWorldName, pixels.data(), w, h);
             
             LOG_INFO("Game Saved with preview screenshot");
+        });
+        
+        uiManager.setOnRespawn([this]() {
+            // Kill player first if coming from menu, then respawn
+            if (playerHealth > 0) {
+                playerHealth = 0;
+                uiManager.playerHealth = 0;
+            }
+            respawnPlayer();
         });
         
         uiManager.setOnExit([this]() {
@@ -1077,14 +1140,6 @@ public:
             
             window->pollEvents();
             window->swapBuffers();
-            
-            // Log FPS every second
-            static float fpsTimer = 0.0f;
-            fpsTimer += deltaTime;
-            if (fpsTimer >= 1.0f) {
-                LOG_INFO("FPS: " + std::to_string(Time::instance().getFPS()));
-                fpsTimer = 0.0f;
-            }
         }
         
         LOG_INFO("Application shutting down");
@@ -1712,7 +1767,7 @@ private:
         }
         
         // Check if we should skip player controls but continue world updates
-        bool skipPlayerControls = uiManager.isMenuOpen();
+        bool skipPlayerControls = uiManager.isMenuOpen() || Console::instance().isVisible();
         // Always continue world updates in multiplayer OR when world is loaded OR in main menu (for background)
         bool continueWorldUpdates = networkManager.isOnline() || uiManager.isWorldLoaded() || menuWorldInitialized;
 
@@ -2131,6 +2186,7 @@ private:
             renderer.render(chunkManager, menuCamera, emptyEntities, window->getWidth(), window->getHeight());
             renderer.cleanUnusedMeshes(chunkManager);
             uiManager.render();
+            uiManager.renderConsole();
             return;
         }
         
@@ -2222,6 +2278,7 @@ private:
         }
         
         uiManager.render();
+        uiManager.renderConsole();
     }
     
     void updatePhysics(float deltaTime) {
@@ -2408,8 +2465,13 @@ private:
     
     void onPlayerDeath() {
         LOG_INFO("Player died!");
-        // TODO: Implement respawn logic
-        // For now, just reset health and position
+        // Show death screen
+        uiManager.setMenuState(MenuState::DEATH_SCREEN);
+        window->setCursorMode(GLFW_CURSOR_NORMAL);
+    }
+    
+    void respawnPlayer() {
+        // Reset health
         playerHealth = playerMaxHealth;
         uiManager.playerHealth = static_cast<int>(playerHealth);
         
@@ -2419,6 +2481,8 @@ private:
         int terrainHeight = worldGenerator.getSurfaceHeight(spawnX, spawnZ);
         camera.setPosition(glm::vec3(spawnX, terrainHeight + 2.0f, spawnZ));
         camera.velocity = glm::vec3(0.0f);
+        
+        LOG_INFO("Player respawned");
     }
 };
 

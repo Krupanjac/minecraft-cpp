@@ -12,6 +12,7 @@
 #include <chrono>
 #include <iomanip>
 #include <mutex>
+#include <functional>
 
 enum class LogLevel {
     DEBUG,
@@ -19,6 +20,9 @@ enum class LogLevel {
     WARNING,
     ERROR
 };
+
+// Forward declaration to avoid circular dependencies
+class Console;
 
 class Logger {
 public:
@@ -58,30 +62,11 @@ public:
         }
         m_fileLoggingEnabled = false;
     }
+    
+    // Enable/disable console forwarding
+    void enableConsoleLogging(bool enable) { m_consoleLoggingEnabled = enable; }
 
-    void log(LogLevel level, const std::string& message) {
-        if (level < minLevel) return;
-
-        auto now = std::chrono::system_clock::now();
-        auto time = std::chrono::system_clock::to_time_t(now);
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now.time_since_epoch()) % 1000;
-
-        std::stringstream ss;
-        ss << "[" << std::put_time(std::localtime(&time), "%H:%M:%S");
-        ss << "." << std::setfill('0') << std::setw(3) << ms.count() << "] ";
-        ss << "[" << levelToString(level) << "] ";
-        ss << message;
-
-        std::lock_guard<std::mutex> lock(m_mutex);
-        std::cout << ss.str() << std::endl;
-        
-        // Write to file if enabled
-        if (m_fileLoggingEnabled && m_fileStream.is_open()) {
-            m_fileStream << ss.str() << std::endl;
-            m_fileStream.flush();  // Flush immediately to catch crashes
-        }
-    }
+    void log(LogLevel level, const std::string& message);
 
     void debug(const std::string& message) { log(LogLevel::DEBUG, message); }
     void info(const std::string& message) { log(LogLevel::INFO, message); }
@@ -89,11 +74,12 @@ public:
     void error(const std::string& message) { log(LogLevel::ERROR, message); }
 
 private:
-    Logger() : minLevel(LogLevel::INFO), m_fileLoggingEnabled(false) {}
+    Logger() : minLevel(LogLevel::INFO), m_fileLoggingEnabled(false), m_consoleLoggingEnabled(true) {}
     LogLevel minLevel;
     std::mutex m_mutex;
     std::ofstream m_fileStream;
     bool m_fileLoggingEnabled;
+    bool m_consoleLoggingEnabled;
 
     const char* levelToString(LogLevel level) {
         switch (level) {
