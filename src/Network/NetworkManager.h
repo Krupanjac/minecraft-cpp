@@ -48,9 +48,17 @@ public:
     void playAttackAnimation();
     bool isPlayingAttackAnimation() const { return m_isAttacking; }
     
+    // Hit receive animation control (for showing damage taken)
+    void playHitReceiveAnimation();
+    bool isPlayingHitReceiveAnimation() const { return m_isHitReacting; }
+    
     // Death animation control  
     void playDeathAnimation();
     bool isPlayingDeathAnimation() const { return m_isDead; }
+    
+    // Damage handling for network (override to track visual health for this remote player)
+    void applyNetworkDamage(float damage, const glm::vec3& knockback);
+    float getNetworkHealth() const { return m_networkHealth; }
     
 private:
     uint32_t m_playerId;
@@ -75,6 +83,7 @@ private:
     std::string m_idleAttackAnim = "Idle_Attack";
     std::string m_runAttackAnim = "Run_Attack";
     std::string m_punchAnim = "Punch";
+    std::string m_hitReceiveAnim = "HitReceive";
     std::string m_deathAnim = "Death";
     std::string m_rightHandBone = "Fist.R";
     bool m_hasHoldAnimations = false;
@@ -84,8 +93,15 @@ private:
     bool m_isAttacking = false;
     float m_attackAnimTimer = 0.0f;
     
+    // Hit receive state
+    bool m_isHitReacting = false;
+    float m_hitReactTimer = 0.0f;
+    
     // Death state
     bool m_isDead = false;
+    
+    // Health tracking for remote player (for visual purposes)
+    float m_networkHealth = 20.0f;
 };
 
 class NetworkManager {
@@ -124,6 +140,9 @@ public:
     void broadcastEntityDespawn(uint32_t entityId);
     void broadcastEntityUpdate(uint32_t entityId, const glm::vec3& pos, const glm::vec3& vel, float yaw, float health, uint8_t flags);
     
+    // Player damage for PvP combat
+    void sendPlayerDamage(uint32_t targetPlayerId, float damage, const glm::vec3& knockback);
+    
     // Get remote player entities for rendering
     std::vector<RemotePlayerEntity*> getRemotePlayerEntities();
     
@@ -149,6 +168,7 @@ public:
     using EntityDespawnCallback = std::function<void(uint32_t entityId)>;
     using EntityUpdateCallback = std::function<void(uint32_t entityId, const glm::vec3& pos, const glm::vec3& vel, float yaw, float health, uint8_t flags)>;
     using PlayerJoinCallback = std::function<void(uint32_t playerId, const std::string& name)>;
+    using PlayerDamageCallback = std::function<void(uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback)>;
     
     void setBlockChangeCallback(BlockChangeCallback cb) { m_onBlockChange = std::move(cb); }
     void setChatCallback(ChatCallback cb) { m_onChat = std::move(cb); }
@@ -159,6 +179,7 @@ public:
     void setEntityDespawnCallback(EntityDespawnCallback cb) { m_onEntityDespawn = std::move(cb); }
     void setEntityUpdateCallback(EntityUpdateCallback cb) { m_onEntityUpdate = std::move(cb); }
     void setPlayerJoinCallback(PlayerJoinCallback cb) { m_onPlayerJoin = std::move(cb); }
+    void setPlayerDamageCallback(PlayerDamageCallback cb) { m_onPlayerDamage = std::move(cb); }
     
 private:
     void updateRemotePlayerEntities();
@@ -193,6 +214,7 @@ private:
     EntityDespawnCallback m_onEntityDespawn;
     EntityUpdateCallback m_onEntityUpdate;
     PlayerJoinCallback m_onPlayerJoin;
+    PlayerDamageCallback m_onPlayerDamage;
 };
 
 } // namespace Network

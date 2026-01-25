@@ -182,9 +182,14 @@ void SkeletonEntity::playDeathAnimation() {
     attackAnimTimer = 0.0f;
     isHitReacting = false;
     hitReactTimer = 0.0f;
+    deathTimer = 0.0f;  // Reset death timer
+    deathFadeAlpha = 1.0f;
     
     if (!deathAnim.empty()) {
         model->playAnimation(deathAnim, false);
+        LOG_INFO("SkeletonEntity: Playing death animation '" + deathAnim + "'");
+    } else {
+        LOG_WARNING("SkeletonEntity: No death animation found!");
     }
 }
 
@@ -192,7 +197,9 @@ void SkeletonEntity::playHitReceiveAnimation() {
     if (!model || dead) return;
     
     isHitReacting = true;
-    hitReactTimer = 0.3f;
+    hitReactTimer = 0.5f;  // Longer hit reaction (was 0.3f)
+    isAttacking = false;   // Interrupt attack when hit
+    attackAnimTimer = 0.0f;
     
     if (!hitReceiveAnim.empty()) {
         model->playAnimation(hitReceiveAnim, false);
@@ -231,6 +238,9 @@ bool SkeletonEntity::updateAI(float deltaTime, ChunkManager& chunkManager, const
         if (hitReactTimer <= 0.0f) {
             isHitReacting = false;
         }
+        // During hit reaction, don't move or attack - just update animation
+        if (model) model->updateAnimation(deltaTime);
+        return false;
     }
 
     attackCooldown = std::max(0.0f, attackCooldown - deltaTime);

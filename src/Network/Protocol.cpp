@@ -233,4 +233,16 @@ void serializeTimeSync(PacketBuffer& buffer, float timeOfDay, bool isPaused) {
     buffer.writeU8(isPaused ? 1 : 0);
 }
 
+void serializePlayerDamage(PacketBuffer& buffer, uint32_t attackerId, uint32_t targetId,
+                           float damage, const glm::vec3& knockback) {
+    buffer.writeU8(static_cast<uint8_t>(PacketType::PLAYER_DAMAGE));
+    buffer.writeU16(4 + 4 + 4 + 4 * 3);  // attackerId + targetId + damage + knockback (3 floats)
+    buffer.writeU32(attackerId);
+    buffer.writeU32(targetId);
+    buffer.writeFloat(damage);
+    buffer.writeFloat(knockback.x);
+    buffer.writeFloat(knockback.y);
+    buffer.writeFloat(knockback.z);
+}
+
 } // namespace Network

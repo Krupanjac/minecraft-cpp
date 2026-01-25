@@ -42,6 +42,9 @@ enum class PacketType : uint8_t {
     ENTITY_DESPAWN = 0x51,
     ENTITY_UPDATE = 0x52,
     ENTITY_BATCH_UPDATE = 0x53,  // Efficient batch sync
+    
+    // Player damage/combat
+    PLAYER_DAMAGE = 0x60,
 };
 
 // Packet header (sent before every packet)
@@ -212,6 +215,16 @@ struct EntityUpdatePacket {
     static constexpr PacketType TYPE = PacketType::ENTITY_UPDATE;
 };
 
+// Player damage packet for PvP combat
+struct PlayerDamagePacket {
+    uint32_t attackerId;    // Player who dealt the damage
+    uint32_t targetId;      // Player who received the damage
+    float damage;           // Amount of damage dealt
+    float knockbackX, knockbackY, knockbackZ;  // Knockback direction and force
+    
+    static constexpr PacketType TYPE = PacketType::PLAYER_DAMAGE;
+};
+
 // ============== Packet Serialization ==============
 
 class PacketBuffer {
@@ -275,5 +288,7 @@ void serializePing(PacketBuffer& buffer, uint64_t timestamp);
 void serializePong(PacketBuffer& buffer, uint64_t timestamp);
 void serializeDisconnect(PacketBuffer& buffer, const std::string& reason);
 void serializeTimeSync(PacketBuffer& buffer, float timeOfDay, bool isPaused);
+void serializePlayerDamage(PacketBuffer& buffer, uint32_t attackerId, uint32_t targetId,
+                           float damage, const glm::vec3& knockback);
 
 } // namespace Network

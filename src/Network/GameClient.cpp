@@ -338,6 +338,20 @@ void GameClient::handlePacket(PacketType type, PacketBuffer& buffer) {
             break;
         }
         
+        case PacketType::PLAYER_DAMAGE: {
+            uint32_t attackerId = buffer.readU32();
+            uint32_t targetId = buffer.readU32();
+            float damage = buffer.readFloat();
+            float knockbackX = buffer.readFloat();
+            float knockbackY = buffer.readFloat();
+            float knockbackZ = buffer.readFloat();
+            
+            if (m_onPlayerDamage) {
+                m_onPlayerDamage(attackerId, targetId, damage, glm::vec3(knockbackX, knockbackY, knockbackZ));
+            }
+            break;
+        }
+        
         default:
             LOG_WARNING("Unknown packet type: " + std::to_string(static_cast<int>(type)));
             break;
@@ -390,6 +404,14 @@ void GameClient::sendChatMessage(const std::string& message) {
     
     PacketBuffer packet;
     serializeChatMessage(packet, m_localPlayerId, message);
+    sendPacket(packet);
+}
+
+void GameClient::sendPlayerDamage(uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback) {
+    if (!isConnected()) return;
+    
+    PacketBuffer packet;
+    serializePlayerDamage(packet, attackerId, targetId, damage, knockback);
     sendPacket(packet);
 }
 

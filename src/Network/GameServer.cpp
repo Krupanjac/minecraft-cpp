@@ -298,6 +298,21 @@ void GameServer::handlePacket(ClientConnection& client, PacketType type, PacketB
             break;
         }
         
+        case PacketType::PLAYER_DAMAGE: {
+            uint32_t attackerId = buffer.readU32();
+            uint32_t targetId = buffer.readU32();
+            float damage = buffer.readFloat();
+            float knockbackX = buffer.readFloat();
+            float knockbackY = buffer.readFloat();
+            float knockbackZ = buffer.readFloat();
+            
+            glm::vec3 knockback(knockbackX, knockbackY, knockbackZ);
+            
+            // Broadcast to all clients (including sender for confirmation)
+            broadcastPlayerDamage(attackerId, targetId, damage, knockback);
+            break;
+        }
+        
         default:
             LOG_WARNING("Unknown packet type: " + std::to_string(static_cast<int>(type)));
             break;
@@ -444,6 +459,21 @@ void GameServer::broadcastEntityUpdate(uint32_t entityId, const glm::vec3& pos, 
     packet.writeU8(flags);
     
     broadcastToAll(packet);
+}
+
+void GameServer::broadcastPlayerDamage(uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback) {
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
+    
+    PacketBuffer packet;
+    serializePlayerDamage(packet, attackerId, targetId, damage, knockback);
+    
+    // Broadcast to all clients so they can see the damage effect
+    broadcastToAll(packet);
+    
+    // Call callback for server-side handling (e.g., applying damage to local player if we're the host)
+    if (m_onPlayerDamage) {
+        m_onPlayerDamage(attackerId, targetId, damage, knockback);
+    }
 }
 
 size_t GameServer::getPlayerCount() const {

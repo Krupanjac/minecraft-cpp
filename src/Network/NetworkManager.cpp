@@ -127,6 +127,18 @@ void RemotePlayerEntity::update(float deltaTime) {
             return;
         }
         
+        // Update hit reaction timer
+        if (m_isHitReacting && m_hitReactTimer > 0.0f) {
+            m_hitReactTimer -= deltaTime;
+            if (m_hitReactTimer <= 0.0f) {
+                m_isHitReacting = false;
+                m_hitReactTimer = 0.0f;
+            } else {
+                // Still in hit reaction, don't change animation
+                return;
+            }
+        }
+        
         // Update attack animation timer
         if (m_isAttacking && m_attackAnimTimer > 0.0f) {
             m_attackAnimTimer -= deltaTime;
@@ -230,16 +242,46 @@ void RemotePlayerEntity::playAttackAnimation() {
     model->playAnimation(attackAnim, false);
 }
 
+void RemotePlayerEntity::playHitReceiveAnimation() {
+    if (!model || m_isDead) return;
+    
+    m_isHitReacting = true;
+    m_hitReactTimer = 0.5f; // Hit reaction duration
+    m_isAttacking = false;  // Interrupt attack if hit
+    m_attackAnimTimer = 0.0f;
+    
+    model->playAnimation(m_hitReceiveAnim, false);
+}
+
 void RemotePlayerEntity::playDeathAnimation() {
     if (!model) return;
     
     m_isDead = true;
     m_isAttacking = false;
     m_attackAnimTimer = 0.0f;
+    m_isHitReacting = false;
+    m_hitReactTimer = 0.0f;
     
     model->playAnimation(m_deathAnim, false);
 }
 
+void RemotePlayerEntity::applyNetworkDamage(float damage, const glm::vec3& knockback) {
+    if (m_isDead) return;
+    
+    m_networkHealth -= damage;
+    
+    // Apply knockback to velocity for visual effect
+    if (glm::length(knockback) > 0.001f) {
+        velocity += knockback;
+    }
+    
+    if (m_networkHealth <= 0.0f) {
+        m_networkHealth = 0.0f;
+        playDeathAnimation();
+    } else {
+        playHitReceiveAnimation();
+    }
+}
 // ============== NetworkManager ==============
 
 NetworkManager::NetworkManager() = default;
@@ -468,6 +510,17 @@ void NetworkManager::broadcastEntityUpdate(uint32_t entityId, const glm::vec3& p
     }
 }
 
+void NetworkManager::sendPlayerDamage(uint32_t targetPlayerId, float damage, const glm::vec3& knockback) {
+    uint32_t attackerId = getLocalPlayerId();
+    
+    if (m_mode == NetworkMode::CLIENT && m_client && m_client->isConnected()) {
+        m_client->sendPlayerDamage(attackerId, targetPlayerId, damage, knockback);
+    } else if (m_mode == NetworkMode::HOST && m_server) {
+        // Host broadcasts directly
+        m_server->broadcastPlayerDamage(attackerId, targetPlayerId, damage, knockback);
+    }
+}
+
 std::vector<RemotePlayerEntity*> NetworkManager::getRemotePlayerEntities() {
     std::vector<RemotePlayerEntity*> entities;
     entities.reserve(m_remotePlayerEntities.size());
@@ -582,6 +635,12 @@ void NetworkManager::setupServerCallbacks() {
             m_onChat(playerName, message);
         }
     });
+    
+    m_server->setPlayerDamageCallback([this](uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback) {
+        if (m_onPlayerDamage) {
+            m_onPlayerDamage(attackerId, targetId, damage, knockback);
+        }
+    });
 }
 
 void NetworkManager::setupClientCallbacks() {
@@ -659,6 +718,12 @@ void NetworkManager::setupClientCallbacks() {
     m_client->setEntityUpdateCallback([this](uint32_t entityId, const glm::vec3& pos, const glm::vec3& vel, float yaw, float health, uint8_t flags) {
         if (m_onEntityUpdate) {
             m_onEntityUpdate(entityId, pos, vel, yaw, health, flags);
+        }
+    });
+    
+    m_client->setPlayerDamageCallback([this](uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback) {
+        if (m_onPlayerDamage) {
+            m_onPlayerDamage(attackerId, targetId, damage, knockback);
         }
     });
 }

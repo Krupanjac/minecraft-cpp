@@ -44,6 +44,7 @@ public:
                       const glm::vec3& velocity, bool onGround, uint8_t heldItem = 0);
     void sendBlockChange(int x, int y, int z, uint8_t blockType);
     void sendChatMessage(const std::string& message);
+    void sendPlayerDamage(uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback);
     
     // Getters
     uint32_t getLocalPlayerId() const { return m_localPlayerId; }
@@ -63,6 +64,7 @@ public:
     using EntitySpawnCallback = std::function<void(uint32_t entityId, uint8_t mobType, const glm::vec3& pos, float yaw)>;
     using EntityDespawnCallback = std::function<void(uint32_t entityId)>;
     using EntityUpdateCallback = std::function<void(uint32_t entityId, const glm::vec3& pos, const glm::vec3& vel, float yaw, float health, uint8_t flags)>;
+    using PlayerDamageCallback = std::function<void(uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback)>;
     
     void setBlockChangeCallback(BlockChangeCallback cb) { m_onBlockChange = std::move(cb); }
     void setPlayerJoinCallback(PlayerJoinCallback cb) { m_onPlayerJoin = std::move(cb); }
@@ -74,6 +76,7 @@ public:
     void setEntitySpawnCallback(EntitySpawnCallback cb) { m_onEntitySpawn = std::move(cb); }
     void setEntityDespawnCallback(EntityDespawnCallback cb) { m_onEntityDespawn = std::move(cb); }
     void setEntityUpdateCallback(EntityUpdateCallback cb) { m_onEntityUpdate = std::move(cb); }
+    void setPlayerDamageCallback(PlayerDamageCallback cb) { m_onPlayerDamage = std::move(cb); }
     
 private:
     void processPackets();
@@ -114,6 +117,7 @@ private:
     EntitySpawnCallback m_onEntitySpawn;
     EntityDespawnCallback m_onEntityDespawn;
     EntityUpdateCallback m_onEntityUpdate;
+    PlayerDamageCallback m_onPlayerDamage;
 };
 
 } // namespace Network

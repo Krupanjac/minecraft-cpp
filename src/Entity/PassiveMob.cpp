@@ -144,9 +144,14 @@ void PassiveMob::playDeathAnimation() {
     
     dead = true;
     isDeathPlaying = true;
+    deathTimer = 0.0f;  // Reset death timer when starting death animation
+    deathFadeAlpha = 1.0f;
     
     if (!deathAnim.empty()) {
         model->playAnimation(deathAnim, false);
+        LOG_INFO("PassiveMob: Playing death animation '" + deathAnim + "'");
+    } else {
+        LOG_WARNING("PassiveMob: No death animation found!");
     }
 }
 

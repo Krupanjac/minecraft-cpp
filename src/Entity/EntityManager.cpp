@@ -343,7 +343,8 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     // Despawn zombies
     auto& zombies = entities.zombies;
     for (auto it = zombies.begin(); it != zombies.end();) {
-        if ((*it)->isDead() || shouldDespawn((*it)->getPosition())) {
+        // Use shouldBeRemoved() to allow death animation to play before removal
+        if ((*it)->shouldBeRemoved() || shouldDespawn((*it)->getPosition())) {
             EntityId id = (*it)->getEntityId();
             if (isServer) pendingDespawnEvents.push_back(id);
             entities.idMap.erase(id);
@@ -357,7 +358,8 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     // Despawn skeletons
     auto& skeletons = entities.skeletons;
     for (auto it = skeletons.begin(); it != skeletons.end();) {
-        if ((*it)->isDead() || shouldDespawn((*it)->getPosition())) {
+        // Use shouldBeRemoved() to allow death animation to play before removal
+        if ((*it)->shouldBeRemoved() || shouldDespawn((*it)->getPosition())) {
             EntityId id = (*it)->getEntityId();
             if (isServer) pendingDespawnEvents.push_back(id);
             entities.idMap.erase(id);
@@ -371,7 +373,8 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     // Despawn pigs
     auto& pigs = entities.pigs;
     for (auto it = pigs.begin(); it != pigs.end();) {
-        if ((*it)->isDead() || shouldDespawn((*it)->getPosition())) {
+        // Use shouldBeRemoved() to allow death animation to play before removal
+        if ((*it)->shouldBeRemoved() || shouldDespawn((*it)->getPosition())) {
             EntityId id = (*it)->getEntityId();
             if (isServer) pendingDespawnEvents.push_back(id);
             entities.idMap.erase(id);
@@ -385,7 +388,8 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     // Despawn chickens
     auto& chickens = entities.chickens;
     for (auto it = chickens.begin(); it != chickens.end();) {
-        if ((*it)->isDead() || shouldDespawn((*it)->getPosition())) {
+        // Use shouldBeRemoved() to allow death animation to play before removal
+        if ((*it)->shouldBeRemoved() || shouldDespawn((*it)->getPosition())) {
             EntityId id = (*it)->getEntityId();
             if (isServer) pendingDespawnEvents.push_back(id);
             entities.idMap.erase(id);
@@ -399,7 +403,8 @@ void EntityManager::processDespawns(const glm::vec3& playerPos) {
     // Despawn sheep
     auto& sheep = entities.sheep;
     for (auto it = sheep.begin(); it != sheep.end();) {
-        if ((*it)->isDead() || shouldDespawn((*it)->getPosition())) {
+        // Use shouldBeRemoved() to allow death animation to play before removal
+        if ((*it)->shouldBeRemoved() || shouldDespawn((*it)->getPosition())) {
             EntityId id = (*it)->getEntityId();
             if (isServer) pendingDespawnEvents.push_back(id);
             entities.idMap.erase(id);
@@ -503,9 +508,15 @@ void EntityManager::updateEntityAI(float deltaTime, const glm::vec3& playerPos,
     static int frameCounter = 0;
     frameCounter++;
     
-    // Update zombies
+    // Update zombies (always update for death timer, updateAI handles dead state internally)
     for (auto& zombie : entities.zombies) {
         if (!zombie) continue;
+        
+        // Always update dead entities for death animation timer
+        if (zombie->isDead()) {
+            zombie->updateAI(deltaTime, *chunkManager, playerPos);
+            continue;
+        }
         
         ActivationLevel level = getActivationLevel(zombie->getPosition(), playerPos);
         
@@ -534,9 +545,15 @@ void EntityManager::updateEntityAI(float deltaTime, const glm::vec3& playerPos,
         }
     }
     
-    // Update skeletons
+    // Update skeletons (always update for death timer, updateAI handles dead state internally)
     for (auto& skeleton : entities.skeletons) {
-        if (!skeleton || skeleton->isDead()) continue;
+        if (!skeleton) continue;
+        
+        // Always update dead entities for death animation timer
+        if (skeleton->isDead()) {
+            skeleton->updateAI(deltaTime, *chunkManager, playerPos);
+            continue;
+        }
         
         ActivationLevel level = getActivationLevel(skeleton->getPosition(), playerPos);
         
@@ -556,9 +573,14 @@ void EntityManager::updateEntityAI(float deltaTime, const glm::vec3& playerPos,
         }
     }
     
-    // Update passive mobs (they don't attack, simpler update)
+    // Update passive mobs (always update for death timer, updateAI handles dead state internally)
     for (auto& pig : entities.pigs) {
-        if (!pig || pig->isDead()) continue;
+        if (!pig) continue;
+        // Always update dead entities for death animation timer
+        if (pig->isDead()) {
+            pig->updateAI(deltaTime, *chunkManager);
+            continue;
+        }
         ActivationLevel level = getActivationLevel(pig->getPosition(), playerPos);
         if (level != ActivationLevel::SLEEP || frameCounter % 10 == 0) {
             pig->updateAI(deltaTime, *chunkManager);
@@ -566,7 +588,12 @@ void EntityManager::updateEntityAI(float deltaTime, const glm::vec3& playerPos,
     }
     
     for (auto& chicken : entities.chickens) {
-        if (!chicken || chicken->isDead()) continue;
+        if (!chicken) continue;
+        // Always update dead entities for death animation timer
+        if (chicken->isDead()) {
+            chicken->updateAI(deltaTime, *chunkManager);
+            continue;
+        }
         ActivationLevel level = getActivationLevel(chicken->getPosition(), playerPos);
         if (level != ActivationLevel::SLEEP || frameCounter % 10 == 0) {
             chicken->updateAI(deltaTime, *chunkManager);
@@ -574,7 +601,12 @@ void EntityManager::updateEntityAI(float deltaTime, const glm::vec3& playerPos,
     }
     
     for (auto& sheep : entities.sheep) {
-        if (!sheep || sheep->isDead()) continue;
+        if (!sheep) continue;
+        // Always update dead entities for death animation timer
+        if (sheep->isDead()) {
+            sheep->updateAI(deltaTime, *chunkManager);
+            continue;
+        }
         ActivationLevel level = getActivationLevel(sheep->getPosition(), playerPos);
         if (level != ActivationLevel::SLEEP || frameCounter % 10 == 0) {
             sheep->updateAI(deltaTime, *chunkManager);
@@ -586,20 +618,21 @@ std::vector<Entity*> EntityManager::getAllEntities() const {
     std::vector<Entity*> result;
     result.reserve(getTotalCount());
     
+    // Include all entities (even dead ones) so death animations can play
     for (const auto& z : entities.zombies) {
         if (z) result.push_back(z.get());
     }
     for (const auto& s : entities.skeletons) {
-        if (s && !s->isDead()) result.push_back(s.get());
+        if (s) result.push_back(s.get());
     }
     for (const auto& p : entities.pigs) {
-        if (p && !p->isDead()) result.push_back(p.get());
+        if (p) result.push_back(p.get());
     }
     for (const auto& c : entities.chickens) {
-        if (c && !c->isDead()) result.push_back(c.get());
+        if (c) result.push_back(c.get());
     }
     for (const auto& s : entities.sheep) {
-        if (s && !s->isDead()) result.push_back(s.get());
+        if (s) result.push_back(s.get());
     }
     
     return result;
@@ -614,20 +647,21 @@ std::vector<Entity*> EntityManager::getEntitiesInRadius(const glm::vec3& center,
         return (diff.x * diff.x + diff.y * diff.y + diff.z * diff.z) <= radiusSq;
     };
     
+    // Include all entities (even dead ones) so death animations can play
     for (const auto& z : entities.zombies) {
         if (z && inRange(z->getPosition())) result.push_back(z.get());
     }
     for (const auto& s : entities.skeletons) {
-        if (s && !s->isDead() && inRange(s->getPosition())) result.push_back(s.get());
+        if (s && inRange(s->getPosition())) result.push_back(s.get());
     }
     for (const auto& p : entities.pigs) {
-        if (p && !p->isDead() && inRange(p->getPosition())) result.push_back(p.get());
+        if (p && inRange(p->getPosition())) result.push_back(p.get());
     }
     for (const auto& c : entities.chickens) {
-        if (c && !c->isDead() && inRange(c->getPosition())) result.push_back(c.get());
+        if (c && inRange(c->getPosition())) result.push_back(c.get());
     }
     for (const auto& s : entities.sheep) {
-        if (s && !s->isDead() && inRange(s->getPosition())) result.push_back(s.get());
+        if (s && inRange(s->getPosition())) result.push_back(s.get());
     }
     
     return result;

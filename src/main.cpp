@@ -521,6 +521,28 @@ public:
             }
         });
         
+        // Player damage callback - handle incoming damage from other players
+        networkManager.setPlayerDamageCallback([this](uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback) {
+            uint32_t localPlayerId = networkManager.getLocalPlayerId();
+            
+            // Check if we are the target
+            if (targetId == localPlayerId) {
+                // We received damage from another player
+                LOG_INFO("Received " + std::to_string(damage) + " damage from player " + std::to_string(attackerId));
+                playerTakeDamage(damage, knockback);
+            }
+            
+            // Find the remote player entity and apply damage for visual effects
+            auto remotePlayers = networkManager.getRemotePlayerEntities();
+            for (auto* rp : remotePlayers) {
+                if (rp->getPlayerId() == targetId) {
+                    // Apply damage to remote player (tracks health and plays hit/death animation)
+                    rp->applyNetworkDamage(damage, knockback);
+                    break;
+                }
+            }
+        });
+        
         // Initialize audio system
         if (!Audio::AudioManager::instance().initialize()) {
             LOG_WARNING("Failed to initialize audio system - continuing without sound");
@@ -1417,7 +1439,18 @@ private:
                             knockbackDir = glm::normalize(knockbackDir);
                         }
                         
-                        targetEntity->takeDamage(damage, knockbackDir * knockback * 10.0f);
+                        glm::vec3 knockbackVec = knockbackDir * knockback * 10.0f;
+                        
+                        // Check if target is a remote player - send damage over network
+                        Network::RemotePlayerEntity* remotePlayer = dynamic_cast<Network::RemotePlayerEntity*>(targetEntity);
+                        if (remotePlayer && networkManager.isOnline()) {
+                            // Send damage over network
+                            networkManager.sendPlayerDamage(remotePlayer->getPlayerId(), damage, knockbackVec);
+                            LOG_INFO("Sent damage to remote player " + std::to_string(remotePlayer->getPlayerId()) + " for " + std::to_string(damage) + " damage");
+                        } else {
+                            // Local entity (mob) - apply damage directly
+                            targetEntity->takeDamage(damage, knockbackVec);
+                        }
                         
                         // Play hit sound
                         Audio::AudioManager::instance().playSoundAt(Audio::SoundType::PLAYER_HURT, targetEntity->getPosition());
