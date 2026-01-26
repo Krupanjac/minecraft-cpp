@@ -115,4 +115,5 @@ private:
                                       float tintR = 1.0f, float tintG = 1.0f, float tintB = 1.0f);
     unsigned char* tintTexture(unsigned char* src, int width, int height,
                                float tintR, float tintG, float tintB);
+    void fixTransparentPixels(unsigned char* data, int width, int height);
 };

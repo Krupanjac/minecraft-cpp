@@ -472,10 +472,10 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     blockShader.setInt("uDebugNoTexture", Settings::instance().debugNoTexture ? 1 : 0);
     blockShader.setInt("uDebugShowNormals", Settings::instance().debugShowNormals ? 1 : 0);
     
-    // Parallax mapping settings
+    // Parallax mapping settings - depth effect derived from normal maps
     blockShader.setInt("uEnableParallax", Settings::instance().enableParallaxMapping ? 1 : 0);
-    blockShader.setFloat("uParallaxScale", 0.03f);  // Depth scale - small value for subtle effect
-    blockShader.setInt("uParallaxSteps", 16);  // Number of steps for quality
+    blockShader.setFloat("uParallaxScale", 0.05f);  // Moderate depth - prevents artifacts
+    blockShader.setInt("uParallaxSteps", 32);  // Quality steps
 
     // Wireframe toggle applied around draw loop to only affect chunk rendering
     if (Settings::instance().debugWireframe) {

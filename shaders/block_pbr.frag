@@ -118,33 +118,61 @@ vec3 applyNormalMap(vec3 normalMapValue, vec3 normal, vec3 tangent, vec3 bitange
 }
 
 // Parallax Occlusion Mapping - gives 3D depth effect to textures
-// Uses the alpha channel of specular map as height data
+// Since we don't have dedicated height maps, we derive height from normal map
+// Normal maps encode surface orientation: flat = (0.5, 0.5, 1.0), tilted = deviation from that
+float getHeightFromNormal(vec3 normalSample) {
+    // Normal map is in [0,1], convert to [-1,1] tangent space
+    vec3 n = normalSample * 2.0 - 1.0;
+    // Use the Z component directly - high Z (pointing up) = raised surface
+    // Low Z (tilted) = crevice/dip
+    // This is smoother than using xy deviation magnitude
+    float height = n.z * 0.5 + 0.5;  // Map from [-1,1] to [0,1]
+    return height;
+}
+
 vec2 parallaxOcclusionMapping(vec2 texCoords, vec3 viewDirTangent, float layer) {
-    // Number of layers for steep parallax mapping
-    int numSteps = uParallaxSteps;
-    float layerDepth = 1.0 / float(numSteps);
+    // Ensure view direction points INTO the surface (positive Z in tangent space)
+    vec3 viewDir = viewDirTangent;
+    if (viewDir.z < 0.0) viewDir = -viewDir;
+    
+    // Number of layers - more at grazing angles for quality
+    float minLayers = 8.0;
+    float maxLayers = float(uParallaxSteps);
+    float numLayers = mix(maxLayers, minLayers, abs(viewDir.z));
+    
+    float layerDepth = 1.0 / numLayers;
     float currentLayerDepth = 0.0;
     
-    // Direction to shift texture coords per layer (in UV space)
-    vec2 deltaTexCoords = viewDirTangent.xy * uParallaxScale / (viewDirTangent.z * float(numSteps));
+    // Calculate UV offset per layer
+    vec2 P = viewDir.xy / max(viewDir.z, 0.2) * uParallaxScale;
+    vec2 deltaTexCoords = P / numLayers;
     
     vec2 currentTexCoords = texCoords;
-    float currentDepthMapValue = texture(uSpecularArray, vec3(currentTexCoords, layer)).a;
+    vec3 normalSample = texture(uNormalArray, vec3(currentTexCoords, layer)).rgb;
+    float currentDepthMapValue = 1.0 - getHeightFromNormal(normalSample);  // Invert: high surface = low depth
     
-    // Steep parallax mapping - march through height layers
-    while(currentLayerDepth < currentDepthMapValue) {
+    // March through layers from surface (depth 0) downward (depth 1)
+    int maxIterations = int(numLayers) + 1;
+    for (int i = 0; i < maxIterations; i++) {
+        if (currentLayerDepth >= currentDepthMapValue) break;
+        
         currentTexCoords -= deltaTexCoords;
-        currentDepthMapValue = texture(uSpecularArray, vec3(fract(currentTexCoords), layer)).a;
+        normalSample = texture(uNormalArray, vec3(fract(currentTexCoords), layer)).rgb;
+        currentDepthMapValue = 1.0 - getHeightFromNormal(normalSample);
         currentLayerDepth += layerDepth;
     }
     
-    // Parallax occlusion mapping - interpolate for smoother result
+    // Interpolate between current and previous position for smooth result
     vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
     float afterDepth = currentDepthMapValue - currentLayerDepth;
-    float beforeDepth = texture(uSpecularArray, vec3(fract(prevTexCoords), layer)).a - currentLayerDepth + layerDepth;
-    float weight = afterDepth / (afterDepth - beforeDepth);
+    vec3 prevNormalSample = texture(uNormalArray, vec3(fract(prevTexCoords), layer)).rgb;
+    float prevDepthMapValue = 1.0 - getHeightFromNormal(prevNormalSample);
+    float beforeDepth = prevDepthMapValue - currentLayerDepth + layerDepth;
     
-    vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+    float weight = afterDepth / (afterDepth - beforeDepth + 0.0001);
+    weight = clamp(weight, 0.0, 1.0);
+    
+    vec2 finalTexCoords = mix(currentTexCoords, prevTexCoords, weight);
     
     return fract(finalTexCoords);
 }
@@ -159,7 +187,7 @@ void main() {
         // Sample from texture arrays
         vec2 uv = fract(vTexCoord);
         
-        // Apply parallax occlusion mapping if enabled
+        // Apply parallax occlusion mapping if enabled (works in both light and shadow)
         if (uEnableParallax == 1) {
             // Calculate view direction in tangent space for parallax
             mat3 TBN = mat3(normalize(vTangent), normalize(vBitangent), normalize(vNormal));
@@ -170,10 +198,22 @@ void main() {
             uv = parallaxOcclusionMapping(uv, viewDirTangent, float(vTextureLayer));
         }
         
-        // Sample albedo
+        // Sample albedo with better filtering for vegetation
         vec4 albedo = texture(uAlbedoArray, vec3(uv, float(vTextureLayer)));
-        if (albedo.a < 0.1) discard;
+        
+        // For vegetation (tall grass, flowers), use stricter alpha test to remove edge artifacts
+        if (vMaterial == 13u || vMaterial == 14u) {
+            if (albedo.a < 0.5) discard;  // Stricter threshold for vegetation
+        } else {
+            if (albedo.a < 0.1) discard;
+        }
         baseColor = albedo.rgb;
+        
+        // Dirt block (material 2) - match the look of grass block's dirt portion
+        // Apply slight warmth to match composited grass side appearance
+        if (vMaterial == 2u) {
+            baseColor *= vec3(1.0, 0.98, 0.95);  // Very subtle warm tint to match grass dirt
+        }
         
         // Apply biome tinting for grayscale textures
         // NOTE: Grass block (material 1) textures are pre-tinted during loading

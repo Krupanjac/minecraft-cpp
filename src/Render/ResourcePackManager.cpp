@@ -187,6 +187,64 @@ unsigned char* ResourcePackManager::tintTexture(unsigned char* src, int width, i
     return result;
 }
 
+void ResourcePackManager::fixTransparentPixels(unsigned char* data, int width, int height) {
+    // Fix transparent/semi-transparent pixels to prevent edge bleeding when filtering/mipmapping
+    // For pixels with low alpha, copy RGB from nearest opaque neighbor (alpha > 128)
+    // This prevents white halos around vegetation edges
+    
+    // First pass: collect all low-alpha pixel positions
+    std::vector<std::pair<int, int>> lowAlphaPixels;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int idx = (y * width + x) * 4;
+            if (data[idx + 3] < 128) {  // Also fix semi-transparent pixels
+                lowAlphaPixels.push_back({x, y});
+            }
+        }
+    }
+    
+    // For each low-alpha pixel, find nearest opaque pixel and copy its color
+    for (const auto& [px, py] : lowAlphaPixels) {
+        // Search in expanding squares for nearest opaque pixel
+        int maxDist = 16;  // Limit search distance for performance
+        bool found = false;
+        
+        for (int dist = 1; dist < maxDist && !found; dist++) {
+            // Check pixels at this manhattan distance
+            for (int dx = -dist; dx <= dist && !found; dx++) {
+                for (int dy = -dist; dy <= dist && !found; dy++) {
+                    if (std::abs(dx) != dist && std::abs(dy) != dist) continue;
+                    
+                    int nx = px + dx;
+                    int ny = py + dy;
+                    
+                    // Skip out of bounds (don't wrap for vegetation)
+                    if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                    
+                    int nidx = (ny * width + nx) * 4;
+                    if (data[nidx + 3] >= 128) {  // Found opaque enough pixel
+                        // Copy its RGB to the low-alpha pixel
+                        int pidx = (py * width + px) * 4;
+                        data[pidx + 0] = data[nidx + 0];
+                        data[pidx + 1] = data[nidx + 1];
+                        data[pidx + 2] = data[nidx + 2];
+                        // Keep original alpha
+                        found = true;
+                    }
+                }
+            }
+        }
+        
+        // If no opaque neighbor found, set to black (prevents white)
+        if (!found) {
+            int pidx = (py * width + px) * 4;
+            data[pidx + 0] = 0;
+            data[pidx + 1] = 0;
+            data[pidx + 2] = 0;
+        }
+    }
+}
+
 bool ResourcePackManager::loadTextures(const std::string& texturePath) {
     std::vector<unsigned char*> albedoData;
     std::vector<unsigned char*> normalData;
@@ -256,6 +314,10 @@ bool ResourcePackManager::loadTextures(const std::string& texturePath) {
                 continue;
             }
         }
+        
+        // Fix transparent pixels to prevent white edge bleeding during mipmapping
+        // This copies RGB from nearest opaque pixel into transparent pixels
+        fixTransparentPixels(albedo, w, h);
         
         int index = static_cast<int>(albedoData.size());
         albedoTextureMap[baseName] = index;
