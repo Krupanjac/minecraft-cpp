@@ -147,7 +147,7 @@ public:
     // Resource Pack settings (PBRANDPOM)
     bool usePBRResourcePack = false; // Use PBRANDPOM resource pack textures
     bool pbrSettingsChanged = false; // Flag to trigger shadow/lighting recalculation when PBR mode changes
-    bool enableParallaxMapping = false; // Enable 3D parallax occlusion mapping for PBR textures
+    bool enableParallaxMapping = true; // Enable 3D parallax occlusion mapping for PBR textures (ON by default)
     static constexpr int RT_QUALITY_HIGH = 2;
     static constexpr const char* RT_QUALITY_NAMES[] = { "Low", "Medium", "High" };
     bool rtShadows = true;         // Ray traced shadows

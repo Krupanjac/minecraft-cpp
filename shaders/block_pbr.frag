@@ -169,7 +169,13 @@ vec2 parallaxOcclusionMapping(vec2 texCoords, vec3 viewDirTangent, float layer) 
     float beforeHeight = (1.0 - getHeight(prevTexCoords, layer)) - currentLayerDepth + layerDepth;
     float weight = afterHeight / (afterHeight - beforeHeight + 0.001);
     
-    return mix(currentTexCoords, prevTexCoords, clamp(weight, 0.0, 1.0));
+    vec2 result = mix(currentTexCoords, prevTexCoords, clamp(weight, 0.0, 1.0));
+    
+    // Clamp to valid UV range with small margin to prevent edge bleeding
+    float margin = 0.001;
+    result = clamp(result, vec2(margin), vec2(1.0 - margin));
+    
+    return result;
 }
 
 void main() {
@@ -179,8 +185,14 @@ void main() {
     float metallic = 0.0;
     
     if (uUsePBRResourcePack == 1 && vTextureLayer >= 0) {
-        // Sample from texture arrays
+        // Sample from texture arrays with texel inset to prevent edge bleeding
         vec2 uv = fract(vTexCoord);
+        
+        // Apply half-texel inset to prevent sampling outside the texture
+        // This fixes the small gaps/seams between block faces
+        float texSize = 128.0;  // Texture array resolution
+        float texelInset = 0.5 / texSize;
+        uv = uv * (1.0 - 2.0 * texelInset) + texelInset;
         
         // Calculate distance for LOD-based effects
         float distToCamera = length(uCameraPos - vWorldPos);
