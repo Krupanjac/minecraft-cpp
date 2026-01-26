@@ -313,6 +313,15 @@ void GameServer::handlePacket(ClientConnection& client, PacketType type, PacketB
             break;
         }
         
+        case PacketType::PLAYER_ANIMATION: {
+            uint32_t playerId = buffer.readU32();
+            uint8_t animationType = buffer.readU8();
+            
+            // Broadcast to all clients so they can see the animation
+            broadcastPlayerAnimation(playerId, animationType);
+            break;
+        }
+        
         default:
             LOG_WARNING("Unknown packet type: " + std::to_string(static_cast<int>(type)));
             break;
@@ -496,6 +505,21 @@ void GameServer::updateHostPosition(const glm::vec3& position, float yaw, float 
     PacketBuffer posPacket;
     serializePlayerPosition(posPacket, 0, m_hostPosition, m_hostYaw, m_hostPitch, m_hostVelocity, m_hostOnGround, m_hostHeldItem);
     broadcastToAll(posPacket);
+}
+
+void GameServer::broadcastPlayerAnimation(uint32_t playerId, uint8_t animationType) {
+    std::lock_guard<std::recursive_mutex> lock(m_clientsMutex);
+    
+    PacketBuffer packet;
+    serializePlayerAnimation(packet, playerId, animationType);
+    
+    // Broadcast to all clients so they can see the animation
+    broadcastToAll(packet);
+    
+    // Call callback for server-side handling (e.g., triggering animation on host)
+    if (m_onPlayerAnimation) {
+        m_onPlayerAnimation(playerId, animationType);
+    }
 }
 
 } // namespace Network

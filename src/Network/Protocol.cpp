@@ -245,4 +245,11 @@ void serializePlayerDamage(PacketBuffer& buffer, uint32_t attackerId, uint32_t t
     buffer.writeFloat(knockback.z);
 }
 
+void serializePlayerAnimation(PacketBuffer& buffer, uint32_t playerId, uint8_t animationType) {
+    buffer.writeU8(static_cast<uint8_t>(PacketType::PLAYER_ANIMATION));
+    buffer.writeU16(4 + 1);  // playerId + animationType
+    buffer.writeU32(playerId);
+    buffer.writeU8(animationType);
+}
+
 } // namespace Network

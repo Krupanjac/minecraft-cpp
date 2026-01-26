@@ -45,6 +45,9 @@ enum class PacketType : uint8_t {
     
     // Player damage/combat
     PLAYER_DAMAGE = 0x60,
+    
+    // Player animation sync
+    PLAYER_ANIMATION = 0x61,
 };
 
 // Packet header (sent before every packet)
@@ -225,6 +228,23 @@ struct PlayerDamagePacket {
     static constexpr PacketType TYPE = PacketType::PLAYER_DAMAGE;
 };
 
+// Player animation packet for syncing attack/emote animations
+struct PlayerAnimationPacket {
+    uint32_t playerId;
+    uint8_t animationType;  // Animation type constant
+    
+    // Animation type constants
+    static constexpr uint8_t ANIM_ATTACK = 0;
+    static constexpr uint8_t ANIM_PUNCH = 1;
+    static constexpr uint8_t ANIM_WAVE = 2;
+    static constexpr uint8_t ANIM_YES = 3;
+    static constexpr uint8_t ANIM_NO = 4;
+    static constexpr uint8_t ANIM_DEATH = 5;
+    static constexpr uint8_t ANIM_HIT_REACT = 6;
+    
+    static constexpr PacketType TYPE = PacketType::PLAYER_ANIMATION;
+};
+
 // ============== Packet Serialization ==============
 
 class PacketBuffer {
@@ -290,5 +310,6 @@ void serializeDisconnect(PacketBuffer& buffer, const std::string& reason);
 void serializeTimeSync(PacketBuffer& buffer, float timeOfDay, bool isPaused);
 void serializePlayerDamage(PacketBuffer& buffer, uint32_t attackerId, uint32_t targetId,
                            float damage, const glm::vec3& knockback);
+void serializePlayerAnimation(PacketBuffer& buffer, uint32_t playerId, uint8_t animationType);
 
 } // namespace Network

@@ -1356,6 +1356,11 @@ private:
                     playerEntity->playAttackAnimation();
                 }
                 
+                // Send attack animation to network for multiplayer
+                if (networkManager.isOnline()) {
+                    networkManager.sendPlayerAnimation(Network::PlayerAnimationPacket::ANIM_ATTACK);
+                }
+                
                 // First, try to attack an entity
                 bool attackedEntity = false;
                 if (attackCooldown <= 0.0f) {
@@ -2541,6 +2546,12 @@ private:
     
     void onPlayerDeath() {
         LOG_INFO("Player died!");
+        
+        // Trigger death animation on third person model
+        if (playerEntity) {
+            playerEntity->playDeathAnimation();
+        }
+        
         // Show death screen
         uiManager.setMenuState(MenuState::DEATH_SCREEN);
         window->setCursorMode(GLFW_CURSOR_NORMAL);
@@ -2550,6 +2561,11 @@ private:
         // Reset health
         playerHealth = playerMaxHealth;
         uiManager.playerHealth = static_cast<int>(playerHealth);
+        
+        // Reset player entity death state so animation plays correctly
+        if (playerEntity) {
+            playerEntity->resetDeathState();
+        }
         
         // Respawn at world spawn
         int spawnX = 0;

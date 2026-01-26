@@ -280,6 +280,34 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
                 ++shadowDrawCalls;
             }
         }
+        
+        // Render entities to shadow map (for entity shadows)
+        if (!entities.empty()) {
+            shadowModelShader.use();
+            shadowModelShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
+            
+            for (auto* entity : entities) {
+                if (!entity) continue;
+                
+                glm::vec3 worldPos = entity->getPosition();
+                glm::vec3 relPos = glm::vec3(glm::dvec3(worldPos) - renderOrigin);
+                
+                // Build model matrix
+                glm::mat4 entityModel = glm::mat4(1.0f);
+                entityModel = glm::translate(entityModel, relPos);
+                glm::vec3 rot = entity->getRotation();
+                entityModel = glm::rotate(entityModel, glm::radians(rot.y), glm::vec3(0.0f, 1.0f, 0.0f));
+                entityModel = glm::rotate(entityModel, glm::radians(rot.x), glm::vec3(1.0f, 0.0f, 0.0f));
+                entityModel = glm::rotate(entityModel, glm::radians(rot.z), glm::vec3(0.0f, 0.0f, 1.0f));
+                entityModel = glm::scale(entityModel, entity->getScale());
+                
+                shadowModelShader.setMat4("uModel", entityModel);
+                
+                // Render entity for shadow
+                entity->renderWithMatrices(shadowModelShader, entityModel, entityModel);
+            }
+            shadowModelShader.unuse();
+        }
 
         // Restore state
         glDisable(GL_POLYGON_OFFSET_FILL);
@@ -560,10 +588,18 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         modelShader.setMat4("uView", view);
         modelShader.setMat4("uPrevView", prevView);
         modelShader.setMat4("uPrevProjection", prevProjection);
+        modelShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
         modelShader.setVec3("uLightDir", lightDirection);
         modelShader.setVec3("uCameraPos", cameraRelative);
         modelShader.setVec4("uBaseColor", glm::vec4(1.0f)); // Default white
         modelShader.setFloat("uAlphaMultiplier", 1.0f); // Default full opacity
+        
+        // Shadow map
+        modelShader.setInt("uUseShadows", Settings::instance().enableShadows ? 1 : 0);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, shadowMap->getDepthMap());
+        modelShader.setInt("uShadowMap", 3);
+        
         // Debug flags
         modelShader.setInt("uDebugNoTexture", Settings::instance().debugNoTexture ? 1 : 0);
         modelShader.setInt("uDebugShowNormals", Settings::instance().debugShowNormals ? 1 : 0);
@@ -891,6 +927,10 @@ bool Renderer::loadShaders() {
     }    
     if (!shadowShader.loadFromFiles("shaders/shadow.vert", "shaders/shadow.frag")) {
         LOG_ERROR("Failed to load shadow shader");
+        success = false;
+    }
+    if (!shadowModelShader.loadFromFiles("shaders/shadow_model.vert", "shaders/shadow_model.frag")) {
+        LOG_ERROR("Failed to load shadow model shader");
         success = false;
     }
     if (!starShader.loadFromFiles("shaders/stars.vert", "shaders/stars.frag")) {

@@ -76,6 +76,9 @@ public:
     // Player damage for PvP
     void broadcastPlayerDamage(uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback);
     
+    // Player animation sync
+    void broadcastPlayerAnimation(uint32_t playerId, uint8_t animationType);
+    
     // Update host player position (broadcasts to all clients)
     void updateHostPosition(const glm::vec3& position, float yaw, float pitch,
                            const glm::vec3& velocity, bool onGround, uint8_t heldItem = 0);
@@ -92,12 +95,14 @@ public:
     using PlayerLeaveCallback = std::function<void(uint32_t playerId)>;
     using ChatCallback = std::function<void(uint32_t senderId, const std::string& message)>;
     using PlayerDamageCallback = std::function<void(uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback)>;
+    using PlayerAnimationCallback = std::function<void(uint32_t playerId, uint8_t animationType)>;
     
     void setBlockChangeCallback(BlockChangeCallback cb) { m_onBlockChange = std::move(cb); }
     void setPlayerJoinCallback(PlayerJoinCallback cb) { m_onPlayerJoin = std::move(cb); }
     void setPlayerLeaveCallback(PlayerLeaveCallback cb) { m_onPlayerLeave = std::move(cb); }
     void setChatCallback(ChatCallback cb) { m_onChat = std::move(cb); }
     void setPlayerDamageCallback(PlayerDamageCallback cb) { m_onPlayerDamage = std::move(cb); }
+    void setPlayerAnimationCallback(PlayerAnimationCallback cb) { m_onPlayerAnimation = std::move(cb); }
     
     uint16_t getPort() const { return m_port; }
     size_t getPlayerCount() const;
@@ -142,6 +147,7 @@ private:
     PlayerLeaveCallback m_onPlayerLeave;
     ChatCallback m_onChat;
     PlayerDamageCallback m_onPlayerDamage;
+    PlayerAnimationCallback m_onPlayerAnimation;
 };
 
 } // namespace Network

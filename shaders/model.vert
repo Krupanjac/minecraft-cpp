@@ -8,11 +8,13 @@ layout (location = 4) in vec4 aWeights;
 out vec3 FragPos;
 out vec3 Normal;
 out vec2 TexCoord;
+out vec4 vFragPosLightSpace;
 
 uniform mat4 uModel;
 uniform mat4 uPrevModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
+uniform mat4 uLightSpaceMatrix;
 
 uniform mat4 uPrevView;
 uniform mat4 uPrevProjection;
@@ -50,19 +52,17 @@ void main() {
         totalNormal = aNormal;
     }
 
-    FragPos = vec3(uModel * totalLocalPos);
+    vec4 worldPos = uModel * totalLocalPos;
+    FragPos = worldPos.xyz;
+    
+    // Light space position for shadow mapping
+    vFragPosLightSpace = uLightSpaceMatrix * worldPos;
     
     // Normal matrix should ideally be passed from CPU, but for now:
-    // If skinning, 'uModel' applies after skinning.
-    // If not skinning, uModel applies to raw pos. (matches branch else)
-    
-    // Simplification: uModel is the Entity transform. Skinning happens in Model space relative to uModel.
-    // Actually skinning transforms into Model space. So uModel is correct.
-    
-    Normal = mat3(transpose(inverse(uModel))) * totalNormal; // Should optimize
+    Normal = mat3(transpose(inverse(uModel))) * totalNormal;
     TexCoord = aTexCoord;
     
-    gl_Position = uProjection * uView * vec4(FragPos, 1.0);
+    gl_Position = uProjection * uView * worldPos;
     
     vCurrentClip = gl_Position;
     // Previous position (entity motion + animation)

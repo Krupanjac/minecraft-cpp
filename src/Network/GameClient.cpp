@@ -352,6 +352,16 @@ void GameClient::handlePacket(PacketType type, PacketBuffer& buffer) {
             break;
         }
         
+        case PacketType::PLAYER_ANIMATION: {
+            uint32_t playerId = buffer.readU32();
+            uint8_t animationType = buffer.readU8();
+            
+            if (m_onPlayerAnimation) {
+                m_onPlayerAnimation(playerId, animationType);
+            }
+            break;
+        }
+        
         default:
             LOG_WARNING("Unknown packet type: " + std::to_string(static_cast<int>(type)));
             break;
@@ -412,6 +422,14 @@ void GameClient::sendPlayerDamage(uint32_t attackerId, uint32_t targetId, float 
     
     PacketBuffer packet;
     serializePlayerDamage(packet, attackerId, targetId, damage, knockback);
+    sendPacket(packet);
+}
+
+void GameClient::sendPlayerAnimation(uint8_t animationType) {
+    if (!isConnected()) return;
+    
+    PacketBuffer packet;
+    serializePlayerAnimation(packet, m_localPlayerId, animationType);
     sendPacket(packet);
 }
 

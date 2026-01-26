@@ -29,7 +29,7 @@ public:
     // Death animation control
     void playDeathAnimation();
     bool isPlayingDeathAnimation() const { return isDead; }
-    void resetDeathState() { isDead = false; }
+    void resetDeathState();
     
     // Hit react animation control (when taking damage)
     void playHitReactAnimation();

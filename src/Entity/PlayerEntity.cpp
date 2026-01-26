@@ -201,6 +201,7 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
     float speed = glm::length(glm::vec2(velocity.x, velocity.z));
     std::string currentAnim = toLowerPlayer(model->getCurrentAnimation());
     bool onGround = camera.onGround;
+    bool isSneaking = camera.isSneaking;
     
     // Check if holding an item (for Hold animations)
     bool isHoldingItem = (heldItem != ItemType::NONE) && hasHoldAnimations;
@@ -247,10 +248,21 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
         }
     }
     
+    // Handle ducking/sneaking animation
+    if (isSneaking && onGround && !isDuckingState) {
+        // Start ducking when sneaking begins
+        isDuckingState = true;
+        // Don't play duck animation immediately - let the walk/idle state handle it
+    } else if (!isSneaking && isDuckingState) {
+        // Stop ducking when sneaking ends
+        isDuckingState = false;
+    }
+    
     // Detect jump start (transition from ground to air with upward velocity)
     if (wasOnGround && !onGround && velocity.y > 0.1f) {
         isJumping = true;
         jumpAnimTimer = 0.0f;
+        isDuckingState = false;  // Can't duck while jumping
         model->playAnimation(jumpAnim, false);
     }
     
@@ -283,8 +295,14 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
         }
     } else if (onGround && jumpAnimTimer <= 0.0f) {
         // On ground and not in landing animation
-        if (speed > 4.0f && camera.isSprinting) {
-            // Running (with or without item)
+        if (isDuckingState && speed < 0.1f) {
+            // Ducking while stationary
+            if (currentAnim.find("duck") == std::string::npos) {
+                model->playAnimation(duckAnim, true);
+            }
+            model->setAnimationSpeed(1.0f);
+        } else if (speed > 4.0f && camera.isSprinting) {
+            // Running (with or without item) - no ducking while sprinting
             std::string targetAnim = isHoldingItem ? runHoldAnim : runAnim;
             if (currentAnim.find("run") == std::string::npos || 
                 (isHoldingItem && currentAnim.find("hold") == std::string::npos) ||
@@ -298,29 +316,41 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
         } else if (speed > 0.1f) {
             // Walking (with or without item)
             std::string targetAnim = isHoldingItem ? walkHoldAnim : walkAnim;
-            bool needsChange = (currentAnim.find("walk") == std::string::npos && currentAnim.find("run") == std::string::npos);
+            bool needsChange = (currentAnim.find("walk") == std::string::npos && 
+                                currentAnim.find("run") == std::string::npos &&
+                                currentAnim.find("duck") == std::string::npos);
             // Also switch if hold state changed
             if (!needsChange && isHoldingItem && currentAnim.find("hold") == std::string::npos) needsChange = true;
             if (!needsChange && !isHoldingItem && currentAnim.find("hold") != std::string::npos) needsChange = true;
+            // Switch from duck to walk when moving
+            if (currentAnim.find("duck") != std::string::npos) needsChange = true;
             
             if (needsChange) {
                 model->playAnimation(targetAnim, true);
             }
-            // Match animation speed to walk velocity
-            float walkSpeedRef = 5.0f;
-            float animSpeed = std::clamp(speed / walkSpeedRef, 0.75f, 1.4f);
+            // Match animation speed to walk velocity (slower when sneaking)
+            float walkSpeedRef = isDuckingState ? 2.5f : 5.0f;
+            float animSpeed = std::clamp(speed / walkSpeedRef, 0.5f, 1.4f);
             model->setAnimationSpeed(animSpeed);
         } else {
             // Idle (with or without item)
-            std::string targetAnim = isHoldingItem ? idleHoldAnim : idleAnim;
-            bool needsChange = (currentAnim.find("idle") == std::string::npos || 
-                                currentAnim.find("jump") != std::string::npos);
-            // Also switch if hold state changed
-            if (!needsChange && isHoldingItem && currentAnim.find("hold") == std::string::npos) needsChange = true;
-            if (!needsChange && !isHoldingItem && currentAnim.find("hold") != std::string::npos) needsChange = true;
-            
-            if (needsChange) {
-                model->playAnimation(targetAnim, true);
+            if (isDuckingState) {
+                // Duck animation for sneaking idle
+                if (currentAnim.find("duck") == std::string::npos) {
+                    model->playAnimation(duckAnim, true);
+                }
+            } else {
+                std::string targetAnim = isHoldingItem ? idleHoldAnim : idleAnim;
+                bool needsChange = (currentAnim.find("idle") == std::string::npos || 
+                                    currentAnim.find("jump") != std::string::npos ||
+                                    currentAnim.find("duck") != std::string::npos);
+                // Also switch if hold state changed
+                if (!needsChange && isHoldingItem && currentAnim.find("hold") == std::string::npos) needsChange = true;
+                if (!needsChange && !isHoldingItem && currentAnim.find("hold") != std::string::npos) needsChange = true;
+                
+                if (needsChange) {
+                    model->playAnimation(targetAnim, true);
+                }
             }
             model->setAnimationSpeed(1.0f);
         }
@@ -382,6 +412,24 @@ void PlayerEntity::playDeathAnimation() {
     emoteTimer = 0.0f;
     
     model->playAnimation(deathAnim, false);
+}
+
+void PlayerEntity::resetDeathState() {
+    isDead = false;
+    isAttacking = false;
+    attackAnimTimer = 0.0f;
+    isHitReacting = false;
+    hitReactTimer = 0.0f;
+    isEmoting = false;
+    emoteTimer = 0.0f;
+    isDuckingState = false;
+    isJumping = false;
+    jumpAnimTimer = 0.0f;
+    
+    // Return to idle animation
+    if (model) {
+        model->playAnimation(idleAnim, true);
+    }
 }
 
 void PlayerEntity::playHitReactAnimation() {

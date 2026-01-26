@@ -7,6 +7,7 @@ in vec3 Normal;
 in vec2 TexCoord;
 in vec4 vCurrentClip;
 in vec4 vPrevClip;
+in vec4 vFragPosLightSpace;
 
 uniform sampler2D uAlbedoMap;
 uniform bool uHasTexture;
@@ -15,6 +16,10 @@ uniform vec4 uBaseColor;
 uniform sampler2D uEmissiveMap;
 uniform bool uHasEmissive;
 
+// Shadow mapping
+uniform sampler2D uShadowMap;
+uniform int uUseShadows;
+
 // Debug uniforms
 uniform int uDebugNoTexture;
 uniform int uDebugShowNormals;
@@ -22,6 +27,39 @@ uniform int uDebugShowNormals;
 uniform vec3 uLightDir;
 uniform vec3 uCameraPos;
 uniform float uAlphaMultiplier; // For death fade effect
+
+// Shadow calculation with PCF
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
+    // Perspective divide
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    
+    // Check if outside shadow map
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0 ||
+        projCoords.z > 1.0) {
+        return 0.0; // Not in shadow
+    }
+    
+    float currentDepth = projCoords.z;
+    
+    // Bias based on surface angle to light
+    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
+    
+    // PCF (Percentage-Closer Filtering) for soft shadows
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(uShadowMap, 0);
+    
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(uShadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0;
+    
+    return shadow;
+}
 
 void main() {
     vec4 albedo = uBaseColor;
@@ -57,10 +95,17 @@ void main() {
 
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(uLightDir);
-    float diff = max(dot(norm, lightDir), 0.2);
+    float diff = max(dot(norm, lightDir), 0.0);
     
-    vec3 ambient = 0.5 * albedo.rgb; 
-    vec3 diffuse = diff * albedo.rgb;
+    // Calculate shadow
+    float shadow = 0.0;
+    if (uUseShadows != 0) {
+        shadow = ShadowCalculation(vFragPosLightSpace, norm, lightDir);
+    }
+    
+    // Lighting with shadow
+    vec3 ambient = 0.4 * albedo.rgb;  // Slightly reduced ambient for better shadow contrast
+    vec3 diffuse = diff * albedo.rgb * (1.0 - shadow * 0.7);  // Shadow reduces diffuse but not completely
     
     vec3 finalColor = ambient + diffuse + emission;
     

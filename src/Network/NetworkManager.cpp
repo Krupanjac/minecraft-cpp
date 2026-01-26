@@ -521,6 +521,17 @@ void NetworkManager::sendPlayerDamage(uint32_t targetPlayerId, float damage, con
     }
 }
 
+void NetworkManager::sendPlayerAnimation(uint8_t animationType) {
+    uint32_t playerId = getLocalPlayerId();
+    
+    if (m_mode == NetworkMode::CLIENT && m_client && m_client->isConnected()) {
+        m_client->sendPlayerAnimation(animationType);
+    } else if (m_mode == NetworkMode::HOST && m_server) {
+        // Host broadcasts directly
+        m_server->broadcastPlayerAnimation(playerId, animationType);
+    }
+}
+
 std::vector<RemotePlayerEntity*> NetworkManager::getRemotePlayerEntities() {
     std::vector<RemotePlayerEntity*> entities;
     entities.reserve(m_remotePlayerEntities.size());
@@ -641,6 +652,23 @@ void NetworkManager::setupServerCallbacks() {
             m_onPlayerDamage(attackerId, targetId, damage, knockback);
         }
     });
+    
+    m_server->setPlayerAnimationCallback([this](uint32_t playerId, uint8_t animationType) {
+        // Find the remote player entity and play the animation
+        for (auto& entity : m_remotePlayerEntities) {
+            if (entity && entity->getPlayerId() == playerId) {
+                if (animationType == PlayerAnimationPacket::ANIM_ATTACK || 
+                    animationType == PlayerAnimationPacket::ANIM_PUNCH) {
+                    entity->playAttackAnimation();
+                } else if (animationType == PlayerAnimationPacket::ANIM_HIT_REACT) {
+                    entity->playHitReceiveAnimation();
+                } else if (animationType == PlayerAnimationPacket::ANIM_DEATH) {
+                    entity->playDeathAnimation();
+                }
+                break;
+            }
+        }
+    });
 }
 
 void NetworkManager::setupClientCallbacks() {
@@ -724,6 +752,23 @@ void NetworkManager::setupClientCallbacks() {
     m_client->setPlayerDamageCallback([this](uint32_t attackerId, uint32_t targetId, float damage, const glm::vec3& knockback) {
         if (m_onPlayerDamage) {
             m_onPlayerDamage(attackerId, targetId, damage, knockback);
+        }
+    });
+    
+    m_client->setPlayerAnimationCallback([this](uint32_t playerId, uint8_t animationType) {
+        // Find the remote player entity and play the animation
+        for (auto& entity : m_remotePlayerEntities) {
+            if (entity && entity->getPlayerId() == playerId) {
+                if (animationType == PlayerAnimationPacket::ANIM_ATTACK || 
+                    animationType == PlayerAnimationPacket::ANIM_PUNCH) {
+                    entity->playAttackAnimation();
+                } else if (animationType == PlayerAnimationPacket::ANIM_HIT_REACT) {
+                    entity->playHitReceiveAnimation();
+                } else if (animationType == PlayerAnimationPacket::ANIM_DEATH) {
+                    entity->playDeathAnimation();
+                }
+                break;
+            }
         }
     });
 }

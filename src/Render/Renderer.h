@@ -70,6 +70,7 @@ private:
     Shader crosshairShader;
     Shader sunShader;
     Shader shadowShader;
+    Shader shadowModelShader; // Shadow shader for skinned models
     Shader starShader;
     Shader cloudShader;
     Shader modelShader; // New shader for entities

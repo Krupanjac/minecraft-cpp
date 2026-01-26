@@ -143,6 +143,9 @@ public:
     // Player damage for PvP combat
     void sendPlayerDamage(uint32_t targetPlayerId, float damage, const glm::vec3& knockback);
     
+    // Player animation sync (for attack, emotes, etc.)
+    void sendPlayerAnimation(uint8_t animationType);
+    
     // Get remote player entities for rendering
     std::vector<RemotePlayerEntity*> getRemotePlayerEntities();
     
