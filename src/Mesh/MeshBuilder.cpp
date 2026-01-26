@@ -294,26 +294,49 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                         int neg_u[3] = {-u_vec[0], -u_vec[1], -u_vec[2]};
                         int neg_v[3] = {-v_vec[0], -v_vec[1], -v_vec[2]};
                         
-                        // V0: (0, 0) -> Block (0, 0), check -u, -v
-                        quad.ao[0] = calculateVertexAO(chunk, quad.x, quad.y, quad.z, neg_u, neg_v, neighbors);
+                        // The face is at the boundary of the block. For AO, we need to check
+                        // blocks that are ADJACENT to the exposed face, which means checking
+                        // in the direction of the face normal from the face position.
+                        //
+                        // quad.x/y/z gives the corner of the face (already offset for positive normals).
+                        // For negative normals (nx<0, ny<0, nz<0), the face is at the block's min boundary.
+                        // For positive normals, the face is at the block's max boundary.
+                        //
+                        // AO neighbors should be checked from the block position, looking outward.
+                        // The key insight: for a face with normal N, we check blocks at positions
+                        // that would cast shadows onto this face - those are blocks that are
+                        // in the N direction from the edge, but also adjacent in u/v directions.
                         
-                        // V1: (w, 0) -> Block (w-1, 0), check +u, -v
-                        int bx = quad.x + (quad.w - step)*u_vec[0]/step;
-                        int by = quad.y + (quad.w - step)*u_vec[1]/step;
-                        int bz = quad.z + (quad.w - step)*u_vec[2]/step;
-                        quad.ao[1] = calculateVertexAO(chunk, bx, by, bz, u_vec, neg_v, neighbors);
+                        // Get the position of the block that OWNS this face (block behind the face)
+                        int blockX = quad.x - (nx > 0 ? step : 0);
+                        int blockY = quad.y - (ny > 0 ? step : 0);
+                        int blockZ = quad.z - (nz > 0 ? step : 0);
                         
-                        // V2: (w, h) -> Block (w-1, h-1), check +u, +v
-                        bx = quad.x + (quad.w - step)*u_vec[0]/step + (quad.h - step)*v_vec[0]/step;
-                        by = quad.y + (quad.w - step)*u_vec[1]/step + (quad.h - step)*v_vec[1]/step;
-                        bz = quad.z + (quad.w - step)*u_vec[2]/step + (quad.h - step)*v_vec[2]/step;
-                        quad.ao[2] = calculateVertexAO(chunk, bx, by, bz, u_vec, v_vec, neighbors);
+                        // Now check AO from the face's perspective
+                        // V0: corner at (0,0) of the quad - check neighbors in -u and -v from face
+                        quad.ao[0] = calculateVertexAOWithNormal(chunk, blockX, blockY, blockZ, 
+                                                                  neg_u, neg_v, n_vec, neighbors);
                         
-                        // V3: (0, h) -> Block (0, h-1), check -u, +v
-                        bx = quad.x + (quad.h - step)*v_vec[0]/step;
-                        by = quad.y + (quad.h - step)*v_vec[1]/step;
-                        bz = quad.z + (quad.h - step)*v_vec[2]/step;
-                        quad.ao[3] = calculateVertexAO(chunk, bx, by, bz, neg_u, v_vec, neighbors);
+                        // V1: corner at (w,0) - block at far end in u direction
+                        int bx = blockX + (quad.w - step)*u_vec[0]/step;
+                        int by = blockY + (quad.w - step)*u_vec[1]/step;
+                        int bz = blockZ + (quad.w - step)*u_vec[2]/step;
+                        quad.ao[1] = calculateVertexAOWithNormal(chunk, bx, by, bz, 
+                                                                  u_vec, neg_v, n_vec, neighbors);
+                        
+                        // V2: corner at (w,h) - block at far end in both u and v
+                        bx = blockX + (quad.w - step)*u_vec[0]/step + (quad.h - step)*v_vec[0]/step;
+                        by = blockY + (quad.w - step)*u_vec[1]/step + (quad.h - step)*v_vec[1]/step;
+                        bz = blockZ + (quad.w - step)*u_vec[2]/step + (quad.h - step)*v_vec[2]/step;
+                        quad.ao[2] = calculateVertexAOWithNormal(chunk, bx, by, bz, 
+                                                                  u_vec, v_vec, n_vec, neighbors);
+                        
+                        // V3: corner at (0,h) - block at far end in v direction
+                        bx = blockX + (quad.h - step)*v_vec[0]/step;
+                        by = blockY + (quad.h - step)*v_vec[1]/step;
+                        bz = blockZ + (quad.h - step)*v_vec[2]/step;
+                        quad.ao[3] = calculateVertexAOWithNormal(chunk, bx, by, bz, 
+                                                                  neg_u, v_vec, n_vec, neighbors);
                     }
                     
                     addQuad(quad, meshData);
@@ -475,14 +498,48 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
 u8 MeshBuilder::calculateVertexAO(std::shared_ptr<Chunk> chunk, int x, int y, int z, 
                                  const int* u_vec, const int* v_vec,
                                  std::shared_ptr<Chunk> neighbors[6]) {
-    // Check 3 neighbors: Side1 (u), Side2 (v), Corner (u+v)
-    // x,y,z is the block inside the quad.
-    // u_vec, v_vec are directions to neighbors.
+    // Legacy function - forwards to new implementation with zero normal
+    int n_vec[3] = {0, 0, 0};
+    return calculateVertexAOWithNormal(chunk, x, y, z, u_vec, v_vec, n_vec, neighbors);
+}
+
+u8 MeshBuilder::calculateVertexAOWithNormal(std::shared_ptr<Chunk> chunk, int x, int y, int z,
+                                            const int* u_vec, const int* v_vec, const int* n_vec,
+                                            std::shared_ptr<Chunk> neighbors[6]) {
+    // Minecraft-style ambient occlusion for block face vertices
+    //
+    // For each vertex of a face, we check 3 neighbor blocks that could occlude it:
+    // - Side1: block adjacent in u direction (along one edge)
+    // - Side2: block adjacent in v direction (along other edge)
+    // - Corner: block diagonal in u+v direction
+    //
+    // CRITICAL: These neighbors must be checked in the space IN FRONT of the face,
+    // i.e., offset by the face normal. A block behind the face doesn't occlude it.
+    //
+    // x,y,z = position of the block that owns this face
+    // u_vec = direction along one edge of the face
+    // v_vec = direction along other edge of the face  
+    // n_vec = face normal direction (points outward from the block)
     
-    bool s1 = isBlockSolid(chunk, x + u_vec[0], y + u_vec[1], z + u_vec[2], neighbors);
-    bool s2 = isBlockSolid(chunk, x + v_vec[0], y + v_vec[1], z + v_vec[2], neighbors);
-    bool c = isBlockSolid(chunk, x + u_vec[0] + v_vec[0], y + u_vec[1] + v_vec[1], z + u_vec[2] + v_vec[2], neighbors);
+    // Check neighbors at positions offset by the normal (in front of the face)
+    // These are the blocks that would actually cast shadows onto this vertex
+    int nx = x + n_vec[0];
+    int ny = y + n_vec[1];
+    int nz = z + n_vec[2];
     
+    // Side1: adjacent in u direction, in front of face
+    bool s1 = isBlockSolid(chunk, nx + u_vec[0], ny + u_vec[1], nz + u_vec[2], neighbors);
+    
+    // Side2: adjacent in v direction, in front of face
+    bool s2 = isBlockSolid(chunk, nx + v_vec[0], ny + v_vec[1], nz + v_vec[2], neighbors);
+    
+    // Corner: diagonal in u+v direction, in front of face
+    bool c = isBlockSolid(chunk, nx + u_vec[0] + v_vec[0], ny + u_vec[1] + v_vec[1], nz + u_vec[2] + v_vec[2], neighbors);
+    
+    // Standard AO formula:
+    // - If both sides are solid, the corner is fully occluded (AO = 0)
+    //   This prevents light leaking through diagonal cracks
+    // - Otherwise, count solid neighbors and subtract from 3
     if (s1 && s2) return 0;
     return 3 - (s1 + s2 + c);
 }

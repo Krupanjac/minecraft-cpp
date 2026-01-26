@@ -63,6 +63,10 @@ private:
                         const int* u, const int* v,
                         std::shared_ptr<Chunk> neighbors[6]);
     
+    u8 calculateVertexAOWithNormal(std::shared_ptr<Chunk> chunk, int x, int y, int z,
+                                   const int* u, const int* v, const int* n,
+                                   std::shared_ptr<Chunk> neighbors[6]);
+    
     void addQuad(const Quad& quad, MeshData& meshData);
     
     void addCross(int x, int y, int z, u8 material, u8 ao, MeshData& meshData);

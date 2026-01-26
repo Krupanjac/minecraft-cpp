@@ -347,10 +347,20 @@ void main() {
         }
     }
     
-    // Apply AO
-    float aoCurve = smoothstep(0.0, 1.0, vAO);
-    float minAO = max(0.0, mix(1.0, 0.25, uAOStrength));
-    float aoFactor = mix(minAO, 1.0, aoCurve);
+    // Apply AO with improved blending
+    // vAO is 0-1 where 0 = fully occluded corner, 1 = no occlusion
+    // Apply a softer curve that preserves detail without harsh darkening
+    float aoBase = vAO;
+    
+    // Use a power curve for more natural AO falloff
+    // Lower power = softer shadows, higher = harder
+    float aoPower = mix(0.5, 1.5, uAOStrength); // Soft at low strength, harder at high
+    float aoCurve = pow(aoBase, aoPower);
+    
+    // Clamp minimum brightness to prevent overly dark corners
+    // At strength 0, no darkening. At strength 1, minimum is 0.4 (not pitch black)
+    float minBrightness = mix(1.0, 0.4, uAOStrength);
+    float aoFactor = mix(minBrightness, 1.0, aoCurve);
     
     // Final lighting
     float directLightStrength = 1.0;

@@ -175,11 +175,11 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
         // Noise tiling and SSAO params
         ssaoShader.setVec2("noiseScale", glm::vec2((float)width / 4.0f, (float)height / 4.0f));
 
-        // Base radius scaled by AO strength so stronger AO increases radius visually
-        float baseRadius = 0.5f * (1.0f + settings.aoStrength * 0.8f);
+        // Base radius - smaller for tighter, more realistic occlusion
+        float baseRadius = 0.35f * (1.0f + settings.aoStrength * 0.5f);
         ssaoShader.setFloat("radius", baseRadius);
-        ssaoShader.setFloat("bias", 0.025f);
-        ssaoShader.setFloat("radiusScaleFactor", glm::clamp(settings.aoStrength * 1.2f, 0.0f, 3.0f));
+        ssaoShader.setFloat("bias", 0.035f); // Slightly higher bias to reduce self-occlusion
+        ssaoShader.setFloat("radiusScaleFactor", glm::clamp(settings.aoStrength * 0.8f, 0.0f, 2.0f));
         
         for (unsigned int i = 0; i < 64; ++i)
             ssaoShader.setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);

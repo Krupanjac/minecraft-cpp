@@ -17,11 +17,32 @@ void main()
     float ao = texture(ssao, TexCoords).r;
     vec3 vol = texture(volumetric, TexCoords).rgb;
     
-    // Soften AO curve slightly to avoid a visible overlay when strength is high
-    float aoGamma = mix(1.0, 0.85, clamp(uAOStrength, 0.0, 1.0));
-    float aoAdj = pow(ao, aoGamma);
-    float aoMix = mix(1.0, aoAdj, clamp(uAOStrength, 0.0, 1.0));
-    hdrColor *= aoMix; 
+    // Improved SSAO blending
+    // Use a more natural falloff curve
+    float aoStrength = clamp(uAOStrength, 0.0, 1.0);
+    
+    // Remap AO to avoid too dark shadows
+    // ao is 0-1 where 1 = no occlusion, 0 = full occlusion
+    // We want to limit how dark it can get based on strength
+    float minAO = mix(1.0, 0.3, aoStrength); // At full strength, minimum brightness is 0.3
+    float aoRemapped = mix(minAO, 1.0, ao);
+    
+    // Apply a subtle curve for more natural appearance
+    float aoCurved = pow(aoRemapped, mix(1.0, 1.2, aoStrength));
+    
+    // Blend: at 0 strength = no AO, at 1 strength = full AO effect
+    float aoFinal = mix(1.0, aoCurved, aoStrength);
+    
+    // Apply AO to color
+    // Use soft-light style blending for more natural look on bright surfaces
+    vec3 aoColor = hdrColor * aoFinal;
+    
+    // Preserve some color in shadowed areas to prevent overly dark corners
+    float luminance = dot(hdrColor, vec3(0.2126, 0.7152, 0.0722));
+    float preserveFactor = smoothstep(0.0, 0.3, luminance) * 0.15 * (1.0 - ao) * aoStrength;
+    aoColor += hdrColor * preserveFactor;
+    
+    hdrColor = aoColor;
     
     // Add Volumetric Lighting
     hdrColor += vol; 
@@ -33,5 +54,4 @@ void main()
     mapped = pow(mapped, vec3(1.0 / gamma));
     
     FragColor = vec4(mapped, 1.0);
-    // FragColor = vec4(hdrColor, 1.0); // DEBUG: Direct output
 }
