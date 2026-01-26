@@ -35,6 +35,11 @@ uniform float uAOStrength;
 uniform int uDebugNoTexture;
 uniform int uDebugShowNormals;
 
+// Parallax mapping settings
+uniform int uEnableParallax;
+uniform float uParallaxScale;
+uniform int uParallaxSteps;
+
 in vec4 vFragPosLightSpace;
 in vec4 vCurrentClip;
 in vec4 vPrevClip;
@@ -112,6 +117,38 @@ vec3 applyNormalMap(vec3 normalMapValue, vec3 normal, vec3 tangent, vec3 bitange
     return normalize(TBN * tangentNormal);
 }
 
+// Parallax Occlusion Mapping - gives 3D depth effect to textures
+// Uses the alpha channel of specular map as height data
+vec2 parallaxOcclusionMapping(vec2 texCoords, vec3 viewDirTangent, float layer) {
+    // Number of layers for steep parallax mapping
+    int numSteps = uParallaxSteps;
+    float layerDepth = 1.0 / float(numSteps);
+    float currentLayerDepth = 0.0;
+    
+    // Direction to shift texture coords per layer (in UV space)
+    vec2 deltaTexCoords = viewDirTangent.xy * uParallaxScale / (viewDirTangent.z * float(numSteps));
+    
+    vec2 currentTexCoords = texCoords;
+    float currentDepthMapValue = texture(uSpecularArray, vec3(currentTexCoords, layer)).a;
+    
+    // Steep parallax mapping - march through height layers
+    while(currentLayerDepth < currentDepthMapValue) {
+        currentTexCoords -= deltaTexCoords;
+        currentDepthMapValue = texture(uSpecularArray, vec3(fract(currentTexCoords), layer)).a;
+        currentLayerDepth += layerDepth;
+    }
+    
+    // Parallax occlusion mapping - interpolate for smoother result
+    vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+    float afterDepth = currentDepthMapValue - currentLayerDepth;
+    float beforeDepth = texture(uSpecularArray, vec3(fract(prevTexCoords), layer)).a - currentLayerDepth + layerDepth;
+    float weight = afterDepth / (afterDepth - beforeDepth);
+    
+    vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+    
+    return fract(finalTexCoords);
+}
+
 void main() {
     vec3 baseColor;
     vec3 normal = normalize(vNormal);
@@ -121,6 +158,17 @@ void main() {
     if (uUsePBRResourcePack == 1 && vTextureLayer >= 0) {
         // Sample from texture arrays
         vec2 uv = fract(vTexCoord);
+        
+        // Apply parallax occlusion mapping if enabled
+        if (uEnableParallax == 1) {
+            // Calculate view direction in tangent space for parallax
+            mat3 TBN = mat3(normalize(vTangent), normalize(vBitangent), normalize(vNormal));
+            mat3 TBN_inv = transpose(TBN);  // TBN is orthonormal, so transpose = inverse
+            vec3 viewDir = normalize(uCameraPos - vWorldPos);
+            vec3 viewDirTangent = normalize(TBN_inv * viewDir);
+            
+            uv = parallaxOcclusionMapping(uv, viewDirTangent, float(vTextureLayer));
+        }
         
         // Sample albedo
         vec4 albedo = texture(uAlbedoArray, vec3(uv, float(vTextureLayer)));

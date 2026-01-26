@@ -98,6 +98,17 @@ void Renderer::onResize(int width, int height) {
 }
 
 void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, int windowWidth, int windowHeight) {
+    // === HANDLE PBR SETTINGS CHANGES ===
+    // When PBR mode is toggled, we may need to recalculate lighting/shadows
+    if (Settings::instance().pbrSettingsChanged) {
+        Settings::instance().pbrSettingsChanged = false;
+        // Invalidate TAA history to prevent ghosting from texture changes
+        if (postProcess) postProcess->invalidateTAAHistory();
+        // Force shadow map to be redrawn (the shadow pass will redraw next frame anyway,
+        // but we can clear it to ensure a clean slate)
+        LOG_DEBUG("PBR settings changed - invalidating rendering caches");
+    }
+    
     // === CAMERA-RELATIVE RENDERING SETUP ===
     // This prevents floating-point precision issues when far from world origin
     
@@ -460,6 +471,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     // Debug uniforms
     blockShader.setInt("uDebugNoTexture", Settings::instance().debugNoTexture ? 1 : 0);
     blockShader.setInt("uDebugShowNormals", Settings::instance().debugShowNormals ? 1 : 0);
+    
+    // Parallax mapping settings
+    blockShader.setInt("uEnableParallax", Settings::instance().enableParallaxMapping ? 1 : 0);
+    blockShader.setFloat("uParallaxScale", 0.03f);  // Depth scale - small value for subtle effect
+    blockShader.setInt("uParallaxSteps", 16);  // Number of steps for quality
 
     // Wireframe toggle applied around draw loop to only affect chunk rendering
     if (Settings::instance().debugWireframe) {

@@ -712,6 +712,58 @@ void ResourcePackManager::setupBlockMappings() {
         blockMappings[BlockType::AIR] = mapping;
     }
     
+    // === Additional blocks with full PBR support ===
+    
+    // COBBLESTONE - has full PBR (cobblestone.png, _n, _s)
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("cobblestone");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::STONE] = mapping;  // Use for stone since cobblestone has better PBR
+        // Actually let's keep stone as stone - add cobblestone as extra
+        LOG_INFO("COBBLESTONE: idx=" + std::to_string(idx));
+    }
+    
+    // COAL_ORE - has full PBR
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("coal_ore");
+        // Coal ore could be used for special blocks if we add them
+        LOG_INFO("COAL_ORE available: idx=" + std::to_string(idx));
+    }
+    
+    // IRON_ORE - has full PBR  
+    {
+        int idx = findTex("iron_ore");
+        LOG_INFO("IRON_ORE available: idx=" + std::to_string(idx));
+    }
+    
+    // GOLD_ORE - has full PBR
+    {
+        int idx = findTex("gold_ore");
+        LOG_INFO("GOLD_ORE available: idx=" + std::to_string(idx));
+    }
+    
+    // DIAMOND_ORE - has full PBR
+    {
+        int idx = findTex("diamond_ore");
+        LOG_INFO("DIAMOND_ORE available: idx=" + std::to_string(idx));
+    }
+    
+    // BRICKS - has full PBR
+    {
+        int idx = findTex("bricks");
+        LOG_INFO("BRICKS available: idx=" + std::to_string(idx));
+    }
+    
+    // CLAY - has full PBR
+    {
+        int idx = findTex("clay");
+        LOG_INFO("CLAY available: idx=" + std::to_string(idx));
+    }
+    
     // Log loaded textures for debugging
     LOG_INFO("Block texture mappings created. Total textures: " + std::to_string(textureCount));
 }

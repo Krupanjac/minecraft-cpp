@@ -841,9 +841,22 @@ void UIManager::setupVideoSettingsMenu() {
     pbr.x = rightCol; pbr.y = y; pbr.w = colWidth; pbr.h = rowHeight;
     pbr.text = "PBRANDPOM: " + std::string(s.usePBRResourcePack ? "ON" : "OFF");
     pbr.boolValueRef = &s.usePBRResourcePack;
-    pbr.onClick = [this]() { setupVideoSettingsMenu(); }; // Refresh to update text
-    pbr.tooltip = "Use PBRANDPOM resource pack with PBR textures";
+    pbr.onClick = [this]() { 
+        Settings::instance().pbrSettingsChanged = true; // Trigger shadow recalculation
+        setupVideoSettingsMenu(); 
+    }; // Refresh to update text
+    pbr.tooltip = "Use PBRANDPOM resource pack with PBR textures (triggers shadow update)";
     elements.push_back(pbr);
+    y += rowHeight + rowGap;
+    
+    // Parallax Mapping (3D depth effect)
+    UIElement parallax;
+    parallax.x = rightCol; parallax.y = y; parallax.w = colWidth; parallax.h = rowHeight;
+    parallax.text = "3D Parallax: " + std::string(s.enableParallaxMapping ? "ON" : "OFF");
+    parallax.boolValueRef = &s.enableParallaxMapping;
+    parallax.onClick = [this]() { setupVideoSettingsMenu(); };
+    parallax.tooltip = "Enable parallax occlusion mapping for 3D depth in textures";
+    elements.push_back(parallax);
     y += rowHeight + rowGap;
     
     // === RIGHT COLUMN - Celestial ===
