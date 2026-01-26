@@ -127,18 +127,26 @@ void main() {
         if (albedo.a < 0.1) discard;
         baseColor = albedo.rgb;
         
-        // Apply biome tinting for grayscale textures (grass, leaves, etc.)
-        // Grass block top (material 1, facing up)
-        if (vMaterial == 1u && vNormal.y > 0.5) {
-            baseColor *= vec3(0.5, 0.85, 0.4);  // Green grass tint
+        // Apply biome tinting for grayscale textures
+        // NOTE: Grass block (material 1) textures are pre-tinted during loading
+        // Only apply runtime tinting for leaves and vegetation that might need it
+        
+        // Leaves (material 7) - may need tinting if texture is grayscale
+        if (vMaterial == 7u) {
+            // Check if the texture looks grayscale (R ≈ G ≈ B)
+            float grayTest = abs(baseColor.r - baseColor.g) + abs(baseColor.g - baseColor.b);
+            if (grayTest < 0.1) {
+                baseColor *= vec3(0.45, 0.75, 0.35);  // Green leaves tint
+            }
         }
-        // Leaves (material 7)
-        else if (vMaterial == 7u) {
-            baseColor *= vec3(0.45, 0.75, 0.35);  // Green leaves tint
-        }
-        // Tall grass vegetation (material 13)
+        // Tall grass vegetation (material 13) - these use actual grass textures now
+        // The grass.png, tall_grass_bottom.png textures have their own colors
+        // but if they appear too gray, apply subtle tint
         else if (vMaterial == 13u) {
-            baseColor *= vec3(0.5, 0.85, 0.4);  // Green grass tint
+            float grayTest = abs(baseColor.r - baseColor.g) + abs(baseColor.g - baseColor.b);
+            if (grayTest < 0.1) {
+                baseColor *= vec3(0.5, 0.85, 0.4);  // Green grass tint
+            }
         }
         // Rose/flowers (material 14) - no tint, keep original colors
         

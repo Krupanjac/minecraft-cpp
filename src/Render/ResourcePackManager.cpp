@@ -135,6 +135,58 @@ unsigned char* ResourcePackManager::resizeTexture(unsigned char* src, int srcW, 
     return dst;
 }
 
+unsigned char* ResourcePackManager::compositeTextures(unsigned char* base, unsigned char* overlay, 
+                                                       int width, int height, 
+                                                       float tintR, float tintG, float tintB) {
+    // Composite overlay on top of base using alpha blending
+    // The overlay is tinted with the given color before blending (for biome colors)
+    unsigned char* result = new unsigned char[width * height * 4];
+    
+    for (int i = 0; i < width * height; i++) {
+        // Get base color
+        float baseR = base[i * 4 + 0] / 255.0f;
+        float baseG = base[i * 4 + 1] / 255.0f;
+        float baseB = base[i * 4 + 2] / 255.0f;
+        float baseA = base[i * 4 + 3] / 255.0f;
+        
+        // Get overlay color and apply tint (overlay is grayscale, tint gives it color)
+        float overlayGray = overlay[i * 4 + 0] / 255.0f;  // Grayscale value
+        float overlayR = overlayGray * tintR;
+        float overlayG = overlayGray * tintG;
+        float overlayB = overlayGray * tintB;
+        float overlayA = overlay[i * 4 + 3] / 255.0f;
+        
+        // Alpha blending: result = overlay * overlayA + base * (1 - overlayA)
+        float outR = overlayR * overlayA + baseR * (1.0f - overlayA);
+        float outG = overlayG * overlayA + baseG * (1.0f - overlayA);
+        float outB = overlayB * overlayA + baseB * (1.0f - overlayA);
+        float outA = overlayA + baseA * (1.0f - overlayA);
+        
+        result[i * 4 + 0] = static_cast<unsigned char>(outR * 255.0f);
+        result[i * 4 + 1] = static_cast<unsigned char>(outG * 255.0f);
+        result[i * 4 + 2] = static_cast<unsigned char>(outB * 255.0f);
+        result[i * 4 + 3] = static_cast<unsigned char>(outA * 255.0f);
+    }
+    
+    return result;
+}
+
+unsigned char* ResourcePackManager::tintTexture(unsigned char* src, int width, int height,
+                                                 float tintR, float tintG, float tintB) {
+    // Apply color tint to a grayscale texture
+    unsigned char* result = new unsigned char[width * height * 4];
+    
+    for (int i = 0; i < width * height; i++) {
+        float gray = src[i * 4 + 0] / 255.0f;  // Assume grayscale (R=G=B)
+        result[i * 4 + 0] = static_cast<unsigned char>(gray * tintR * 255.0f);
+        result[i * 4 + 1] = static_cast<unsigned char>(gray * tintG * 255.0f);
+        result[i * 4 + 2] = static_cast<unsigned char>(gray * tintB * 255.0f);
+        result[i * 4 + 3] = src[i * 4 + 3];  // Preserve alpha
+    }
+    
+    return result;
+}
+
 bool ResourcePackManager::loadTextures(const std::string& texturePath) {
     std::vector<unsigned char*> albedoData;
     std::vector<unsigned char*> normalData;
@@ -278,6 +330,116 @@ bool ResourcePackManager::loadTextures(const std::string& texturePath) {
     
     LOG_INFO("Loaded " + std::to_string(textureCount) + " textures from resource pack");
     
+    // Post-processing: Create composited grass_block_side texture (dirt + grass_block_side_overlay)
+    // This combines the dirt texture with the grass overlay to create a proper grass side
+    auto dirtIt = albedoTextureMap.find("dirt");
+    auto overlayIt = albedoTextureMap.find("grass_block_side_overlay");
+    auto overlayNIt = normalTextureMap.find("grass_block_side_overlay");
+    auto overlaySIt = specularTextureMap.find("grass_block_side_overlay");
+    auto dirtNIt = normalTextureMap.find("dirt");
+    auto dirtSIt = specularTextureMap.find("dirt");
+    
+    if (dirtIt != albedoTextureMap.end() && overlayIt != albedoTextureMap.end()) {
+        // Create composited grass side texture (dirt + tinted grass overlay)
+        // Green tint for the grass overlay: RGB(0.5, 0.85, 0.4) = vibrant grass green
+        unsigned char* grassSide = compositeTextures(
+            albedoData[dirtIt->second], 
+            albedoData[overlayIt->second],
+            textureSize, textureSize,
+            0.5f, 0.85f, 0.4f  // Green biome tint
+        );
+        
+        // Add the composited texture to the arrays
+        int grassSideIndex = static_cast<int>(albedoData.size());
+        albedoTextureMap["grass_block_side_composited"] = grassSideIndex;
+        albedoData.push_back(grassSide);
+        albedoNames.push_back("grass_block_side_composited");
+        
+        // For normal map, use the overlay normal if available, otherwise dirt normal
+        unsigned char* grassSideNormal = nullptr;
+        if (overlayNIt != normalTextureMap.end()) {
+            // Copy the overlay normal map
+            grassSideNormal = new unsigned char[textureSize * textureSize * 4];
+            memcpy(grassSideNormal, normalData[overlayNIt->second], textureSize * textureSize * 4);
+        } else if (dirtNIt != normalTextureMap.end()) {
+            grassSideNormal = new unsigned char[textureSize * textureSize * 4];
+            memcpy(grassSideNormal, normalData[dirtNIt->second], textureSize * textureSize * 4);
+        } else {
+            grassSideNormal = createDefaultNormalMap();
+        }
+        normalTextureMap["grass_block_side_composited"] = grassSideIndex;
+        normalData.push_back(grassSideNormal);
+        normalNames.push_back("grass_block_side_composited");
+        normalFromStbiFlags.push_back(false);  // We used new[]
+        
+        // For specular map, use overlay specular if available
+        unsigned char* grassSideSpec = nullptr;
+        if (overlaySIt != specularTextureMap.end()) {
+            grassSideSpec = new unsigned char[textureSize * textureSize * 4];
+            memcpy(grassSideSpec, specularData[overlaySIt->second], textureSize * textureSize * 4);
+        } else if (dirtSIt != specularTextureMap.end()) {
+            grassSideSpec = new unsigned char[textureSize * textureSize * 4];
+            memcpy(grassSideSpec, specularData[dirtSIt->second], textureSize * textureSize * 4);
+        } else {
+            grassSideSpec = createDefaultSpecularMap();
+        }
+        specularTextureMap["grass_block_side_composited"] = grassSideIndex;
+        specularData.push_back(grassSideSpec);
+        specularNames.push_back("grass_block_side_composited");
+        specularFromStbiFlags.push_back(false);
+        
+        textureCount++;
+        LOG_INFO("Created composited grass_block_side texture at index " + std::to_string(grassSideIndex));
+    }
+    
+    // Also create a pre-tinted grass_block_top for better appearance
+    auto grassTopIt = albedoTextureMap.find("grass_block_top");
+    auto grassTopNIt = normalTextureMap.find("grass_block_top");
+    auto grassTopSIt = specularTextureMap.find("grass_block_top");
+    
+    if (grassTopIt != albedoTextureMap.end()) {
+        // Create tinted grass top (green biome tint)
+        unsigned char* grassTopTinted = tintTexture(
+            albedoData[grassTopIt->second],
+            textureSize, textureSize,
+            0.5f, 0.85f, 0.4f  // Green biome tint
+        );
+        
+        int grassTopTintedIndex = static_cast<int>(albedoData.size());
+        albedoTextureMap["grass_block_top_tinted"] = grassTopTintedIndex;
+        albedoData.push_back(grassTopTinted);
+        albedoNames.push_back("grass_block_top_tinted");
+        
+        // Copy normal map
+        unsigned char* grassTopNormal = nullptr;
+        if (grassTopNIt != normalTextureMap.end()) {
+            grassTopNormal = new unsigned char[textureSize * textureSize * 4];
+            memcpy(grassTopNormal, normalData[grassTopNIt->second], textureSize * textureSize * 4);
+        } else {
+            grassTopNormal = createDefaultNormalMap();
+        }
+        normalTextureMap["grass_block_top_tinted"] = grassTopTintedIndex;
+        normalData.push_back(grassTopNormal);
+        normalNames.push_back("grass_block_top_tinted");
+        normalFromStbiFlags.push_back(false);
+        
+        // Copy specular map
+        unsigned char* grassTopSpec = nullptr;
+        if (grassTopSIt != specularTextureMap.end()) {
+            grassTopSpec = new unsigned char[textureSize * textureSize * 4];
+            memcpy(grassTopSpec, specularData[grassTopSIt->second], textureSize * textureSize * 4);
+        } else {
+            grassTopSpec = createDefaultSpecularMap();
+        }
+        specularTextureMap["grass_block_top_tinted"] = grassTopTintedIndex;
+        specularData.push_back(grassTopSpec);
+        specularNames.push_back("grass_block_top_tinted");
+        specularFromStbiFlags.push_back(false);
+        
+        textureCount++;
+        LOG_INFO("Created tinted grass_block_top texture at index " + std::to_string(grassTopTintedIndex));
+    }
+    
     // Create texture arrays
     bool success = createTextureArrays(albedoData, normalData, specularData);
     
@@ -375,18 +537,18 @@ void ResourcePackManager::setupBlockMappings() {
         return -1;
     };
     
-    // GRASS block - grass_block_top for top, dirt for bottom, grass_block_side_overlay or dirt for sides
+    // GRASS block - use pre-tinted/composited textures for proper appearance
     {
         BlockTextureMapping mapping;
-        int topIdx = findFirstTex({"grass_block_top"});
+        // Use the pre-tinted grass top (already has green biome color baked in)
+        int topIdx = findFirstTex({"grass_block_top_tinted", "grass_block_top"});
         int dirtIdx = findTex("dirt");
-        // Grass block side overlay has transparency - we need dirt underneath
-        // For now just use dirt for sides, the overlay is incomplete without blending
-        int sideIdx = dirtIdx; // TODO: implement multi-layer blending for side overlay
+        // Use the composited grass side (dirt + grass overlay with green tint)
+        int sideIdx = findFirstTex({"grass_block_side_composited", "dirt"});
         
         mapping.top.albedoIndex = (topIdx >= 0) ? topIdx : dirtIdx;
         mapping.bottom.albedoIndex = dirtIdx;
-        mapping.side.albedoIndex = sideIdx;
+        mapping.side.albedoIndex = (sideIdx >= 0) ? sideIdx : dirtIdx;
         
         LOG_INFO("GRASS: top=" + std::to_string(mapping.top.albedoIndex) + 
                  " bottom=" + std::to_string(mapping.bottom.albedoIndex) +

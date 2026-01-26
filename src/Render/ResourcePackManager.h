@@ -110,4 +110,9 @@ private:
     unsigned char* createDefaultNormalMap();
     unsigned char* createDefaultSpecularMap();
     unsigned char* resizeTexture(unsigned char* src, int srcW, int srcH, int dstW, int dstH);
+    unsigned char* compositeTextures(unsigned char* base, unsigned char* overlay, 
+                                      int width, int height,
+                                      float tintR = 1.0f, float tintG = 1.0f, float tintB = 1.0f);
+    unsigned char* tintTexture(unsigned char* src, int width, int height,
+                               float tintR, float tintG, float tintB);
 };
