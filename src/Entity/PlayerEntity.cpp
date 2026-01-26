@@ -40,6 +40,11 @@ void PlayerEntity::loadModelFromSettings() {
     
     // Pick animations based on model
     pickAnimations();
+    
+    // Start with idle animation
+    if (model && !idleAnim.empty()) {
+        model->playAnimation(idleAnim, true);
+    }
 }
 
 void PlayerEntity::pickAnimations() {
@@ -157,8 +162,7 @@ void PlayerEntity::update(float deltaTime) {
         // Check if holding an item (for Hold animations)
         bool isHoldingItem = (heldItem != ItemType::NONE) && hasHoldAnimations;
         
-        // Update animation
-        model->updateAnimation(deltaTime);
+        // Note: Entity::update already calls model->updateAnimation, don't call it again
         
         // Simple state machine for animation switching (no camera info)
         if (speed > 0.1f) {
@@ -171,8 +175,8 @@ void PlayerEntity::update(float deltaTime) {
             if (needsChange) {
                 model->playAnimation(targetAnim, true);
             }
-            float walkSpeedRef = 5.0f;
-            float animSpeed = std::clamp(speed / walkSpeedRef, 0.75f, 1.4f);
+            float walkSpeedRef = 4.0f;
+            float animSpeed = std::clamp(speed / walkSpeedRef, 2.0f, 2.5f);
             model->setAnimationSpeed(animSpeed);
         } else {
             std::string targetAnim = isHoldingItem ? idleHoldAnim : idleAnim;
@@ -183,7 +187,7 @@ void PlayerEntity::update(float deltaTime) {
             if (needsChange) {
                 model->playAnimation(targetAnim, true);
             }
-            model->setAnimationSpeed(1.0f);
+            model->setAnimationSpeed(1.25f);
         }
     }
 }
@@ -206,8 +210,7 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
     // Check if holding an item (for Hold animations)
     bool isHoldingItem = (heldItem != ItemType::NONE) && hasHoldAnimations;
     
-    // Update animation time
-    model->updateAnimation(deltaTime);
+    // Note: Entity::update already calls model->updateAnimation, don't call it again
     
     // If dead, only play death animation
     if (isDead) {
@@ -220,6 +223,11 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
         if (hitReactTimer <= 0.0f) {
             isHitReacting = false;
             hitReactTimer = 0.0f;
+            // Return to base state after hit react
+            if (isDuckingState) {
+                model->playAnimation(duckAnim, false);  // Hold duck pose
+            }
+            // Otherwise let the state machine below handle it
         } else {
             return;  // Don't interrupt hit react animation
         }
@@ -231,6 +239,11 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
         if (emoteTimer <= 0.0f) {
             isEmoting = false;
             emoteTimer = 0.0f;
+            // Return to base state after emote
+            if (isDuckingState) {
+                model->playAnimation(duckAnim, false);  // Hold duck pose
+            }
+            // Otherwise let the state machine below handle it
         } else {
             return;  // Don't interrupt emote animation
         }
@@ -242,6 +255,11 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
         if (attackAnimTimer <= 0.0f) {
             isAttacking = false;
             attackAnimTimer = 0.0f;
+            // Return to base state after attack
+            if (isDuckingState) {
+                model->playAnimation(duckAnim, false);  // Hold duck pose
+            }
+            // Otherwise let the state machine below handle it
         } else {
             // Still in attack animation, don't change
             return;
@@ -296,11 +314,11 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
     } else if (onGround && jumpAnimTimer <= 0.0f) {
         // On ground and not in landing animation
         if (isDuckingState && speed < 0.1f) {
-            // Ducking while stationary
+            // Ducking while stationary - non-looping, hold at last frame
             if (currentAnim.find("duck") == std::string::npos) {
-                model->playAnimation(duckAnim, true);
+                model->playAnimation(duckAnim, false);  // Don't loop - hold pose
             }
-            model->setAnimationSpeed(1.0f);
+            model->setAnimationSpeed(1.5f);
         } else if (speed > 4.0f && camera.isSprinting) {
             // Running (with or without item) - no ducking while sprinting
             std::string targetAnim = isHoldingItem ? runHoldAnim : runAnim;
@@ -311,7 +329,7 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
             }
             // Match animation speed to sprint velocity
             float runSpeedRef = 7.0f;
-            float animSpeed = std::clamp(speed / runSpeedRef, 0.85f, 1.6f);
+            float animSpeed = std::clamp(speed / runSpeedRef, 1.1f, 2.0f);
             model->setAnimationSpeed(animSpeed);
         } else if (speed > 0.1f) {
             // Walking (with or without item)
@@ -328,16 +346,16 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
             if (needsChange) {
                 model->playAnimation(targetAnim, true);
             }
-            // Match animation speed to walk velocity (slower when sneaking)
-            float walkSpeedRef = isDuckingState ? 2.5f : 5.0f;
-            float animSpeed = std::clamp(speed / walkSpeedRef, 0.5f, 1.4f);
+            // Match animation speed to walk velocity (faster to match footsteps)
+            float walkSpeedRef = isDuckingState ? 2.0f : 4.0f;
+            float animSpeed = std::clamp(speed / walkSpeedRef, 1.5f, 2.5f);
             model->setAnimationSpeed(animSpeed);
         } else {
             // Idle (with or without item)
             if (isDuckingState) {
-                // Duck animation for sneaking idle
+                // Duck animation for sneaking idle - hold at last frame
                 if (currentAnim.find("duck") == std::string::npos) {
-                    model->playAnimation(duckAnim, true);
+                    model->playAnimation(duckAnim, false);  // Don't loop - hold pose
                 }
             } else {
                 std::string targetAnim = isHoldingItem ? idleHoldAnim : idleAnim;
@@ -352,7 +370,7 @@ void PlayerEntity::updateWithCamera(float deltaTime, const Camera& camera) {
                     model->playAnimation(targetAnim, true);
                 }
             }
-            model->setAnimationSpeed(1.0f);
+            model->setAnimationSpeed(1.25f);
         }
     }
     
@@ -441,14 +459,14 @@ void PlayerEntity::playHitReactAnimation() {
     model->playAnimation(hitReactAnim, false);
 }
 
-void PlayerEntity::playDuckAnimation(bool loop) {
+void PlayerEntity::playDuckAnimation(bool /*loop*/) {
     if (!model || isDead) return;
     
     isDuckingState = true;
     isEmoting = false;
     emoteTimer = 0.0f;
     
-    model->playAnimation(duckAnim, loop);
+    model->playAnimation(duckAnim, false);  // Always hold at last frame
 }
 
 void PlayerEntity::stopDuckAnimation() {

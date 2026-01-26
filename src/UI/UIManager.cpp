@@ -2116,6 +2116,9 @@ void UIManager::render() {
                 modelPreviewShader.setVec4("uBaseColor", glm::vec4(1.0f));
                 modelPreviewShader.setInt("uDebugNoTexture", 0);
                 modelPreviewShader.setInt("uDebugShowNormals", 0);
+                modelPreviewShader.setInt("uUseShadows", 0);  // No shadows in preview
+                modelPreviewShader.setFloat("uAlphaMultiplier", 1.0f);
+                modelPreviewShader.setMat4("uLightSpaceMatrix", glm::mat4(1.0f));  // Identity for preview
                 
                 // Draw the model
                 previewModel->draw(modelPreviewShader, modelMat, modelMat);

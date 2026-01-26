@@ -227,6 +227,26 @@ public:
                         window->setCursorMode(GLFW_CURSOR_NORMAL);
                     }
                 }
+                
+                // Emote keys - G (wave), Y (yes), B (no)
+                if (key == GLFW_KEY_G && uiManager.getMenuState() == MenuState::NONE && playerEntity) {
+                    playerEntity->playWaveAnimation();
+                    if (networkManager.isOnline()) {
+                        networkManager.sendPlayerAnimation(Network::PlayerAnimationPacket::ANIM_WAVE);
+                    }
+                }
+                if (key == GLFW_KEY_Y && uiManager.getMenuState() == MenuState::NONE && playerEntity) {
+                    playerEntity->playYesAnimation();
+                    if (networkManager.isOnline()) {
+                        networkManager.sendPlayerAnimation(Network::PlayerAnimationPacket::ANIM_YES);
+                    }
+                }
+                if (key == GLFW_KEY_B && uiManager.getMenuState() == MenuState::NONE && playerEntity) {
+                    playerEntity->playNoAnimation();
+                    if (networkManager.isOnline()) {
+                        networkManager.sendPlayerAnimation(Network::PlayerAnimationPacket::ANIM_NO);
+                    }
+                }
 
                 if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
                     uiManager.selectHotbarSlot(key - GLFW_KEY_1);
@@ -2004,9 +2024,9 @@ private:
             chunkManager.update(camera.getPosition(), camera.getFront(), camera.getViewMatrix());
         }
         
-        if (!skipPlayerControls && playerEntity) {
-            playerEntity->update(deltaTime);
-        }
+        // NOTE: playerEntity->updateWithCamera() is called earlier in the main loop (around line 1088)
+        // which already calls Entity::update() internally. Do NOT call update() again here
+        // as it would double-update the animation system.
 
         // === Mob Spawning & AI ===
         // Mobs can run in single-player (offline) or server mode

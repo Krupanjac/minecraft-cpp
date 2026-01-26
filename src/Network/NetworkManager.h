@@ -56,6 +56,12 @@ public:
     void playDeathAnimation();
     bool isPlayingDeathAnimation() const { return m_isDead; }
     
+    // Emote animations
+    void playWaveAnimation();
+    void playYesAnimation();
+    void playNoAnimation();
+    bool isPlayingEmote() const { return m_isEmoting; }
+    
     // Damage handling for network (override to track visual health for this remote player)
     void applyNetworkDamage(float damage, const glm::vec3& knockback);
     float getNetworkHealth() const { return m_networkHealth; }
@@ -85,6 +91,9 @@ private:
     std::string m_punchAnim = "Punch";
     std::string m_hitReceiveAnim = "HitReceive";
     std::string m_deathAnim = "Death";
+    std::string m_waveAnim = "Wave";
+    std::string m_yesAnim = "Yes";
+    std::string m_noAnim = "No";
     std::string m_rightHandBone = "Fist.R";
     bool m_hasHoldAnimations = false;
     bool m_animationsInitialized = false;
@@ -96,6 +105,10 @@ private:
     // Hit receive state
     bool m_isHitReacting = false;
     float m_hitReactTimer = 0.0f;
+    
+    // Emote state
+    bool m_isEmoting = false;
+    float m_emoteTimer = 0.0f;
     
     // Death state
     bool m_isDead = false;

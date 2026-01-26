@@ -41,6 +41,9 @@ void RemotePlayerEntity::initializeAnimations() {
     m_runAttackAnim = "Run_Attack";
     m_punchAnim = "Punch";
     m_deathAnim = "Death";
+    m_waveAnim = "Wave";
+    m_yesAnim = "Yes";
+    m_noAnim = "No";
     m_rightHandBone = "Fist.R";
     m_hasHoldAnimations = false;
     
@@ -66,6 +69,9 @@ void RemotePlayerEntity::initializeAnimations() {
         else if (lower == "run_attack" || lower == "runattack") m_runAttackAnim = name;
         else if (lower == "punch") m_punchAnim = name;
         else if (lower == "death") m_deathAnim = name;
+        else if (lower == "wave") m_waveAnim = name;
+        else if (lower == "yes") m_yesAnim = name;
+        else if (lower == "no") m_noAnim = name;
     }
     
     // Check if model has the right hand bone
@@ -135,6 +141,18 @@ void RemotePlayerEntity::update(float deltaTime) {
                 m_hitReactTimer = 0.0f;
             } else {
                 // Still in hit reaction, don't change animation
+                return;
+            }
+        }
+        
+        // Update emote timer
+        if (m_isEmoting && m_emoteTimer > 0.0f) {
+            m_emoteTimer -= deltaTime;
+            if (m_emoteTimer <= 0.0f) {
+                m_isEmoting = false;
+                m_emoteTimer = 0.0f;
+            } else {
+                // Still in emote animation, don't change
                 return;
             }
         }
@@ -261,8 +279,43 @@ void RemotePlayerEntity::playDeathAnimation() {
     m_attackAnimTimer = 0.0f;
     m_isHitReacting = false;
     m_hitReactTimer = 0.0f;
+    m_isEmoting = false;
+    m_emoteTimer = 0.0f;
     
     model->playAnimation(m_deathAnim, false);
+}
+
+void RemotePlayerEntity::playWaveAnimation() {
+    if (!model || m_isDead) return;
+    
+    m_isEmoting = true;
+    m_emoteTimer = 2.0f;  // Wave animation duration
+    m_isAttacking = false;
+    m_attackAnimTimer = 0.0f;
+    
+    model->playAnimation(m_waveAnim, false);
+}
+
+void RemotePlayerEntity::playYesAnimation() {
+    if (!model || m_isDead) return;
+    
+    m_isEmoting = true;
+    m_emoteTimer = 1.5f;  // Yes animation duration
+    m_isAttacking = false;
+    m_attackAnimTimer = 0.0f;
+    
+    model->playAnimation(m_yesAnim, false);
+}
+
+void RemotePlayerEntity::playNoAnimation() {
+    if (!model || m_isDead) return;
+    
+    m_isEmoting = true;
+    m_emoteTimer = 1.5f;  // No animation duration
+    m_isAttacking = false;
+    m_attackAnimTimer = 0.0f;
+    
+    model->playAnimation(m_noAnim, false);
 }
 
 void RemotePlayerEntity::applyNetworkDamage(float damage, const glm::vec3& knockback) {
@@ -664,6 +717,12 @@ void NetworkManager::setupServerCallbacks() {
                     entity->playHitReceiveAnimation();
                 } else if (animationType == PlayerAnimationPacket::ANIM_DEATH) {
                     entity->playDeathAnimation();
+                } else if (animationType == PlayerAnimationPacket::ANIM_WAVE) {
+                    entity->playWaveAnimation();
+                } else if (animationType == PlayerAnimationPacket::ANIM_YES) {
+                    entity->playYesAnimation();
+                } else if (animationType == PlayerAnimationPacket::ANIM_NO) {
+                    entity->playNoAnimation();
                 }
                 break;
             }
@@ -766,6 +825,12 @@ void NetworkManager::setupClientCallbacks() {
                     entity->playHitReceiveAnimation();
                 } else if (animationType == PlayerAnimationPacket::ANIM_DEATH) {
                     entity->playDeathAnimation();
+                } else if (animationType == PlayerAnimationPacket::ANIM_WAVE) {
+                    entity->playWaveAnimation();
+                } else if (animationType == PlayerAnimationPacket::ANIM_YES) {
+                    entity->playYesAnimation();
+                } else if (animationType == PlayerAnimationPacket::ANIM_NO) {
+                    entity->playNoAnimation();
                 }
                 break;
             }
