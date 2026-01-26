@@ -93,6 +93,7 @@ private:
     int waterStillIndex = -1;
     int waterFlowIndex = -1;
     int iceIndex = -1;
+    int grassDirtIndex = -1;  // Dirt texture index used by grass block (for consistency)
 
     // Helper functions
     bool loadTextures(const std::string& texturePath);

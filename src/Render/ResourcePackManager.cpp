@@ -417,15 +417,34 @@ bool ResourcePackManager::loadTextures(const std::string& texturePath) {
         albedoData.push_back(grassSide);
         albedoNames.push_back("grass_block_side_composited");
         
-        // For normal map, use the overlay normal if available, otherwise dirt normal
+        // For normal map, composite dirt normal with overlay normal based on overlay alpha
+        // This ensures the dirt portion looks consistent with standalone dirt blocks
         unsigned char* grassSideNormal = nullptr;
-        if (overlayNIt != normalTextureMap.end()) {
-            // Copy the overlay normal map
+        if (dirtNIt != normalTextureMap.end()) {
+            grassSideNormal = new unsigned char[textureSize * textureSize * 4];
+            // Start with dirt normal
+            memcpy(grassSideNormal, normalData[dirtNIt->second], textureSize * textureSize * 4);
+            
+            // If overlay normal exists, blend it based on overlay alpha
+            if (overlayNIt != normalTextureMap.end() && overlayIt != albedoTextureMap.end()) {
+                unsigned char* overlayNormal = normalData[overlayNIt->second];
+                unsigned char* overlayAlbedo = albedoData[overlayIt->second];
+                
+                for (int i = 0; i < textureSize * textureSize; i++) {
+                    float overlayAlpha = overlayAlbedo[i * 4 + 3] / 255.0f;
+                    // Blend normal maps based on overlay alpha
+                    for (int c = 0; c < 4; c++) {
+                        float dirtVal = grassSideNormal[i * 4 + c] / 255.0f;
+                        float overlayVal = overlayNormal[i * 4 + c] / 255.0f;
+                        float blended = dirtVal * (1.0f - overlayAlpha) + overlayVal * overlayAlpha;
+                        grassSideNormal[i * 4 + c] = static_cast<unsigned char>(blended * 255.0f);
+                    }
+                }
+            }
+        } else if (overlayNIt != normalTextureMap.end()) {
+            // Fallback to overlay normal only
             grassSideNormal = new unsigned char[textureSize * textureSize * 4];
             memcpy(grassSideNormal, normalData[overlayNIt->second], textureSize * textureSize * 4);
-        } else if (dirtNIt != normalTextureMap.end()) {
-            grassSideNormal = new unsigned char[textureSize * textureSize * 4];
-            memcpy(grassSideNormal, normalData[dirtNIt->second], textureSize * textureSize * 4);
         } else {
             grassSideNormal = createDefaultNormalMap();
         }
@@ -434,14 +453,30 @@ bool ResourcePackManager::loadTextures(const std::string& texturePath) {
         normalNames.push_back("grass_block_side_composited");
         normalFromStbiFlags.push_back(false);  // We used new[]
         
-        // For specular map, use overlay specular if available
+        // For specular map, composite dirt specular with overlay specular
         unsigned char* grassSideSpec = nullptr;
-        if (overlaySIt != specularTextureMap.end()) {
-            grassSideSpec = new unsigned char[textureSize * textureSize * 4];
-            memcpy(grassSideSpec, specularData[overlaySIt->second], textureSize * textureSize * 4);
-        } else if (dirtSIt != specularTextureMap.end()) {
+        if (dirtSIt != specularTextureMap.end()) {
             grassSideSpec = new unsigned char[textureSize * textureSize * 4];
             memcpy(grassSideSpec, specularData[dirtSIt->second], textureSize * textureSize * 4);
+            
+            // Blend with overlay specular based on overlay alpha
+            if (overlaySIt != specularTextureMap.end() && overlayIt != albedoTextureMap.end()) {
+                unsigned char* overlaySpec = specularData[overlaySIt->second];
+                unsigned char* overlayAlbedo = albedoData[overlayIt->second];
+                
+                for (int i = 0; i < textureSize * textureSize; i++) {
+                    float overlayAlpha = overlayAlbedo[i * 4 + 3] / 255.0f;
+                    for (int c = 0; c < 4; c++) {
+                        float dirtVal = grassSideSpec[i * 4 + c] / 255.0f;
+                        float overlayVal = overlaySpec[i * 4 + c] / 255.0f;
+                        float blended = dirtVal * (1.0f - overlayAlpha) + overlayVal * overlayAlpha;
+                        grassSideSpec[i * 4 + c] = static_cast<unsigned char>(blended * 255.0f);
+                    }
+                }
+            }
+        } else if (overlaySIt != specularTextureMap.end()) {
+            grassSideSpec = new unsigned char[textureSize * textureSize * 4];
+            memcpy(grassSideSpec, specularData[overlaySIt->second], textureSize * textureSize * 4);
         } else {
             grassSideSpec = createDefaultSpecularMap();
         }
@@ -531,10 +566,14 @@ bool ResourcePackManager::createTextureArrays(const std::vector<unsigned char*>&
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, textureSize, textureSize, 1, GL_RGBA, GL_UNSIGNED_BYTE, albedoData[i]);
     }
     
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // Add anisotropic filtering for better quality at angles/distance
+    float maxAniso = 1.0f;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maxAniso);
+    glTexParameterf(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_ANISOTROPY, std::min(maxAniso, 8.0f));
     glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
     
     // Create normal texture array
@@ -614,17 +653,22 @@ void ResourcePackManager::setupBlockMappings() {
         
         LOG_INFO("GRASS: top=" + std::to_string(mapping.top.albedoIndex) + 
                  " bottom=" + std::to_string(mapping.bottom.albedoIndex) +
-                 " side=" + std::to_string(mapping.side.albedoIndex));
+                 " side=" + std::to_string(mapping.side.albedoIndex) +
+                 " dirtIdx=" + std::to_string(dirtIdx));
         blockMappings[BlockType::GRASS] = mapping;
+        
+        // Store dirt index for use by DIRT block
+        grassDirtIndex = dirtIdx;
     }
     
-    // DIRT block
+    // DIRT block - MUST use same dirt texture as grass block bottom for consistency
     {
         BlockTextureMapping mapping;
-        int idx = findTex("dirt");
+        int idx = grassDirtIndex;  // Use the same index as grass block's dirt
         mapping.top.albedoIndex = idx;
         mapping.bottom.albedoIndex = idx;
         mapping.side.albedoIndex = idx;
+        LOG_INFO("DIRT: all faces=" + std::to_string(idx));
         blockMappings[BlockType::DIRT] = mapping;
     }
     

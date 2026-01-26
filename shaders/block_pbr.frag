@@ -187,15 +187,23 @@ void main() {
         // Sample from texture arrays
         vec2 uv = fract(vTexCoord);
         
+        // Calculate distance for LOD-based effects
+        float distToCamera = length(uCameraPos - vWorldPos);
+        
         // Apply parallax occlusion mapping if enabled (works in both light and shadow)
-        if (uEnableParallax == 1) {
+        // Fade out parallax at distance to prevent artifacts and improve performance
+        if (uEnableParallax == 1 && distToCamera < 32.0) {
             // Calculate view direction in tangent space for parallax
             mat3 TBN = mat3(normalize(vTangent), normalize(vBitangent), normalize(vNormal));
             mat3 TBN_inv = transpose(TBN);  // TBN is orthonormal, so transpose = inverse
             vec3 viewDir = normalize(uCameraPos - vWorldPos);
             vec3 viewDirTangent = normalize(TBN_inv * viewDir);
             
-            uv = parallaxOcclusionMapping(uv, viewDirTangent, float(vTextureLayer));
+            vec2 parallaxUV = parallaxOcclusionMapping(uv, viewDirTangent, float(vTextureLayer));
+            
+            // Smoothly blend between parallax and non-parallax based on distance
+            float parallaxFade = 1.0 - smoothstep(16.0, 32.0, distToCamera);
+            uv = mix(uv, parallaxUV, parallaxFade);
         }
         
         // Sample albedo with better filtering for vegetation
@@ -208,12 +216,6 @@ void main() {
             if (albedo.a < 0.1) discard;
         }
         baseColor = albedo.rgb;
-        
-        // Dirt block (material 2) - match the look of grass block's dirt portion
-        // Apply slight warmth to match composited grass side appearance
-        if (vMaterial == 2u) {
-            baseColor *= vec3(1.0, 0.98, 0.95);  // Very subtle warm tint to match grass dirt
-        }
         
         // Apply biome tinting for grayscale textures
         // NOTE: Grass block (material 1) textures are pre-tinted during loading
