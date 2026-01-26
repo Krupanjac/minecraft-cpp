@@ -118,63 +118,58 @@ vec3 applyNormalMap(vec3 normalMapValue, vec3 normal, vec3 tangent, vec3 bitange
 }
 
 // Parallax Occlusion Mapping - gives 3D depth effect to textures
-// Since we don't have dedicated height maps, we derive height from normal map
-// Normal maps encode surface orientation: flat = (0.5, 0.5, 1.0), tilted = deviation from that
-float getHeightFromNormal(vec3 normalSample) {
-    // Normal map is in [0,1], convert to [-1,1] tangent space
+// Uses normal map to derive height - steep angles = crevices, flat = raised
+float getHeight(vec2 uv, float layer) {
+    vec3 normalSample = texture(uNormalArray, vec3(uv, layer)).rgb;
+    
+    // Normal map: (0.5, 0.5, 1.0) = flat surface pointing up
+    // Deviation from flat indicates surface detail
     vec3 n = normalSample * 2.0 - 1.0;
-    // Use the Z component directly - high Z (pointing up) = raised surface
-    // Low Z (tilted) = crevice/dip
-    // This is smoother than using xy deviation magnitude
-    float height = n.z * 0.5 + 0.5;  // Map from [-1,1] to [0,1]
-    return height;
+    
+    // Height from normal Z: flat (z=1) = high, tilted (z<1) = low
+    // This creates depth in crevices and raised areas on flat parts
+    float height = n.z;
+    
+    return clamp(height, 0.0, 1.0);
 }
 
 vec2 parallaxOcclusionMapping(vec2 texCoords, vec3 viewDirTangent, float layer) {
-    // Ensure view direction points INTO the surface (positive Z in tangent space)
-    vec3 viewDir = viewDirTangent;
-    if (viewDir.z < 0.0) viewDir = -viewDir;
+    // View direction should point toward camera (into surface in tangent space)
+    vec3 viewDir = normalize(viewDirTangent);
     
-    // Number of layers - more at grazing angles for quality
-    float minLayers = 8.0;
-    float maxLayers = float(uParallaxSteps);
-    float numLayers = mix(maxLayers, minLayers, abs(viewDir.z));
+    // Flip if needed - we want positive Z pointing out of surface
+    if (viewDir.z < 0.0) viewDir.z = -viewDir.z;
     
+    // Fewer layers for performance and less blur
+    float numLayers = mix(float(uParallaxSteps), 8.0, viewDir.z);
     float layerDepth = 1.0 / numLayers;
     float currentLayerDepth = 0.0;
     
-    // Calculate UV offset per layer
-    vec2 P = viewDir.xy / max(viewDir.z, 0.2) * uParallaxScale;
+    // UV offset direction - scale by parallax amount
+    vec2 P = viewDir.xy * uParallaxScale;
     vec2 deltaTexCoords = P / numLayers;
     
     vec2 currentTexCoords = texCoords;
-    vec3 normalSample = texture(uNormalArray, vec3(currentTexCoords, layer)).rgb;
-    float currentDepthMapValue = 1.0 - getHeightFromNormal(normalSample);  // Invert: high surface = low depth
+    float heightValue = getHeight(currentTexCoords, layer);
+    float currentDepthMapValue = 1.0 - heightValue;
     
-    // March through layers from surface (depth 0) downward (depth 1)
-    int maxIterations = int(numLayers) + 1;
-    for (int i = 0; i < maxIterations; i++) {
+    // Simple steep parallax - march until we hit surface
+    for (int i = 0; i < 32; i++) {
         if (currentLayerDepth >= currentDepthMapValue) break;
         
         currentTexCoords -= deltaTexCoords;
-        normalSample = texture(uNormalArray, vec3(fract(currentTexCoords), layer)).rgb;
-        currentDepthMapValue = 1.0 - getHeightFromNormal(normalSample);
+        heightValue = getHeight(currentTexCoords, layer);
+        currentDepthMapValue = 1.0 - heightValue;
         currentLayerDepth += layerDepth;
     }
     
-    // Interpolate between current and previous position for smooth result
+    // Simple interpolation for smoother result
     vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
-    float afterDepth = currentDepthMapValue - currentLayerDepth;
-    vec3 prevNormalSample = texture(uNormalArray, vec3(fract(prevTexCoords), layer)).rgb;
-    float prevDepthMapValue = 1.0 - getHeightFromNormal(prevNormalSample);
-    float beforeDepth = prevDepthMapValue - currentLayerDepth + layerDepth;
+    float afterHeight = currentDepthMapValue - currentLayerDepth;
+    float beforeHeight = (1.0 - getHeight(prevTexCoords, layer)) - currentLayerDepth + layerDepth;
+    float weight = afterHeight / (afterHeight - beforeHeight + 0.001);
     
-    float weight = afterDepth / (afterDepth - beforeDepth + 0.0001);
-    weight = clamp(weight, 0.0, 1.0);
-    
-    vec2 finalTexCoords = mix(currentTexCoords, prevTexCoords, weight);
-    
-    return fract(finalTexCoords);
+    return mix(currentTexCoords, prevTexCoords, clamp(weight, 0.0, 1.0));
 }
 
 void main() {
@@ -190,19 +185,26 @@ void main() {
         // Calculate distance for LOD-based effects
         float distToCamera = length(uCameraPos - vWorldPos);
         
-        // Apply parallax occlusion mapping if enabled (works in both light and shadow)
-        // Fade out parallax at distance to prevent artifacts and improve performance
-        if (uEnableParallax == 1 && distToCamera < 32.0) {
-            // Calculate view direction in tangent space for parallax
-            mat3 TBN = mat3(normalize(vTangent), normalize(vBitangent), normalize(vNormal));
-            mat3 TBN_inv = transpose(TBN);  // TBN is orthonormal, so transpose = inverse
-            vec3 viewDir = normalize(uCameraPos - vWorldPos);
-            vec3 viewDirTangent = normalize(TBN_inv * viewDir);
+        // Apply parallax occlusion mapping if enabled
+        // Works on all block faces using tangent space
+        if (uEnableParallax == 1 && distToCamera < 24.0) {
+            // Build TBN matrix for this face
+            vec3 T = normalize(vTangent);
+            vec3 B = normalize(vBitangent);
+            vec3 N = normalize(vNormal);
+            
+            // Transform view direction to tangent space
+            vec3 viewDirWorld = normalize(uCameraPos - vWorldPos);
+            vec3 viewDirTangent = vec3(
+                dot(viewDirWorld, T),
+                dot(viewDirWorld, B),
+                dot(viewDirWorld, N)
+            );
             
             vec2 parallaxUV = parallaxOcclusionMapping(uv, viewDirTangent, float(vTextureLayer));
             
-            // Smoothly blend between parallax and non-parallax based on distance
-            float parallaxFade = 1.0 - smoothstep(16.0, 32.0, distToCamera);
+            // Fade out at distance
+            float parallaxFade = 1.0 - smoothstep(12.0, 24.0, distToCamera);
             uv = mix(uv, parallaxUV, parallaxFade);
         }
         

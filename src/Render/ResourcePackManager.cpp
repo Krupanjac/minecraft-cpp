@@ -773,11 +773,38 @@ void ResourcePackManager::setupBlockMappings() {
         blockMappings[BlockType::LOG] = mapping;
     }
     
-    // TALL_GRASS - use the actual grass/tall_grass textures (now resized from 256x256 to 128x128)
+    // Collect grass/vegetation variants for randomization in shader
+    grassVariants.clear();
+    tallGrassVariants.clear();
+    flowerVariants.clear();
+    
+    // Collect all grass variants
+    for (const std::string& name : {"grass", "grass1", "grass2", "tall_grass_bottom", "tall_grass_top"}) {
+        auto it = albedoTextureMap.find(name);
+        if (it != albedoTextureMap.end()) {
+            grassVariants.push_back(it->second);
+            LOG_INFO("Added grass variant: " + name + " at index " + std::to_string(it->second));
+        }
+    }
+    
+    // Collect flower variants
+    for (const std::string& name : {"dandelion", "poppy", "blue_orchid", "allium", "azure_bluet", 
+                                      "red_tulip", "orange_tulip", "white_tulip", "pink_tulip",
+                                      "oxeye_daisy", "cornflower", "lily_of_the_valley"}) {
+        auto it = albedoTextureMap.find(name);
+        if (it != albedoTextureMap.end()) {
+            flowerVariants.push_back(it->second);
+            LOG_INFO("Added flower variant: " + name + " at index " + std::to_string(it->second));
+        }
+    }
+    
+    LOG_INFO("Collected " + std::to_string(grassVariants.size()) + " grass variants and " + 
+             std::to_string(flowerVariants.size()) + " flower variants");
+    
+    // TALL_GRASS - use the first grass variant (shader will randomize)
     {
         BlockTextureMapping mapping;
-        // Try tall_grass_bottom first, then grass, grass1, grass2
-        int idx = findFirstTex({"tall_grass_bottom", "grass", "grass1", "grass2", "grass_block_foliage"});
+        int idx = grassVariants.empty() ? findFirstTex({"grass", "grass_block_foliage"}) : grassVariants[0];
         mapping.top.albedoIndex = idx;
         mapping.bottom.albedoIndex = idx;
         mapping.side.albedoIndex = idx;
@@ -785,13 +812,10 @@ void ResourcePackManager::setupBlockMappings() {
         blockMappings[BlockType::TALL_GRASS] = mapping;
     }
     
-    // ROSE (Flower) - use dandelion or poppy (these have transparency for the flower shape)
+    // ROSE (Flower) - use dandelion as default (shader will randomize)
     {
         BlockTextureMapping mapping;
-        int idx = findFirstTex({"dandelion", "poppy", "blue_orchid", "allium"});
-        if (idx < 0) {
-            idx = findFirstTex({"grass", "tall_grass_bottom"});  // fallback to grass
-        }
+        int idx = flowerVariants.empty() ? findFirstTex({"dandelion", "grass"}) : flowerVariants[0];
         mapping.top.albedoIndex = idx;
         mapping.bottom.albedoIndex = idx;
         mapping.side.albedoIndex = idx;

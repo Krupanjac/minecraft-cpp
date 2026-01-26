@@ -466,16 +466,25 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
             }
         }
         glUniform1iv(glGetUniformLocation(blockShader.getProgram(), "uTextureIndices"), 96, textureIndices);
+        
+        // Pass grass variants for vegetation randomization
+        const auto& grassVariants = resPack.getGrassVariants();
+        int grassVariantIndices[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+        for (size_t i = 0; i < std::min(grassVariants.size(), size_t(8)); i++) {
+            grassVariantIndices[i] = grassVariants[i];
+        }
+        glUniform1iv(glGetUniformLocation(blockShader.getProgram(), "uGrassVariants"), 8, grassVariantIndices);
+        blockShader.setInt("uGrassVariantCount", resPack.getGrassVariantCount());
     }
 
     // Debug uniforms
     blockShader.setInt("uDebugNoTexture", Settings::instance().debugNoTexture ? 1 : 0);
     blockShader.setInt("uDebugShowNormals", Settings::instance().debugShowNormals ? 1 : 0);
     
-    // Parallax mapping settings - depth effect derived from normal maps
+    // Parallax mapping settings - subtle depth effect
     blockShader.setInt("uEnableParallax", Settings::instance().enableParallaxMapping ? 1 : 0);
-    blockShader.setFloat("uParallaxScale", 0.05f);  // Moderate depth - prevents artifacts
-    blockShader.setInt("uParallaxSteps", 32);  // Quality steps
+    blockShader.setFloat("uParallaxScale", 0.03f);  // Subtle depth to avoid blur
+    blockShader.setInt("uParallaxSteps", 16);  // Fewer steps = less blur
 
     // Wireframe toggle applied around draw loop to only affect chunk rendering
     if (Settings::instance().debugWireframe) {

@@ -94,8 +94,21 @@ private:
     int waterFlowIndex = -1;
     int iceIndex = -1;
     int grassDirtIndex = -1;  // Dirt texture index used by grass block (for consistency)
+    
+    // Vegetation variant indices for randomization
+    std::vector<int> grassVariants;     // grass, grass1, grass2
+    std::vector<int> tallGrassVariants; // tall_grass_bottom, tall_grass_top
+    std::vector<int> flowerVariants;    // dandelion, poppy, etc.
 
-    // Helper functions
+public:
+    // Get vegetation variant count for shader randomization
+    int getGrassVariantCount() const { return static_cast<int>(grassVariants.size()); }
+    int getGrassVariant(int index) const { 
+        return grassVariants.empty() ? -1 : grassVariants[index % grassVariants.size()]; 
+    }
+    const std::vector<int>& getGrassVariants() const { return grassVariants; }
+
+private:
     bool loadTextures(const std::string& texturePath);
     void setupBlockMappings();
     int findOrLoadTexture(const std::string& name, 

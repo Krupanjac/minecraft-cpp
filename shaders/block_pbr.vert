@@ -36,6 +36,10 @@ out vec3 vBitangent;
 // These are set from CPU based on ResourcePackManager
 uniform int uTextureIndices[16 * 6];  // 16 block types * 6 faces
 
+// Vegetation variant indices for randomization
+uniform int uGrassVariants[8];
+uniform int uGrassVariantCount;
+
 void main() {
     vec4 worldPos = uModel * vec4(aPos, 1.0);
     vWorldPos = worldPos.xyz;
@@ -101,6 +105,22 @@ void main() {
         } else {
             vTextureLayer = 0;
         }
+        
+        // Vegetation randomization based on world position
+        // For tall grass (13) and flowers (14), use position-based hash to pick variant
+        if (aMaterial == 13u || aMaterial == 14u) {
+            // Create a hash from block position for consistent randomization
+            ivec3 blockPos = ivec3(floor(worldPos.xyz));
+            int hash = blockPos.x * 73856093 ^ blockPos.y * 19349663 ^ blockPos.z * 83492791;
+            hash = abs(hash);
+            
+            // Pick from grass variants
+            if (uGrassVariantCount > 0) {
+                int variantIdx = hash % uGrassVariantCount;
+                vTextureLayer = uGrassVariants[variantIdx];
+            }
+        }
+        
         vCellOrigin = vec2(0.0);  // Not used in PBR mode
     } else {
         // Original atlas-based texture mapping
