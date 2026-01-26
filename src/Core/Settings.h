@@ -143,6 +143,9 @@ public:
     int rayTracingQuality = 1;     // 0 = Low, 1 = Medium, 2 = High
     static constexpr int RT_QUALITY_LOW = 0;
     static constexpr int RT_QUALITY_MEDIUM = 1;
+    
+    // Resource Pack settings (PBRANDPOM)
+    bool usePBRResourcePack = false; // Use PBRANDPOM resource pack textures
     static constexpr int RT_QUALITY_HIGH = 2;
     static constexpr const char* RT_QUALITY_NAMES[] = { "Low", "Medium", "High" };
     bool rtShadows = true;         // Ray traced shadows
@@ -236,6 +239,7 @@ public:
                     else if (key == "shadowMethod") shadowMethod = std::stoi(value);
                     else if (key == "rtShadows") rtShadows = (value == "1");
                     else if (key == "rtReflections") rtReflections = (value == "1");
+                    else if (key == "usePBRResourcePack") usePBRResourcePack = (value == "1");
                     else if (key == "debugShowTAA") debugShowTAA = (value == "1");
                     else if (key == "debugNoTexture") debugNoTexture = (value == "1");
                     else if (key == "debugWireframe") debugWireframe = (value == "1");
@@ -298,6 +302,7 @@ public:
         file << "shadowMethod=" << shadowMethod << "\n";
         file << "rtShadows=" << (rtShadows ? "1" : "0") << "\n";
         file << "rtReflections=" << (rtReflections ? "1" : "0") << "\n";
+        file << "usePBRResourcePack=" << (usePBRResourcePack ? "1" : "0") << "\n";
         file << "debugShowTAA=" << (debugShowTAA ? "1" : "0") << "\n";
         file << "debugNoTexture=" << (debugNoTexture ? "1" : "0") << "\n";
         file << "debugWireframe=" << (debugWireframe ? "1" : "0") << "\n";

@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "ResourcePackManager.h"
 #include "../Core/Logger.h"
 #include "../Util/Config.h"
 #include "../Core/Settings.h"
@@ -26,6 +27,16 @@ bool Renderer::initialize(int windowWidth, int windowHeight) {
     initDestroyOverlay();
 
     blockAtlas = std::make_unique<Texture>("assets/block_atlas.png");
+
+    // Initialize PBR Resource Pack Manager
+    if (ResourcePackManager::instance().initialize("assets/PBRANDPOM")) {
+        LOG_INFO("PBRANDPOM resource pack loaded successfully");
+        // Sync with settings
+        ResourcePackManager::instance().setEnabled(Settings::instance().usePBRResourcePack);
+    } else {
+        LOG_WARNING("Failed to load PBRANDPOM resource pack - will use default textures");
+        Settings::instance().usePBRResourcePack = false;
+    }
 
     // Initialize Post Processing
     mainFBO = std::make_unique<FrameBuffer>(windowWidth, windowHeight);
@@ -382,6 +393,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     renderClouds(camera, windowWidth, windowHeight, lightSpaceMatrix);
 
     // Render chunks
+    // Sync resource pack setting
+    auto& resPack = ResourcePackManager::instance();
+    bool usePBR = Settings::instance().usePBRResourcePack && resPack.isLoaded();
+    resPack.setEnabled(usePBR);
+    
     glActiveTexture(GL_TEXTURE0);
     blockAtlas->bind(0);
     
@@ -396,10 +412,24 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         glBindTexture(GL_TEXTURE_2D, 0);
     }
     
+    // Bind PBR texture arrays if enabled
+    if (usePBR) {
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, resPack.getAlbedoTextureArray());
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, resPack.getNormalTextureArray());
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, resPack.getSpecularTextureArray());
+    }
+    
     blockShader.use();
     blockShader.setInt("uTexture", 0);
     blockShader.setInt("uShadowMap", 1);
     blockShader.setInt("uRayTracingMap", 2);
+    blockShader.setInt("uAlbedoArray", 3);
+    blockShader.setInt("uNormalArray", 4);
+    blockShader.setInt("uSpecularArray", 5);
+    blockShader.setInt("uUsePBRResourcePack", usePBR ? 1 : 0);
     blockShader.setInt("uUseShadows", Settings::instance().enableShadows ? 1 : 0);
     blockShader.setInt("uShadowMethod", Settings::instance().shadowMethod);
     blockShader.setInt("uUseRTShadows", (Settings::instance().enableRayTracing && Settings::instance().rtShadows) ? 1 : 0);
@@ -413,6 +443,19 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     blockShader.setVec3("uLightDir", lightDirection);
     blockShader.setFloat("uAOStrength", Settings::instance().aoStrength);
     blockShader.setFloat("uGamma", Settings::instance().gamma);
+    
+    // Set texture indices for PBR mode
+    if (usePBR) {
+        // Build texture index array for all block types and faces
+        int textureIndices[16 * 6];
+        for (int mat = 0; mat < 16; mat++) {
+            BlockType type = static_cast<BlockType>(mat);
+            for (int face = 0; face < 6; face++) {
+                textureIndices[mat * 6 + face] = resPack.getTextureIndex(type, face);
+            }
+        }
+        glUniform1iv(glGetUniformLocation(blockShader.getProgram(), "uTextureIndices"), 96, textureIndices);
+    }
 
     // Debug uniforms
     blockShader.setInt("uDebugNoTexture", Settings::instance().debugNoTexture ? 1 : 0);
@@ -802,7 +845,12 @@ void Renderer::setupOpenGL() {
 }
 
 bool Renderer::loadShaders() {
-    bool success = blockShader.loadFromFiles("shaders/block.vert", "shaders/block.frag");
+    // Try to load PBR shaders first, fall back to standard if not available
+    bool success = blockShader.loadFromFiles("shaders/block_pbr.vert", "shaders/block_pbr.frag");
+    if (!success) {
+        LOG_WARNING("PBR block shaders not found, falling back to standard shaders");
+        success = blockShader.loadFromFiles("shaders/block.vert", "shaders/block.frag");
+    }
     if (success) {
         LOG_INFO("Block shader loaded successfully");
     }

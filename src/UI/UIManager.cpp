@@ -823,6 +823,29 @@ void UIManager::setupVideoSettingsMenu() {
     elements.push_back(br);
     y += rowHeight + rowGap;
     
+    // === RIGHT COLUMN - Resource Packs ===
+    y += 15;
+    UIElement rpHeader;
+    rpHeader.x = rightCol;
+    rpHeader.y = y;
+    rpHeader.w = colWidth;
+    rpHeader.h = 25;
+    rpHeader.text = "-- Resource Packs --";
+    rpHeader.isLabel = true;
+    rpHeader.isHeader = true;
+    elements.push_back(rpHeader);
+    y += 35;
+    
+    // PBRANDPOM Resource Pack toggle
+    UIElement pbr;
+    pbr.x = rightCol; pbr.y = y; pbr.w = colWidth; pbr.h = rowHeight;
+    pbr.text = "PBRANDPOM: " + std::string(s.usePBRResourcePack ? "ON" : "OFF");
+    pbr.boolValueRef = &s.usePBRResourcePack;
+    pbr.onClick = [this]() { setupVideoSettingsMenu(); }; // Refresh to update text
+    pbr.tooltip = "Use PBRANDPOM resource pack with PBR textures";
+    elements.push_back(pbr);
+    y += rowHeight + rowGap;
+    
     // === RIGHT COLUMN - Celestial ===
     y += 15;
     UIElement celHeader;

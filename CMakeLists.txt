@@ -120,6 +120,7 @@ set(SOURCES
     src/Render/PostProcess.cpp
     src/Render/VoxelRayTracer.cpp
     src/Render/HeldItemRenderer.cpp
+    src/Render/ResourcePackManager.cpp
     src/Network/Socket.cpp
     src/Network/Protocol.cpp
     src/Network/GameServer.cpp

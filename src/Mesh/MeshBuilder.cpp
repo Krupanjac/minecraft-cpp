@@ -45,10 +45,13 @@ MeshData MeshBuilder::buildChunkMesh(std::shared_ptr<Chunk> chunk,
 }
 
 void MeshBuilder::addCross(int x, int y, int z, u8 material, u8 ao, MeshData& meshData) {
-    // Two intersecting quads
-    // Quad 1: (0,0,0) to (1,1,1)
-    // Quad 2: (0,0,1) to (1,1,0)
+    // Two intersecting quads forming an X shape
+    // Quad 1: diagonal from (0,0,0) to (1,1,1)
+    // Quad 2: diagonal from (0,0,1) to (1,1,0)
     
+    // UV represents block dimensions for the face (1x1 block)
+    // The shader unpacks these as the size, giving coords 0..1 across the face
+    // fract() is used in fragment shader for texture tiling
     u16 uv00 = Vertex::packUV(0, 0);
     u16 uv10 = Vertex::packUV(1, 0);
     u16 uv11 = Vertex::packUV(1, 1);
