@@ -51,7 +51,10 @@ struct UIElement {
 
     // For Inventory
     BlockType blockType = BlockType::AIR;
+    ItemType itemType = ItemType::NONE;  // For tools/items
     bool isInventoryItem = false;
+    bool isInventoryTool = false;        // True if this is a tool/item, not a block
+    int inventoryIndex = -1;             // Index in inventory for rotation tracking
     std::function<void()> onRightClick;
 
     // For Keybinding
@@ -124,6 +127,10 @@ public:
     void toggleDebug() { showDebug = !showDebug; }
 
     void updateDebugInfo(float fps, const std::string& blockName, const glm::vec3& playerPos, const glm::vec3& playerVel, float taaMotion = 0.0f, float taaHistoryWeight = 0.0f);
+
+    // Helpers accessible outside UI
+    std::string getBlockName(BlockType type);
+    static int getBlockTextureIndex(BlockType type, int face); // face: 0=top, 1=bottom, 2=side
     
     // Console rendering
     void renderConsole();
@@ -150,6 +157,22 @@ public:
         BlockType::SAND, BlockType::GRAVEL, BlockType::GRASS, BlockType::WATER, BlockType::AIR 
     };
     int selectedSlot = 0;
+    
+    // HUD Animation State
+    float hotbarSlotHover[9] = {0.0f};       // Hover animation progress (0-1)
+    float hotbarSlotBounce[9] = {0.0f};      // Bounce animation on selection
+    float hotbarSlotRotation[9] = {0.0f};    // Block rotation for hover spin
+    int hoveredSlot = -1;                     // Currently hovered hotbar slot
+    float healthFlash = 0.0f;                 // Flash when taking damage
+    float xpBarGlow = 0.0f;                   // Glow when gaining XP
+    float hudAlpha = 1.0f;                    // Overall HUD opacity
+    float selectionBounce = 0.0f;            // Selection highlight bounce
+    
+    // Inventory Animation State
+    std::string inventorySearch;              // Search filter text
+    float inventoryItemRotations[256] = {0};  // Rotation for each inventory item
+    int inventoryHoveredIndex = -1;           // Currently hovered inventory item
+    int inventoryTab = 0;                     // 0 = Blocks, 1 = Tools
     
     // Debug controls
     float timeOfDay = 0.0f; // 0-1200
@@ -183,6 +206,7 @@ private:
     BlockType selectedBlock = BlockType::STONE; // Deprecated by hotbar, keeping for internal ref if needed, but hotbar[selectedSlot] is primary.
     
     void renderHUD();
+    void updateHUDAnimations(float deltaTime, double mouseX, double mouseY);  // Update HUD hover/animations
     void renderChat();
     void renderModelPreview();  // Render 3D character model preview
     void loadPreviewModel(int modelIndex);  // Load preview model by index
@@ -279,9 +303,12 @@ private:
     void clearWorldPreviewTextures();
     
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
+    void drawRoundedRect(float x, float y, float w, float h, float radius, const glm::vec4& color);
+    void drawGradientRect(float x, float y, float w, float h, const glm::vec4& colorTop, const glm::vec4& colorBottom);
     void drawTexturedRect(float x, float y, float w, float h, GLuint textureId);
     void drawText(float x, float y, float scale, const std::string& text, const glm::vec4& color);
-    void drawBlockIcon(float x, float y, float size, BlockType type); // Draw 3D isometric block
+    void drawBlockIcon(float x, float y, float size, BlockType type, float extraRotation = 0.0f); // Draw 3D isometric block with optional rotation
+    void drawToolIcon(float x, float y, float size, ItemType type);  // Draw tool/item icon
     
     // Helper for vector font
     void drawLine(float x1, float y1, float x2, float y2, const glm::vec4& color);
@@ -289,6 +316,6 @@ private:
     // Helper to get color for block preview
     glm::vec4 getBlockColor(BlockType type);
     
-    // Helper to get texture atlas index for a block face
-    int getBlockTextureIndex(BlockType type, int face); // face: 0=top, 1=bottom, 2=side
+    // Helper to get block name
+    std::string getItemName(ItemType type);
 };

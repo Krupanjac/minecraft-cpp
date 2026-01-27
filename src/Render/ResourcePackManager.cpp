@@ -692,10 +692,10 @@ void ResourcePackManager::setupBlockMappings() {
         blockMappings[BlockType::SAND] = mapping;
     }
     
-    // WATER - use blue ice as placeholder
+    // WATER - use ice as placeholder
     {
         BlockTextureMapping mapping;
-        int idx = findFirstTex({"blue_ice", "ice", "packed_ice"});
+        int idx = findFirstTex({"ice"});
         waterStillIndex = idx;
         waterFlowIndex = idx;
         mapping.top.albedoIndex = idx;
@@ -717,7 +717,7 @@ void ResourcePackManager::setupBlockMappings() {
     // LEAVES
     {
         BlockTextureMapping mapping;
-        int idx = findFirstTex({"oak_leaves", "birch_leaves", "spruce_leaves", "acacia_leaves"});
+        int idx = findFirstTex({"oak_leaves", "birch_leaves", "spruce_leaves", "jungle_leaves"});
         mapping.top.albedoIndex = idx;
         mapping.bottom.albedoIndex = idx;
         mapping.side.albedoIndex = idx;
@@ -737,7 +737,7 @@ void ResourcePackManager::setupBlockMappings() {
     // ICE
     {
         BlockTextureMapping mapping;
-        int idx = findFirstTex({"ice", "blue_ice", "packed_ice"});
+        int idx = findFirstTex({"ice"});
         iceIndex = idx;
         mapping.top.albedoIndex = idx;
         mapping.bottom.albedoIndex = idx;
@@ -851,8 +851,7 @@ void ResourcePackManager::setupBlockMappings() {
         mapping.top.albedoIndex = idx;
         mapping.bottom.albedoIndex = idx;
         mapping.side.albedoIndex = idx;
-        blockMappings[BlockType::STONE] = mapping;  // Use for stone since cobblestone has better PBR
-        // Actually let's keep stone as stone - add cobblestone as extra
+        blockMappings[BlockType::COBBLESTONE] = mapping;
         LOG_INFO("COBBLESTONE: idx=" + std::to_string(idx));
     }
     
@@ -860,38 +859,576 @@ void ResourcePackManager::setupBlockMappings() {
     {
         BlockTextureMapping mapping;
         int idx = findTex("coal_ore");
-        // Coal ore could be used for special blocks if we add them
-        LOG_INFO("COAL_ORE available: idx=" + std::to_string(idx));
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::COAL_ORE] = mapping;
+        LOG_INFO("COAL_ORE: idx=" + std::to_string(idx));
     }
     
     // IRON_ORE - has full PBR  
     {
+        BlockTextureMapping mapping;
         int idx = findTex("iron_ore");
-        LOG_INFO("IRON_ORE available: idx=" + std::to_string(idx));
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::IRON_ORE] = mapping;
+        LOG_INFO("IRON_ORE: idx=" + std::to_string(idx));
     }
     
     // GOLD_ORE - has full PBR
     {
+        BlockTextureMapping mapping;
         int idx = findTex("gold_ore");
-        LOG_INFO("GOLD_ORE available: idx=" + std::to_string(idx));
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::GOLD_ORE] = mapping;
+        LOG_INFO("GOLD_ORE: idx=" + std::to_string(idx));
     }
     
     // DIAMOND_ORE - has full PBR
     {
+        BlockTextureMapping mapping;
         int idx = findTex("diamond_ore");
-        LOG_INFO("DIAMOND_ORE available: idx=" + std::to_string(idx));
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::DIAMOND_ORE] = mapping;
+        LOG_INFO("DIAMOND_ORE: idx=" + std::to_string(idx));
+    }
+    
+    // EMERALD_ORE
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("emerald_ore");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::EMERALD_ORE] = mapping;
+    }
+    
+    // REDSTONE_ORE
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("redstone_ore");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::REDSTONE_ORE] = mapping;
+    }
+    
+    // LAPIS_ORE
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("lapis_ore");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::LAPIS_ORE] = mapping;
+    }
+    
+    
+    // MOSSY_COBBLESTONE
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("mossy_cobblestone");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::MOSSY_COBBLESTONE] = mapping;
+    }
+    
+    // STONE_BRICKS
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("stone_bricks");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::STONE_BRICKS] = mapping;
+    }
+    
+    // MOSSY_STONE_BRICKS
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("mossy_stone_bricks");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::MOSSY_STONE_BRICKS] = mapping;
+    }
+    
+    // CRACKED_STONE_BRICKS
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("cracked_stone_bricks");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::CRACKED_STONE_BRICKS] = mapping;
+    }
+    
+    // CHISELED_STONE_BRICKS
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("chiseled_stone_bricks");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::CHISELED_STONE_BRICKS] = mapping;
+    }
+    
+    
+    // IRON_BLOCK
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("iron_block");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::IRON_BLOCK] = mapping;
+    }
+    
+    // GOLD_BLOCK
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("gold_block");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::GOLD_BLOCK] = mapping;
+    }
+    
+    // DIAMOND_BLOCK
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("diamond_block");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::DIAMOND_BLOCK] = mapping;
+    }
+    
+    // EMERALD_BLOCK
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("emerald_block");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::EMERALD_BLOCK] = mapping;
+    }
+    
+    // REDSTONE_BLOCK
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("redstone_block");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::REDSTONE_BLOCK] = mapping;
     }
     
     // BRICKS - has full PBR
     {
+        BlockTextureMapping mapping;
         int idx = findTex("bricks");
-        LOG_INFO("BRICKS available: idx=" + std::to_string(idx));
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::BRICKS] = mapping;
+        LOG_INFO("BRICKS: idx=" + std::to_string(idx));
     }
     
-    // CLAY - has full PBR
+    // OBSIDIAN
     {
+        BlockTextureMapping mapping;
+        int idx = findTex("obsidian");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::OBSIDIAN] = mapping;
+    }
+    
+    
+    // GLASS
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("glass");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::GLASS] = mapping;
+    }
+    
+    // BOOKSHELF
+    {
+        BlockTextureMapping mapping;
+        int sideIdx = findTex("bookshelf");
+        int plankIdx = findFirstTex({"oak_planks", "birch_planks"});
+        mapping.top.albedoIndex = plankIdx;
+        mapping.bottom.albedoIndex = plankIdx;
+        mapping.side.albedoIndex = sideIdx;
+        blockMappings[BlockType::BOOKSHELF] = mapping;
+    }
+    
+    // TNT
+    {
+        BlockTextureMapping mapping;
+        mapping.top.albedoIndex = findTex("tnt_top");
+        mapping.bottom.albedoIndex = findTex("tnt_bottom");
+        mapping.side.albedoIndex = findTex("tnt_side");
+        blockMappings[BlockType::TNT] = mapping;
+    }
+    
+    // GLOWSTONE
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("glowstone");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::GLOWSTONE] = mapping;
+    }
+    
+    
+    // REDSTONE_LAMP
+    {
+        BlockTextureMapping mapping;
+        int idx = findFirstTex({"redstone_lamp_on", "redstone_lamp"});
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::REDSTONE_LAMP] = mapping;
+    }
+    
+    // OAK_PLANKS
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("oak_planks");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::OAK_PLANKS] = mapping;
+    }
+    
+    // SPRUCE_PLANKS
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("spruce_planks");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::SPRUCE_PLANKS] = mapping;
+    }
+    
+    // BIRCH_PLANKS
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("birch_planks");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::BIRCH_PLANKS] = mapping;
+    }
+    
+    // JUNGLE_PLANKS
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("jungle_planks");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::JUNGLE_PLANKS] = mapping;
+    }
+    
+    
+    // OAK_LOG
+    {
+        BlockTextureMapping mapping;
+        mapping.top.albedoIndex = findTex("oak_log_top");
+        mapping.bottom.albedoIndex = findTex("oak_log_top");
+        mapping.side.albedoIndex = findTex("oak_log");
+        blockMappings[BlockType::OAK_LOG] = mapping;
+    }
+    
+    // SPRUCE_LOG
+    {
+        BlockTextureMapping mapping;
+        mapping.top.albedoIndex = findTex("spruce_log_top");
+        mapping.bottom.albedoIndex = findTex("spruce_log_top");
+        mapping.side.albedoIndex = findTex("spruce_log");
+        blockMappings[BlockType::SPRUCE_LOG] = mapping;
+    }
+    
+    // BIRCH_LOG
+    {
+        BlockTextureMapping mapping;
+        mapping.top.albedoIndex = findTex("birch_log_top");
+        mapping.bottom.albedoIndex = findTex("birch_log_top");
+        mapping.side.albedoIndex = findTex("birch_log");
+        blockMappings[BlockType::BIRCH_LOG] = mapping;
+    }
+    
+    // JUNGLE_LOG
+    {
+        BlockTextureMapping mapping;
+        mapping.top.albedoIndex = findTex("jungle_log_top");
+        mapping.bottom.albedoIndex = findTex("jungle_log_top");
+        mapping.side.albedoIndex = findTex("jungle_log");
+        blockMappings[BlockType::JUNGLE_LOG] = mapping;
+    }
+    
+    
+    // OAK_LEAVES
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("oak_leaves");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::OAK_LEAVES] = mapping;
+    }
+    
+    // SPRUCE_LEAVES
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("spruce_leaves");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::SPRUCE_LEAVES] = mapping;
+    }
+    
+    // BIRCH_LEAVES
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("birch_leaves");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::BIRCH_LEAVES] = mapping;
+    }
+    
+    // JUNGLE_LEAVES
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("jungle_leaves");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::JUNGLE_LEAVES] = mapping;
+    }
+    
+    
+    // WOOL - All 16 colors
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("white_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::WHITE_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("orange_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::ORANGE_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("magenta_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::MAGENTA_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("light_blue_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::LIGHT_BLUE_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findFirstTex({"yellow_wool", "white_wool"});
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::YELLOW_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("lime_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::LIME_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("pink_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::PINK_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("gray_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::GRAY_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("light_gray_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::LIGHT_GRAY_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("cyan_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::CYAN_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("purple_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::PURPLE_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("blue_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::BLUE_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("brown_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::BROWN_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("green_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::GREEN_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("red_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::RED_WOOL] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("black_wool");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::BLACK_WOOL] = mapping;
+    }
+    
+    
+    // Sand variants
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("chiseled_sandstone");
+        mapping.top.albedoIndex = findTex("sandstone_top");
+        mapping.bottom.albedoIndex = findTex("sandstone_top");
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::CHISELED_SANDSTONE] = mapping;
+    }
+    
+    // Misc blocks
+    {
+        BlockTextureMapping mapping;
         int idx = findTex("clay");
-        LOG_INFO("CLAY available: idx=" + std::to_string(idx));
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::CLAY] = mapping;
+        LOG_INFO("CLAY: idx=" + std::to_string(idx));
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("sponge");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::SPONGE] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("cobweb");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::COBWEB] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        mapping.top.albedoIndex = findTex("crafting_table_top");
+        mapping.bottom.albedoIndex = findFirstTex({"oak_planks", "birch_planks"});
+        mapping.side.albedoIndex = findTex("crafting_table_side");
+        blockMappings[BlockType::CRAFTING_TABLE] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("note_block");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::NOTE_BLOCK] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int topIdx = findTex("jukebox_top");
+        int sideIdx = findTex("note_block");  // Use note block for sides
+        mapping.top.albedoIndex = topIdx;
+        mapping.bottom.albedoIndex = sideIdx;
+        mapping.side.albedoIndex = sideIdx;
+        blockMappings[BlockType::JUKEBOX] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("farmland");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = findTex("dirt");
+        mapping.side.albedoIndex = findTex("dirt");
+        blockMappings[BlockType::FARMLAND] = mapping;
+    }
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("sugar_cane");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::SUGAR_CANE] = mapping;
     }
     
     // Log loaded textures for debugging

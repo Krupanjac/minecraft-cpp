@@ -1,5 +1,6 @@
 #include "Renderer.h"
 #include "ResourcePackManager.h"
+#include "../UI/UIManager.h"
 #include "../Core/Logger.h"
 #include "../Util/Config.h"
 #include "../Core/Settings.h"
@@ -8,6 +9,7 @@
 #include <random>
 #include <cmath>
 #include <fstream> // For debug shadow dump
+#include <vector>
 
 Renderer::Renderer() {
 }
@@ -483,17 +485,30 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     blockShader.setFloat("uAOStrength", Settings::instance().aoStrength);
     blockShader.setFloat("uGamma", Settings::instance().gamma);
     
+    const int blockTypeCount = static_cast<int>(BlockType::BLOCK_TYPE_COUNT);
+
+    // Build atlas indices for all block types/faces
+    std::vector<int> atlasIndices(blockTypeCount * 6, 0);
+    for (int mat = 0; mat < blockTypeCount; mat++) {
+        BlockType type = static_cast<BlockType>(mat);
+        for (int face = 0; face < 6; face++) {
+            int atlasFace = (face == 2) ? 0 : (face == 3 ? 2 : 1); // 0=top,1=side,2=bottom
+            atlasIndices[mat * 6 + face] = UIManager::getBlockTextureIndex(type, atlasFace);
+        }
+    }
+    glUniform1iv(glGetUniformLocation(blockShader.getProgram(), "uAtlasIndices"), blockTypeCount * 6, atlasIndices.data());
+
     // Set texture indices for PBR mode
     if (usePBR) {
         // Build texture index array for all block types and faces
-        int textureIndices[16 * 6];
-        for (int mat = 0; mat < 16; mat++) {
+        std::vector<int> textureIndices(blockTypeCount * 6, 0);
+        for (int mat = 0; mat < blockTypeCount; mat++) {
             BlockType type = static_cast<BlockType>(mat);
             for (int face = 0; face < 6; face++) {
                 textureIndices[mat * 6 + face] = resPack.getTextureIndex(type, face);
             }
         }
-        glUniform1iv(glGetUniformLocation(blockShader.getProgram(), "uTextureIndices"), 96, textureIndices);
+        glUniform1iv(glGetUniformLocation(blockShader.getProgram(), "uTextureIndices"), blockTypeCount * 6, textureIndices.data());
         
         // Pass grass variants for vegetation randomization
         const auto& grassVariants = resPack.getGrassVariants();
@@ -511,8 +526,8 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     
     // Parallax mapping settings - subtle depth effect
     blockShader.setInt("uEnableParallax", Settings::instance().enableParallaxMapping ? 1 : 0);
-    blockShader.setFloat("uParallaxScale", 0.03f);  // Subtle depth to avoid blur
-    blockShader.setInt("uParallaxSteps", 16);  // Fewer steps = less blur
+    blockShader.setFloat("uParallaxScale", 0.06f);  // Increased depth for visibility
+    blockShader.setInt("uParallaxSteps", 24);  // More steps for smoother POM
 
     // Wireframe toggle applied around draw loop to only affect chunk rendering
     if (Settings::instance().debugWireframe) {
@@ -1707,11 +1722,16 @@ void Renderer::renderBlockBreakOverlay(const Camera& camera, const glm::ivec3& b
     }
     
     // Model matrix positions the overlay cube at the block position
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), blockPosF);
+    // Scale slightly larger (1.002) to prevent z-fighting with the actual block
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), blockPosF + glm::vec3(0.5f));  // Center of block
+    model = glm::scale(model, glm::vec3(1.002f));  // Slightly larger to avoid z-fighting
+    model = glm::translate(model, glm::vec3(-0.5f));  // Move back to block corner
     
     // Setup rendering state
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL); // Use LEQUAL to render on top of existing geometry at same depth
+    glEnable(GL_POLYGON_OFFSET_FILL);  // Use polygon offset to push the overlay slightly toward camera
+    glPolygonOffset(-1.0f, -1.0f);     // Negative values push toward camera
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE); // Render both sides
@@ -1738,6 +1758,7 @@ void Renderer::renderBlockBreakOverlay(const Camera& camera, const glm::ivec3& b
     
     // Restore state
     glDepthFunc(GL_LESS);
+    glDisable(GL_POLYGON_OFFSET_FILL);
     glDisable(GL_BLEND);
     glEnable(GL_CULL_FACE);
 }

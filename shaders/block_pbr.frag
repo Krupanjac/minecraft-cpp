@@ -5,7 +5,7 @@ in vec3 vNormal;
 in vec2 vTexCoord;
 flat in vec2 vCellOrigin;
 flat in uint vMaterial;
-flat in int vTextureLayer;
+flat in int vFace;
 in float vAO;
 in vec3 vTangent;
 in vec3 vBitangent;
@@ -23,6 +23,13 @@ uniform sampler2DArray uAlbedoArray;
 uniform sampler2DArray uNormalArray;
 uniform sampler2DArray uSpecularArray;
 uniform int uUsePBRResourcePack;
+const int kBlockTypeCount = 117;
+// Texture layer indices for PBR resource pack (per block type, per face)
+uniform int uTextureIndices[kBlockTypeCount * 6];
+
+// Vegetation variant indices for randomization
+uniform int uGrassVariants[8];
+uniform int uGrassVariantCount;
 
 uniform sampler2D uShadowMap;
 uniform sampler2D uRayTracingMap;
@@ -184,7 +191,24 @@ void main() {
     float roughness = 0.8;
     float metallic = 0.0;
     
-    if (uUsePBRResourcePack == 1 && vTextureLayer >= 0) {
+    int textureLayer = 0;
+    if (uUsePBRResourcePack == 1) {
+        int lookupIdx = int(vMaterial) * 6 + vFace;
+        if (lookupIdx >= 0 && lookupIdx < (kBlockTypeCount * 6)) {
+            textureLayer = uTextureIndices[lookupIdx];
+        }
+        // Vegetation randomization based on world position
+        if (textureLayer >= 0 && (vMaterial == 13u || vMaterial == 14u) && uGrassVariantCount > 0) {
+            ivec3 blockPos = ivec3(floor(vWorldPos));
+            int hash = blockPos.x * 73856093 ^ blockPos.y * 19349663 ^ blockPos.z * 83492791;
+            hash = abs(hash);
+            int variantIdx = hash % uGrassVariantCount;
+            int variantLayer = uGrassVariants[variantIdx];
+            if (variantLayer >= 0) textureLayer = variantLayer;
+        }
+    }
+
+    if (uUsePBRResourcePack == 1) {
         // Sample from texture arrays with texel inset to prevent edge bleeding
         vec2 uv = fract(vTexCoord);
         
@@ -199,7 +223,7 @@ void main() {
         
         // Apply parallax occlusion mapping if enabled
         // Works on all block faces using tangent space
-        if (uEnableParallax == 1 && distToCamera < 24.0) {
+        if (uEnableParallax == 1 && distToCamera < 48.0) {
             // Build TBN matrix for this face
             vec3 T = normalize(vTangent);
             vec3 B = normalize(vBitangent);
@@ -213,15 +237,15 @@ void main() {
                 dot(viewDirWorld, N)
             );
             
-            vec2 parallaxUV = parallaxOcclusionMapping(uv, viewDirTangent, float(vTextureLayer));
+            vec2 parallaxUV = parallaxOcclusionMapping(uv, viewDirTangent, float(textureLayer));
             
             // Fade out at distance
-            float parallaxFade = 1.0 - smoothstep(12.0, 24.0, distToCamera);
+            float parallaxFade = 1.0 - smoothstep(24.0, 48.0, distToCamera);
             uv = mix(uv, parallaxUV, parallaxFade);
         }
         
         // Sample albedo with better filtering for vegetation
-        vec4 albedo = texture(uAlbedoArray, vec3(uv, float(vTextureLayer)));
+        vec4 albedo = texture(uAlbedoArray, vec3(uv, float(textureLayer)));
         
         // For vegetation (tall grass, flowers), use stricter alpha test to remove edge artifacts
         if (vMaterial == 13u || vMaterial == 14u) {
@@ -255,13 +279,13 @@ void main() {
         // Rose/flowers (material 14) - no tint, keep original colors
         
         // Sample and apply normal map
-        vec3 normalMapValue = texture(uNormalArray, vec3(uv, float(vTextureLayer))).rgb;
+        vec3 normalMapValue = texture(uNormalArray, vec3(uv, float(textureLayer))).rgb;
         if (length(normalMapValue) > 0.1) {
             normal = applyNormalMap(normalMapValue, vNormal, vTangent, vBitangent);
         }
         
         // Sample specular/roughness map
-        vec4 specularData = texture(uSpecularArray, vec3(uv, float(vTextureLayer)));
+        vec4 specularData = texture(uSpecularArray, vec3(uv, float(textureLayer)));
         roughness = specularData.r;  // R channel = roughness
         metallic = specularData.g;   // G channel = metallic
     } else {

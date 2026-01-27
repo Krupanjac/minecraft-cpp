@@ -1153,21 +1153,7 @@ public:
                 int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
                 Block block = chunkManager.getBlockAt(x, y, z);
                 
-                switch (block.getType()) {
-                    case BlockType::AIR: blockName = "Air"; break;
-                    case BlockType::GRASS: blockName = "Grass"; break;
-                    case BlockType::DIRT: blockName = "Dirt"; break;
-                    case BlockType::STONE: blockName = "Stone"; break;
-                    case BlockType::SAND: blockName = "Sand"; break;
-                    case BlockType::WATER: blockName = "Water"; break;
-                    case BlockType::WOOD: blockName = "Wood"; break;
-                    case BlockType::LEAVES: blockName = "Leaves"; break;
-                    case BlockType::SNOW: blockName = "Snow"; break;
-                    case BlockType::ICE: blockName = "Ice"; break;
-                    case BlockType::GRAVEL: blockName = "Gravel"; break;
-                    case BlockType::SANDSTONE: blockName = "Sandstone"; break;
-                    default: blockName = "Unknown"; break;
-                }
+                blockName = uiManager.getBlockName(block.getType());
             }
             
             // Pass estimated TAA metrics to UI for debugging

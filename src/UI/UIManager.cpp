@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <random>
 #include <climits>
+#include <cctype>
 
 // Prevent Windows min/max macros from interfering with std::min/max
 #ifdef _WIN32
@@ -135,7 +136,7 @@ void UIManager::initialize(int windowWidth, int windowHeight) {
     
     // Setup isometric cube VAO for block icons
     // Cube vertices: position (3), texcoord (2), normal (3), faceId (1)
-    // Only render 3 visible faces: top, right, front (like Minecraft inventory)
+    // All 6 faces for full rotation support
     float cubeVertices[] = {
         // Top face (Y+) - faceId = 0
         -0.5f,  0.5f, -0.5f,  0.0f, 0.0f,  0.0f, 1.0f, 0.0f,  0.0f,
@@ -145,13 +146,13 @@ void UIManager::initialize(int windowWidth, int windowHeight) {
          0.5f,  0.5f,  0.5f,  1.0f, 1.0f,  0.0f, 1.0f, 0.0f,  0.0f,
         -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,  0.0f, 1.0f, 0.0f,  0.0f,
         
-        // Right face (X+) - faceId = 1 (side texture)
-         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,  1.0f, 0.0f, 0.0f,  1.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,  1.0f,
-         0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  1.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,  1.0f, 0.0f, 0.0f,  1.0f,
-         0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  1.0f,
-         0.5f, -0.5f,  0.5f,  0.0f, 1.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+        // Bottom face (Y-) - faceId = 2
+        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,  0.0f, -1.0f, 0.0f,  2.0f,
+         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,  0.0f, -1.0f, 0.0f,  2.0f,
+         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,  0.0f, -1.0f, 0.0f,  2.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,  0.0f, -1.0f, 0.0f,  2.0f,
+         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,  0.0f, -1.0f, 0.0f,  2.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,  0.0f, -1.0f, 0.0f,  2.0f,
         
         // Front face (Z+) - faceId = 1 (side texture)
         -0.5f, -0.5f,  0.5f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f,  1.0f,
@@ -160,13 +161,37 @@ void UIManager::initialize(int windowWidth, int windowHeight) {
         -0.5f, -0.5f,  0.5f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f,  1.0f,
          0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  0.0f, 0.0f, 1.0f,  1.0f,
         -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,  1.0f,
+        
+        // Back face (Z-) - faceId = 1 (side texture)
+         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,  0.0f, 0.0f, -1.0f,  1.0f,
+        -0.5f, -0.5f, -0.5f,  1.0f, 1.0f,  0.0f, 0.0f, -1.0f,  1.0f,
+        -0.5f,  0.5f, -0.5f,  1.0f, 0.0f,  0.0f, 0.0f, -1.0f,  1.0f,
+         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,  0.0f, 0.0f, -1.0f,  1.0f,
+        -0.5f,  0.5f, -0.5f,  1.0f, 0.0f,  0.0f, 0.0f, -1.0f,  1.0f,
+         0.5f,  0.5f, -0.5f,  0.0f, 0.0f,  0.0f, 0.0f, -1.0f,  1.0f,
+        
+        // Right face (X+) - faceId = 1 (side texture)
+         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+         0.5f,  0.5f, -0.5f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, 1.0f,  1.0f, 0.0f, 0.0f,  1.0f,
+        
+        // Left face (X-) - faceId = 1 (side texture)
+        -0.5f, -0.5f,  0.5f,  1.0f, 1.0f, -1.0f, 0.0f, 0.0f,  1.0f,
+        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f, -1.0f, 0.0f, 0.0f,  1.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f, 0.0f, -1.0f, 0.0f, 0.0f,  1.0f,
+        -0.5f, -0.5f,  0.5f,  1.0f, 1.0f, -1.0f, 0.0f, 0.0f,  1.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f, 0.0f, -1.0f, 0.0f, 0.0f,  1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f, -1.0f, 0.0f, 0.0f,  1.0f,
     };
     
     glGenVertexArrays(1, &blockIconVao);
     glGenBuffers(1, &blockIconVbo);
     
     glBindVertexArray(blockIconVao);
-    glBindBuffer(GL_ARRAY_BUFFER, blockIconVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, blockIconVbo);;
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
     
     // Position
@@ -1479,56 +1504,318 @@ void UIManager::setupNewGameMenu() {
 void UIManager::setupInventoryMenu() {
     elements.clear();
     
-    // Inventory Grid similar to Minecraft
-    float slotSize = 60.0f;
-    float gap = 10.0f;
-    int cols = 9; 
+    // Inventory Grid similar to Minecraft - with tabs for Blocks and Tools
+    float slotSize = 52.0f;
+    float gap = 6.0f;
+    int cols = 9;
     
-    std::vector<BlockType> blocks = {
-        BlockType::GRASS, BlockType::DIRT, BlockType::STONE, BlockType::SAND, 
-        BlockType::WOOD, BlockType::LOG, BlockType::LEAVES, BlockType::GRAVEL, 
-        BlockType::SANDSTONE, BlockType::SNOW, BlockType::ICE, BlockType::WATER,
-        BlockType::TALL_GRASS, BlockType::ROSE, BlockType::BEDROCK
+    // All available blocks (excluding AIR) - organized by category
+    std::vector<BlockType> allBlocks = {
+        // Natural terrain
+        BlockType::GRASS, BlockType::DIRT,
+        BlockType::STONE, BlockType::COBBLESTONE, BlockType::MOSSY_COBBLESTONE,
+        BlockType::SAND, BlockType::GRAVEL, BlockType::CLAY,
+        
+        // Ores
+        BlockType::COAL_ORE, BlockType::IRON_ORE, BlockType::GOLD_ORE, BlockType::DIAMOND_ORE,
+        BlockType::EMERALD_ORE, BlockType::REDSTONE_ORE, BlockType::LAPIS_ORE,
+        
+        // Mineral blocks
+        BlockType::IRON_BLOCK, BlockType::GOLD_BLOCK, BlockType::DIAMOND_BLOCK,
+        BlockType::EMERALD_BLOCK, BlockType::REDSTONE_BLOCK,
+        
+        // Stone variants
+        BlockType::STONE_BRICKS, BlockType::MOSSY_STONE_BRICKS, BlockType::CRACKED_STONE_BRICKS,
+        BlockType::CHISELED_STONE_BRICKS,
+        
+        // Sandstone
+        BlockType::SANDSTONE, BlockType::CHISELED_SANDSTONE,
+        
+        // Building blocks
+        BlockType::BRICKS, BlockType::OBSIDIAN,
+        BlockType::BOOKSHELF, BlockType::TNT, BlockType::CRAFTING_TABLE,
+        
+        // Light sources
+        BlockType::GLOWSTONE, BlockType::REDSTONE_LAMP,
+        
+        // Glass
+        BlockType::GLASS,
+        
+        // Wool
+        BlockType::WHITE_WOOL, BlockType::ORANGE_WOOL, BlockType::MAGENTA_WOOL,
+        BlockType::LIGHT_BLUE_WOOL, BlockType::YELLOW_WOOL, BlockType::LIME_WOOL,
+        BlockType::PINK_WOOL, BlockType::GRAY_WOOL, BlockType::LIGHT_GRAY_WOOL,
+        BlockType::CYAN_WOOL, BlockType::PURPLE_WOOL, BlockType::BLUE_WOOL,
+        BlockType::BROWN_WOOL, BlockType::GREEN_WOOL, BlockType::RED_WOOL, BlockType::BLACK_WOOL,
+        
+        // Wood - Planks
+        BlockType::WOOD, BlockType::OAK_PLANKS, BlockType::SPRUCE_PLANKS, BlockType::BIRCH_PLANKS,
+        BlockType::JUNGLE_PLANKS,
+        
+        // Wood - Logs
+        BlockType::LOG, BlockType::OAK_LOG, BlockType::SPRUCE_LOG, BlockType::BIRCH_LOG,
+        BlockType::JUNGLE_LOG,
+        
+        // Leaves
+        BlockType::LEAVES, BlockType::OAK_LEAVES, BlockType::SPRUCE_LEAVES, BlockType::BIRCH_LEAVES,
+        BlockType::JUNGLE_LEAVES,
+        
+        // Nature
+        BlockType::TALL_GRASS, BlockType::ROSE, BlockType::COBWEB, BlockType::SUGAR_CANE,
+        
+        // Ice variants
+        BlockType::SNOW, BlockType::ICE,
+        
+        // Water
+        BlockType::WATER,
+        
+        // Misc
+        BlockType::SPONGE, BlockType::NOTE_BLOCK, BlockType::JUKEBOX,
+        BlockType::FARMLAND,
+        
+        // Bedrock (last - creative only)
+        BlockType::BEDROCK
+    };
+    
+    // All available tools
+    std::vector<ItemType> allTools = {
+        ItemType::SWORD_WOOD, ItemType::PICKAXE_WOOD, ItemType::AXE_WOOD, ItemType::SHOVEL_WOOD,
+        ItemType::SWORD_STONE, ItemType::PICKAXE_STONE, ItemType::AXE_STONE, ItemType::SHOVEL_STONE,
+        ItemType::SWORD_GOLD, ItemType::PICKAXE_GOLD, ItemType::AXE_GOLD, ItemType::SHOVEL_GOLD,
+        ItemType::SWORD_DIAMOND, ItemType::PICKAXE_DIAMOND, ItemType::AXE_DIAMOND, ItemType::SHOVEL_DIAMOND
     };
     
     float totalW = cols * slotSize + (cols - 1) * gap;
-    // float startX = (width - totalW) / 2.0f;
-    // Align with Minecraft style, usually centered
     float startX = (width - totalW) / 2.0f;
-    float startY = height / 2.0f - slotSize - 20.0f; 
+    float baseY = 100.0f;
     
-    // Draw "Survival Inventory" label
-    elements.push_back({width/2.0f - 150, startY - 60, 300, 30, "INVENTORY", false, nullptr});
-
-    for (size_t i = 0; i < blocks.size(); i++) {
-        int col = i % cols;
-        int row = i / cols;
-        
-        float x = startX + col * (slotSize + gap);
-        float y = startY + row * (slotSize + gap);
-        
-        UIElement el;
-        el.x = x;
-        el.y = y;
-        el.w = slotSize;
-        el.h = slotSize;
-        el.text = ""; 
-        el.isInventoryItem = true;
-        el.blockType = blocks[i];
-        el.onClick = [this, type = blocks[i]]() {
-            // Left click selects slot for placement (legacy) or maybe primary functionality?
-            // Actually, let's keep it simple: Left click just does nothing special or maybe selects for later drag/drop if we implemented it.
-            // But per plan, we rely on Right Click for assignment.
-        };
-        el.onRightClick = [this, type = blocks[i]]() {
-             // Assign to current hotbar slot
-             hotbar[selectedSlot] = type;
-        };
-        elements.push_back(el);
+    // ========================================
+    // INVENTORY TITLE
+    // ========================================
+    UIElement titleEl;
+    titleEl.x = width / 2.0f - 100;
+    titleEl.y = baseY;
+    titleEl.w = 200;
+    titleEl.h = 30;
+    titleEl.text = "INVENTORY";
+    titleEl.isLabel = true;
+    elements.push_back(titleEl);
+    
+    // ========================================
+    // SEARCH BAR
+    // ========================================
+    float searchY = baseY + 45;
+    float searchW = 280.0f;
+    float searchX = width / 2.0f - searchW / 2.0f;
+    
+    UIElement searchEl;
+    searchEl.x = searchX;
+    searchEl.y = searchY;
+    searchEl.w = searchW;
+    searchEl.h = 30;
+    searchEl.text = inventorySearch.empty() ? "Search..." : inventorySearch;
+    searchEl.isInput = true;
+    searchEl.textRef = &inventorySearch;
+    elements.push_back(searchEl);
+    
+    // ========================================
+    // CATEGORY TABS
+    // ========================================
+    float tabY = searchY + 45;
+    float tabW = 120.0f;
+    float tabH = 28.0f;
+    float tabGap = 10.0f;
+    float tabsStartX = width / 2.0f - (tabW * 2 + tabGap) / 2.0f;
+    
+    // Blocks Tab
+    UIElement blocksTab;
+    blocksTab.x = tabsStartX;
+    blocksTab.y = tabY;
+    blocksTab.w = tabW;
+    blocksTab.h = tabH;
+    blocksTab.text = "BLOCKS";
+    blocksTab.customColor = (inventoryTab == 0) ? glm::vec4(0.3f, 0.6f, 0.3f, 1.0f) : glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
+    blocksTab.onClick = [this]() { inventoryTab = 0; setupInventoryMenu(); };
+    elements.push_back(blocksTab);
+    
+    // Tools Tab
+    UIElement toolsTab;
+    toolsTab.x = tabsStartX + tabW + tabGap;
+    toolsTab.y = tabY;
+    toolsTab.w = tabW;
+    toolsTab.h = tabH;
+    toolsTab.text = "TOOLS";
+    toolsTab.customColor = (inventoryTab == 1) ? glm::vec4(0.3f, 0.6f, 0.3f, 1.0f) : glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
+    toolsTab.onClick = [this]() { inventoryTab = 1; setupInventoryMenu(); };
+    elements.push_back(toolsTab);
+    
+    // ========================================
+    // ITEMS GRID
+    // ========================================
+    float gridY = tabY + tabH + 20;
+    int itemIndex = 0;
+    
+    // Convert search to lowercase for comparison
+    std::string searchLower = inventorySearch;
+    for (auto& c : searchLower) c = std::tolower(c);
+    
+    if (inventoryTab == 0) {
+        // BLOCKS TAB
+        for (size_t i = 0; i < allBlocks.size(); i++) {
+            BlockType type = allBlocks[i];
+            
+            // Filter by search
+            if (!inventorySearch.empty()) {
+                std::string blockName = getBlockName(type);
+                std::string nameLower = blockName;
+                for (auto& c : nameLower) c = std::tolower(c);
+                if (nameLower.find(searchLower) == std::string::npos) {
+                    continue;
+                }
+            }
+            
+            int col = itemIndex % cols;
+            int row = itemIndex / cols;
+            
+            float x = startX + col * (slotSize + gap);
+            float y = gridY + row * (slotSize + gap);
+            
+            UIElement el;
+            el.x = x;
+            el.y = y;
+            el.w = slotSize;
+            el.h = slotSize;
+            el.text = "";
+            el.isInventoryItem = true;
+            el.isInventoryTool = false;
+            el.blockType = type;
+            el.inventoryIndex = itemIndex;
+            el.tooltip = getBlockName(type);
+            el.onClick = [this, type]() {
+                // Left click - assign block to current hotbar slot
+                hotbarSlots[selectedSlot] = HotbarSlot(type);
+                hotbar[selectedSlot] = type;  // Keep legacy array in sync
+            };
+            el.onRightClick = [this, type]() {
+                // Right click - also assign block to current hotbar slot
+                hotbarSlots[selectedSlot] = HotbarSlot(type);
+                hotbar[selectedSlot] = type;  // Keep legacy array in sync
+            };
+            elements.push_back(el);
+            itemIndex++;
+        }
+    } else {
+        // TOOLS TAB
+        for (size_t i = 0; i < allTools.size(); i++) {
+            ItemType type = allTools[i];
+            
+            // Filter by search
+            if (!inventorySearch.empty()) {
+                std::string toolName = getItemName(type);
+                std::string nameLower = toolName;
+                for (auto& c : nameLower) c = std::tolower(c);
+                if (nameLower.find(searchLower) == std::string::npos) {
+                    continue;
+                }
+            }
+            
+            int col = itemIndex % cols;
+            int row = itemIndex / cols;
+            
+            float x = startX + col * (slotSize + gap);
+            float y = gridY + row * (slotSize + gap);
+            
+            UIElement el;
+            el.x = x;
+            el.y = y;
+            el.w = slotSize;
+            el.h = slotSize;
+            el.text = "";
+            el.isInventoryItem = true;
+            el.isInventoryTool = true;
+            el.itemType = type;
+            el.inventoryIndex = itemIndex;
+            el.tooltip = getItemName(type);
+            el.onClick = [this, type]() {
+                // Left click - assign tool to current hotbar slot
+                hotbarSlots[selectedSlot] = HotbarSlot(type);
+                hotbar[selectedSlot] = BlockType::AIR;  // Clear legacy array since it's now a tool
+            };
+            el.onRightClick = [this, type]() {
+                // Right click - also assign tool to current hotbar slot
+                hotbarSlots[selectedSlot] = HotbarSlot(type);
+                hotbar[selectedSlot] = BlockType::AIR;  // Clear legacy array since it's now a tool
+            };
+            elements.push_back(el);
+            itemIndex++;
+        }
     }
     
-    // Add close instruction
-    elements.push_back({width/2.0f - 100, height - 100.0f, 200, 30, "PRESS [E] TO CLOSE", false, nullptr});
+    // ========================================
+    // CURRENT HOTBAR DISPLAY
+    // ========================================
+    float hotbarDisplayY = height - 160.0f;
+    float hotbarLabelY = hotbarDisplayY - 30.0f;
+    
+    UIElement hotbarLabel;
+    hotbarLabel.x = width / 2.0f - 80;
+    hotbarLabel.y = hotbarLabelY;
+    hotbarLabel.w = 160;
+    hotbarLabel.h = 20;
+    hotbarLabel.text = "HOTBAR";
+    hotbarLabel.isLabel = true;
+    elements.push_back(hotbarLabel);
+    
+    float hotbarSlotSize = 48.0f;
+    float hotbarGap = 4.0f;
+    float hotbarTotalW = 9 * hotbarSlotSize + 8 * hotbarGap;
+    float hotbarStartX = (width - hotbarTotalW) / 2.0f;
+    
+    for (int i = 0; i < 9; i++) {
+        const HotbarSlot& hSlot = hotbarSlots[i];
+        
+        UIElement slot;
+        slot.x = hotbarStartX + i * (hotbarSlotSize + hotbarGap);
+        slot.y = hotbarDisplayY;
+        slot.w = hotbarSlotSize;
+        slot.h = hotbarSlotSize;
+        slot.text = std::to_string(i + 1);
+        slot.isInventoryItem = true;
+        slot.inventoryIndex = 100 + i;  // Use 100+ for hotbar slots to differentiate
+        
+        // Set the slot content based on hotbarSlots
+        if (hSlot.isItem) {
+            slot.isInventoryTool = true;
+            slot.itemType = hSlot.itemStack.type;
+            slot.blockType = BlockType::AIR;
+        } else {
+            slot.isInventoryTool = false;
+            slot.blockType = hSlot.blockType;
+            slot.itemType = ItemType::NONE;
+        }
+        
+        slot.onClick = [this, i]() {
+            selectedSlot = i;
+        };
+        slot.onRightClick = [this, i]() {
+            // Clear slot
+            hotbarSlots[i] = HotbarSlot(BlockType::AIR);
+            hotbar[i] = BlockType::AIR;
+        };
+        elements.push_back(slot);
+    }
+    
+    // ========================================
+    // CLOSE INSTRUCTION
+    // ========================================
+    UIElement closeEl;
+    closeEl.x = width / 2.0f - 100;
+    closeEl.y = height - 60.0f;
+    closeEl.w = 200;
+    closeEl.h = 30;
+    closeEl.text = "PRESS [E] TO CLOSE";
+    closeEl.isLabel = true;
+    elements.push_back(closeEl);
 }
 
 glm::vec4 UIManager::getBlockColor(BlockType type) {
@@ -1603,6 +1890,9 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
         while (previewRotation > 360.0f) previewRotation -= 360.0f;
         while (previewRotation < 0.0f) previewRotation += 360.0f;
     }
+    
+    // Always update HUD animations (hover, selection bounce, etc.)
+    updateHUDAnimations(deltaTime, mouseX, mouseY);
     
     if (!isMenuOpen()) {
         lastMousePressed = mousePressed;
@@ -2027,13 +2317,21 @@ void UIManager::render() {
                     drawRect(el.x, el.y, el.w, el.h, bgColor);
                     drawRect(el.x + 2, el.y + 2, el.w - 4, el.h - 4, innerColor);
                     
-                    // Draw 3D isometric block
-                    if (el.blockType != BlockType::AIR) {
-                        drawBlockIcon(el.x + 4, el.y + 4, el.w - 8, el.blockType);
+                    // Get rotation for this inventory item
+                    float rotation = 0.0f;
+                    if (el.inventoryIndex >= 0 && el.inventoryIndex < 256) {
+                        rotation = inventoryItemRotations[el.inventoryIndex];
+                    }
+                    
+                    // Draw 3D isometric block or tool
+                    if (el.isInventoryTool && el.itemType != ItemType::NONE) {
+                        drawToolIcon(el.x + 4, el.y + 4, el.w - 8, el.itemType);
+                    } else if (el.blockType != BlockType::AIR) {
+                        drawBlockIcon(el.x + 4, el.y + 4, el.w - 8, el.blockType, rotation);
                     }
                     
                     // Draw selection highlight if this block is in current hotbar slot
-                    if (el.blockType == hotbar[selectedSlot]) {
+                    if (!el.isInventoryTool && el.blockType == hotbar[selectedSlot]) {
                         glm::vec4 hl(0.9f, 0.8f, 0.3f, 1.0f); // Golden highlight
                         float t = 3.0f;
                         drawRect(el.x - 2, el.y - 2, el.w + 4, t, hl); // Top
@@ -2226,104 +2524,226 @@ void UIManager::renderHUD() {
     glm::mat4 projection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
     uiShader.setMat4("uProjection", projection);
     
-    // Hotbar Settings
-    float slotSize = 44.0f;  // Slightly larger for better block visibility
-    float gap = 2.0f;
+    // ========================================
+    // HOTBAR - Modern Glass-like Design
+    // ========================================
+    float slotSize = 48.0f;
+    float slotPadding = 4.0f;
+    float slotGap = 3.0f;
     int slots = 9;
-    float totalW = slots * slotSize + (slots - 1) * gap;
-    float startX = (width - totalW) / 2.0f;
-    float startY = height - slotSize - 10.0f;
+    float innerSize = slotSize - slotPadding * 2;
+    float totalW = slots * slotSize + (slots - 1) * slotGap;
+    float hotbarPadding = 6.0f;
+    float hotbarW = totalW + hotbarPadding * 2;
+    float hotbarH = slotSize + hotbarPadding * 2;
+    float startX = (width - hotbarW) / 2.0f;
+    float startY = height - hotbarH - 8.0f;
     
-    // 1. Hotbar Background
+    // Hotbar background - dark glass effect
+    drawRect(startX, startY, hotbarW, hotbarH, glm::vec4(0.05f, 0.05f, 0.08f, 0.85f));
+    // Top highlight
+    drawRect(startX, startY, hotbarW, 1.0f, glm::vec4(0.3f, 0.3f, 0.35f, 0.6f));
+    // Bottom shadow
+    drawRect(startX, startY + hotbarH - 1, hotbarW, 1.0f, glm::vec4(0.0f, 0.0f, 0.0f, 0.5f));
+    // Left/right borders
+    drawRect(startX, startY, 1.0f, hotbarH, glm::vec4(0.2f, 0.2f, 0.25f, 0.5f));
+    drawRect(startX + hotbarW - 1, startY, 1.0f, hotbarH, glm::vec4(0.2f, 0.2f, 0.25f, 0.5f));
+    
+    float slotStartX = startX + hotbarPadding;
+    float slotStartY = startY + hotbarPadding;
+    
     for (int i = 0; i < slots; ++i) {
-        float x = startX + i * (slotSize + gap);
-        float y = startY;
+        float x = slotStartX + i * (slotSize + slotGap);
+        float y = slotStartY;
         
-        // Selection highlight (golden border like Minecraft)
+        // Apply hover animation (slots bob up slightly when hovered)
+        float hoverOffset = hotbarSlotHover[i] * 6.0f;
+        float bounceOffset = hotbarSlotBounce[i] * 4.0f;
+        y -= hoverOffset + bounceOffset;
+        
+        // Selection highlight
         if (i == selectedSlot) {
-            drawRect(x - 3, y - 3, slotSize + 6, slotSize + 6, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-            drawRect(x - 2, y - 2, slotSize + 4, slotSize + 4, glm::vec4(0.9f, 0.8f, 0.3f, 1.0f));
+            // Outer glow
+            float glowSize = 4.0f + selectionBounce * 2.0f;
+            drawRect(x - glowSize, y - glowSize, slotSize + glowSize * 2, slotSize + glowSize * 2, 
+                     glm::vec4(1.0f, 0.85f, 0.3f, 0.3f + selectionBounce * 0.2f));
+            // Golden border
+            drawRect(x - 2, y - 2, slotSize + 4, slotSize + 4, glm::vec4(1.0f, 0.85f, 0.3f, 1.0f));
+            drawRect(x - 1, y - 1, slotSize + 2, slotSize + 2, glm::vec4(0.9f, 0.75f, 0.2f, 1.0f));
         }
         
-        // Slot background (darker, more opaque)
-        drawRect(x, y, slotSize, slotSize, glm::vec4(0.15f, 0.15f, 0.15f, 0.9f));
+        // Slot background with subtle gradient effect
+        glm::vec4 slotBg = (i == selectedSlot) ? 
+            glm::vec4(0.2f, 0.2f, 0.22f, 0.95f) : 
+            glm::vec4(0.12f, 0.12f, 0.14f, 0.9f);
         
-        // Inner border for depth effect
-        drawRect(x + 1, y + 1, slotSize - 2, slotSize - 2, glm::vec4(0.25f, 0.25f, 0.25f, 0.9f));
-        
-        // Item - draw 3D isometric block
-        BlockType type = hotbar[i];
-        if (type != BlockType::AIR) {
-            drawBlockIcon(x + 2, y + 2, slotSize - 4, type);
+        // Brighten on hover
+        if (hotbarSlotHover[i] > 0.0f) {
+            float h = hotbarSlotHover[i];
+            slotBg = glm::vec4(slotBg.r + h * 0.1f, slotBg.g + h * 0.1f, slotBg.b + h * 0.12f, slotBg.a);
         }
         
-        // Slot number label (small, at bottom)
-        float numX = x + slotSize - 10;
-        float numY = y + slotSize - 12;
-        drawText(numX, numY, 0.4f, std::to_string(i + 1), glm::vec4(0.7f, 0.7f, 0.7f, 0.8f));
+        drawRect(x, y, slotSize, slotSize, slotBg);
+        
+        // Inner border (3D inset effect)
+        drawRect(x, y, slotSize, 1.0f, glm::vec4(0.0f, 0.0f, 0.0f, 0.5f));  // top shadow
+        drawRect(x, y, 1.0f, slotSize, glm::vec4(0.0f, 0.0f, 0.0f, 0.5f));  // left shadow
+        drawRect(x, y + slotSize - 1, slotSize, 1.0f, glm::vec4(0.3f, 0.3f, 0.35f, 0.3f));  // bottom highlight
+        drawRect(x + slotSize - 1, y, 1.0f, slotSize, glm::vec4(0.3f, 0.3f, 0.35f, 0.3f));  // right highlight
+        
+        // Draw item/block from hotbarSlots (supports both blocks and items)
+        const HotbarSlot& slot = hotbarSlots[i];
+        float iconX = x + slotPadding;
+        float iconY = y + slotPadding;
+        
+        if (!slot.isEmpty()) {
+            if (slot.isItem) {
+                // Draw tool icon
+                drawToolIcon(iconX, iconY, innerSize, slot.itemStack.type);
+            } else if (slot.blockType != BlockType::AIR) {
+                // Draw block with rotation on hover for spinning effect
+                drawBlockIcon(iconX, iconY, innerSize, slot.blockType, hotbarSlotRotation[i]);
+            }
+        }
+        
+        // Slot number (subtle, bottom-right corner)
+        float numX = x + slotSize - 12;
+        float numY = y + slotSize - 14;
+        glm::vec4 numColor = (i == selectedSlot) ? 
+            glm::vec4(1.0f, 0.9f, 0.6f, 0.9f) : 
+            glm::vec4(0.6f, 0.6f, 0.65f, 0.7f);
+        drawText(numX, numY, 0.4f, std::to_string(i + 1), numColor);
     }
     
-    // 2. Health Bar (Hearts) - Left above hotbar
-    // 10 hearts, 2 health per heart
-    float heartSize = 16.0f;
-    float heartGap = 2.0f;
-    float healthStartX = startX;
-    float healthStartY = startY - heartSize - 15.0f; // Above XP bar usually, but simplifying layer
+    // ========================================
+    // STATS BARS - Above Hotbar
+    // ========================================
+    float statsY = startY - 32.0f;
+    float barHeight = 10.0f;
+    float barWidth = (totalW - 20.0f) / 2.0f;
+    float iconSize = 14.0f;
     
-    // Draw max health background? Maybe just current health for now
-    for (int i = 0; i < 10; ++i) {
-        float x = healthStartX + i * (heartSize + heartGap);
-        // Background (empty heart - dark red)
-        drawRect(x, healthStartY, heartSize, heartSize, glm::vec4(0.3f, 0.0f, 0.0f, 1.0f));
-        
-        // Filled based on health
-        int heartHealth = (i + 1) * 2;
-        if (playerHealth >= heartHealth) {
-            // Full heart
-            drawRect(x, healthStartY, heartSize, heartSize, glm::vec4(0.9f, 0.1f, 0.1f, 1.0f));
-        } else if (playerHealth == heartHealth - 1) {
-            // Half heart
-            drawRect(x, healthStartY, heartSize / 2, heartSize, glm::vec4(0.9f, 0.1f, 0.1f, 1.0f));
+    // Health Bar (left side)
+    float healthX = startX + hotbarPadding;
+    
+    // Health icon (heart shape approximation)
+    glm::vec4 heartColor = glm::vec4(0.9f, 0.15f, 0.2f, 1.0f);
+    if (healthFlash > 0.0f) {
+        heartColor = glm::mix(heartColor, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), healthFlash);
+    }
+    // Simple heart icon made of squares
+    drawRect(healthX + 2, statsY + 2, iconSize - 4, iconSize - 4, heartColor);
+    drawRect(healthX, statsY + 4, iconSize, iconSize - 6, heartColor);
+    drawRect(healthX + 4, statsY, iconSize - 8, iconSize - 2, heartColor);
+    
+    // Health bar background
+    float hBarX = healthX + iconSize + 6;
+    drawRect(hBarX, statsY + 1, barWidth, barHeight, glm::vec4(0.15f, 0.05f, 0.05f, 0.9f));
+    // Health bar border
+    drawRect(hBarX, statsY + 1, barWidth, 1.0f, glm::vec4(0.4f, 0.1f, 0.1f, 1.0f));
+    drawRect(hBarX, statsY + barHeight, barWidth, 1.0f, glm::vec4(0.2f, 0.05f, 0.05f, 1.0f));
+    
+    // Health fill with gradient
+    float healthPct = playerHealth / 20.0f;
+    float healthFillW = (barWidth - 4) * healthPct;
+    if (healthFillW > 0) {
+        glm::vec4 healthColorMain = glm::vec4(0.85f, 0.15f, 0.2f, 1.0f);
+        glm::vec4 healthColorBright = glm::vec4(1.0f, 0.3f, 0.35f, 1.0f);
+        if (healthFlash > 0.0f) {
+            healthColorMain = glm::mix(healthColorMain, glm::vec4(1.0f, 0.5f, 0.5f, 1.0f), healthFlash);
         }
+        drawRect(hBarX + 2, statsY + 3, healthFillW, barHeight - 4, healthColorMain);
+        // Top shine
+        drawRect(hBarX + 2, statsY + 3, healthFillW, 2.0f, healthColorBright);
     }
     
-    // 3. Food Bar (Hunger) - Right above hotbar
-    float foodStartX = startX + totalW - (10 * (heartSize + heartGap)) + heartGap; // Align right
-    for (int i = 0; i < 10; ++i) {
-        // Draw reverse order to align right? Or just draw left-to-right from calculated start
-        // Minecraft draws right-to-left usually but visual result is same 
-        float x = foodStartX + i * (heartSize + heartGap);
-        
-         // Background (empty food - dark brown)
-        drawRect(x, healthStartY, heartSize, heartSize, glm::vec4(0.3f, 0.2f, 0.1f, 1.0f));
-        
-        // Filled
-        int foodLevel = (i + 1) * 2; // Logic is tricky if we want right-alignment visual but usually simple enough
-        // Actually, MC fills from right to left? No, usually 0 is left. 
-        // Let's just draw 0..9 left to right.
-        
-        if (playerFood >= foodLevel) {
-            drawRect(x, healthStartY, heartSize, heartSize, glm::vec4(0.6f, 0.4f, 0.2f, 1.0f));
-        }
+    // Health text
+    std::string healthText = std::to_string(playerHealth) + "/20";
+    drawText(hBarX + barWidth / 2 - healthText.length() * 3, statsY + 2, 0.4f, healthText, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f));
+    
+    // Hunger/Food Bar (right side)
+    float foodX = startX + hotbarW - hotbarPadding - barWidth - iconSize - 6;
+    
+    // Food icon (drumstick shape approximation)
+    glm::vec4 foodColor = glm::vec4(0.7f, 0.45f, 0.2f, 1.0f);
+    drawRect(foodX + 2, statsY + 3, iconSize - 4, iconSize - 6, foodColor);
+    drawRect(foodX + iconSize - 6, statsY + 5, 4, iconSize - 8, glm::vec4(0.9f, 0.85f, 0.7f, 1.0f)); // bone
+    
+    // Food bar
+    float fBarX = foodX + iconSize + 6;
+    drawRect(fBarX, statsY + 1, barWidth, barHeight, glm::vec4(0.1f, 0.08f, 0.03f, 0.9f));
+    drawRect(fBarX, statsY + 1, barWidth, 1.0f, glm::vec4(0.3f, 0.2f, 0.1f, 1.0f));
+    drawRect(fBarX, statsY + barHeight, barWidth, 1.0f, glm::vec4(0.15f, 0.1f, 0.05f, 1.0f));
+    
+    // Food fill
+    float foodPct = playerFood / 20.0f;
+    float foodFillW = (barWidth - 4) * foodPct;
+    if (foodFillW > 0) {
+        drawRect(fBarX + 2, statsY + 3, foodFillW, barHeight - 4, glm::vec4(0.65f, 0.4f, 0.15f, 1.0f));
+        drawRect(fBarX + 2, statsY + 3, foodFillW, 2.0f, glm::vec4(0.8f, 0.55f, 0.25f, 1.0f));
     }
     
-    // 4. XP Bar - Between hotbar and stats
-    float xpH = 5.0f;
-    float xpY = startY - xpH - 4.0f;
-    // Background
-    drawRect(startX, xpY, totalW, xpH, glm::vec4(0.3f, 0.3f, 0.3f, 1.0f));
-    // Progress
-    drawRect(startX, xpY, totalW * playerXP, xpH, glm::vec4(0.2f, 0.9f, 0.2f, 1.0f));
+    // Food text
+    std::string foodText = std::to_string(playerFood) + "/20";
+    drawText(fBarX + barWidth / 2 - foodText.length() * 3, statsY + 2, 0.4f, foodText, glm::vec4(1.0f, 1.0f, 1.0f, 0.9f));
     
-    // 5. Game Mode Indicator (top-left corner) - Only show in Creative Mode
+    // ========================================
+    // XP BAR - Below stats, above hotbar
+    // ========================================
+    float xpY = startY - 14.0f;
+    float xpH = 6.0f;
+    float xpW = totalW;
+    float xpX = startX + hotbarPadding;
+    
+    // XP bar background
+    drawRect(xpX, xpY, xpW, xpH, glm::vec4(0.08f, 0.08f, 0.1f, 0.9f));
+    drawRect(xpX, xpY, xpW, 1.0f, glm::vec4(0.0f, 0.0f, 0.0f, 0.5f));
+    
+    // XP fill with glow effect
+    float xpFillW = xpW * playerXP;
+    if (xpFillW > 0) {
+        glm::vec4 xpColor = glm::vec4(0.3f, 0.9f, 0.3f, 1.0f);
+        if (xpBarGlow > 0.0f) {
+            xpColor = glm::mix(xpColor, glm::vec4(0.6f, 1.0f, 0.6f, 1.0f), xpBarGlow);
+        }
+        drawRect(xpX + 1, xpY + 1, xpFillW - 2, xpH - 2, xpColor);
+        // Shine
+        drawRect(xpX + 1, xpY + 1, xpFillW - 2, 2.0f, glm::vec4(0.5f, 1.0f, 0.5f, 0.8f));
+    }
+    
+    // Level indicator (centered above XP bar)
+    if (playerLevel > 0) {
+        std::string levelText = std::to_string(playerLevel);
+        float levelX = width / 2.0f - levelText.length() * 4;
+        float levelY = xpY - 14.0f;
+        // Shadow
+        drawText(levelX + 1, levelY + 1, 0.5f, levelText, glm::vec4(0.0f, 0.0f, 0.0f, 0.8f));
+        // Text with glow
+        glm::vec4 levelColor = glm::vec4(0.5f, 1.0f, 0.5f, 1.0f);
+        if (xpBarGlow > 0.0f) {
+            levelColor = glm::mix(levelColor, glm::vec4(1.0f, 1.0f, 0.5f, 1.0f), xpBarGlow);
+        }
+        drawText(levelX, levelY, 0.5f, levelText, levelColor);
+    }
+    
+    // ========================================
+    // GAME MODE INDICATOR
+    // ========================================
     if (isCreativeMode) {
         std::string modeText = "Creative Mode";
-        glm::vec4 modeColor = glm::vec4(0.3f, 0.8f, 1.0f, 0.9f);
+        float modeTextW = modeText.length() * 7.0f;
+        float modeX = 12.0f;
+        float modeY = 12.0f;
         
-        // Draw background for better visibility
-        float modeTextWidth = modeText.length() * 8.0f * 0.5f;  // Approximate text width
-        drawRect(8.0f, 8.0f, modeTextWidth + 10.0f, 22.0f, glm::vec4(0.0f, 0.0f, 0.0f, 0.5f));
-        drawText(13.0f, 12.0f, 0.5f, modeText, modeColor);
+        // Background pill
+        drawRect(modeX, modeY, modeTextW + 16.0f, 24.0f, glm::vec4(0.0f, 0.0f, 0.0f, 0.6f));
+        drawRect(modeX, modeY, modeTextW + 16.0f, 1.0f, glm::vec4(0.3f, 0.7f, 1.0f, 0.5f));
+        
+        // Icon (star-like)
+        drawRect(modeX + 6, modeY + 8, 8, 8, glm::vec4(0.3f, 0.8f, 1.0f, 1.0f));
+        
+        // Text
+        drawText(modeX + 18, modeY + 6, 0.45f, modeText, glm::vec4(0.4f, 0.85f, 1.0f, 1.0f));
     }
     
     uiShader.unuse();
@@ -2369,10 +2789,160 @@ void UIManager::drawTexturedRect(float x, float y, float w, float h, GLuint text
     uiShader.setMat4("uProjection", projection);
 }
 
+void UIManager::drawRoundedRect(float x, float y, float w, float h, float radius, const glm::vec4& color) {
+    // For now, just draw a regular rect - true rounded corners would need more vertices
+    // We can simulate with layered rects
+    drawRect(x + radius, y, w - radius * 2, h, color);
+    drawRect(x, y + radius, w, h - radius * 2, color);
+    // Corner fills (approximation)
+    drawRect(x, y, radius, radius, color);
+    drawRect(x + w - radius, y, radius, radius, color);
+    drawRect(x, y + h - radius, radius, radius, color);
+    drawRect(x + w - radius, y + h - radius, radius, radius, color);
+}
+
+void UIManager::drawGradientRect(float x, float y, float w, float h, const glm::vec4& colorTop, const glm::vec4& colorBottom) {
+    // Simulate gradient with multiple horizontal strips
+    int strips = 8;
+    float stripH = h / strips;
+    for (int i = 0; i < strips; ++i) {
+        float t = (float)i / (strips - 1);
+        glm::vec4 c = glm::mix(colorTop, colorBottom, t);
+        drawRect(x, y + i * stripH, w, stripH + 1, c);  // +1 to avoid gaps
+    }
+}
+
+void UIManager::updateHUDAnimations(float deltaTime, double mouseX, double mouseY) {
+    // Calculate hotbar slot positions for hover detection
+    float slotSize = 48.0f;
+    float slotGap = 3.0f;
+    int slots = 9;
+    float totalW = slots * slotSize + (slots - 1) * slotGap;
+    float hotbarPadding = 6.0f;
+    float hotbarW = totalW + hotbarPadding * 2;
+    float hotbarH = slotSize + hotbarPadding * 2;
+    float startX = (width - hotbarW) / 2.0f;
+    float startY = height - hotbarH - 8.0f;
+    float slotStartX = startX + hotbarPadding;
+    float slotStartY = startY + hotbarPadding;
+    
+    // Detect which slot is hovered
+    int newHoveredSlot = -1;
+    for (int i = 0; i < slots; ++i) {
+        float x = slotStartX + i * (slotSize + slotGap);
+        float y = slotStartY;
+        
+        if (mouseX >= x && mouseX <= x + slotSize &&
+            mouseY >= y - 10 && mouseY <= y + slotSize + 10) {  // Slightly larger hit area
+            newHoveredSlot = i;
+            break;
+        }
+    }
+    
+    // Update hover animations
+    float hoverSpeed = 8.0f;
+    float rotationSpeed = 45.0f;  // Degrees per second when hovered
+    for (int i = 0; i < 9; ++i) {
+        float targetHover = (i == newHoveredSlot) ? 1.0f : 0.0f;
+        float diff = targetHover - hotbarSlotHover[i];
+        hotbarSlotHover[i] += diff * deltaTime * hoverSpeed;
+        hotbarSlotHover[i] = std::clamp(hotbarSlotHover[i], 0.0f, 1.0f);
+        
+        // Bounce animation decays
+        if (hotbarSlotBounce[i] > 0.0f) {
+            hotbarSlotBounce[i] -= deltaTime * 4.0f;
+            if (hotbarSlotBounce[i] < 0.0f) hotbarSlotBounce[i] = 0.0f;
+        }
+        
+        // Rotation animation for hovered slots - spin slowly when hovered
+        if (i == newHoveredSlot) {
+            hotbarSlotRotation[i] += deltaTime * rotationSpeed;
+            if (hotbarSlotRotation[i] >= 360.0f) hotbarSlotRotation[i] -= 360.0f;
+        } else {
+            // Smoothly return to default rotation
+            if (hotbarSlotRotation[i] > 0.0f) {
+                hotbarSlotRotation[i] -= deltaTime * rotationSpeed * 2.0f;
+                if (hotbarSlotRotation[i] < 0.0f) hotbarSlotRotation[i] = 0.0f;
+            }
+        }
+    }
+    
+    // Update inventory item rotations when inventory is open
+    if (currentMenuState == MenuState::INVENTORY) {
+        // Find which inventory item is hovered
+        int newInventoryHovered = -1;
+        for (size_t i = 0; i < elements.size(); ++i) {
+            const auto& el = elements[i];
+            if (el.isInventoryItem && el.isHovered && el.inventoryIndex >= 0) {
+                newInventoryHovered = el.inventoryIndex;
+                break;
+            }
+        }
+        inventoryHoveredIndex = newInventoryHovered;
+        
+        // Update rotations for inventory items
+        for (int i = 0; i < 256; ++i) {
+            if (i == inventoryHoveredIndex) {
+                inventoryItemRotations[i] += deltaTime * rotationSpeed;
+                if (inventoryItemRotations[i] >= 360.0f) inventoryItemRotations[i] -= 360.0f;
+            } else {
+                // Smoothly return to default rotation
+                if (inventoryItemRotations[i] > 0.0f) {
+                    inventoryItemRotations[i] -= deltaTime * rotationSpeed * 2.0f;
+                    if (inventoryItemRotations[i] < 0.0f) inventoryItemRotations[i] = 0.0f;
+                }
+            }
+        }
+    }
+    
+    hoveredSlot = newHoveredSlot;
+    
+    // Selection bounce animation
+    static int lastSelectedSlot = -1;
+    if (selectedSlot != lastSelectedSlot) {
+        selectionBounce = 1.0f;
+        hotbarSlotBounce[selectedSlot] = 1.0f;
+        lastSelectedSlot = selectedSlot;
+    }
+    if (selectionBounce > 0.0f) {
+        selectionBounce -= deltaTime * 5.0f;
+        if (selectionBounce < 0.0f) selectionBounce = 0.0f;
+    }
+    
+    // Health flash decays
+    if (healthFlash > 0.0f) {
+        healthFlash -= deltaTime * 3.0f;
+        if (healthFlash < 0.0f) healthFlash = 0.0f;
+    }
+    
+    // XP glow decays
+    if (xpBarGlow > 0.0f) {
+        xpBarGlow -= deltaTime * 2.0f;
+        if (xpBarGlow < 0.0f) xpBarGlow = 0.0f;
+    }
+    
+    // Track health changes for flash effect
+    static int lastHealth = 20;
+    if (playerHealth < lastHealth) {
+        healthFlash = 1.0f;  // Trigger flash when taking damage
+    }
+    lastHealth = playerHealth;
+    
+    // Track XP changes for glow effect
+    static float lastXP = 0.0f;
+    if (playerXP > lastXP) {
+        xpBarGlow = 1.0f;  // Trigger glow when gaining XP
+    }
+    lastXP = playerXP;
+}
+
 int UIManager::getBlockTextureIndex(BlockType type, int face) {
     // face: 0=top, 1=side, 2=bottom
     // Returns texture atlas index (0-255 for 16x16 atlas)
+    // Use ResourcePackManager for actual texture lookup when available
+    
     switch (type) {
+        // Original blocks
         case BlockType::GRASS:
             if (face == 0) return 0;       // Top - grass top
             if (face == 2) return 2;       // Bottom - dirt
@@ -2393,9 +2963,10 @@ int UIManager::getBlockTextureIndex(BlockType type, int face) {
             if (face == 0 || face == 2) return 21; // Top/Bottom - log top
             return 20;                     // Side - log side
         case BlockType::SNOW:
-            return 240;                    // All faces - snow
+            return 66;                     // Snow texture
         case BlockType::SANDSTONE:
-            return 192;                    // All faces - sandstone
+            if (face == 0 || face == 2) return 176; // sandstone top
+            return 192;                    // sandstone side
         case BlockType::WATER:
             return 205;                    // Water texture
         case BlockType::ICE:
@@ -2406,12 +2977,168 @@ int UIManager::getBlockTextureIndex(BlockType type, int face) {
             return 39;                     // Tall grass
         case BlockType::ROSE:
             return 12;                     // Rose
+            
+        // Ores
+        case BlockType::COBBLESTONE:
+            return 16;                     // Cobblestone
+        case BlockType::COAL_ORE:
+            return 34;                     // Coal ore
+        case BlockType::IRON_ORE:
+            return 33;                     // Iron ore
+        case BlockType::GOLD_ORE:
+            return 32;                     // Gold ore
+        case BlockType::DIAMOND_ORE:
+            return 50;                     // Diamond ore
+        case BlockType::EMERALD_ORE:
+            return 171;                    // Emerald ore
+        case BlockType::REDSTONE_ORE:
+            return 51;                     // Redstone ore
+        case BlockType::LAPIS_ORE:
+            return 160;                    // Lapis ore
+            
+        // Stone variants
+        case BlockType::MOSSY_COBBLESTONE:
+            return 36;                     // Mossy cobblestone
+        case BlockType::STONE_BRICKS:
+            return 54;                     // Stone bricks
+        case BlockType::MOSSY_STONE_BRICKS:
+            return 100;                    // Mossy stone bricks
+        case BlockType::CRACKED_STONE_BRICKS:
+            return 118;                    // Cracked stone bricks
+        case BlockType::CHISELED_STONE_BRICKS:
+            return 98;                     // Chiseled stone bricks
+            
+        // Mineral blocks
+        case BlockType::IRON_BLOCK:
+            return 22;                     // Iron block
+        case BlockType::GOLD_BLOCK:
+            return 23;                     // Gold block
+        case BlockType::DIAMOND_BLOCK:
+            return 24;                     // Diamond block
+        case BlockType::EMERALD_BLOCK:
+            return 25;                     // Emerald block
+        case BlockType::REDSTONE_BLOCK:
+            return 215;                    // Redstone block
+            
+        // Building blocks
+        case BlockType::BRICKS:
+            return 7;                      // Bricks
+        case BlockType::OBSIDIAN:
+            return 37;                     // Obsidian
+        case BlockType::GLASS:
+            return 49;                     // Glass
+        case BlockType::BOOKSHELF:
+            if (face == 0 || face == 2) return 4; // Top/Bottom - planks
+            return 35;                     // Side - bookshelf
+        case BlockType::TNT:
+            if (face == 0) return 9;       // Top
+            if (face == 2) return 10;      // Bottom
+            return 8;                      // Side
+        case BlockType::GLOWSTONE:
+            return 105;                    // Glowstone
+        case BlockType::REDSTONE_LAMP:
+            return 123;                    // Redstone lamp
+            
+        // Wood - Planks
+        case BlockType::OAK_PLANKS:
+            return 4;                      // Oak planks
+        case BlockType::SPRUCE_PLANKS:
+            return 198;                    // Spruce planks
+        case BlockType::BIRCH_PLANKS:
+            return 214;                    // Birch planks
+        case BlockType::JUNGLE_PLANKS:
+            return 199;                    // Jungle planks
+            
+        // Wood - Logs
+        case BlockType::OAK_LOG:
+            if (face == 0 || face == 2) return 21; // Top
+            return 20;                     // Side
+        case BlockType::SPRUCE_LOG:
+            if (face == 0 || face == 2) return 117; // Spruce log top
+            return 116;                    // Spruce log side
+        case BlockType::BIRCH_LOG:
+            if (face == 0 || face == 2) return 117; // Birch log top
+            return 117;                    // Birch log side
+        case BlockType::JUNGLE_LOG:
+            if (face == 0 || face == 2) return 153; // Jungle log top
+            return 153;                    // Jungle log side
+            
+        // Wood - Leaves
+        case BlockType::OAK_LEAVES:
+            return 52;                     // Oak leaves
+        case BlockType::SPRUCE_LEAVES:
+            return 132;                    // Spruce leaves
+        case BlockType::BIRCH_LEAVES:
+            return 52;                     // Use oak leaves
+        case BlockType::JUNGLE_LEAVES:
+            return 52;                     // Use oak leaves
+            
+        // Wool colors (using wool row starting at index 64)
+        case BlockType::WHITE_WOOL:
+            return 64;                     // White wool
+        case BlockType::ORANGE_WOOL:
+            return 210;                    // Orange wool
+        case BlockType::MAGENTA_WOOL:
+            return 194;                    // Magenta wool
+        case BlockType::LIGHT_BLUE_WOOL:
+            return 178;                    // Light blue wool
+        case BlockType::YELLOW_WOOL:
+            return 162;                    // Yellow wool
+        case BlockType::LIME_WOOL:
+            return 146;                    // Lime wool
+        case BlockType::PINK_WOOL:
+            return 130;                    // Pink wool
+        case BlockType::GRAY_WOOL:
+            return 114;                    // Gray wool
+        case BlockType::LIGHT_GRAY_WOOL:
+            return 225;                    // Light gray wool
+        case BlockType::CYAN_WOOL:
+            return 209;                    // Cyan wool
+        case BlockType::PURPLE_WOOL:
+            return 193;                    // Purple wool
+        case BlockType::BLUE_WOOL:
+            return 177;                    // Blue wool
+        case BlockType::BROWN_WOOL:
+            return 161;                    // Brown wool
+        case BlockType::GREEN_WOOL:
+            return 145;                    // Green wool
+        case BlockType::RED_WOOL:
+            return 129;                    // Red wool
+        case BlockType::BLACK_WOOL:
+            return 113;                    // Black wool
+            
+        case BlockType::CHISELED_SANDSTONE:
+            if (face == 0 || face == 2) return 176;
+            return 229;                    // Chiseled sandstone side
+            
+        // Misc blocks
+        case BlockType::CLAY:
+            return 53;                     // Clay
+        case BlockType::SPONGE:
+            return 48;                     // Sponge
+        case BlockType::COBWEB:
+            return 11;                     // Cobweb
+        case BlockType::CRAFTING_TABLE:
+            if (face == 0) return 43;      // Crafting table top
+            if (face == 2) return 4;       // Bottom - planks
+            return 59;                     // Side
+        case BlockType::NOTE_BLOCK:
+            return 74;                     // Note block
+        case BlockType::JUKEBOX:
+            if (face == 0) return 75;      // Jukebox top
+            return 74;                     // Sides - note block
+        case BlockType::FARMLAND:
+            if (face == 0) return 86;      // Farmland top
+            return 2;                      // Dirt sides
+        case BlockType::SUGAR_CANE:
+            return 73;                     // Sugar cane
+            
         default:
             return 1;                      // Default to stone
     }
 }
 
-void UIManager::drawBlockIcon(float x, float y, float size, BlockType type) {
+void UIManager::drawBlockIcon(float x, float y, float size, BlockType type, float extraRotation) {
     if (type == BlockType::AIR || blockAtlasTexture == 0) return;
     
     blockIconShader.use();
@@ -2433,7 +3160,8 @@ void UIManager::drawBlockIcon(float x, float y, float size, BlockType type) {
     // Standard Minecraft view shows Front and Right faces.
     // +45 deg shows Front+Left.
     // -45 (315) deg shows Front+Right.
-    model = glm::rotate(model, glm::radians(315.0f), glm::vec3(0.0f, 1.0f, 0.0f));   // Rotate to show Front+Right (standard)
+    // Add extraRotation for hover spin effect
+    model = glm::rotate(model, glm::radians(315.0f + extraRotation), glm::vec3(0.0f, 1.0f, 0.0f));   // Rotate to show Front+Right + spin
     
     blockIconShader.setMat4("uModel", model);
     
@@ -2474,7 +3202,7 @@ void UIManager::drawBlockIcon(float x, float y, float size, BlockType type) {
     glDepthFunc(GL_LESS);
     
     glBindVertexArray(blockIconVao);
-    glDrawArrays(GL_TRIANGLES, 0, 18); // 3 faces * 6 vertices
+    glDrawArrays(GL_TRIANGLES, 0, 36); // 6 faces * 6 vertices
     glBindVertexArray(0);
     
     glDisable(GL_DEPTH_TEST);
@@ -2487,6 +3215,213 @@ void UIManager::drawBlockIcon(float x, float y, float size, BlockType type) {
     uiShader.use();
     glm::mat4 uiProjection = glm::ortho(0.0f, (float)width, (float)height, 0.0f);
     uiShader.setMat4("uProjection", uiProjection);
+}
+
+void UIManager::drawToolIcon(float x, float y, float size, ItemType type) {
+    if (type == ItemType::NONE) return;
+    
+    // Draw a simplified tool icon using basic shapes
+    // Color based on material
+    glm::vec4 handleColor(0.5f, 0.35f, 0.2f, 1.0f);  // Wood handle
+    glm::vec4 headColor;
+    
+    // ItemType enum is organized by TOOL TYPE first, then MATERIAL:
+    // SWORD_WOOD=1, SWORD_STONE=2, SWORD_GOLD=3, SWORD_DIAMOND=4
+    // PICKAXE_WOOD=5, PICKAXE_STONE=6, PICKAXE_GOLD=7, PICKAXE_DIAMOND=8
+    // AXE_WOOD=9, AXE_STONE=10, AXE_GOLD=11, AXE_DIAMOND=12
+    // SHOVEL_WOOD=13, SHOVEL_STONE=14, SHOVEL_GOLD=15, SHOVEL_DIAMOND=16
+    
+    int typeVal = static_cast<int>(type);
+    int toolType = (typeVal - 1) / 4;   // 0=sword, 1=pickaxe, 2=axe, 3=shovel
+    int material = (typeVal - 1) % 4;   // 0=wood, 1=stone, 2=gold, 3=diamond
+    
+    // Determine material color
+    switch (material) {
+        case 0: // Wood
+            headColor = glm::vec4(0.6f, 0.45f, 0.25f, 1.0f);
+            break;
+        case 1: // Stone
+            headColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+            break;
+        case 2: // Gold
+            headColor = glm::vec4(1.0f, 0.85f, 0.2f, 1.0f);
+            break;
+        case 3: // Diamond
+            headColor = glm::vec4(0.3f, 0.9f, 0.9f, 1.0f);
+            break;
+        default:
+            headColor = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f);
+            break;
+    }
+    
+    float cx = x + size * 0.5f;
+    float cy = y + size * 0.5f;
+    float handleW = size * 0.12f;
+    float handleH = size * 0.5f;
+    
+    if (toolType == 0) {
+        // Sword - vertical blade with handle
+        // Handle
+        drawRect(cx - handleW * 0.5f, cy + size * 0.1f, handleW, handleH, handleColor);
+        // Guard
+        drawRect(cx - size * 0.15f, cy, size * 0.3f, handleW, headColor);
+        // Blade
+        drawRect(cx - handleW * 0.7f, cy - size * 0.35f, handleW * 1.4f, size * 0.4f, headColor);
+        // Tip
+        drawRect(cx - handleW * 0.5f, cy - size * 0.4f, handleW, size * 0.08f, headColor);
+    } else if (toolType == 1) {
+        // Pickaxe - diagonal with double head
+        // Handle (diagonal)
+        drawRect(cx - handleW * 0.5f, cy - size * 0.1f, handleW, handleH * 1.1f, handleColor);
+        // Head (horizontal bar)
+        drawRect(cx - size * 0.35f, cy - size * 0.25f, size * 0.7f, size * 0.15f, headColor);
+        // Tips
+        drawRect(cx - size * 0.38f, cy - size * 0.35f, size * 0.12f, size * 0.12f, headColor);
+        drawRect(cx + size * 0.26f, cy - size * 0.35f, size * 0.12f, size * 0.12f, headColor);
+    } else if (toolType == 2) {
+        // Axe - handle with single head
+        // Handle
+        drawRect(cx - handleW * 0.5f, cy, handleW, handleH, handleColor);
+        // Axe head
+        drawRect(cx - size * 0.05f, cy - size * 0.35f, size * 0.3f, size * 0.35f, headColor);
+        // Blade edge
+        drawRect(cx + size * 0.18f, cy - size * 0.3f, size * 0.1f, size * 0.25f, headColor);
+    } else {
+        // Shovel - handle with flat head
+        // Handle
+        drawRect(cx - handleW * 0.5f, cy - size * 0.05f, handleW, handleH * 1.1f, handleColor);
+        // Shovel head
+        drawRect(cx - size * 0.15f, cy - size * 0.4f, size * 0.3f, size * 0.35f, headColor);
+        // Round tip approximation
+        drawRect(cx - size * 0.12f, cy - size * 0.45f, size * 0.24f, size * 0.08f, headColor);
+    }
+}
+
+std::string UIManager::getBlockName(BlockType type) {
+    switch (type) {
+        case BlockType::AIR: return "Air";
+        case BlockType::GRASS: return "Grass Block";
+        case BlockType::DIRT: return "Dirt";
+        case BlockType::STONE: return "Stone";
+        case BlockType::SAND: return "Sand";
+        case BlockType::WATER: return "Water";
+        case BlockType::WOOD: return "Wood Planks";
+        case BlockType::LEAVES: return "Leaves";
+        case BlockType::SNOW: return "Snow Block";
+        case BlockType::ICE: return "Ice";
+        case BlockType::GRAVEL: return "Gravel";
+        case BlockType::SANDSTONE: return "Sandstone";
+        case BlockType::LOG: return "Oak Log";
+        case BlockType::TALL_GRASS: return "Tall Grass";
+        case BlockType::ROSE: return "Flower";
+        case BlockType::BEDROCK: return "Bedrock";
+        
+        // Ores
+        case BlockType::COBBLESTONE: return "Cobblestone";
+        case BlockType::COAL_ORE: return "Coal Ore";
+        case BlockType::IRON_ORE: return "Iron Ore";
+        case BlockType::GOLD_ORE: return "Gold Ore";
+        case BlockType::DIAMOND_ORE: return "Diamond Ore";
+        case BlockType::EMERALD_ORE: return "Emerald Ore";
+        case BlockType::REDSTONE_ORE: return "Redstone Ore";
+        case BlockType::LAPIS_ORE: return "Lapis Lazuli Ore";
+        
+        // Stone variants
+        case BlockType::MOSSY_COBBLESTONE: return "Mossy Cobblestone";
+        case BlockType::STONE_BRICKS: return "Stone Bricks";
+        case BlockType::MOSSY_STONE_BRICKS: return "Mossy Stone Bricks";
+        case BlockType::CRACKED_STONE_BRICKS: return "Cracked Stone Bricks";
+        case BlockType::CHISELED_STONE_BRICKS: return "Chiseled Stone Bricks";
+        
+        // Mineral blocks
+        case BlockType::IRON_BLOCK: return "Block of Iron";
+        case BlockType::GOLD_BLOCK: return "Block of Gold";
+        case BlockType::DIAMOND_BLOCK: return "Block of Diamond";
+        case BlockType::EMERALD_BLOCK: return "Block of Emerald";
+        case BlockType::REDSTONE_BLOCK: return "Block of Redstone";
+        
+        // Building blocks
+        case BlockType::BRICKS: return "Bricks";
+        case BlockType::OBSIDIAN: return "Obsidian";
+        case BlockType::GLASS: return "Glass";
+        case BlockType::BOOKSHELF: return "Bookshelf";
+        case BlockType::TNT: return "TNT";
+        case BlockType::GLOWSTONE: return "Glowstone";
+        case BlockType::REDSTONE_LAMP: return "Redstone Lamp";
+        
+        // Wood - Planks
+        case BlockType::OAK_PLANKS: return "Oak Planks";
+        case BlockType::SPRUCE_PLANKS: return "Spruce Planks";
+        case BlockType::BIRCH_PLANKS: return "Birch Planks";
+        case BlockType::JUNGLE_PLANKS: return "Jungle Planks";
+        
+        // Wood - Logs
+        case BlockType::OAK_LOG: return "Oak Log";
+        case BlockType::SPRUCE_LOG: return "Spruce Log";
+        case BlockType::BIRCH_LOG: return "Birch Log";
+        case BlockType::JUNGLE_LOG: return "Jungle Log";
+        
+        // Wood - Leaves
+        case BlockType::OAK_LEAVES: return "Oak Leaves";
+        case BlockType::SPRUCE_LEAVES: return "Spruce Leaves";
+        case BlockType::BIRCH_LEAVES: return "Birch Leaves";
+        case BlockType::JUNGLE_LEAVES: return "Jungle Leaves";
+        
+        // Wool
+        case BlockType::WHITE_WOOL: return "White Wool";
+        case BlockType::ORANGE_WOOL: return "Orange Wool";
+        case BlockType::MAGENTA_WOOL: return "Magenta Wool";
+        case BlockType::LIGHT_BLUE_WOOL: return "Light Blue Wool";
+        case BlockType::YELLOW_WOOL: return "Yellow Wool";
+        case BlockType::LIME_WOOL: return "Lime Wool";
+        case BlockType::PINK_WOOL: return "Pink Wool";
+        case BlockType::GRAY_WOOL: return "Gray Wool";
+        case BlockType::LIGHT_GRAY_WOOL: return "Light Gray Wool";
+        case BlockType::CYAN_WOOL: return "Cyan Wool";
+        case BlockType::PURPLE_WOOL: return "Purple Wool";
+        case BlockType::BLUE_WOOL: return "Blue Wool";
+        case BlockType::BROWN_WOOL: return "Brown Wool";
+        case BlockType::GREEN_WOOL: return "Green Wool";
+        case BlockType::RED_WOOL: return "Red Wool";
+        case BlockType::BLACK_WOOL: return "Black Wool";
+        
+        case BlockType::CHISELED_SANDSTONE: return "Chiseled Sandstone";
+        
+        // Misc blocks
+        case BlockType::CLAY: return "Clay";
+        case BlockType::SPONGE: return "Sponge";
+        case BlockType::COBWEB: return "Cobweb";
+        case BlockType::CRAFTING_TABLE: return "Crafting Table";
+        case BlockType::NOTE_BLOCK: return "Note Block";
+        case BlockType::JUKEBOX: return "Jukebox";
+        case BlockType::FARMLAND: return "Farmland";
+        case BlockType::SUGAR_CANE: return "Sugar Cane";
+        
+        default: return "Unknown";
+    }
+}
+
+std::string UIManager::getItemName(ItemType type) {
+    switch (type) {
+        case ItemType::NONE: return "None";
+        case ItemType::SWORD_WOOD: return "Wooden Sword";
+        case ItemType::PICKAXE_WOOD: return "Wooden Pickaxe";
+        case ItemType::AXE_WOOD: return "Wooden Axe";
+        case ItemType::SHOVEL_WOOD: return "Wooden Shovel";
+        case ItemType::SWORD_STONE: return "Stone Sword";
+        case ItemType::PICKAXE_STONE: return "Stone Pickaxe";
+        case ItemType::AXE_STONE: return "Stone Axe";
+        case ItemType::SHOVEL_STONE: return "Stone Shovel";
+        case ItemType::SWORD_GOLD: return "Golden Sword";
+        case ItemType::PICKAXE_GOLD: return "Golden Pickaxe";
+        case ItemType::AXE_GOLD: return "Golden Axe";
+        case ItemType::SHOVEL_GOLD: return "Golden Shovel";
+        case ItemType::SWORD_DIAMOND: return "Diamond Sword";
+        case ItemType::PICKAXE_DIAMOND: return "Diamond Pickaxe";
+        case ItemType::AXE_DIAMOND: return "Diamond Axe";
+        case ItemType::SHOVEL_DIAMOND: return "Diamond Shovel";
+        default: return "Unknown";
+    }
 }
 
 GLuint UIManager::loadWorldPreviewTexture(const std::string& worldName) {

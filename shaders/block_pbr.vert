@@ -24,7 +24,7 @@ out vec3 vNormal;
 out vec2 vTexCoord;
 flat out vec2 vCellOrigin;
 flat out uint vMaterial;
-flat out int vTextureLayer;  // For texture array
+flat out int vFace;
 out float vAO;
 out vec4 vFragPosLightSpace;
 out vec4 vCurrentClip;
@@ -32,13 +32,11 @@ out vec4 vPrevClip;
 out vec3 vTangent;
 out vec3 vBitangent;
 
-// Texture layer indices for PBR resource pack (per block type, per face)
-// These are set from CPU based on ResourcePackManager
-uniform int uTextureIndices[16 * 6];  // 16 block types * 6 faces
+const int kBlockTypeCount = 117;
 
-// Vegetation variant indices for randomization
-uniform int uGrassVariants[8];
-uniform int uGrassVariantCount;
+// Texture atlas indices for non-PBR mode (per block type, per face)
+uniform int uAtlasIndices[kBlockTypeCount * 6];
+
 
 void main() {
     vec4 worldPos = uModel * vec4(aPos, 1.0);
@@ -95,67 +93,26 @@ void main() {
     
     vMaterial = aMaterial;
     
+    int faceIdx = int(aNormal);
+    vFace = faceIdx;
+
     if (uUsePBRResourcePack == 1) {
-        // Use texture array with layer index from uniform
-        // Material ID * 6 + face direction gives the index into uTextureIndices
-        int faceIdx = int(aNormal);
-        int lookupIdx = int(aMaterial) * 6 + faceIdx;
-        if (lookupIdx < 96) {  // 16 * 6
-            vTextureLayer = uTextureIndices[lookupIdx];
-        } else {
-            vTextureLayer = 0;
-        }
+        vCellOrigin = vec2(0.0);
         
-        // Vegetation randomization based on world position
-        // For tall grass (13) and flowers (14), use position-based hash to pick variant
-        if (aMaterial == 13u || aMaterial == 14u) {
-            // Create a hash from block position for consistent randomization
-            ivec3 blockPos = ivec3(floor(worldPos.xyz));
-            int hash = blockPos.x * 73856093 ^ blockPos.y * 19349663 ^ blockPos.z * 83492791;
-            hash = abs(hash);
-            
-            // Pick from grass variants
-            if (uGrassVariantCount > 0) {
-                int variantIdx = hash % uGrassVariantCount;
-                vTextureLayer = uGrassVariants[variantIdx];
-            }
-        }
-        
-        vCellOrigin = vec2(0.0);  // Not used in PBR mode
     } else {
         // Original atlas-based texture mapping
-        vTextureLayer = -1;  // Signal to use atlas
-        
-        // Texture Atlas Mapping (16x16 atlas)
         float atlasSize = 16.0;
         float cellSize = 1.0 / atlasSize;
-        
-        uint textureIndex = aMaterial - 1u;
-        
-        if (aMaterial == 1u) { // Grass
-            if (aNormal == 2u) textureIndex = 0u;
-            else if (aNormal == 3u) textureIndex = 2u;
-            else textureIndex = 3u;
+        int atlasLookup = int(aMaterial) * 6 + faceIdx;
+        int textureIndex = 0;
+        if (atlasLookup >= 0 && atlasLookup < (kBlockTypeCount * 6)) {
+            textureIndex = uAtlasIndices[atlasLookup];
         }
-        else if (aMaterial == 2u) textureIndex = 2u;
-        else if (aMaterial == 3u) textureIndex = 1u;
-        else if (aMaterial == 4u) textureIndex = 18u;
-        else if (aMaterial == 10u) textureIndex = 19u;
-        else if (aMaterial == 6u) textureIndex = 4u;
-        else if (aMaterial == 7u) textureIndex = 52u;
-        else if (aMaterial == 12u) {
-            if (aNormal == 2u || aNormal == 3u) textureIndex = 21u;
-            else textureIndex = 20u;
-        }
-        else if (aMaterial == 8u) textureIndex = 240u;
-        else if (aMaterial == 13u) textureIndex = 39u;
-        else if (aMaterial == 14u) textureIndex = 12u;
-        else if (aMaterial == 11u) textureIndex = 192u;
-        
-        float col = float(textureIndex % 16u);
-        float row = float(textureIndex / 16u);
+        if (textureIndex < 0) textureIndex = 0;
+
+        float col = float(textureIndex % 16);
+        float row = float(textureIndex / 16);
         row = 15.0 - row;
-        
         vCellOrigin = vec2(col * cellSize, row * cellSize);
     }
     
