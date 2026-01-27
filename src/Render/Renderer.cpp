@@ -526,8 +526,8 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     
     // Parallax mapping settings - subtle depth effect
     blockShader.setInt("uEnableParallax", Settings::instance().enableParallaxMapping ? 1 : 0);
-    blockShader.setFloat("uParallaxScale", 0.06f);  // Increased depth for visibility
-    blockShader.setInt("uParallaxSteps", 24);  // More steps for smoother POM
+    blockShader.setFloat("uParallaxScale", 0.08f);  // Increased depth for visibility
+    blockShader.setInt("uParallaxSteps", 28);  // More steps for smoother POM
 
     // Wireframe toggle applied around draw loop to only affect chunk rendering
     if (Settings::instance().debugWireframe) {

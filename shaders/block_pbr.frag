@@ -128,16 +128,12 @@ vec3 applyNormalMap(vec3 normalMapValue, vec3 normal, vec3 tangent, vec3 bitange
 // Uses normal map to derive height - steep angles = crevices, flat = raised
 float getHeight(vec2 uv, float layer) {
     vec3 normalSample = texture(uNormalArray, vec3(uv, layer)).rgb;
-    
-    // Normal map: (0.5, 0.5, 1.0) = flat surface pointing up
-    // Deviation from flat indicates surface detail
-    vec3 n = normalSample * 2.0 - 1.0;
-    
-    // Height from normal Z: flat (z=1) = high, tilted (z<1) = low
-    // This creates depth in crevices and raised areas on flat parts
-    float height = n.z;
-    
-    return clamp(height, 0.0, 1.0);
+
+    // Use XY of normal map as a height proxy for stronger relief
+    // Flat normals (~0.5, 0.5, 1.0) still yield mid-height for visible effect
+    float height = (normalSample.r + normalSample.g) * 0.5;
+    height = clamp(height * 1.5 - 0.25, 0.0, 1.0);
+    return height;
 }
 
 vec2 parallaxOcclusionMapping(vec2 texCoords, vec3 viewDirTangent, float layer) {
