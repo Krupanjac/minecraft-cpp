@@ -9,9 +9,22 @@ enum class BiomeType {
     RIVER,
     PLAINS,
     DESERT,
-    FOREST,
+    FOREST,           // Oak forest
+    BIRCH_FOREST,     // Birch forest
+    TAIGA,            // Spruce forest (cold)
+    JUNGLE,           // Jungle
+    SWAMP,            // Swamp
     MOUNTAINS,
-    SNOWY_TUNDRA
+    SNOWY_TUNDRA,
+    SAVANNA           // Hot plains with acacia-like trees
+};
+
+enum class TreeType {
+    OAK,
+    BIRCH,
+    SPRUCE,
+    JUNGLE,
+    NONE
 };
 
 struct BiomeInfo {
@@ -22,6 +35,12 @@ struct BiomeInfo {
     BlockType surfaceBlock;
     BlockType subsurfaceBlock;
     int surfaceDepth;
+    
+    // Biome-specific colors for grass/foliage tinting
+    float grassColorR, grassColorG, grassColorB;
+    float foliageColorR, foliageColorG, foliageColorB;
+    // Map color for minimap display
+    float mapColorR, mapColorG, mapColorB;
 };
 
 class WorldGenerator {
@@ -85,5 +104,8 @@ private:
     
     // Vegetation helpers
     bool hasTree(int x, int z, BiomeType biome) const;
-    int getTreeHeight(int x, int z) const;
+    int getTreeHeight(int x, int z, BiomeType biome) const;
+    TreeType getTreeType(BiomeType biome) const;
+    BlockType getLogType(TreeType tree) const;
+    BlockType getLeavesType(TreeType tree) const;
 };

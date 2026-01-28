@@ -32,6 +32,11 @@ public:
     void setTimeOfDay(float time) { timeOfDay = time; }
 
     void setSkyColor(const glm::vec3& color) { skyColor = color; }
+    
+    // Set biome colors for vegetation tinting
+    void setBiomeGrassColor(const glm::vec3& color) { biomeGrassColor = color; }
+    void setBiomeFoliageColor(const glm::vec3& color) { biomeFoliageColor = color; }
+    void setUseBiomeColors(bool use) { useBiomeColors = use; }
     // void setShowShadows(bool show) { showShadows = show; } // Removed, uses Settings
 
     Shader& getBlockShader() { return blockShader; }
@@ -111,6 +116,11 @@ private:
     float sunHeight = 1.0f;
     float timeOfDay = 0.0f;
     // bool showShadows = true; // Removed
+    
+    // Biome colors for vegetation tinting
+    glm::vec3 biomeGrassColor = glm::vec3(0.5f, 0.85f, 0.4f);   // Default green
+    glm::vec3 biomeFoliageColor = glm::vec3(0.45f, 0.75f, 0.35f); // Default foliage
+    bool useBiomeColors = true;
     
     // Camera-Relative Rendering for TAA stability
     glm::dvec3 renderOrigin = glm::dvec3(0.0); // Origin for rendering (rebased periodically)

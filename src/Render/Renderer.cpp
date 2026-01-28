@@ -518,6 +518,20 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         }
         glUniform1iv(glGetUniformLocation(blockShader.getProgram(), "uGrassVariants"), 8, grassVariantIndices);
         blockShader.setInt("uGrassVariantCount", resPack.getGrassVariantCount());
+        
+        // Pass flower variants for flower randomization
+        const auto& flowerVariants = resPack.getFlowerVariants();
+        int flowerVariantIndices[12] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+        for (size_t i = 0; i < std::min(flowerVariants.size(), size_t(12)); i++) {
+            flowerVariantIndices[i] = flowerVariants[i];
+        }
+        glUniform1iv(glGetUniformLocation(blockShader.getProgram(), "uFlowerVariants"), 12, flowerVariantIndices);
+        blockShader.setInt("uFlowerVariantCount", resPack.getFlowerVariantCount());
+        
+        // Pass biome colors for vegetation tinting
+        blockShader.setVec3("uBiomeGrassColor", biomeGrassColor);
+        blockShader.setVec3("uBiomeFoliageColor", biomeFoliageColor);
+        blockShader.setInt("uUseBiomeColors", useBiomeColors ? 1 : 0);
     }
 
     // Debug uniforms

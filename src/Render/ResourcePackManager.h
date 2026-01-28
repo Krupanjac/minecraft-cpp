@@ -107,6 +107,13 @@ public:
         return grassVariants.empty() ? -1 : grassVariants[index % grassVariants.size()]; 
     }
     const std::vector<int>& getGrassVariants() const { return grassVariants; }
+    
+    // Get flower variant count for shader randomization
+    int getFlowerVariantCount() const { return static_cast<int>(flowerVariants.size()); }
+    int getFlowerVariant(int index) const { 
+        return flowerVariants.empty() ? -1 : flowerVariants[index % flowerVariants.size()]; 
+    }
+    const std::vector<int>& getFlowerVariants() const { return flowerVariants; }
 
 private:
     bool loadTextures(const std::string& texturePath);

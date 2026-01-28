@@ -4,6 +4,7 @@
 #include <cmath>
 #include <random>
 #include <algorithm>
+#include <map>
 
 WorldGenerator::WorldGenerator(unsigned int seed) : seed(seed) {
     setSeed(seed);
@@ -58,16 +59,22 @@ BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
             info.surfaceBlock = BlockType::SAND;
             info.subsurfaceBlock = BlockType::SAND;
             info.surfaceDepth = 3;
+            // Ocean colors (used for seagrass if any)
+            info.grassColorR = 0.30f; info.grassColorG = 0.65f; info.grassColorB = 0.55f;
+            info.foliageColorR = 0.30f; info.foliageColorG = 0.65f; info.foliageColorB = 0.55f;
+            info.mapColorR = 0.15f; info.mapColorG = 0.40f; info.mapColorB = 0.80f;
             break;
 
         case BiomeType::RIVER:
             info.temperature = 0.5f;
             info.humidity = 0.8f;
             info.heightVariation = 0.15f;
-            // River banks should look sandy; gravel should be underwater / below the bed
             info.surfaceBlock = BlockType::SAND;
             info.subsurfaceBlock = BlockType::GRAVEL;
             info.surfaceDepth = 3;
+            info.grassColorR = 0.55f; info.grassColorG = 0.75f; info.grassColorB = 0.45f;
+            info.foliageColorR = 0.45f; info.foliageColorG = 0.70f; info.foliageColorB = 0.40f;
+            info.mapColorR = 0.25f; info.mapColorG = 0.50f; info.mapColorB = 0.85f;
             break;
             
         case BiomeType::PLAINS:
@@ -77,6 +84,10 @@ BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
             info.surfaceBlock = BlockType::GRASS;
             info.subsurfaceBlock = BlockType::DIRT;
             info.surfaceDepth = 4;
+            // Plains - bright yellowish green (Minecraft style)
+            info.grassColorR = 0.57f; info.grassColorG = 0.74f; info.grassColorB = 0.35f;
+            info.foliageColorR = 0.47f; info.foliageColorG = 0.68f; info.foliageColorB = 0.32f;
+            info.mapColorR = 0.55f; info.mapColorG = 0.75f; info.mapColorB = 0.35f;
             break;
             
         case BiomeType::DESERT:
@@ -86,6 +97,10 @@ BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
             info.surfaceBlock = BlockType::SAND;
             info.subsurfaceBlock = BlockType::SANDSTONE;
             info.surfaceDepth = 5;
+            // Desert - no grass, but warm tones
+            info.grassColorR = 0.75f; info.grassColorG = 0.72f; info.grassColorB = 0.42f;
+            info.foliageColorR = 0.68f; info.foliageColorG = 0.65f; info.foliageColorB = 0.38f;
+            info.mapColorR = 0.86f; info.mapColorG = 0.78f; info.mapColorB = 0.55f;
             break;
             
         case BiomeType::FOREST:
@@ -95,15 +110,76 @@ BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
             info.surfaceBlock = BlockType::GRASS;
             info.subsurfaceBlock = BlockType::DIRT;
             info.surfaceDepth = 4;
+            // Forest - rich dark green
+            info.grassColorR = 0.35f; info.grassColorG = 0.60f; info.grassColorB = 0.28f;
+            info.foliageColorR = 0.30f; info.foliageColorG = 0.55f; info.foliageColorB = 0.25f;
+            info.mapColorR = 0.20f; info.mapColorG = 0.50f; info.mapColorB = 0.20f;
+            break;
+            
+        case BiomeType::BIRCH_FOREST:
+            info.temperature = 0.45f;
+            info.humidity = 0.7f;
+            info.heightVariation = 0.5f;
+            info.surfaceBlock = BlockType::GRASS;
+            info.subsurfaceBlock = BlockType::DIRT;
+            info.surfaceDepth = 4;
+            // Birch Forest - lighter, more vibrant green
+            info.grassColorR = 0.52f; info.grassColorG = 0.72f; info.grassColorB = 0.38f;
+            info.foliageColorR = 0.48f; info.foliageColorG = 0.68f; info.foliageColorB = 0.35f;
+            info.mapColorR = 0.45f; info.mapColorG = 0.68f; info.mapColorB = 0.38f;
+            break;
+            
+        case BiomeType::TAIGA:
+            info.temperature = 0.2f;
+            info.humidity = 0.6f;
+            info.heightVariation = 0.6f;
+            info.surfaceBlock = BlockType::GRASS;
+            info.subsurfaceBlock = BlockType::DIRT;
+            info.surfaceDepth = 4;
+            // Taiga - cold blue-green tint
+            info.grassColorR = 0.45f; info.grassColorG = 0.60f; info.grassColorB = 0.45f;
+            info.foliageColorR = 0.38f; info.foliageColorG = 0.55f; info.foliageColorB = 0.40f;
+            info.mapColorR = 0.35f; info.mapColorG = 0.55f; info.mapColorB = 0.40f;
+            break;
+            
+        case BiomeType::JUNGLE:
+            info.temperature = 0.85f;
+            info.humidity = 0.95f;
+            info.heightVariation = 0.8f;
+            info.surfaceBlock = BlockType::GRASS;
+            info.subsurfaceBlock = BlockType::DIRT;
+            info.surfaceDepth = 5;
+            // Jungle - lush vibrant green (most saturated)
+            info.grassColorR = 0.35f; info.grassColorG = 0.78f; info.grassColorB = 0.22f;
+            info.foliageColorR = 0.30f; info.foliageColorG = 0.75f; info.foliageColorB = 0.18f;
+            info.mapColorR = 0.25f; info.mapColorG = 0.65f; info.mapColorB = 0.15f;
+            break;
+            
+        case BiomeType::SWAMP:
+            info.temperature = 0.6f;
+            info.humidity = 0.9f;
+            info.heightVariation = 0.2f;
+            info.surfaceBlock = BlockType::GRASS;
+            info.subsurfaceBlock = BlockType::DIRT;
+            info.surfaceDepth = 4;
+            // Swamp - murky olive/brown-green
+            info.grassColorR = 0.42f; info.grassColorG = 0.52f; info.grassColorB = 0.32f;
+            info.foliageColorR = 0.40f; info.foliageColorG = 0.48f; info.foliageColorB = 0.30f;
+            info.mapColorR = 0.38f; info.mapColorG = 0.48f; info.mapColorB = 0.30f;
             break;
             
         case BiomeType::MOUNTAINS:
             info.temperature = 0.3f;
             info.humidity = 0.4f;
             info.heightVariation = 1.5f;
-            info.surfaceBlock = BlockType::STONE;
-            info.subsurfaceBlock = BlockType::STONE;
-            info.surfaceDepth = 1;
+            // Mountains use grass at lower elevations, stone higher up (handled in generate)
+            info.surfaceBlock = BlockType::GRASS;
+            info.subsurfaceBlock = BlockType::DIRT;
+            info.surfaceDepth = 3;
+            // Mountains - cool grayish green
+            info.grassColorR = 0.50f; info.grassColorG = 0.62f; info.grassColorB = 0.42f;
+            info.foliageColorR = 0.45f; info.foliageColorG = 0.58f; info.foliageColorB = 0.38f;
+            info.mapColorR = 0.50f; info.mapColorG = 0.50f; info.mapColorB = 0.55f;
             break;
             
         case BiomeType::SNOWY_TUNDRA:
@@ -113,6 +189,23 @@ BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
             info.surfaceBlock = BlockType::SNOW;
             info.subsurfaceBlock = BlockType::DIRT;
             info.surfaceDepth = 3;
+            // Snowy - cold aqua/teal tint
+            info.grassColorR = 0.50f; info.grassColorG = 0.65f; info.grassColorB = 0.55f;
+            info.foliageColorR = 0.42f; info.foliageColorG = 0.58f; info.foliageColorB = 0.48f;
+            info.mapColorR = 0.86f; info.mapColorG = 0.90f; info.mapColorB = 0.94f;
+            break;
+            
+        case BiomeType::SAVANNA:
+            info.temperature = 0.85f;
+            info.humidity = 0.3f;
+            info.heightVariation = 0.4f;
+            info.surfaceBlock = BlockType::GRASS;
+            info.subsurfaceBlock = BlockType::DIRT;
+            info.surfaceDepth = 4;
+            // Savanna - dry yellowish/tan green
+            info.grassColorR = 0.72f; info.grassColorG = 0.72f; info.grassColorB = 0.35f;
+            info.foliageColorR = 0.68f; info.foliageColorG = 0.68f; info.foliageColorB = 0.32f;
+            info.mapColorR = 0.70f; info.mapColorG = 0.70f; info.mapColorB = 0.40f;
             break;
     }
     
@@ -121,16 +214,16 @@ BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
 
 float WorldGenerator::getTemperature(float x, float z) const {
     // Use specific offset for temperature
-    // Scale reduced to 0.0005f for much larger biomes (approx 6x larger)
-    float tempNoise = fbm(x * 0.0003f + offsetTempX, z * 0.0003f + offsetTempZ, 4);
+    // Scale reduced significantly for much larger biomes (approx 2500+ blocks)
+    float tempNoise = fbm(x * 0.00012f + offsetTempX, z * 0.00012f + offsetTempZ, 4);
     float t = (tempNoise + 1.0f) * 0.5f; // Map to [0, 1]
     return std::clamp(t + globalTempBias, 0.0f, 1.0f);
 }
 
 float WorldGenerator::getHumidity(float x, float z) const {
     // Use specific offset for humidity
-    // Scale reduced to 0.0005f for much larger biomes
-    float humidNoise = fbm(x * 0.0003f + offsetHumidX, z * 0.0003f + offsetHumidZ, 4);
+    // Scale reduced significantly for much larger biomes
+    float humidNoise = fbm(x * 0.00012f + offsetHumidX, z * 0.00012f + offsetHumidZ, 4);
     float h = (humidNoise + 1.0f) * 0.5f; // Map to [0, 1]
     return std::clamp(h + globalHumidBias, 0.0f, 1.0f);
 }
@@ -138,9 +231,9 @@ float WorldGenerator::getHumidity(float x, float z) const {
 BiomeType WorldGenerator::getBiome(float x, float z) const {
     // Biome Selection matching the new terrain generation
     
-    // SCALE FACTORS - Must match getHeight
-    const float CONTINENT_SCALE = 0.0008f * globalFrequencyBias;
-    const float MOUNTAIN_SCALE = 0.002f * globalFrequencyBias;
+    // SCALE FACTORS - Must match getHeight (reduced for larger biomes/oceans)
+    const float CONTINENT_SCALE = 0.0004f * globalFrequencyBias;  // Larger continents/oceans
+    const float MOUNTAIN_SCALE = 0.0015f * globalFrequencyBias;   // Larger mountain ranges
     
     // 1. Continentalness (ocean vs land)
     float contX = x * CONTINENT_SCALE + offsetContinentX;
@@ -148,8 +241,8 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
     float warpX = contX, warpZ = contZ;
     domainWarp(warpX, warpZ);
     float continentalness = fbm(warpX, warpZ, 4);
-    // Must match getHeight() bias so biome/ocean decisions line up with terrain.
-    continentalness = std::clamp(continentalness + 0.12f, -1.0f, 1.0f);
+    // Bias towards land but allow proper oceans
+    continentalness = std::clamp(continentalness + 0.10f, -1.0f, 1.0f);
     
     // 2. Mountain factor (same as getHeight)
     float mtX = x * MOUNTAIN_SCALE + offsetErosionX;
@@ -167,86 +260,153 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
     // Get actual height for height-based biome decisions
     float height = getHeight(x, z);
 
-    // River mask (must match getHeight)
-    float rX = x * 0.0035f + offsetPVX * 0.25f + 31000.0f;
-    float rZ = z * 0.0035f + offsetPVZ * 0.25f + 42000.0f;
+    // River mask - reduced probability (higher threshold = fewer rivers)
+    float rX = x * 0.0025f + offsetPVX * 0.25f + 31000.0f;  // Lower frequency
+    float rZ = z * 0.0025f + offsetPVZ * 0.25f + 42000.0f;
     float riverBase = fbm(rX, rZ, 3);
     float riverVal = 1.0f - std::abs(riverBase);
-    float riverMask = std::pow(std::clamp((riverVal - 0.78f) / 0.22f, 0.0f, 1.0f), 2.6f);
+    float riverMask = std::pow(std::clamp((riverVal - 0.85f) / 0.15f, 0.0f, 1.0f), 3.0f);  // Higher threshold = rarer rivers
     
     // ========== BIOME SELECTION ==========
     
-    // OCEAN (reduce inland water: require strong ocean continentalness OR very low height)
-    // Don't classify rivers as ocean - check riverMask first
-    if (riverMask < 0.3f && ((continentalness < -0.30f && height < (float)SEA_LEVEL + 1.0f) || height < (float)SEA_LEVEL - 5.0f)) {
+    // OCEAN (proper large oceans)
+    if (continentalness < -0.25f && height < (float)SEA_LEVEL + 1.0f) {
+        return BiomeType::OCEAN;
+    }
+    
+    // Deep underwater is always ocean
+    if (height < (float)SEA_LEVEL - 8.0f) {
         return BiomeType::OCEAN;
     }
 
-    // RIVERS (river-like water channels) - lowered threshold to match terrain carving
-    if (riverMask > 0.3f && height < (float)SEA_LEVEL + 2.0f) {
+    // RIVERS (river-like water channels) - much rarer
+    if (riverMask > 0.5f && height < (float)SEA_LEVEL + 2.0f && continentalness > -0.1f) {
         return BiomeType::RIVER;
     }
     
-    // MOUNTAINS (based on mountain factor and height)
-    if (mountainFactor > 0.38f || height > 90.0f) {
-        if (temp < 0.33f || height > 122.0f) {
+    // SWAMP (low, wet areas near water level - but not too common)
+    if (height < (float)SEA_LEVEL + 4.0f && humid > 0.75f && temp > 0.45f && temp < 0.75f) {
+        return BiomeType::SWAMP;
+    }
+    
+    // DESERT - hot and dry flatlands (expanded range)
+    if (temp > 0.65f && humid < 0.30f && mountainFactor < 0.25f && height < 80.0f) {
+        return BiomeType::DESERT;
+    }
+    
+    // JUNGLE - hot and very wet (isolated, requires both high temp AND high humidity)
+    if (temp > 0.70f && humid > 0.75f && mountainFactor < 0.30f) {
+        return BiomeType::JUNGLE;
+    }
+    
+    // MOUNTAINS (based on mountain factor and height) - NO trees on pure stone
+    if (mountainFactor > 0.38f || height > 95.0f) {
+        if (temp < 0.30f || height > 125.0f) {
             return BiomeType::SNOWY_TUNDRA; // Snowy mountain peaks
         }
         return BiomeType::MOUNTAINS;
     }
     
-    // HILLS / HIGHLANDS
+    // SNOWY TUNDRA - cold flat areas (for snowy trees)
+    if (temp < 0.25f) {
+        return BiomeType::SNOWY_TUNDRA;
+    }
+    
+    // TAIGA - cold but not freezing (spruce forests)
+    if (temp < 0.40f) {
+        if (humid > 0.4f) return BiomeType::TAIGA;
+        return BiomeType::SNOWY_TUNDRA;
+    }
+    
+    // SAVANNA - hot and dry but not desert
+    if (temp > 0.65f && humid < 0.45f) {
+        return BiomeType::SAVANNA;
+    }
+    
+    // HILLS / HIGHLANDS - with more variety
     if (mountainFactor > 0.18f || height > 72.0f) {
-        if (temp < 0.25f) return BiomeType::SNOWY_TUNDRA;
-        if (humid < 0.3f && temp > 0.6f) return BiomeType::DESERT;
-        return BiomeType::FOREST; // Forested hills
+        if (humid > 0.6f) return BiomeType::FOREST;
+        if (temp < 0.45f) return BiomeType::TAIGA;
+        return BiomeType::BIRCH_FOREST;
     }
     
-    // FLATLANDS - based on temperature and humidity
-    if (temp < 0.2f) return BiomeType::SNOWY_TUNDRA;
-    
-    if (temp > 0.7f) {
-        if (humid < 0.4f) return BiomeType::DESERT;
-        return BiomeType::PLAINS; // Savanna-like
-    }
-    
-    if (humid > 0.55f) return BiomeType::FOREST;
+    // Temperate regions
+    if (humid > 0.65f) return BiomeType::FOREST;
+    if (humid > 0.50f) return BiomeType::BIRCH_FOREST;
     
     return BiomeType::PLAINS;
 }
 
 bool WorldGenerator::isCave(float x, float y, float z) const {
-    // Don't generate caves too close to surface or too deep
-    if (y > SEA_LEVEL + 10 || y < 5) {
-        return false;
-    }
+    // Extended cave system - deeper and more natural
+    
+    // Caves can go much deeper now (down to y=0, but not in bedrock)
+    if (y < 2) return false;
+    
+    // Get surface height for this column
+    int surfaceHeight = getSurfaceHeight(static_cast<int>(x), static_cast<int>(z));
     
     // Don't carve caves through underwater areas (oceans/rivers)
-    // Check if the surface at this X,Z is below sea level - if so, no caves here
-    int surfaceHeight = getSurfaceHeight(static_cast<int>(x), static_cast<int>(z));
     if (surfaceHeight < SEA_LEVEL && y < SEA_LEVEL) {
-        // This column is underwater - don't create caves that would drain the water
         return false;
     }
     
-    // 1. Cheese Caves (Large Rooms)
-    // Use lower frequency noise for large open areas
-    float cheese = noise3D(x * 0.012f, y * 0.012f, z * 0.012f);
-    float cheeseThreshold = -0.55f + globalCaveDensityBias;
+    // CRITICAL: Don't carve caves too close to surface to prevent ugly holes
+    // Caves should start at least 5 blocks below the surface
+    int depthBelowSurface = surfaceHeight - static_cast<int>(y);
+    if (depthBelowSurface < 5) {
+        return false;  // Too close to surface - no caves here
+    }
     
-    // 2. Spaghetti Caves (Tunnels)
-    // Use ridged noise (abs value close to 0)
-    float worm1 = noise3D(x * 0.018f + 123.4f, y * 0.025f + 521.2f, z * 0.018f + 921.1f);
-    float worm2 = noise3D(x * 0.018f + 921.4f, y * 0.025f + 123.2f, z * 0.018f + 521.1f);
+    // Natural cave entrance zones - only allow near-surface caves where terrain dips
+    // This creates natural-looking cave entrances in hillsides
+    if (depthBelowSurface < 12) {
+        // Near surface - only allow caves if there's a "entrance" condition
+        float entranceNoise = noise2D(x * 0.02f + 5000.0f, z * 0.02f + 6000.0f);
+        if (entranceNoise < 0.3f) {
+            return false;  // No entrance here
+        }
+        // Additional check: entrances only on slopes (where height changes)
+        float heightNearby = getHeight(x + 4.0f, z) + getHeight(x - 4.0f, z) + 
+                            getHeight(x, z + 4.0f) + getHeight(x, z - 4.0f);
+        float avgHeight = heightNearby / 4.0f;
+        float slope = std::abs(avgHeight - surfaceHeight);
+        if (slope < 3.0f) {
+            return false;  // Too flat for natural entrance
+        }
+    }
     
-    // Vary tunnel width based on depth
-    float depthFactor = std::clamp((SEA_LEVEL - y) / 60.0f, 0.0f, 1.0f);
-    float tunnelWidth = 0.05f + depthFactor * 0.04f; 
+    // Depth factor - caves get larger and more common deeper down
+    float depth = static_cast<float>(SEA_LEVEL) - y;
+    float depthFactor = std::clamp(depth / 80.0f, 0.0f, 1.0f);
     
-    bool isTunnel = (std::abs(worm1) < tunnelWidth && std::abs(worm2) < tunnelWidth);
+    // 1. Cheese Caves (Large Rooms) - more common deeper
+    float cheese = noise3D(x * 0.010f, y * 0.010f, z * 0.010f);
+    float cheeseThreshold = -0.50f + globalCaveDensityBias - depthFactor * 0.1f;
     bool isRoom = (cheese < cheeseThreshold);
     
-    return isTunnel || isRoom;
+    // 2. Spaghetti Caves (Tunnels) - winding tunnels
+    float worm1 = noise3D(x * 0.015f + 123.4f, y * 0.020f + 521.2f, z * 0.015f + 921.1f);
+    float worm2 = noise3D(x * 0.015f + 921.4f, y * 0.020f + 123.2f, z * 0.015f + 521.1f);
+    
+    // Tunnel width increases with depth
+    float tunnelWidth = 0.045f + depthFactor * 0.05f;
+    bool isTunnel = (std::abs(worm1) < tunnelWidth && std::abs(worm2) < tunnelWidth);
+    
+    // 3. Noodle Caves (Thin, snaking passages) - new layer
+    float noodle1 = noise3D(x * 0.025f + 333.0f, y * 0.030f + 444.0f, z * 0.025f + 555.0f);
+    float noodle2 = noise3D(x * 0.025f + 666.0f, y * 0.030f + 777.0f, z * 0.025f + 888.0f);
+    float noodleWidth = 0.03f + depthFactor * 0.02f;
+    bool isNoodle = (std::abs(noodle1) < noodleWidth && std::abs(noodle2) < noodleWidth);
+    
+    // 4. Deep caverns - massive caves only at great depths
+    bool isDeepCavern = false;
+    if (y < 0) {  // Below sea level origin
+        float cavern = noise3D(x * 0.006f, y * 0.008f, z * 0.006f);
+        isDeepCavern = (cavern < -0.55f);
+    }
+    
+    return isTunnel || isRoom || isNoodle || isDeepCavern;
 }
 
 int WorldGenerator::getSurfaceHeight(int x, int z) const {
@@ -264,15 +424,23 @@ bool WorldGenerator::hasTree(int x, int z, BiomeType biome) const {
     float r = (h & 0xFFFF) / 65536.0f;
     
     float treeProb = 0.0f;
-    if (biome == BiomeType::FOREST) treeProb = 0.025f; 
-    else if (biome == BiomeType::PLAINS) treeProb = 0.001f;
-    else if (biome == BiomeType::MOUNTAINS) treeProb = 0.004f;
-    // No trees in DESERT, OCEAN, SNOWY_TUNDRA (unless we add spruce later)
+    switch (biome) {
+        case BiomeType::FOREST:        treeProb = 0.025f; break;
+        case BiomeType::BIRCH_FOREST:  treeProb = 0.022f; break;
+        case BiomeType::TAIGA:         treeProb = 0.028f; break;
+        case BiomeType::JUNGLE:        treeProb = 0.045f; break; // Dense jungle
+        case BiomeType::SWAMP:         treeProb = 0.015f; break;
+        case BiomeType::PLAINS:        treeProb = 0.001f; break;
+        case BiomeType::SAVANNA:       treeProb = 0.003f; break;
+        case BiomeType::MOUNTAINS:     treeProb = 0.004f; break;
+        case BiomeType::SNOWY_TUNDRA:  treeProb = 0.002f; break; // Sparse spruce
+        default:                       treeProb = 0.0f;   break; // No trees
+    }
     
     if (r >= treeProb) return false;
 
     // 2. Spatial check: Suppress if a "better" candidate is nearby
-    int radius = 3;
+    int radius = (biome == BiomeType::JUNGLE) ? 2 : 3; // Jungle trees closer together
     
     for (int dx = -radius; dx <= radius; ++dx) {
         for (int dz = -radius; dz <= radius; ++dz) {
@@ -300,11 +468,53 @@ bool WorldGenerator::hasTree(int x, int z, BiomeType biome) const {
     return true;
 }
 
-int WorldGenerator::getTreeHeight(int x, int z) const {
+int WorldGenerator::getTreeHeight(int x, int z, BiomeType biome) const {
     unsigned int h = seed + x * 123 + z * 456;
     h = (h ^ (h >> 13)) * 1274126177;
-    // Height variation: 4 to 8
-    return 4 + (h % 5); 
+    
+    // Height variation based on biome
+    switch (biome) {
+        case BiomeType::JUNGLE:       return 8 + (h % 8);  // 8-15 tall jungle trees
+        case BiomeType::TAIGA:        return 6 + (h % 5);  // 6-10 tall spruce
+        case BiomeType::SWAMP:        return 4 + (h % 3);  // 4-6 shorter swamp trees
+        case BiomeType::BIRCH_FOREST: return 5 + (h % 4);  // 5-8 birch trees
+        default:                      return 4 + (h % 5);  // 4-8 oak trees
+    }
+}
+
+TreeType WorldGenerator::getTreeType(BiomeType biome) const {
+    switch (biome) {
+        case BiomeType::BIRCH_FOREST: return TreeType::BIRCH;
+        case BiomeType::TAIGA:        return TreeType::SPRUCE;
+        case BiomeType::SNOWY_TUNDRA: return TreeType::SPRUCE;
+        case BiomeType::JUNGLE:       return TreeType::JUNGLE;
+        case BiomeType::SWAMP:        return TreeType::OAK;     // Swamp oak
+        case BiomeType::FOREST:       return TreeType::OAK;
+        case BiomeType::PLAINS:       return TreeType::OAK;
+        case BiomeType::SAVANNA:      return TreeType::OAK;     // Would be acacia if available
+        case BiomeType::MOUNTAINS:    return TreeType::SPRUCE;
+        default:                      return TreeType::NONE;
+    }
+}
+
+BlockType WorldGenerator::getLogType(TreeType tree) const {
+    switch (tree) {
+        case TreeType::OAK:    return BlockType::OAK_LOG;
+        case TreeType::BIRCH:  return BlockType::BIRCH_LOG;
+        case TreeType::SPRUCE: return BlockType::SPRUCE_LOG;
+        case TreeType::JUNGLE: return BlockType::JUNGLE_LOG;
+        default:               return BlockType::OAK_LOG;
+    }
+}
+
+BlockType WorldGenerator::getLeavesType(TreeType tree) const {
+    switch (tree) {
+        case TreeType::OAK:    return BlockType::OAK_LEAVES;
+        case TreeType::BIRCH:  return BlockType::BIRCH_LEAVES;
+        case TreeType::SPRUCE: return BlockType::SPRUCE_LEAVES;
+        case TreeType::JUNGLE: return BlockType::JUNGLE_LEAVES;
+        default:               return BlockType::OAK_LEAVES;
+    }
 }
 
 void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
@@ -345,6 +555,21 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                         // River: if the bed is underwater, top layer should be gravel (sand is for shores)
                         if (biome == BiomeType::RIVER && worldY < SEA_LEVEL) blockType = BlockType::GRAVEL;
 
+                        // MOUNTAINS: transition from grass to stone at higher elevations
+                        // Below ~SEA_LEVEL+30: grass/dirt (tree zone)
+                        // Above ~SEA_LEVEL+30: stone (barren peaks)
+                        if (biome == BiomeType::MOUNTAINS) {
+                            int mountainTreeLine = SEA_LEVEL + 30;
+                            if (worldY > mountainTreeLine) {
+                                // Use noise to create patchy transition zone
+                                float transitionNoise = noise2D(worldX * 0.05f + 1234.0f, worldZ * 0.05f + 5678.0f);
+                                int adjustedTreeLine = mountainTreeLine + static_cast<int>(transitionNoise * 8.0f);
+                                if (worldY > adjustedTreeLine) {
+                                    blockType = BlockType::STONE;
+                                }
+                            }
+                        }
+
                         // Snow line: add more snow on mountain tops, and make peaks feel less bare
                         // (Temperature + altitude based, regardless of biome classification)
                         if (worldY >= SEA_LEVEL + 55 && temp < 0.55f) {
@@ -370,20 +595,69 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
 
                 int localY = height - chunkBaseY;
                 Block below = chunk->getBlock(x, localY - 1, z);
-                if (below.getType() == BlockType::GRASS) {
-                    unsigned int h = seed + worldX * 374761393 + worldZ * 668265263;
-                    h = (h ^ (h >> 13)) * 1274126177;
-                    float r = (h & 0xFFFF) / 65536.0f;
+                BlockType belowType = below.getType();
+                
+                unsigned int h = seed + worldX * 374761393 + worldZ * 668265263;
+                h = (h ^ (h >> 13)) * 1274126177;
+                float r = (h & 0xFFFF) / 65536.0f;
+                
+                // Sugar cane near water
+                if (belowType == BlockType::GRASS || belowType == BlockType::SAND) {
+                    // Check if near water
+                    bool nearWater = false;
+                    for (int dx = -1; dx <= 1 && !nearWater; ++dx) {
+                        for (int dz = -1; dz <= 1 && !nearWater; ++dz) {
+                            if (dx == 0 && dz == 0) continue;
+                            int checkX = x + dx;
+                            int checkZ = z + dz;
+                            if (checkX >= 0 && checkX < CHUNK_SIZE && checkZ >= 0 && checkZ < CHUNK_SIZE) {
+                                Block neighbor = chunk->getBlock(checkX, localY - 1, checkZ);
+                                if (neighbor.getType() == BlockType::WATER) nearWater = true;
+                            }
+                        }
+                    }
                     
+                    if (nearWater && r < 0.08f && biome != BiomeType::DESERT && biome != BiomeType::SNOWY_TUNDRA) {
+                        // Sugar cane (1-3 blocks tall)
+                        int caneHeight = 1 + (h % 3);
+                        for (int cy = 0; cy < caneHeight && (localY + cy) < CHUNK_HEIGHT; ++cy) {
+                            chunk->setBlock(x, localY + cy, z, Block(BlockType::SUGAR_CANE));
+                        }
+                        continue;
+                    }
+                }
+                
+                // Normal vegetation on grass
+                if (belowType == BlockType::GRASS) {
                     float plantProb = 0.0f;
-                    if (biome == BiomeType::PLAINS) plantProb = 0.2f;
-                    else if (biome == BiomeType::FOREST) plantProb = 0.1f;
-                    else if (biome == BiomeType::MOUNTAINS) plantProb = 0.05f;
+                    float flowerChance = 0.1f; // 10% of plants are flowers
+                    
+                    switch (biome) {
+                        case BiomeType::PLAINS:       plantProb = 0.25f; flowerChance = 0.15f; break;
+                        case BiomeType::FOREST:       plantProb = 0.12f; flowerChance = 0.08f; break;
+                        case BiomeType::BIRCH_FOREST: plantProb = 0.15f; flowerChance = 0.12f; break;
+                        case BiomeType::JUNGLE:       plantProb = 0.35f; flowerChance = 0.05f; break;
+                        case BiomeType::SWAMP:        plantProb = 0.20f; flowerChance = 0.02f; break;
+                        case BiomeType::SAVANNA:      plantProb = 0.18f; flowerChance = 0.08f; break;
+                        case BiomeType::TAIGA:        plantProb = 0.08f; flowerChance = 0.03f; break;
+                        case BiomeType::MOUNTAINS:    plantProb = 0.06f; flowerChance = 0.05f; break;
+                        default:                      plantProb = 0.0f;  break;
+                    }
                     
                     if (r < plantProb) {
                         BlockType plant = BlockType::TALL_GRASS;
-                        if (((h >> 16) & 0xFF) < 25) plant = BlockType::ROSE; // ~10% chance
+                        if (((h >> 16) & 0xFF) < static_cast<unsigned int>(flowerChance * 255.0f)) {
+                            plant = BlockType::ROSE;
+                        }
                         chunk->setBlock(x, localY, z, Block(plant));
+                    }
+                }
+                
+                // Dead bushes on sand (desert)
+                if (belowType == BlockType::SAND && biome == BiomeType::DESERT) {
+                    if (r < 0.02f) {
+                        // Use cobweb as a placeholder for dead bush visual (or TALL_GRASS if no dead bush)
+                        chunk->setBlock(x, localY, z, Block(BlockType::TALL_GRASS));
                     }
                 }
             }
@@ -391,7 +665,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
     }
     
     // 3. Tree Pass (Neighborhood Search)
-    int pad = 2;
+    int pad = 3; // Increased for larger jungle trees
     for (int nx = -pad; nx < CHUNK_SIZE + pad; ++nx) {
         for (int nz = -pad; nz < CHUNK_SIZE + pad; ++nz) {
             int worldX = static_cast<int>(worldPos.x) + nx;
@@ -405,54 +679,203 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                 if (treeBaseY < SEA_LEVEL) continue;
                 if (isCave(static_cast<float>(worldX), static_cast<float>(treeBaseY - 1), static_cast<float>(worldZ))) continue;
 
-                int treeH = getTreeHeight(worldX, worldZ);
+                // Check if surface block can support a tree (must be grass, dirt, or snow)
+                // This prevents trees from spawning on stone in mountains
+                int localTreeX = worldX - static_cast<int>(worldPos.x);
+                int localTreeZ = worldZ - static_cast<int>(worldPos.z);
+                int localBaseY = treeBaseY - static_cast<int>(worldPos.y) - 1;
+                
+                bool canSupportTree = false;
+                if (localTreeX >= 0 && localTreeX < CHUNK_SIZE && localTreeZ >= 0 && localTreeZ < CHUNK_SIZE &&
+                    localBaseY >= 0 && localBaseY < CHUNK_HEIGHT) {
+                    Block groundBlock = chunk->getBlock(localTreeX, localBaseY, localTreeZ);
+                    BlockType groundType = groundBlock.getType();
+                    canSupportTree = (groundType == BlockType::GRASS || 
+                                     groundType == BlockType::DIRT ||
+                                     groundType == BlockType::SNOW);
+                } else {
+                    // For trees outside chunk bounds, check biome info
+                    BiomeInfo info = getBiomeInfo(biome);
+                    canSupportTree = (info.surfaceBlock == BlockType::GRASS ||
+                                     info.surfaceBlock == BlockType::DIRT ||
+                                     info.surfaceBlock == BlockType::SNOW);
+                    // For mountains, check elevation for tree line
+                    if (biome == BiomeType::MOUNTAINS && treeBaseY > SEA_LEVEL + 38) {
+                        canSupportTree = false;  // Above tree line
+                    }
+                }
+                
+                if (!canSupportTree) continue;
+
+                TreeType treeType = getTreeType(biome);
+                if (treeType == TreeType::NONE) continue;
+                
+                int treeH = getTreeHeight(worldX, worldZ, biome);
+                BlockType logType = getLogType(treeType);
+                BlockType leavesType = getLeavesType(treeType);
                 
                 int chunkBaseY = static_cast<int>(worldPos.y);
                 int treeTopY = treeBaseY + treeH + 1;
                 
                 if (treeTopY < chunkBaseY || treeBaseY > chunkBaseY + CHUNK_HEIGHT) continue;
                 
-                // Draw Trunk
-                if (nx >= 0 && nx < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE) {
-                    for (int i = 0; i < treeH; ++i) {
-                        int wy = treeBaseY + i;
-                        if (wy >= chunkBaseY && wy < chunkBaseY + CHUNK_HEIGHT) {
-                            chunk->setBlock(nx, wy - chunkBaseY, nz, Block(BlockType::LOG));
-                        }
-                    }
-                }
-                
-                // Draw Leaves
                 unsigned int h = seed + worldX * 34123 + worldZ * 23123;
                 h = (h ^ (h >> 13)) * 1274126177;
-                bool extraLeaves = (h % 2) == 0;
-
-                for (int ly = treeBaseY + treeH - 3; ly <= treeBaseY + treeH; ++ly) {
-                    if (ly < chunkBaseY || ly >= chunkBaseY + CHUNK_HEIGHT) continue;
+                
+                // Check if this is snowy biome - we'll add snow to leaves
+                bool addSnowToLeaves = (biome == BiomeType::SNOWY_TUNDRA || 
+                                       (biome == BiomeType::TAIGA && getTemperature(static_cast<float>(worldX), static_cast<float>(worldZ)) < 0.25f));
+                
+                // Draw tree based on type
+                if (treeType == TreeType::SPRUCE) {
+                    // Spruce tree - conical shape
+                    // Draw Trunk
+                    if (nx >= 0 && nx < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE) {
+                        for (int i = 0; i < treeH; ++i) {
+                            int wy = treeBaseY + i;
+                            if (wy >= chunkBaseY && wy < chunkBaseY + CHUNK_HEIGHT) {
+                                chunk->setBlock(nx, wy - chunkBaseY, nz, Block(logType));
+                            }
+                        }
+                    }
                     
-                    int dy = ly - (treeBaseY + treeH);
-                    int radius = (dy >= -1) ? 1 : 2;
+                    // Track highest leaf at each position for snow placement
+                    std::map<std::pair<int,int>, int> highestLeafY;
                     
-                    for (int lx = worldX - radius; lx <= worldX + radius; ++lx) {
-                        for (int lz = worldZ - radius; lz <= worldZ + radius; ++lz) {
-                            int localX = lx - static_cast<int>(worldPos.x);
-                            int localZ = lz - static_cast<int>(worldPos.z);
-                            
-                            if (localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE) {
-                                bool isCorner = std::abs(lx - worldX) == radius && std::abs(lz - worldZ) == radius;
+                    // Conical leaves
+                    for (int ly = treeBaseY + 2; ly <= treeBaseY + treeH + 1; ++ly) {
+                        if (ly < chunkBaseY || ly >= chunkBaseY + CHUNK_HEIGHT) continue;
+                        
+                        int dy = ly - (treeBaseY + treeH);
+                        int radius = (dy >= 0) ? 0 : std::min(2, (-dy) / 2 + 1);
+                        
+                        for (int lx = worldX - radius; lx <= worldX + radius; ++lx) {
+                            for (int lz = worldZ - radius; lz <= worldZ + radius; ++lz) {
+                                int localX = lx - static_cast<int>(worldPos.x);
+                                int localZ = lz - static_cast<int>(worldPos.z);
                                 
-                                if (isCorner) {
-                                    if (radius == 1) continue;
-                                    if (radius == 2) {
-                                        if (!extraLeaves || (h % 3 != 0)) continue; 
+                                if (localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE) {
+                                    bool isCorner = std::abs(lx - worldX) == radius && std::abs(lz - worldZ) == radius;
+                                    if (isCorner && radius > 1) continue;
+                                    
+                                    Block existing = chunk->getBlock(localX, ly - chunkBaseY, localZ);
+                                    if (existing.getType() == BlockType::AIR || existing.isCrossModel()) {
+                                        chunk->setBlock(localX, ly - chunkBaseY, localZ, Block(leavesType));
+                                        // Track highest leaf for snow
+                                        auto key = std::make_pair(localX, localZ);
+                                        if (highestLeafY.find(key) == highestLeafY.end() || ly > highestLeafY[key]) {
+                                            highestLeafY[key] = ly;
+                                        }
                                     }
                                 }
-
-                                if (lx == worldX && lz == worldZ) continue;
+                            }
+                        }
+                    }
+                    
+                    // Add snow layer on top of leaves for snowy biomes
+                    if (addSnowToLeaves) {
+                        for (auto& pair : highestLeafY) {
+                            int localX = pair.first.first;
+                            int localZ = pair.first.second;
+                            int snowY = pair.second + 1;
+                            
+                            if (snowY >= chunkBaseY && snowY < chunkBaseY + CHUNK_HEIGHT) {
+                                int localSnowY = snowY - chunkBaseY;
+                                Block existing = chunk->getBlock(localX, localSnowY, localZ);
+                                if (existing.getType() == BlockType::AIR) {
+                                    chunk->setBlock(localX, localSnowY, localZ, Block(BlockType::SNOW));
+                                }
+                            }
+                        }
+                    }
+                } else if (treeType == TreeType::JUNGLE) {
+                    // Jungle tree - thick trunk, dense canopy
+                    // Draw Trunk (2x2 for large trees)
+                    bool largeTrunk = treeH > 10;
+                    int trunkSize = largeTrunk ? 2 : 1;
+                    
+                    for (int tx = 0; tx < trunkSize; ++tx) {
+                        for (int tz = 0; tz < trunkSize; ++tz) {
+                            int localX = nx + tx;
+                            int localZ = nz + tz;
+                            if (localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE) {
+                                for (int i = 0; i < treeH; ++i) {
+                                    int wy = treeBaseY + i;
+                                    if (wy >= chunkBaseY && wy < chunkBaseY + CHUNK_HEIGHT) {
+                                        chunk->setBlock(localX, wy - chunkBaseY, localZ, Block(logType));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Dense canopy
+                    int canopyStart = treeBaseY + treeH - 4;
+                    for (int ly = canopyStart; ly <= treeBaseY + treeH + 1; ++ly) {
+                        if (ly < chunkBaseY || ly >= chunkBaseY + CHUNK_HEIGHT) continue;
+                        
+                        int dy = ly - (treeBaseY + treeH);
+                        int radius = (dy >= 0) ? 2 : 3;
+                        
+                        for (int lx = worldX - radius; lx <= worldX + radius + (largeTrunk ? 1 : 0); ++lx) {
+                            for (int lz = worldZ - radius; lz <= worldZ + radius + (largeTrunk ? 1 : 0); ++lz) {
+                                int localX = lx - static_cast<int>(worldPos.x);
+                                int localZ = lz - static_cast<int>(worldPos.z);
                                 
-                                Block existing = chunk->getBlock(localX, ly - chunkBaseY, localZ);
-                                if (existing.getType() == BlockType::AIR || existing.isCrossModel()) {
-                                    chunk->setBlock(localX, ly - chunkBaseY, localZ, Block(BlockType::LEAVES));
+                                if (localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE) {
+                                    bool isCorner = (std::abs(lx - worldX) >= radius) && (std::abs(lz - worldZ) >= radius);
+                                    if (isCorner && ((h + ly) % 3 == 0)) continue;
+                                    
+                                    Block existing = chunk->getBlock(localX, ly - chunkBaseY, localZ);
+                                    if (existing.getType() == BlockType::AIR || existing.isCrossModel()) {
+                                        chunk->setBlock(localX, ly - chunkBaseY, localZ, Block(leavesType));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Oak/Birch tree - standard shape
+                    // Draw Trunk
+                    if (nx >= 0 && nx < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE) {
+                        for (int i = 0; i < treeH; ++i) {
+                            int wy = treeBaseY + i;
+                            if (wy >= chunkBaseY && wy < chunkBaseY + CHUNK_HEIGHT) {
+                                chunk->setBlock(nx, wy - chunkBaseY, nz, Block(logType));
+                            }
+                        }
+                    }
+                    
+                    // Standard leaves
+                    bool extraLeaves = (h % 2) == 0;
+                    
+                    for (int ly = treeBaseY + treeH - 3; ly <= treeBaseY + treeH; ++ly) {
+                        if (ly < chunkBaseY || ly >= chunkBaseY + CHUNK_HEIGHT) continue;
+                        
+                        int dy = ly - (treeBaseY + treeH);
+                        int radius = (dy >= -1) ? 1 : 2;
+                        
+                        for (int lx = worldX - radius; lx <= worldX + radius; ++lx) {
+                            for (int lz = worldZ - radius; lz <= worldZ + radius; ++lz) {
+                                int localX = lx - static_cast<int>(worldPos.x);
+                                int localZ = lz - static_cast<int>(worldPos.z);
+                                
+                                if (localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE) {
+                                    bool isCorner = std::abs(lx - worldX) == radius && std::abs(lz - worldZ) == radius;
+                                    
+                                    if (isCorner) {
+                                        if (radius == 1) continue;
+                                        if (radius == 2) {
+                                            if (!extraLeaves || (h % 3 != 0)) continue; 
+                                        }
+                                    }
+
+                                    if (lx == worldX && lz == worldZ) continue;
+                                    
+                                    Block existing = chunk->getBlock(localX, ly - chunkBaseY, localZ);
+                                    if (existing.getType() == BlockType::AIR || existing.isCrossModel()) {
+                                        chunk->setBlock(localX, ly - chunkBaseY, localZ, Block(leavesType));
+                                    }
                                 }
                             }
                         }
@@ -496,7 +919,8 @@ float WorldGenerator::getHeight(float x, float z) const {
     float continentalness = fbm(warpX, warpZ, 4);
     // Bias towards land so the world isn't overly ocean-heavy.
     // This is the simplest way to get more flatlands without changing SEA_LEVEL.
-    continentalness = std::clamp(continentalness + 0.12f, -1.0f, 1.0f);
+    // Increased bias (0.20) for more land coverage, less ocean
+    continentalness = std::clamp(continentalness + 0.20f, -1.0f, 1.0f);
     
     // ========== 2. MOUNTAIN RANGE NOISE ==========
     // Separate noise layer specifically for mountain ranges

@@ -2301,6 +2301,17 @@ private:
             entities.push_back(remotePlayer);
         }
         
+        // Update biome colors based on camera/player position
+        {
+            glm::vec3 camPos = camera.getPosition();
+            BiomeType currentBiome = worldGenerator.getBiome(camPos.x, camPos.z);
+            BiomeInfo biomeInfo = worldGenerator.getBiomeInfo(currentBiome);
+            
+            renderer.setBiomeGrassColor(glm::vec3(biomeInfo.grassColorR, biomeInfo.grassColorG, biomeInfo.grassColorB));
+            renderer.setBiomeFoliageColor(glm::vec3(biomeInfo.foliageColorR, biomeInfo.foliageColorG, biomeInfo.foliageColorB));
+            renderer.setUseBiomeColors(true);
+        }
+        
         renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight());
         // Clean up any GPU meshes for chunks that have been unloaded by ChunkManager
         renderer.cleanUnusedMeshes(chunkManager);

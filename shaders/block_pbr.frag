@@ -30,6 +30,13 @@ uniform int uTextureIndices[kBlockTypeCount * 6];
 // Vegetation variant indices for randomization
 uniform int uGrassVariants[8];
 uniform int uGrassVariantCount;
+uniform int uFlowerVariants[12];
+uniform int uFlowerVariantCount;
+
+// Biome color tinting (computed per-chunk or interpolated)
+uniform vec3 uBiomeGrassColor;   // Grass/vegetation tint
+uniform vec3 uBiomeFoliageColor; // Leaves/foliage tint
+uniform int uUseBiomeColors;     // Enable biome-based coloring
 
 uniform sampler2D uShadowMap;
 uniform sampler2D uRayTracingMap;
@@ -194,12 +201,22 @@ void main() {
             textureLayer = uTextureIndices[lookupIdx];
         }
         // Vegetation randomization based on world position
-        if (textureLayer >= 0 && (vMaterial == 13u || vMaterial == 14u) && uGrassVariantCount > 0) {
+        // Tall grass (13) uses grass variants
+        if (vMaterial == 13u && uGrassVariantCount > 0) {
             ivec3 blockPos = ivec3(floor(vWorldPos));
             int hash = blockPos.x * 73856093 ^ blockPos.y * 19349663 ^ blockPos.z * 83492791;
             hash = abs(hash);
             int variantIdx = hash % uGrassVariantCount;
             int variantLayer = uGrassVariants[variantIdx];
+            if (variantLayer >= 0) textureLayer = variantLayer;
+        }
+        // Flowers (14) use flower variants
+        else if (vMaterial == 14u && uFlowerVariantCount > 0) {
+            ivec3 blockPos = ivec3(floor(vWorldPos));
+            int hash = blockPos.x * 73856093 ^ blockPos.y * 19349663 ^ blockPos.z * 83492791;
+            hash = abs(hash);
+            int variantIdx = hash % uFlowerVariantCount;
+            int variantLayer = uFlowerVariants[variantIdx];
             if (variantLayer >= 0) textureLayer = variantLayer;
         }
     }
@@ -255,21 +272,31 @@ void main() {
         // NOTE: Grass block (material 1) textures are pre-tinted during loading
         // Only apply runtime tinting for leaves and vegetation that might need it
         
-        // Leaves (material 7) - may need tinting if texture is grayscale
+        // Leaves (material 7) - apply biome foliage color
         if (vMaterial == 7u) {
             // Check if the texture looks grayscale (R ≈ G ≈ B)
             float grayTest = abs(baseColor.r - baseColor.g) + abs(baseColor.g - baseColor.b);
             if (grayTest < 0.1) {
-                baseColor *= vec3(0.45, 0.75, 0.35);  // Green leaves tint
+                // Apply biome foliage color if enabled, otherwise use default
+                vec3 foliageTint = (uUseBiomeColors == 1) ? uBiomeFoliageColor : vec3(0.45, 0.75, 0.35);
+                baseColor *= foliageTint;
             }
         }
-        // Tall grass vegetation (material 13) - these use actual grass textures now
-        // The grass.png, tall_grass_bottom.png textures have their own colors
-        // but if they appear too gray, apply subtle tint
+        // Tall grass vegetation (material 13) - apply biome grass color
         else if (vMaterial == 13u) {
             float grayTest = abs(baseColor.r - baseColor.g) + abs(baseColor.g - baseColor.b);
             if (grayTest < 0.1) {
-                baseColor *= vec3(0.5, 0.85, 0.4);  // Green grass tint
+                // Apply biome grass color if enabled, otherwise use default
+                vec3 grassTint = (uUseBiomeColors == 1) ? uBiomeGrassColor : vec3(0.5, 0.85, 0.4);
+                baseColor *= grassTint;
+            }
+        }
+        // Grass block top (material 1, top face) - apply biome grass color
+        else if (vMaterial == 1u && vNormal.y > 0.5) {
+            // For grass blocks, apply subtle biome tinting on top
+            if (uUseBiomeColors == 1) {
+                // Blend with biome color (subtle effect since texture is pre-tinted)
+                baseColor = mix(baseColor, baseColor * uBiomeGrassColor * 2.0, 0.3);
             }
         }
         // Rose/flowers (material 14) - no tint, keep original colors

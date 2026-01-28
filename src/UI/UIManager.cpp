@@ -2185,18 +2185,51 @@ void UIManager::render() {
                                                   0.3f + 0.3f * (1.0f - depth), 
                                                   0.7f + 0.2f * (1.0f - depth), 1.0f);
                             } else {
+                                BiomeInfo biomeInfo = worldGenerator->getBiomeInfo(biome);
+                                float heightFactor = std::min(h / 100.0f, 1.0f);
+                                
                                 switch (biome) {
                                     case BiomeType::OCEAN:
                                         color = glm::vec4(0.15f, 0.4f, 0.8f, 1.0f);
                                         break;
+                                    case BiomeType::RIVER:
+                                        color = glm::vec4(biomeInfo.mapColorR, biomeInfo.mapColorG, biomeInfo.mapColorB, 1.0f);
+                                        break;
                                     case BiomeType::PLAINS:
-                                        color = glm::vec4(0.47f, 0.7f, 0.3f, 1.0f);
+                                        color = glm::vec4(biomeInfo.mapColorR * (0.7f + 0.3f * heightFactor),
+                                                          biomeInfo.mapColorG * (0.7f + 0.3f * heightFactor),
+                                                          biomeInfo.mapColorB, 1.0f);
                                         break;
                                     case BiomeType::DESERT:
-                                        color = glm::vec4(0.86f, 0.78f, 0.55f, 1.0f);
+                                        color = glm::vec4(biomeInfo.mapColorR, biomeInfo.mapColorG, biomeInfo.mapColorB, 1.0f);
                                         break;
                                     case BiomeType::FOREST:
-                                        color = glm::vec4(0.2f, 0.5f, 0.2f, 1.0f);
+                                        color = glm::vec4(biomeInfo.mapColorR * (0.8f + 0.2f * heightFactor),
+                                                          biomeInfo.mapColorG * (0.8f + 0.2f * heightFactor),
+                                                          biomeInfo.mapColorB, 1.0f);
+                                        break;
+                                    case BiomeType::BIRCH_FOREST:
+                                        color = glm::vec4(biomeInfo.mapColorR * (0.85f + 0.15f * heightFactor),
+                                                          biomeInfo.mapColorG * (0.85f + 0.15f * heightFactor),
+                                                          biomeInfo.mapColorB, 1.0f);
+                                        break;
+                                    case BiomeType::TAIGA:
+                                        color = glm::vec4(biomeInfo.mapColorR * (0.8f + 0.2f * heightFactor),
+                                                          biomeInfo.mapColorG * (0.8f + 0.2f * heightFactor),
+                                                          biomeInfo.mapColorB, 1.0f);
+                                        break;
+                                    case BiomeType::JUNGLE:
+                                        color = glm::vec4(biomeInfo.mapColorR * (0.75f + 0.25f * heightFactor),
+                                                          biomeInfo.mapColorG * (0.75f + 0.25f * heightFactor),
+                                                          biomeInfo.mapColorB, 1.0f);
+                                        break;
+                                    case BiomeType::SWAMP:
+                                        color = glm::vec4(biomeInfo.mapColorR, biomeInfo.mapColorG, biomeInfo.mapColorB, 1.0f);
+                                        break;
+                                    case BiomeType::SAVANNA:
+                                        color = glm::vec4(biomeInfo.mapColorR * (0.85f + 0.15f * heightFactor),
+                                                          biomeInfo.mapColorG * (0.85f + 0.15f * heightFactor),
+                                                          biomeInfo.mapColorB, 1.0f);
                                         break;
                                     case BiomeType::MOUNTAINS:
                                         if (h > 120) {
@@ -2207,7 +2240,7 @@ void UIManager::render() {
                                         }
                                         break;
                                     case BiomeType::SNOWY_TUNDRA:
-                                        color = glm::vec4(0.86f, 0.9f, 0.94f, 1.0f);
+                                        color = glm::vec4(biomeInfo.mapColorR, biomeInfo.mapColorG, biomeInfo.mapColorB, 1.0f);
                                         break;
                                     default:
                                         color = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
@@ -3600,25 +3633,61 @@ void UIManager::generateMapTexture() {
                 g = static_cast<unsigned char>(80 + 80 * (1.0f - depth));
                 b = static_cast<unsigned char>(180 + 50 * (1.0f - depth));
             } else {
-                // Land - color by biome
+                // Land - color by biome using BiomeInfo map colors
+                BiomeInfo biomeInfo = worldGenerator->getBiomeInfo(biome);
+                float heightFactor = std::min(terrainHeight / 100.0f, 1.0f);
+                
                 switch (biome) {
                     case BiomeType::OCEAN:
                         r = 40; g = 100; b = 200;
                         break;
+                    case BiomeType::RIVER:
+                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255);
+                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255);
+                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
+                        break;
                     case BiomeType::PLAINS:
-                        r = 120; g = 180; b = 80;
-                        // Height shading
-                        r = static_cast<unsigned char>(r * (0.7f + 0.3f * std::min(terrainHeight / 100.0f, 1.0f)));
-                        g = static_cast<unsigned char>(g * (0.7f + 0.3f * std::min(terrainHeight / 100.0f, 1.0f)));
+                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255 * (0.7f + 0.3f * heightFactor));
+                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255 * (0.7f + 0.3f * heightFactor));
+                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
                         break;
                     case BiomeType::DESERT:
-                        r = 220; g = 200; b = 140;
+                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255);
+                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255);
+                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
                         break;
                     case BiomeType::FOREST:
-                        r = 50; g = 130; b = 50;
-                        // Darker for dense forest
-                        r = static_cast<unsigned char>(r * (0.8f + 0.2f * std::min(terrainHeight / 80.0f, 1.0f)));
-                        g = static_cast<unsigned char>(g * (0.8f + 0.2f * std::min(terrainHeight / 80.0f, 1.0f)));
+                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255 * (0.8f + 0.2f * heightFactor));
+                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255 * (0.8f + 0.2f * heightFactor));
+                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
+                        break;
+                    case BiomeType::BIRCH_FOREST:
+                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255 * (0.85f + 0.15f * heightFactor));
+                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255 * (0.85f + 0.15f * heightFactor));
+                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
+                        break;
+                    case BiomeType::TAIGA:
+                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255 * (0.8f + 0.2f * heightFactor));
+                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255 * (0.8f + 0.2f * heightFactor));
+                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
+                        break;
+                    case BiomeType::JUNGLE:
+                        // Jungle - lush dark green
+                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255 * (0.75f + 0.25f * heightFactor));
+                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255 * (0.75f + 0.25f * heightFactor));
+                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
+                        break;
+                    case BiomeType::SWAMP:
+                        // Swamp - murky brownish green
+                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255);
+                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255);
+                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
+                        break;
+                    case BiomeType::SAVANNA:
+                        // Savanna - dry tan/yellow
+                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255 * (0.85f + 0.15f * heightFactor));
+                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255 * (0.85f + 0.15f * heightFactor));
+                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
                         break;
                     case BiomeType::MOUNTAINS:
                         // Gray stone, whiter at peaks
@@ -3633,7 +3702,9 @@ void UIManager::generateMapTexture() {
                         }
                         break;
                     case BiomeType::SNOWY_TUNDRA:
-                        r = 220; g = 230; b = 240;
+                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255);
+                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255);
+                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
                         break;
                     default:
                         r = 128; g = 128; b = 128;
