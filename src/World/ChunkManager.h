@@ -66,6 +66,16 @@ public:
     void clear() { 
         chunks.clear(); 
         preloadedChunks.clear();
+        unloadTimestamps.clear();
+        std::lock_guard<std::mutex> lock(fluidMutex);
+        fluidQueue.clear();
+        pendingFluidUpdates.clear();
+    }
+    void unloadAllComplete() {
+        // Full cleanup including all state
+        chunks.clear();
+        preloadedChunks.clear();
+        unloadTimestamps.clear();
         std::lock_guard<std::mutex> lock(fluidMutex);
         fluidQueue.clear();
         pendingFluidUpdates.clear();

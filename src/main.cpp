@@ -646,6 +646,12 @@ public:
         // This prevents race conditions where game world chunks get mixed with menu world
         threadPool.wait();
         
+        // Clear pending meshes that were built for the previous world
+        {
+            std::lock_guard<std::mutex> lock(meshMutex);
+            pendingMeshes.clear();
+        }
+        
         // Clear any existing world data first
         chunkManager.unloadAll();
         chunkManager.clear();
@@ -809,6 +815,12 @@ public:
         // CRITICAL: Wait for all pending thread pool tasks to complete before clearing
         // This prevents race conditions where old world chunks get inserted after clear()
         threadPool.wait();
+        
+        // Clear pending meshes that were built for the previous world
+        {
+            std::lock_guard<std::mutex> lock(meshMutex);
+            pendingMeshes.clear();
+        }
         
         // Set seed BEFORE clearing so any residual generation uses new seed
         worldGenerator.setSeed(static_cast<unsigned int>(seed));
@@ -1007,6 +1019,12 @@ public:
         
         // CRITICAL: Wait for all pending thread pool tasks to complete before clearing
         threadPool.wait();
+        
+        // Clear pending meshes that were built for the previous world
+        {
+            std::lock_guard<std::mutex> lock(meshMutex);
+            pendingMeshes.clear();
+        }
         
         // Clear existing world
         chunkManager.unloadAll();
