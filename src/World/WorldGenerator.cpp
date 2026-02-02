@@ -678,8 +678,12 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             float undergroundRiverStrength = riverMask * mountainFactor;
             
             // River shore detection for sand/gravel placement
-            // surfaceRiverMask determines how close we are to river center
-            float surfaceRiverMask = riverMask * (1.0f - mountainFactor * 0.95f);
+            // When mountainFactor >= 0.3, river goes underground - no surface river features
+            float surfaceRiverMask = 0.0f;
+            if (mountainFactor < 0.3f) {
+                float mountainSuppression = mountainFactor / 0.3f;
+                surfaceRiverMask = riverMask * (1.0f - mountainSuppression);
+            }
             bool isRiverCenter = surfaceRiverMask > 0.5f;      // Underwater river bed
             bool isRiverShore = surfaceRiverMask > 0.4f && surfaceRiverMask <= 0.5f;  // Shore at water edge
             
@@ -1246,8 +1250,15 @@ float WorldGenerator::getHeight(float x, float z) const {
     float undergroundRiverFactor = riverMask * mountainFactor;
     
     // Reduce surface river carving based on mountain presence
-    // Rivers in mountains become underground rivers (handled by isCave/isUndergroundRiver)
-    float surfaceRiverMask = riverMask * (1.0f - mountainFactor * 0.95f);
+    // When mountainFactor > 0.3, river goes completely underground (no surface carving)
+    // This prevents mountains from being cut through vertically
+    float surfaceRiverMask = 0.0f;
+    if (mountainFactor < 0.3f) {
+        // Only carve surface rivers in flat/low areas
+        float mountainSuppression = mountainFactor / 0.3f;  // 0 to 1 as mountain increases
+        surfaceRiverMask = riverMask * (1.0f - mountainSuppression);
+    }
+    // In mountains (mountainFactor >= 0.3), surfaceRiverMask stays 0 - river goes underground
 
     // SIMPLE RIVER SYSTEM: Fixed water level, carve terrain down to it
     // River water surface is always at SEA_LEVEL (flat like a real river)
