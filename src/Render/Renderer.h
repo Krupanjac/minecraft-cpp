@@ -16,6 +16,7 @@
 #include <vector>
 
 class Entity;
+class ExplosionVolumeSystem;
 
 class Renderer {
 public:
@@ -33,7 +34,8 @@ public:
 
     bool initialize(int windowWidth, int windowHeight);
     void render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, 
-                int windowWidth, int windowHeight, const std::vector<DebrisRenderData>& debris = {});
+                int windowWidth, int windowHeight, const std::vector<DebrisRenderData>& debris = {},
+                ExplosionVolumeSystem* explosionVolumes = nullptr);
     void onResize(int width, int height);
     
     void setLightDirection(const glm::vec3& direction) { lightDirection = direction; }
@@ -95,6 +97,7 @@ private:
     Shader modelShader; // New shader for entities
     Shader destroyOverlayShader; // Shader for block destruction overlay
     Shader debrisShader; // Shader for debris particles
+    Shader explosionVolumeShader; // Shader for volumetric explosions
     
     std::unique_ptr<Mesh> crosshairMesh;
     bool showCrosshair = true;

@@ -27,6 +27,7 @@
 #include "Network/NetworkManager.h"
 #include "Audio/AudioManager.h"
 #include "Physics/PhysicsTest.h"
+#include "Render/ExplosionVolumeSystem.h"
 
 #include <memory>
 #include <iostream>
@@ -1016,7 +1017,7 @@ public:
         
         // Initialize physics test system
 #if ENABLE_PHYSICS_TEST
-        physicsTest.initialize(&chunkManager, &camera);
+        physicsTest.initialize(&chunkManager, &camera, &explosionVolumes);
         LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
 #endif
     }
@@ -1064,7 +1065,7 @@ public:
             
             // Initialize physics test system for loaded world
 #if ENABLE_PHYSICS_TEST
-            physicsTest.initialize(&chunkManager, &camera);
+            physicsTest.initialize(&chunkManager, &camera, &explosionVolumes);
             LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
 #endif
 
@@ -1217,6 +1218,7 @@ private:
     WorldSerializer worldSerializer;
     Network::NetworkManager networkManager;
     HeldItemRenderer heldItemRenderer;
+    ExplosionVolumeSystem explosionVolumes;
     
     // Physics test system (can be disabled via ENABLE_PHYSICS_TEST in PhysicsTest.h)
     Physics::PhysicsTestSystem physicsTest;
@@ -1945,6 +1947,9 @@ private:
             physicsTest.update(deltaTime);
         }
 #endif
+        if (uiManager.isWorldLoaded()) {
+            explosionVolumes.update(deltaTime);
+        }
         
         // renderer.setShowShadows(uiManager.showShadows); // Removed, Renderer uses Settings directly
 
@@ -2284,7 +2289,7 @@ private:
         if (inMainMenu) {
             // Render menu background world
             std::vector<Entity*> emptyEntities;
-            renderer.render(chunkManager, menuCamera, emptyEntities, window->getWidth(), window->getHeight());
+            renderer.render(chunkManager, menuCamera, emptyEntities, window->getWidth(), window->getHeight(), {}, nullptr);
             renderer.cleanUnusedMeshes(chunkManager);
             uiManager.render();
             uiManager.renderConsole();
@@ -2367,7 +2372,7 @@ private:
         }
 #endif
         
-        renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight(), debrisData);
+        renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight(), debrisData, &explosionVolumes);
         // Clean up any GPU meshes for chunks that have been unloaded by ChunkManager
         renderer.cleanUnusedMeshes(chunkManager);
         

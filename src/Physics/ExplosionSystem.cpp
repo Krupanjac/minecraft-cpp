@@ -51,6 +51,11 @@ ExplosionResult ExplosionSystem::explode(const ExplosionParams& params) {
     if (params.breakBlocks) {
         processBlockDamage(params.center, params.power, affectedBlocks, result);
     }
+
+    // Trigger volumetric explosion VFX (always on explosion)
+    if (explosionVfx) {
+        explosionVfx(params.center, params.power);
+    }
     
     // Only play sound if blocks were actually destroyed or affected
     if (soundPlay && !result.destroyedBlocks.empty()) {

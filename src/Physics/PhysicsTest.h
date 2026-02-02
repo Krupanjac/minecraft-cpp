@@ -16,6 +16,7 @@
 #include "../Entity/DebrisEntity.h"
 #include "../World/ChunkManager.h"
 #include "../Render/Camera.h"
+#include "../Render/ExplosionVolumeSystem.h"
 #include "../Render/Renderer.h"
 #include "../Audio/AudioManager.h"
 #include "../Core/Logger.h"
@@ -39,9 +40,10 @@ public:
     PhysicsTestSystem() = default;
     ~PhysicsTestSystem() = default;
     
-    void initialize(ChunkManager* chunkMgr, Camera* cam) {
+    void initialize(ChunkManager* chunkMgr, Camera* cam, ExplosionVolumeSystem* explosionVfx) {
         chunkManager = chunkMgr;
         camera = cam;
+        explosionVolumes = explosionVfx;
         
         PhysicsConfig config;
         config.gravity = glm::vec3(0.0f, -20.0f, 0.0f);
@@ -138,6 +140,13 @@ public:
                     Audio::AudioManager::instance().triggerExplosionMuffle(
                         muffleStrength, muffleDuration, beepVolume, beepPitch);
                 }
+            }
+        });
+
+        // Set up volumetric explosion VFX callback
+        explosionSystem->setExplosionVfx([this](const glm::vec3& pos, float power) {
+            if (explosionVolumes) {
+                explosionVolumes->spawn(pos, power);
             }
         });
         
@@ -381,6 +390,7 @@ private:
     
     ChunkManager* chunkManager = nullptr;
     Camera* camera = nullptr;
+    ExplosionVolumeSystem* explosionVolumes = nullptr;
     std::unique_ptr<PhysicsWorld> physicsWorld;
     std::unique_ptr<ExplosionSystem> explosionSystem;
     ::DebrisManager debrisManager;
@@ -393,7 +403,7 @@ private:
 namespace Physics {
 class PhysicsTestSystem {
 public:
-    void initialize(void*, void*) {}
+    void initialize(void*, void*, void*) {}
     void update(float) {}
     bool handleInput(void*, const void&, float) { return false; }
     bool isEnabled() const { return false; }

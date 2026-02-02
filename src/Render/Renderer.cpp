@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "ExplosionVolumeSystem.h"
 #include "ResourcePackManager.h"
 #include "../UI/UIManager.h"
 #include "../Core/Logger.h"
@@ -101,7 +102,8 @@ void Renderer::onResize(int width, int height) {
 }
 
 void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, 
-                      int windowWidth, int windowHeight, const std::vector<DebrisRenderData>& debris) {
+                      int windowWidth, int windowHeight, const std::vector<DebrisRenderData>& debris,
+                      ExplosionVolumeSystem* explosionVolumes) {
     // === HANDLE PBR SETTINGS CHANGES ===
     // When PBR mode is toggled, we may need to recalculate lighting/shadows
     if (Settings::instance().pbrSettingsChanged) {
@@ -778,6 +780,12 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         renderDebris(camera, debris, windowWidth, windowHeight);
     }
 
+    // Render volumetric explosion volumes (before post-process)
+    if (explosionVolumes && explosionVolumes->hasActiveVolumes()) {
+        explosionVolumes->render(explosionVolumeShader, view, projection, camera.getPosition(), lightDirection,
+                                 glm::vec3(renderOrigin));
+    }
+
     mainFBO->unbind();
 
     // 2. Post Processing Pass
@@ -1004,6 +1012,10 @@ bool Renderer::loadShaders() {
     }
     if (!debrisShader.loadFromFiles("shaders/debris.vert", "shaders/debris.frag")) {
         LOG_ERROR("Failed to load debris shader");
+        success = false;
+    }
+    if (!explosionVolumeShader.loadFromFiles("shaders/explosion_volume.vert", "shaders/explosion_volume.frag")) {
+        LOG_ERROR("Failed to load explosion volume shader");
         success = false;
     }
     // Create simple shader for crosshair inline or load from file
