@@ -79,18 +79,28 @@ private:
     float globalCaveWaterBias = 0.0f; // -1.0 to 0.0 (Dryer caves to Normal)
     float globalFrequencyBias = 1.0f; // 0.5 to 1.5 (Larger vs Smaller features)
     
-    // Simple Perlin-like noise
+    // Simple Perlin-like noise - hot path functions inlined for performance
     float noise3D(float x, float y, float z) const;
-    float noise2D(float x, float z) const;
+    inline float noise2D(float x, float z) const { return noise3D(x, 0, z); }
     float fbm(float x, float z, int octaves) const; // Fractal Brownian Motion
     float ridgeNoise(float x, float z) const;
     float ridgedMultifractal(float x, float z, int octaves, float lacunarity, float gain, float offset) const; // Alpine mountains
     float billowNoise(float x, float z) const; // Billow noise (abs of noise)
     float turbulence(float x, float z, int octaves) const; // Turbulent noise
     float domainWarp(float& x, float& z) const;
-    float lerp(float a, float b, float t) const;
-    float fade(float t) const;
-    float grad(int hash, float x, float y, float z) const;
+    inline float lerp(float a, float b, float t) const { return a + t * (b - a); }
+    inline float fade(float t) const { return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f); }
+    inline float grad(int hash, float x, float y, float z) const {
+        // Convert low 4 bits of hash code into 12 gradient directions
+        int h = hash & 15;
+        float u = h < 8 ? x : y;
+        float v = h < 4 ? y : h == 12 || h == 14 ? x : z;
+        return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+    }
+    
+    // Cached biome info for fast lookups
+    static BiomeInfo biomeInfoCache[12];
+    static bool biomeInfoCacheInitialized;
     
     // Spline helper
     float getSplineHeight(float continentalness, float erosion, float pv) const;
@@ -101,6 +111,7 @@ private:
     
     // Cave generation
     bool isCave(float x, float y, float z) const;
+    bool isCave(float x, float y, float z, int precomputedSurfaceHeight) const;
     
     // Vegetation helpers
     bool hasTree(int x, int z, BiomeType biome) const;

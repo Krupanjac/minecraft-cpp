@@ -6,7 +6,113 @@
 #include <algorithm>
 #include <map>
 
+// Static BiomeInfo cache - initialized once for fast lookups
+BiomeInfo WorldGenerator::biomeInfoCache[12];
+bool WorldGenerator::biomeInfoCacheInitialized = false;
+
+static void initBiomeInfoCache(BiomeInfo* cache) {
+    // OCEAN
+    cache[0].type = BiomeType::OCEAN;
+    cache[0].temperature = 0.5f; cache[0].humidity = 1.0f; cache[0].heightVariation = 0.3f;
+    cache[0].surfaceBlock = BlockType::SAND; cache[0].subsurfaceBlock = BlockType::SAND; cache[0].surfaceDepth = 3;
+    cache[0].grassColorR = 0.30f; cache[0].grassColorG = 0.65f; cache[0].grassColorB = 0.55f;
+    cache[0].foliageColorR = 0.30f; cache[0].foliageColorG = 0.65f; cache[0].foliageColorB = 0.55f;
+    cache[0].mapColorR = 0.15f; cache[0].mapColorG = 0.40f; cache[0].mapColorB = 0.80f;
+    
+    // RIVER
+    cache[1].type = BiomeType::RIVER;
+    cache[1].temperature = 0.5f; cache[1].humidity = 0.8f; cache[1].heightVariation = 0.15f;
+    cache[1].surfaceBlock = BlockType::SAND; cache[1].subsurfaceBlock = BlockType::GRAVEL; cache[1].surfaceDepth = 3;
+    cache[1].grassColorR = 0.55f; cache[1].grassColorG = 0.75f; cache[1].grassColorB = 0.45f;
+    cache[1].foliageColorR = 0.45f; cache[1].foliageColorG = 0.70f; cache[1].foliageColorB = 0.40f;
+    cache[1].mapColorR = 0.25f; cache[1].mapColorG = 0.50f; cache[1].mapColorB = 0.85f;
+    
+    // PLAINS
+    cache[2].type = BiomeType::PLAINS;
+    cache[2].temperature = 0.6f; cache[2].humidity = 0.5f; cache[2].heightVariation = 0.5f;
+    cache[2].surfaceBlock = BlockType::GRASS; cache[2].subsurfaceBlock = BlockType::DIRT; cache[2].surfaceDepth = 4;
+    cache[2].grassColorR = 0.57f; cache[2].grassColorG = 0.74f; cache[2].grassColorB = 0.35f;
+    cache[2].foliageColorR = 0.47f; cache[2].foliageColorG = 0.68f; cache[2].foliageColorB = 0.32f;
+    cache[2].mapColorR = 0.55f; cache[2].mapColorG = 0.75f; cache[2].mapColorB = 0.35f;
+    
+    // DESERT
+    cache[3].type = BiomeType::DESERT;
+    cache[3].temperature = 0.9f; cache[3].humidity = 0.1f; cache[3].heightVariation = 0.4f;
+    cache[3].surfaceBlock = BlockType::SAND; cache[3].subsurfaceBlock = BlockType::SANDSTONE; cache[3].surfaceDepth = 5;
+    cache[3].grassColorR = 0.75f; cache[3].grassColorG = 0.72f; cache[3].grassColorB = 0.42f;
+    cache[3].foliageColorR = 0.68f; cache[3].foliageColorG = 0.65f; cache[3].foliageColorB = 0.38f;
+    cache[3].mapColorR = 0.86f; cache[3].mapColorG = 0.78f; cache[3].mapColorB = 0.55f;
+    
+    // FOREST
+    cache[4].type = BiomeType::FOREST;
+    cache[4].temperature = 0.5f; cache[4].humidity = 0.8f; cache[4].heightVariation = 0.6f;
+    cache[4].surfaceBlock = BlockType::GRASS; cache[4].subsurfaceBlock = BlockType::DIRT; cache[4].surfaceDepth = 4;
+    cache[4].grassColorR = 0.35f; cache[4].grassColorG = 0.60f; cache[4].grassColorB = 0.28f;
+    cache[4].foliageColorR = 0.30f; cache[4].foliageColorG = 0.55f; cache[4].foliageColorB = 0.25f;
+    cache[4].mapColorR = 0.20f; cache[4].mapColorG = 0.50f; cache[4].mapColorB = 0.20f;
+    
+    // BIRCH_FOREST
+    cache[5].type = BiomeType::BIRCH_FOREST;
+    cache[5].temperature = 0.45f; cache[5].humidity = 0.7f; cache[5].heightVariation = 0.5f;
+    cache[5].surfaceBlock = BlockType::GRASS; cache[5].subsurfaceBlock = BlockType::DIRT; cache[5].surfaceDepth = 4;
+    cache[5].grassColorR = 0.52f; cache[5].grassColorG = 0.72f; cache[5].grassColorB = 0.38f;
+    cache[5].foliageColorR = 0.48f; cache[5].foliageColorG = 0.68f; cache[5].foliageColorB = 0.35f;
+    cache[5].mapColorR = 0.45f; cache[5].mapColorG = 0.68f; cache[5].mapColorB = 0.38f;
+    
+    // TAIGA
+    cache[6].type = BiomeType::TAIGA;
+    cache[6].temperature = 0.2f; cache[6].humidity = 0.6f; cache[6].heightVariation = 0.6f;
+    cache[6].surfaceBlock = BlockType::GRASS; cache[6].subsurfaceBlock = BlockType::DIRT; cache[6].surfaceDepth = 4;
+    cache[6].grassColorR = 0.45f; cache[6].grassColorG = 0.60f; cache[6].grassColorB = 0.45f;
+    cache[6].foliageColorR = 0.38f; cache[6].foliageColorG = 0.55f; cache[6].foliageColorB = 0.40f;
+    cache[6].mapColorR = 0.35f; cache[6].mapColorG = 0.55f; cache[6].mapColorB = 0.40f;
+    
+    // JUNGLE
+    cache[7].type = BiomeType::JUNGLE;
+    cache[7].temperature = 0.85f; cache[7].humidity = 0.95f; cache[7].heightVariation = 0.8f;
+    cache[7].surfaceBlock = BlockType::GRASS; cache[7].subsurfaceBlock = BlockType::DIRT; cache[7].surfaceDepth = 5;
+    cache[7].grassColorR = 0.35f; cache[7].grassColorG = 0.78f; cache[7].grassColorB = 0.22f;
+    cache[7].foliageColorR = 0.30f; cache[7].foliageColorG = 0.75f; cache[7].foliageColorB = 0.18f;
+    cache[7].mapColorR = 0.25f; cache[7].mapColorG = 0.65f; cache[7].mapColorB = 0.15f;
+    
+    // SWAMP
+    cache[8].type = BiomeType::SWAMP;
+    cache[8].temperature = 0.6f; cache[8].humidity = 0.9f; cache[8].heightVariation = 0.2f;
+    cache[8].surfaceBlock = BlockType::GRASS; cache[8].subsurfaceBlock = BlockType::DIRT; cache[8].surfaceDepth = 4;
+    cache[8].grassColorR = 0.42f; cache[8].grassColorG = 0.52f; cache[8].grassColorB = 0.32f;
+    cache[8].foliageColorR = 0.40f; cache[8].foliageColorG = 0.48f; cache[8].foliageColorB = 0.30f;
+    cache[8].mapColorR = 0.38f; cache[8].mapColorG = 0.48f; cache[8].mapColorB = 0.30f;
+    
+    // MOUNTAINS
+    cache[9].type = BiomeType::MOUNTAINS;
+    cache[9].temperature = 0.3f; cache[9].humidity = 0.4f; cache[9].heightVariation = 1.5f;
+    cache[9].surfaceBlock = BlockType::GRASS; cache[9].subsurfaceBlock = BlockType::DIRT; cache[9].surfaceDepth = 3;
+    cache[9].grassColorR = 0.50f; cache[9].grassColorG = 0.62f; cache[9].grassColorB = 0.42f;
+    cache[9].foliageColorR = 0.45f; cache[9].foliageColorG = 0.58f; cache[9].foliageColorB = 0.38f;
+    cache[9].mapColorR = 0.50f; cache[9].mapColorG = 0.50f; cache[9].mapColorB = 0.55f;
+    
+    // SNOWY_TUNDRA
+    cache[10].type = BiomeType::SNOWY_TUNDRA;
+    cache[10].temperature = 0.0f; cache[10].humidity = 0.3f; cache[10].heightVariation = 0.4f;
+    cache[10].surfaceBlock = BlockType::SNOW; cache[10].subsurfaceBlock = BlockType::DIRT; cache[10].surfaceDepth = 3;
+    cache[10].grassColorR = 0.50f; cache[10].grassColorG = 0.65f; cache[10].grassColorB = 0.55f;
+    cache[10].foliageColorR = 0.42f; cache[10].foliageColorG = 0.58f; cache[10].foliageColorB = 0.48f;
+    cache[10].mapColorR = 0.86f; cache[10].mapColorG = 0.90f; cache[10].mapColorB = 0.94f;
+    
+    // SAVANNA
+    cache[11].type = BiomeType::SAVANNA;
+    cache[11].temperature = 0.85f; cache[11].humidity = 0.3f; cache[11].heightVariation = 0.4f;
+    cache[11].surfaceBlock = BlockType::GRASS; cache[11].subsurfaceBlock = BlockType::DIRT; cache[11].surfaceDepth = 4;
+    cache[11].grassColorR = 0.72f; cache[11].grassColorG = 0.72f; cache[11].grassColorB = 0.35f;
+    cache[11].foliageColorR = 0.68f; cache[11].foliageColorG = 0.68f; cache[11].foliageColorB = 0.32f;
+    cache[11].mapColorR = 0.70f; cache[11].mapColorG = 0.70f; cache[11].mapColorB = 0.40f;
+}
+
 WorldGenerator::WorldGenerator(unsigned int seed) : seed(seed) {
+    if (!biomeInfoCacheInitialized) {
+        initBiomeInfoCache(biomeInfoCache);
+        biomeInfoCacheInitialized = true;
+    }
     setSeed(seed);
 }
 
@@ -48,168 +154,8 @@ void WorldGenerator::setSeed(unsigned int s) {
 }
 
 BiomeInfo WorldGenerator::getBiomeInfo(BiomeType biome) const {
-    BiomeInfo info;
-    info.type = biome;
-    
-    switch (biome) {
-        case BiomeType::OCEAN:
-            info.temperature = 0.5f;
-            info.humidity = 1.0f;
-            info.heightVariation = 0.3f;
-            info.surfaceBlock = BlockType::SAND;
-            info.subsurfaceBlock = BlockType::SAND;
-            info.surfaceDepth = 3;
-            // Ocean colors (used for seagrass if any)
-            info.grassColorR = 0.30f; info.grassColorG = 0.65f; info.grassColorB = 0.55f;
-            info.foliageColorR = 0.30f; info.foliageColorG = 0.65f; info.foliageColorB = 0.55f;
-            info.mapColorR = 0.15f; info.mapColorG = 0.40f; info.mapColorB = 0.80f;
-            break;
-
-        case BiomeType::RIVER:
-            info.temperature = 0.5f;
-            info.humidity = 0.8f;
-            info.heightVariation = 0.15f;
-            info.surfaceBlock = BlockType::SAND;
-            info.subsurfaceBlock = BlockType::GRAVEL;
-            info.surfaceDepth = 3;
-            info.grassColorR = 0.55f; info.grassColorG = 0.75f; info.grassColorB = 0.45f;
-            info.foliageColorR = 0.45f; info.foliageColorG = 0.70f; info.foliageColorB = 0.40f;
-            info.mapColorR = 0.25f; info.mapColorG = 0.50f; info.mapColorB = 0.85f;
-            break;
-            
-        case BiomeType::PLAINS:
-            info.temperature = 0.6f;
-            info.humidity = 0.5f;
-            info.heightVariation = 0.5f;
-            info.surfaceBlock = BlockType::GRASS;
-            info.subsurfaceBlock = BlockType::DIRT;
-            info.surfaceDepth = 4;
-            // Plains - bright yellowish green (Minecraft style)
-            info.grassColorR = 0.57f; info.grassColorG = 0.74f; info.grassColorB = 0.35f;
-            info.foliageColorR = 0.47f; info.foliageColorG = 0.68f; info.foliageColorB = 0.32f;
-            info.mapColorR = 0.55f; info.mapColorG = 0.75f; info.mapColorB = 0.35f;
-            break;
-            
-        case BiomeType::DESERT:
-            info.temperature = 0.9f;
-            info.humidity = 0.1f;
-            info.heightVariation = 0.4f;
-            info.surfaceBlock = BlockType::SAND;
-            info.subsurfaceBlock = BlockType::SANDSTONE;
-            info.surfaceDepth = 5;
-            // Desert - no grass, but warm tones
-            info.grassColorR = 0.75f; info.grassColorG = 0.72f; info.grassColorB = 0.42f;
-            info.foliageColorR = 0.68f; info.foliageColorG = 0.65f; info.foliageColorB = 0.38f;
-            info.mapColorR = 0.86f; info.mapColorG = 0.78f; info.mapColorB = 0.55f;
-            break;
-            
-        case BiomeType::FOREST:
-            info.temperature = 0.5f;
-            info.humidity = 0.8f;
-            info.heightVariation = 0.6f;
-            info.surfaceBlock = BlockType::GRASS;
-            info.subsurfaceBlock = BlockType::DIRT;
-            info.surfaceDepth = 4;
-            // Forest - rich dark green
-            info.grassColorR = 0.35f; info.grassColorG = 0.60f; info.grassColorB = 0.28f;
-            info.foliageColorR = 0.30f; info.foliageColorG = 0.55f; info.foliageColorB = 0.25f;
-            info.mapColorR = 0.20f; info.mapColorG = 0.50f; info.mapColorB = 0.20f;
-            break;
-            
-        case BiomeType::BIRCH_FOREST:
-            info.temperature = 0.45f;
-            info.humidity = 0.7f;
-            info.heightVariation = 0.5f;
-            info.surfaceBlock = BlockType::GRASS;
-            info.subsurfaceBlock = BlockType::DIRT;
-            info.surfaceDepth = 4;
-            // Birch Forest - lighter, more vibrant green
-            info.grassColorR = 0.52f; info.grassColorG = 0.72f; info.grassColorB = 0.38f;
-            info.foliageColorR = 0.48f; info.foliageColorG = 0.68f; info.foliageColorB = 0.35f;
-            info.mapColorR = 0.45f; info.mapColorG = 0.68f; info.mapColorB = 0.38f;
-            break;
-            
-        case BiomeType::TAIGA:
-            info.temperature = 0.2f;
-            info.humidity = 0.6f;
-            info.heightVariation = 0.6f;
-            info.surfaceBlock = BlockType::GRASS;
-            info.subsurfaceBlock = BlockType::DIRT;
-            info.surfaceDepth = 4;
-            // Taiga - cold blue-green tint
-            info.grassColorR = 0.45f; info.grassColorG = 0.60f; info.grassColorB = 0.45f;
-            info.foliageColorR = 0.38f; info.foliageColorG = 0.55f; info.foliageColorB = 0.40f;
-            info.mapColorR = 0.35f; info.mapColorG = 0.55f; info.mapColorB = 0.40f;
-            break;
-            
-        case BiomeType::JUNGLE:
-            info.temperature = 0.85f;
-            info.humidity = 0.95f;
-            info.heightVariation = 0.8f;
-            info.surfaceBlock = BlockType::GRASS;
-            info.subsurfaceBlock = BlockType::DIRT;
-            info.surfaceDepth = 5;
-            // Jungle - lush vibrant green (most saturated)
-            info.grassColorR = 0.35f; info.grassColorG = 0.78f; info.grassColorB = 0.22f;
-            info.foliageColorR = 0.30f; info.foliageColorG = 0.75f; info.foliageColorB = 0.18f;
-            info.mapColorR = 0.25f; info.mapColorG = 0.65f; info.mapColorB = 0.15f;
-            break;
-            
-        case BiomeType::SWAMP:
-            info.temperature = 0.6f;
-            info.humidity = 0.9f;
-            info.heightVariation = 0.2f;
-            info.surfaceBlock = BlockType::GRASS;
-            info.subsurfaceBlock = BlockType::DIRT;
-            info.surfaceDepth = 4;
-            // Swamp - murky olive/brown-green
-            info.grassColorR = 0.42f; info.grassColorG = 0.52f; info.grassColorB = 0.32f;
-            info.foliageColorR = 0.40f; info.foliageColorG = 0.48f; info.foliageColorB = 0.30f;
-            info.mapColorR = 0.38f; info.mapColorG = 0.48f; info.mapColorB = 0.30f;
-            break;
-            
-        case BiomeType::MOUNTAINS:
-            info.temperature = 0.3f;
-            info.humidity = 0.4f;
-            info.heightVariation = 1.5f;
-            // Mountains use grass at lower elevations, stone higher up (handled in generate)
-            info.surfaceBlock = BlockType::GRASS;
-            info.subsurfaceBlock = BlockType::DIRT;
-            info.surfaceDepth = 3;
-            // Mountains - cool grayish green
-            info.grassColorR = 0.50f; info.grassColorG = 0.62f; info.grassColorB = 0.42f;
-            info.foliageColorR = 0.45f; info.foliageColorG = 0.58f; info.foliageColorB = 0.38f;
-            info.mapColorR = 0.50f; info.mapColorG = 0.50f; info.mapColorB = 0.55f;
-            break;
-            
-        case BiomeType::SNOWY_TUNDRA:
-            info.temperature = 0.0f;
-            info.humidity = 0.3f;
-            info.heightVariation = 0.4f;
-            info.surfaceBlock = BlockType::SNOW;
-            info.subsurfaceBlock = BlockType::DIRT;
-            info.surfaceDepth = 3;
-            // Snowy - cold aqua/teal tint
-            info.grassColorR = 0.50f; info.grassColorG = 0.65f; info.grassColorB = 0.55f;
-            info.foliageColorR = 0.42f; info.foliageColorG = 0.58f; info.foliageColorB = 0.48f;
-            info.mapColorR = 0.86f; info.mapColorG = 0.90f; info.mapColorB = 0.94f;
-            break;
-            
-        case BiomeType::SAVANNA:
-            info.temperature = 0.85f;
-            info.humidity = 0.3f;
-            info.heightVariation = 0.4f;
-            info.surfaceBlock = BlockType::GRASS;
-            info.subsurfaceBlock = BlockType::DIRT;
-            info.surfaceDepth = 4;
-            // Savanna - dry yellowish/tan green
-            info.grassColorR = 0.72f; info.grassColorG = 0.72f; info.grassColorB = 0.35f;
-            info.foliageColorR = 0.68f; info.foliageColorG = 0.68f; info.foliageColorB = 0.32f;
-            info.mapColorR = 0.70f; info.mapColorG = 0.70f; info.mapColorB = 0.40f;
-            break;
-    }
-    
-    return info;
+    // Fast array lookup using biome enum value as index
+    return biomeInfoCache[static_cast<int>(biome)];
 }
 
 float WorldGenerator::getTemperature(float x, float z) const {
@@ -409,6 +355,70 @@ bool WorldGenerator::isCave(float x, float y, float z) const {
     return isTunnel || isRoom || isNoodle || isDeepCavern;
 }
 
+// Optimized isCave overload that accepts precomputed surface height
+bool WorldGenerator::isCave(float x, float y, float z, int surfaceHeight) const {
+    // Extended cave system - deeper and more natural
+    
+    // Caves can go much deeper now (down to y=0, but not in bedrock)
+    if (y < 2) return false;
+    
+    // Don't carve caves through underwater areas (oceans/rivers)
+    if (surfaceHeight < SEA_LEVEL && y < SEA_LEVEL) {
+        return false;
+    }
+    
+    // CRITICAL: Don't carve caves too close to surface to prevent ugly holes
+    int depthBelowSurface = surfaceHeight - static_cast<int>(y);
+    if (depthBelowSurface < 5) {
+        return false;
+    }
+    
+    // Natural cave entrance zones - only allow near-surface caves where terrain dips
+    if (depthBelowSurface < 12) {
+        float entranceNoise = noise2D(x * 0.02f + 5000.0f, z * 0.02f + 6000.0f);
+        if (entranceNoise < 0.3f) {
+            return false;
+        }
+        float heightNearby = getHeight(x + 4.0f, z) + getHeight(x - 4.0f, z) + 
+                            getHeight(x, z + 4.0f) + getHeight(x, z - 4.0f);
+        float avgHeight = heightNearby / 4.0f;
+        float slope = std::abs(avgHeight - surfaceHeight);
+        if (slope < 3.0f) {
+            return false;
+        }
+    }
+    
+    // Depth factor - caves get larger and more common deeper down
+    float depth = static_cast<float>(SEA_LEVEL) - y;
+    float depthFactor = std::clamp(depth / 80.0f, 0.0f, 1.0f);
+    
+    // 1. Cheese Caves (Large Rooms)
+    float cheese = noise3D(x * 0.010f, y * 0.010f, z * 0.010f);
+    float cheeseThreshold = -0.50f + globalCaveDensityBias - depthFactor * 0.1f;
+    bool isRoom = (cheese < cheeseThreshold);
+    
+    // 2. Spaghetti Caves (Tunnels)
+    float worm1 = noise3D(x * 0.015f + 123.4f, y * 0.020f + 521.2f, z * 0.015f + 921.1f);
+    float worm2 = noise3D(x * 0.015f + 921.4f, y * 0.020f + 123.2f, z * 0.015f + 521.1f);
+    float tunnelWidth = 0.045f + depthFactor * 0.05f;
+    bool isTunnel = (std::abs(worm1) < tunnelWidth && std::abs(worm2) < tunnelWidth);
+    
+    // 3. Noodle Caves (Thin, snaking passages)
+    float noodle1 = noise3D(x * 0.025f + 333.0f, y * 0.030f + 444.0f, z * 0.025f + 555.0f);
+    float noodle2 = noise3D(x * 0.025f + 666.0f, y * 0.030f + 777.0f, z * 0.025f + 888.0f);
+    float noodleWidth = 0.03f + depthFactor * 0.02f;
+    bool isNoodle = (std::abs(noodle1) < noodleWidth && std::abs(noodle2) < noodleWidth);
+    
+    // 4. Deep caverns
+    bool isDeepCavern = false;
+    if (y < 0) {
+        float cavern = noise3D(x * 0.006f, y * 0.008f, z * 0.006f);
+        isDeepCavern = (cavern < -0.55f);
+    }
+    
+    return isTunnel || isRoom || isNoodle || isDeepCavern;
+}
+
 int WorldGenerator::getSurfaceHeight(int x, int z) const {
     float baseHeight = getHeight(static_cast<float>(x), static_cast<float>(z));
     return static_cast<int>(baseHeight);
@@ -521,23 +531,50 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
     const ChunkPos& chunkPos = chunk->getPosition();
     glm::vec3 worldPos = ChunkManager::chunkToWorld(chunkPos);
     
-    // 1. Terrain Pass
+    // Precompute per-column data to avoid redundant calculations
+    // This eliminates repeated noise computations for height, biome, and temperature
+    struct ColumnData {
+        int height;
+        BiomeType biome;
+        const BiomeInfo* biomeInfo;
+        float temp;
+    };
+    ColumnData columnCache[CHUNK_SIZE][CHUNK_SIZE];
+    
+    // First pass: precompute all column data
+    for (int x = 0; x < CHUNK_SIZE; ++x) {
+        for (int z = 0; z < CHUNK_SIZE; ++z) {
+            int worldX = static_cast<int>(worldPos.x) + x;
+            int worldZ = static_cast<int>(worldPos.z) + z;
+            float worldXf = static_cast<float>(worldX);
+            float worldZf = static_cast<float>(worldZ);
+            
+            columnCache[x][z].height = static_cast<int>(getHeight(worldXf, worldZf));
+            columnCache[x][z].biome = getBiome(worldXf, worldZf);
+            columnCache[x][z].biomeInfo = &biomeInfoCache[static_cast<int>(columnCache[x][z].biome)];
+            columnCache[x][z].temp = getTemperature(worldXf, worldZf);
+        }
+    }
+    
+    // 1. Terrain Pass - now using precomputed data
     for (int x = 0; x < CHUNK_SIZE; ++x) {
         for (int z = 0; z < CHUNK_SIZE; ++z) {
             int worldX = static_cast<int>(worldPos.x) + x;
             int worldZ = static_cast<int>(worldPos.z) + z;
             
-            BiomeType biome = getBiome(static_cast<float>(worldX), static_cast<float>(worldZ));
-            BiomeInfo biomeInfo = getBiomeInfo(biome);
-            float temp = getTemperature(static_cast<float>(worldX), static_cast<float>(worldZ));
-            
-            int height = getSurfaceHeight(worldX, worldZ);
+            // Use precomputed column data
+            const ColumnData& col = columnCache[x][z];
+            BiomeType biome = col.biome;
+            const BiomeInfo& biomeInfo = *col.biomeInfo;
+            float temp = col.temp;
+            int height = col.height;
             
             for (int y = 0; y < CHUNK_HEIGHT; ++y) {
                 int worldY = static_cast<int>(worldPos.y) + y;
                 BlockType blockType = BlockType::AIR;
                 
-                bool isInCave = isCave(static_cast<float>(worldX), static_cast<float>(worldY), static_cast<float>(worldZ));
+                // Use optimized isCave overload with precomputed surface height
+                bool isInCave = isCave(static_cast<float>(worldX), static_cast<float>(worldY), static_cast<float>(worldZ), height);
                 
                 // Bedrock Layer at Y = -64
                 if (worldY <= -64) {
@@ -665,19 +702,35 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
     }
     
     // 3. Tree Pass (Neighborhood Search)
+    // Use precomputed column cache where possible to avoid redundant getBiome/getHeight calls
     int pad = 3; // Increased for larger jungle trees
     for (int nx = -pad; nx < CHUNK_SIZE + pad; ++nx) {
         for (int nz = -pad; nz < CHUNK_SIZE + pad; ++nz) {
             int worldX = static_cast<int>(worldPos.x) + nx;
             int worldZ = static_cast<int>(worldPos.z) + nz;
             
-            BiomeType biome = getBiome(static_cast<float>(worldX), static_cast<float>(worldZ));
+            // Use precomputed data if within chunk bounds, otherwise compute
+            BiomeType biome;
+            int treeBaseY;
+            float temp;
+            bool inChunkBounds = (nx >= 0 && nx < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE);
+            
+            if (inChunkBounds) {
+                const ColumnData& col = columnCache[nx][nz];
+                biome = col.biome;
+                treeBaseY = col.height;
+                temp = col.temp;
+            } else {
+                float worldXf = static_cast<float>(worldX);
+                float worldZf = static_cast<float>(worldZ);
+                biome = getBiome(worldXf, worldZf);
+                treeBaseY = static_cast<int>(getHeight(worldXf, worldZf));
+                temp = getTemperature(worldXf, worldZf);
+            }
             
             if (hasTree(worldX, worldZ, biome)) {
-                int treeBaseY = getSurfaceHeight(worldX, worldZ);
-                
                 if (treeBaseY < SEA_LEVEL) continue;
-                if (isCave(static_cast<float>(worldX), static_cast<float>(treeBaseY - 1), static_cast<float>(worldZ))) continue;
+                if (isCave(static_cast<float>(worldX), static_cast<float>(treeBaseY - 1), static_cast<float>(worldZ), treeBaseY)) continue;
 
                 // Check if surface block can support a tree (must be grass, dirt, or snow)
                 // This prevents trees from spawning on stone in mountains
@@ -695,7 +748,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                                      groundType == BlockType::SNOW);
                 } else {
                     // For trees outside chunk bounds, check biome info
-                    BiomeInfo info = getBiomeInfo(biome);
+                    const BiomeInfo& info = biomeInfoCache[static_cast<int>(biome)];
                     canSupportTree = (info.surfaceBlock == BlockType::GRASS ||
                                      info.surfaceBlock == BlockType::DIRT ||
                                      info.surfaceBlock == BlockType::SNOW);
@@ -722,9 +775,9 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                 unsigned int h = seed + worldX * 34123 + worldZ * 23123;
                 h = (h ^ (h >> 13)) * 1274126177;
                 
-                // Check if this is snowy biome - we'll add snow to leaves
+                // Check if this is snowy biome - we'll add snow to leaves (use precomputed temp)
                 bool addSnowToLeaves = (biome == BiomeType::SNOWY_TUNDRA || 
-                                       (biome == BiomeType::TAIGA && getTemperature(static_cast<float>(worldX), static_cast<float>(worldZ)) < 0.25f));
+                                       (biome == BiomeType::TAIGA && temp < 0.25f));
                 
                 // Draw tree based on type
                 if (treeType == TreeType::SPRUCE) {
@@ -1126,17 +1179,7 @@ float WorldGenerator::noise3D(float x, float y, float z) const {
     return lerp(y1, y2, w);
 }
 
-float WorldGenerator::grad(int hash, float x, float y, float z) const {
-    // Convert low 4 bits of hash code into 12 gradient directions
-    int h = hash & 15;
-    float u = h < 8 ? x : y;
-    float v = h < 4 ? y : h == 12 || h == 14 ? x : z;
-    return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
-}
-
-float WorldGenerator::noise2D(float x, float z) const {
-    return noise3D(x, 0, z);
-}
+// grad is inline in header for performance
 
 float WorldGenerator::fbm(float x, float z, int octaves) const {
     float total = 0.0f;
@@ -1161,14 +1204,7 @@ float WorldGenerator::fbm(float x, float z, int octaves) const {
     return total / maxValue;
 }
 
-float WorldGenerator::lerp(float a, float b, float t) const {
-    return a + t * (b - a);
-}
-
-float WorldGenerator::fade(float t) const {
-    // Quintic interpolation for smoother gradients
-    return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
-}
+// lerp and fade are now inline in the header
 
 float WorldGenerator::ridgeNoise(float x, float z) const {
     // Ridged multifractal noise
