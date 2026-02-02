@@ -99,17 +99,35 @@ public:
             if (distance < maxShakeRange) {
                 // Intensity falls off with distance (inverse square-ish)
                 float normalizedDist = distance / maxShakeRange;
-                // Stronger intensity - 0.5 base multiplier for noticeable effect
-                float intensity = power * 0.5f * (1.0f - normalizedDist * normalizedDist);
+                float distanceFalloff = (1.0f - normalizedDist);
+                float distanceCurve = distanceFalloff * distanceFalloff; // softer falloff
+
+                // Calmer, more explosion-like shake
+                float baseIntensity = (power <= 4.0f) ? 0.12f : 0.20f;   // X vs C
+                float intensity = baseIntensity * power * distanceCurve;
+
+                // Subtle variation to avoid identical shakes
+                float jitter = 0.85f + (static_cast<float>(std::rand() % 30) / 100.0f); // 0.85..1.14
+                intensity *= jitter;
                 
-                // Duration also scales with power
-                float duration = 0.4f + power * 0.1f;
+                // Duration scales gently with power and proximity
+                float baseDuration = (power <= 4.0f) ? 0.22f : 0.32f;
+                float duration = baseDuration + (power * 0.04f) * distanceCurve;
                 
                 LOG_INFO("[PhysicsTest] Adding shake: intensity=" + std::to_string(intensity) + 
                          " duration=" + std::to_string(duration));
                 
                 // Add the shake to camera
                 camera->addScreenShake(intensity, duration);
+
+                // Trigger explosion muffle/beep when very close
+                float nearRange = power * 6.0f;
+                if (distance < nearRange) {
+                    float nearNorm = 1.0f - (distance / nearRange);
+                    float muffleStrength = std::clamp(nearNorm * (power / 8.0f), 0.2f, 1.0f);
+                    float muffleDuration = 0.6f + power * 0.08f;
+                    Audio::AudioManager::instance().triggerExplosionMuffle(muffleStrength, muffleDuration, 0.9f);
+                }
             }
         });
         

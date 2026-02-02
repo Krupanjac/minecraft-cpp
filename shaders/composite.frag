@@ -11,13 +11,26 @@ uniform float exposure;
 uniform float gamma;
 uniform float uAOStrength; // 0..1 (mix between no AO and full SSAO)
 uniform vec2 uScreenShake; // Screen shake offset in UV space
+uniform float uShakeStrength; // 0..1, controls blur strength
 
 void main()
 {
     // Apply screen shake offset to UV coordinates
     vec2 shakenUV = TexCoords + uScreenShake;
     
-    vec3 hdrColor = texture(scene, shakenUV).rgb;
+    vec3 hdrColor;
+    if (uShakeStrength > 0.001) {
+        // Simple 5-tap blur when shaking
+        vec2 blurOffset = vec2(0.0022) * uShakeStrength;
+        vec3 c0 = texture(scene, shakenUV).rgb;
+        vec3 c1 = texture(scene, shakenUV + vec2( blurOffset.x, 0.0)).rgb;
+        vec3 c2 = texture(scene, shakenUV + vec2(-blurOffset.x, 0.0)).rgb;
+        vec3 c3 = texture(scene, shakenUV + vec2(0.0,  blurOffset.y)).rgb;
+        vec3 c4 = texture(scene, shakenUV + vec2(0.0, -blurOffset.y)).rgb;
+        hdrColor = (c0 * 0.4) + (c1 + c2 + c3 + c4) * 0.15;
+    } else {
+        hdrColor = texture(scene, shakenUV).rgb;
+    }
     float ao = texture(ssao, shakenUV).r;
     vec3 vol = texture(volumetric, shakenUV).rgb;
     

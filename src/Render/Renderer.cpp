@@ -806,9 +806,10 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         glm::vec3 shake = camera.getShakeOffset();
         // Scale shake to UV space (larger values = more visible shake)
         glm::vec2 shakeUV(shake.x * 0.02f, shake.y * 0.02f);
-        postProcess->setScreenShake(shakeUV);
+        float shakeStrength = glm::clamp(glm::length(shakeUV) * 35.0f, 0.0f, 1.0f);
+        postProcess->setScreenShake(shakeUV, shakeStrength);
     } else {
-        postProcess->setScreenShake(glm::vec2(0.0f));
+        postProcess->setScreenShake(glm::vec2(0.0f), 0.0f);
     }
 
     postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), mainFBO->getVelocityTexture(), 

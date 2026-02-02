@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <atomic>
 #include <filesystem>
 
 namespace Audio {
@@ -66,6 +67,9 @@ static std::map<SoundCategory, float>* g_categoryVolumes = nullptr;
 static glm::vec3 g_listenerPos{0.0f};
 static glm::vec3 g_listenerForward{0.0f, 0.0f, -1.0f};
 static glm::vec3 g_listenerUp{0.0f, 1.0f, 0.0f};
+static std::atomic<float> g_muffleStrength{0.0f};
+static float g_lpStateL = 0.0f;
+static float g_lpStateR = 0.0f;
 
 // Helper to get category volume
 static float getCategoryVolumeStatic(SoundCategory category) {
@@ -175,6 +179,21 @@ void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     }
     
     // Clamp output to prevent clipping
+    float muffle = g_muffleStrength.load();
+    if (muffle > 0.001f) {
+        // One-pole low-pass filter, stronger muffle => lower cutoff
+        float alpha = 0.02f + (1.0f - muffle) * 0.18f; // 0.02..0.20
+        for (ma_uint32 frame = 0; frame < frameCount; frame++) {
+            float dryL = output[frame * 2];
+            float dryR = output[frame * 2 + 1];
+
+            g_lpStateL += alpha * (dryL - g_lpStateL);
+            g_lpStateR += alpha * (dryR - g_lpStateR);
+
+            output[frame * 2] = dryL * (1.0f - muffle) + g_lpStateL * muffle;
+            output[frame * 2 + 1] = dryR * (1.0f - muffle) + g_lpStateR * muffle;
+        }
+    }
     for (ma_uint32 i = 0; i < frameCount * 2; i++) {
         output[i] = std::clamp(output[i], -1.0f, 1.0f);
     }
@@ -418,6 +437,7 @@ void AudioManager::loadAllSounds() {
     
     // Effects
     loadSoundVariants(SoundType::EXPLOSION, base + "random/explode", 4);
+    loadSound(SoundType::EXPLOSION_RING, base + "effects/pitch.ogg");
     loadSound(SoundType::FIRE, base + "fire/fire.ogg");
     loadSound(SoundType::FIRE_IGNITE, base + "fire/ignite.ogg");
     loadSound(SoundType::WATER_SPLASH, base + "liquid/splash.ogg");
@@ -648,12 +668,50 @@ void AudioManager::setThundering(bool thundering) {
     m_thundering = thundering;
 }
 
+void AudioManager::triggerExplosionMuffle(float strength, float duration, float beepVolume) {
+    if (!m_initialized) return;
+
+    strength = std::clamp(strength, 0.0f, 1.0f);
+    duration = std::max(duration, 0.05f);
+
+    // Only apply if this is stronger than current
+    if (strength > m_muffleStrength) {
+        m_muffleStrength = strength;
+        m_muffleDuration = duration;
+        m_muffleTimer = duration;
+        g_muffleStrength.store(strength);
+    }
+
+    // Beep ring with cooldown to avoid spam
+    if (m_muffleCooldown <= 0.0f && strength > 0.25f) {
+        playSound(SoundType::EXPLOSION_RING, beepVolume);
+        m_muffleCooldown = 1.25f;
+    }
+}
+
 void AudioManager::update(float deltaTime) {
     if (!m_initialized || m_paused) return;
     
     // Update ambient and music outside lock (playSound acquires the mutex)
     updateAmbient(deltaTime);
     updateMusic(deltaTime);
+
+    // Update explosion muffle (decay)
+    if (m_muffleTimer > 0.0f) {
+        m_muffleTimer -= deltaTime;
+        float t = (m_muffleDuration > 0.0f) ? (m_muffleTimer / m_muffleDuration) : 0.0f;
+        float current = m_muffleStrength * std::clamp(t, 0.0f, 1.0f);
+        g_muffleStrength.store(current);
+        if (m_muffleTimer <= 0.0f) {
+            m_muffleTimer = 0.0f;
+            m_muffleStrength = 0.0f;
+            g_muffleStrength.store(0.0f);
+        }
+    }
+
+    if (m_muffleCooldown > 0.0f) {
+        m_muffleCooldown -= deltaTime;
+    }
 
     std::lock_guard<std::mutex> lock(m_mutex);
     
@@ -786,6 +844,7 @@ SoundCategory AudioManager::getCategoryForType(SoundType type) {
         case SoundType::PLAYER_EAT:
         case SoundType::PLAYER_DRINK:
         case SoundType::PLAYER_BURP:
+        case SoundType::EXPLOSION_RING:
             return SoundCategory::PLAYER;
             
         case SoundType::DIG_GRASS:

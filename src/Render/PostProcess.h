@@ -28,8 +28,9 @@ public:
     glm::vec2 getJitterOffset() const { return jitterOffset; }
 
     // Screen shake
-    void setScreenShake(const glm::vec2& offset) { screenShakeOffset = offset; }
+    void setScreenShake(const glm::vec2& offset, float strength) { screenShakeOffset = offset; screenShakeStrength = strength; }
     glm::vec2 getScreenShake() const { return screenShakeOffset; }
+    float getScreenShakeStrength() const { return screenShakeStrength; }
 
     // Debug accessors for TAA
     float getLastTaaMotionMag() const;
@@ -62,6 +63,7 @@ private:
     glm::mat4 jitterMatrix;
     glm::vec2 jitterOffset = glm::vec2(0.0f); // In screen UV units (pixels / resolution)
     glm::vec2 screenShakeOffset = glm::vec2(0.0f); // Screen shake UV offset
+    float screenShakeStrength = 0.0f; // 0..1
     glm::mat4 prevViewProj;
     glm::vec3 prevCameraPos = glm::vec3(0.0f); // Track camera movement for history rejection
     // For debugging TAA

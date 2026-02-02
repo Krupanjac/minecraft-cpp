@@ -94,6 +94,7 @@ enum class SoundType {
     
     // Other
     EXPLOSION,
+    EXPLOSION_RING,
     FIRE,
     FIRE_IGNITE,
     WATER_SPLASH,
@@ -157,6 +158,9 @@ public:
     void setUnderwater(bool underwater);
     void setRaining(bool raining);
     void setThundering(bool thundering);
+
+    // Explosion audio effects
+    void triggerExplosionMuffle(float strength, float duration, float beepVolume = 0.8f);
     
     // Status
     bool isInitialized() const { return m_initialized; }
@@ -211,6 +215,12 @@ private:
     float m_waterAmbientTimer = 0.0f;
     float m_nextWaterAmbientTime = 12.0f;
     uint32_t m_rainSound = 0;
+
+    // Explosion muffle state
+    float m_muffleTimer = 0.0f;
+    float m_muffleDuration = 0.0f;
+    float m_muffleStrength = 0.0f;
+    float m_muffleCooldown = 0.0f;
     
     // Random
     std::mt19937 m_rng;
