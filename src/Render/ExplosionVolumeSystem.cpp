@@ -333,20 +333,38 @@ ExplosionVolumeSystem::~ExplosionVolumeSystem() {
 }
 
 void ExplosionVolumeSystem::spawn(const glm::vec3& center, float power) {
-    ExplosionVolume volume;
-    volume.center = center;
-    volume.power = power;
-    volume.duration = 2.4f + power * 0.2f;
-    volume.radius = power * 2.2f;
-    volume.gridSize = (power <= 4.0f) ? 22 : 26;
-    volume.isoLevel = 0.1f;
-    volume.rebuildTimer = 0.0f;
-
     std::random_device rd;
-    volume.seed = static_cast<float>(rd() % 10000) * 0.01f;
+    float seed = static_cast<float>(rd() % 10000) * 0.01f;
 
-    buildMesh(volume);
-    volumes.push_back(std::move(volume));
+    // Fire volume (short, bright)
+    ExplosionVolume fire;
+    fire.center = center;
+    fire.power = power;
+    fire.duration = 0.8f + power * 0.08f;
+    fire.startDelay = 0.0f;
+    fire.radius = power * 1.9f;
+    fire.gridSize = (power <= 4.0f) ? 20 : 24;
+    fire.isoLevel = 0.1f;
+    fire.rebuildTimer = 0.0f;
+    fire.seed = seed;
+    fire.type = VolumeType::Fire;
+    buildMesh(fire);
+    volumes.push_back(std::move(fire));
+
+    // Smoke volume (delayed, larger, longer)
+    ExplosionVolume smoke;
+    smoke.center = center;
+    smoke.power = power;
+    smoke.duration = 3.4f + power * 0.25f;
+    smoke.startDelay = 0.08f + power * 0.01f;
+    smoke.radius = power * 1.9f;
+    smoke.gridSize = (power <= 4.0f) ? 18 : 22;
+    smoke.isoLevel = 0.05f;
+    smoke.rebuildTimer = 0.0f;
+    smoke.seed = seed + 1.37f;
+    smoke.type = VolumeType::Smoke;
+    buildMesh(smoke);
+    volumes.push_back(std::move(smoke));
 }
 
 void ExplosionVolumeSystem::update(float deltaTime) {
@@ -375,6 +393,8 @@ void ExplosionVolumeSystem::render(Shader& shader, const glm::mat4& view, const 
     shader.setVec3("uLightDir", glm::normalize(lightDir));
     shader.setVec3("uRenderOrigin", renderOrigin);
 
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE);
@@ -382,13 +402,21 @@ void ExplosionVolumeSystem::render(Shader& shader, const glm::mat4& view, const 
 
     for (auto& v : volumes) {
         if (!v.meshReady || v.mesh.indexCount == 0) continue;
+        if (v.age < v.startDelay) continue;
+
+        float localAge = v.age - v.startDelay;
+        if (localAge >= v.duration) continue;
+
         shader.setVec3("uCenter", v.center);
-        shader.setFloat("uAge", v.age);
+        shader.setFloat("uAge", localAge);
         shader.setFloat("uDuration", v.duration);
         shader.setFloat("uRadius", v.radius);
+        shader.setInt("uVolumeType", static_cast<int>(v.type));
         float t = glm::clamp(v.age / v.duration, 0.0f, 1.0f);
         float expand = 0.7f + 0.6f * (1.0f - std::exp(-v.age * 2.5f));
-        float scale = glm::mix(0.7f, 1.25f, expand) * (1.0f + t * 0.1f);
+        float baseScale = glm::mix(0.7f, 1.25f, expand) * (1.0f + t * 0.1f);
+        float forceBoost = (v.type == VolumeType::Fire) ? 1.08f : 1.0f;
+        float scale = baseScale * forceBoost;
         shader.setFloat("uScale", scale);
         shader.setFloat("uNoisePhase", v.seed + v.age * 1.6f);
         v.mesh.draw();
@@ -397,6 +425,7 @@ void ExplosionVolumeSystem::render(Shader& shader, const glm::mat4& view, const 
     glDepthMask(GL_TRUE);
     glEnable(GL_CULL_FACE);
     glDisable(GL_BLEND);
+    glDepthFunc(GL_LESS);
     shader.unuse();
 }
 
