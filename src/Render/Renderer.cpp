@@ -773,6 +773,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     glDisable(GL_CULL_FACE);
     glDisable(GL_BLEND);
 
+    // Render physics debris in the main pass so post-process affects it
+    if (!debris.empty()) {
+        renderDebris(camera, debris, windowWidth, windowHeight);
+    }
+
     mainFBO->unbind();
 
     // 2. Post Processing Pass
@@ -793,6 +798,17 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         float t = (sunHeight + 0.1f) / 0.2f;
         volIntensity = glm::mix(0.05f, 1.0f, t);
         lightCol = glm::mix(glm::vec3(0.6f, 0.7f, 1.0f), glm::vec3(1.0f, 0.9f, 0.7f), t);
+    }
+
+    // Apply screen shake from camera to post-process
+    // Convert world-space shake to UV-space offset
+    if (camera.isShaking()) {
+        glm::vec3 shake = camera.getShakeOffset();
+        // Scale shake to UV space (larger values = more visible shake)
+        glm::vec2 shakeUV(shake.x * 0.02f, shake.y * 0.02f);
+        postProcess->setScreenShake(shakeUV);
+    } else {
+        postProcess->setScreenShake(glm::vec2(0.0f));
     }
 
     postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), mainFBO->getVelocityTexture(), 

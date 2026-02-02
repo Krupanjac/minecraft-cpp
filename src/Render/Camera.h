@@ -53,6 +53,11 @@ public:
     // 3rd Person State
     bool thirdPerson = false;
     float thirdPersonDistance = 4.0f;
+    
+    // Screen Shake
+    void addScreenShake(float intensity, float duration);
+    glm::vec3 getShakeOffset() const { return shakeOffset; }
+    bool isShaking() const { return shakeTimer > 0.0f; }
 
 
 private:
@@ -69,6 +74,12 @@ private:
     float mouseSensitivity;
     float fov;
     float baseFov;
+    
+    // Screen shake state
+    float shakeIntensity = 0.0f;
+    float shakeDuration = 0.0f;
+    float shakeTimer = 0.0f;
+    glm::vec3 shakeOffset = glm::vec3(0.0f);
     
     // Physics constants
     // Physics constants

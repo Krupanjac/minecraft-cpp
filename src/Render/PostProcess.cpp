@@ -268,6 +268,7 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
     compositeShader.setFloat("exposure", settings.exposure);
     compositeShader.setFloat("gamma", settings.gamma);
     compositeShader.setFloat("uAOStrength", settings.aoStrength);
+    compositeShader.setVec2("uScreenShake", screenShakeOffset);
     
     glBindVertexArray(quadVAO); // Ensure VAO is bound
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);

@@ -83,6 +83,7 @@ public:
     using EntityDamageFunc = std::function<void(const glm::vec3& pos, float radius, float damage, const glm::vec3& center)>;
     using DebrisSpawnFunc = std::function<void(const glm::vec3& pos, BlockType type, const glm::vec3& vel, const glm::vec3& angVel, float scale)>;
     using SoundPlayFunc = std::function<void(const glm::vec3& pos, const std::string& sound, float volume)>;
+    using ScreenShakeFunc = std::function<void(const glm::vec3& explosionPos, float power)>;
 
     ExplosionSystem();
     ~ExplosionSystem() = default;
@@ -93,6 +94,7 @@ public:
     void setEntityDamage(EntityDamageFunc func) { entityDamage = func; }
     void setDebrisSpawn(DebrisSpawnFunc func) { debrisSpawn = func; }
     void setSoundPlay(SoundPlayFunc func) { soundPlay = func; }
+    void setScreenShake(ScreenShakeFunc func) { screenShake = func; }
     
     // Create an explosion
     ExplosionResult explode(const ExplosionParams& params);
@@ -138,6 +140,7 @@ private:
     EntityDamageFunc entityDamage;
     DebrisSpawnFunc debrisSpawn;
     SoundPlayFunc soundPlay;
+    ScreenShakeFunc screenShake;
     
     // Configuration
     Config config;

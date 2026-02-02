@@ -1,6 +1,7 @@
 #include "Camera.h"
 #include "../Util/Config.h"
 #include <iostream>
+#include <random>
 
 Camera::Camera(const glm::vec3& position)
     : position(position),
@@ -69,6 +70,28 @@ void Camera::update(float deltaTime) {
     if (isFlying && isSprinting) targetFov += 15.0f;
     
     fov += (targetFov - fov) * deltaTime * 10.0f; // Smooth transition
+    
+    // 4. Screen Shake
+    if (shakeTimer > 0.0f) {
+        shakeTimer -= deltaTime;
+        
+        // Calculate shake intensity with falloff
+        float progress = shakeTimer / shakeDuration;
+        float currentIntensity = shakeIntensity * progress * progress; // Quadratic falloff
+        
+        // Generate random shake offset using simple noise
+        static std::mt19937 rng(std::random_device{}());
+        std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+        
+        shakeOffset.x = dist(rng) * currentIntensity;
+        shakeOffset.y = dist(rng) * currentIntensity * 0.5f; // Less vertical shake
+        shakeOffset.z = dist(rng) * currentIntensity * 0.3f; // Even less roll
+        
+        if (shakeTimer <= 0.0f) {
+            shakeTimer = 0.0f;
+            shakeOffset = glm::vec3(0.0f);
+        }
+    }
 }
 
 void Camera::processInput(bool forward, bool backward, bool moveLeft, bool moveRight, bool moveUp, bool moveDown, bool sprint, bool sneak, float deltaTime) {
@@ -176,4 +199,18 @@ void Camera::updateCameraVectors() {
     
     right = glm::normalize(glm::cross(front, worldUp));
     up = glm::normalize(glm::cross(right, front));
+}
+
+void Camera::addScreenShake(float intensity, float duration) {
+    // Stack shake effects - take the stronger of current or new
+    // Guard against division by zero when shakeDuration is 0
+    float currentEffectiveIntensity = (shakeDuration > 0.0f) 
+        ? shakeIntensity * (shakeTimer / shakeDuration) 
+        : 0.0f;
+    
+    if (intensity > currentEffectiveIntensity) {
+        shakeIntensity = intensity;
+        shakeDuration = duration;
+        shakeTimer = duration;
+    }
 }

@@ -59,6 +59,11 @@ ExplosionResult ExplosionSystem::explode(const ExplosionParams& params) {
         soundPlay(params.center, "entity.generic.explode", volume);
     }
     
+    // Trigger screen shake if blocks were destroyed
+    if (screenShake && config.enableScreenShake && !result.destroyedBlocks.empty()) {
+        screenShake(params.center, params.power);
+    }
+    
     // Process entity damage
     if (params.damageEntities && entityDamage) {
         processEntityDamage(params.center, radius, params.power);

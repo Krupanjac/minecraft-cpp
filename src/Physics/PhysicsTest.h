@@ -39,8 +39,9 @@ public:
     PhysicsTestSystem() = default;
     ~PhysicsTestSystem() = default;
     
-    void initialize(ChunkManager* chunkMgr) {
+    void initialize(ChunkManager* chunkMgr, Camera* cam) {
         chunkManager = chunkMgr;
+        camera = cam;
         
         PhysicsConfig config;
         config.gravity = glm::vec3(0.0f, -20.0f, 0.0f);
@@ -77,6 +78,39 @@ public:
             // Explosions are loud and should be heard from far away
             Audio::AudioManager::instance().playSoundAtWithRange(
                 Audio::SoundType::EXPLOSION, pos, volume, 128.0f, 1.0f);
+        });
+        
+        // Set up screen shake callback
+        explosionSystem->setScreenShake([this](const glm::vec3& explosionPos, float power) {
+            if (!camera) {
+                LOG_INFO("[PhysicsTest] Screen shake: camera is null!");
+                return;
+            }
+            
+            // Calculate distance from player to explosion
+            float distance = glm::length(explosionPos - camera->getPosition());
+            
+            // Max shake range scales with explosion power
+            float maxShakeRange = power * 10.0f;  // e.g., power 4 = 40 blocks, power 8 = 80 blocks
+            
+            LOG_INFO("[PhysicsTest] Screen shake: dist=" + std::to_string(distance) + 
+                     " maxRange=" + std::to_string(maxShakeRange) + " power=" + std::to_string(power));
+            
+            if (distance < maxShakeRange) {
+                // Intensity falls off with distance (inverse square-ish)
+                float normalizedDist = distance / maxShakeRange;
+                // Stronger intensity - 0.5 base multiplier for noticeable effect
+                float intensity = power * 0.5f * (1.0f - normalizedDist * normalizedDist);
+                
+                // Duration also scales with power
+                float duration = 0.4f + power * 0.1f;
+                
+                LOG_INFO("[PhysicsTest] Adding shake: intensity=" + std::to_string(intensity) + 
+                         " duration=" + std::to_string(duration));
+                
+                // Add the shake to camera
+                camera->addScreenShake(intensity, duration);
+            }
         });
         
         debrisManager.setTerrainQuery([this](int x, int y, int z) -> Block {
@@ -318,6 +352,7 @@ private:
     float physicsAccumulator = 0.0f;
     
     ChunkManager* chunkManager = nullptr;
+    Camera* camera = nullptr;
     std::unique_ptr<PhysicsWorld> physicsWorld;
     std::unique_ptr<ExplosionSystem> explosionSystem;
     ::DebrisManager debrisManager;
@@ -330,7 +365,7 @@ private:
 namespace Physics {
 class PhysicsTestSystem {
 public:
-    void initialize(void*) {}
+    void initialize(void*, void*) {}
     void update(float) {}
     bool handleInput(void*, const void&, float) { return false; }
     bool isEnabled() const { return false; }

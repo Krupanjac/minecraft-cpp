@@ -10,12 +10,16 @@ uniform sampler2D volumetric;
 uniform float exposure;
 uniform float gamma;
 uniform float uAOStrength; // 0..1 (mix between no AO and full SSAO)
+uniform vec2 uScreenShake; // Screen shake offset in UV space
 
 void main()
 {
-    vec3 hdrColor = texture(scene, TexCoords).rgb;
-    float ao = texture(ssao, TexCoords).r;
-    vec3 vol = texture(volumetric, TexCoords).rgb;
+    // Apply screen shake offset to UV coordinates
+    vec2 shakenUV = TexCoords + uScreenShake;
+    
+    vec3 hdrColor = texture(scene, shakenUV).rgb;
+    float ao = texture(ssao, shakenUV).r;
+    vec3 vol = texture(volumetric, shakenUV).rgb;
     
     // Improved SSAO blending
     // Use a more natural falloff curve

@@ -1016,7 +1016,7 @@ public:
         
         // Initialize physics test system
 #if ENABLE_PHYSICS_TEST
-        physicsTest.initialize(&chunkManager);
+        physicsTest.initialize(&chunkManager, &camera);
         LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
 #endif
     }
@@ -1064,7 +1064,7 @@ public:
             
             // Initialize physics test system for loaded world
 #if ENABLE_PHYSICS_TEST
-            physicsTest.initialize(&chunkManager);
+            physicsTest.initialize(&chunkManager, &camera);
             LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
 #endif
 
@@ -2373,13 +2373,6 @@ private:
         
         // Blit depth buffer to default framebuffer so held items can properly occlude/be occluded
         renderer.blitDepthToScreen(window->getWidth(), window->getHeight());
-        
-        // Render physics debris (main pass)
-#if ENABLE_PHYSICS_TEST
-        if (!debrisData.empty()) {
-            renderer.renderDebris(camera, debrisData, window->getWidth(), window->getHeight());
-        }
-#endif
         
         // Render block break overlay when breaking blocks in survival mode
         if (isBreakingBlock && !uiManager.isCreativeMode && blockBreakProgress > 0.0f) {
