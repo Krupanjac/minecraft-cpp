@@ -19,11 +19,21 @@ class Entity;
 
 class Renderer {
 public:
+    // Render debris particles as small textured cubes
+    struct DebrisRenderData {
+        glm::vec3 position;
+        glm::quat rotation;
+        float scale;
+        BlockType blockType;
+        float alpha;
+    };
+    
     Renderer();
     ~Renderer() = default;
 
     bool initialize(int windowWidth, int windowHeight);
-    void render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, int windowWidth, int windowHeight);
+    void render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, 
+                int windowWidth, int windowHeight, const std::vector<DebrisRenderData>& debris = {});
     void onResize(int width, int height);
     
     void setLightDirection(const glm::vec3& direction) { lightDirection = direction; }
@@ -62,15 +72,8 @@ public:
     void renderLoadingScreen(int windowWidth, int windowHeight, float progress);
     void renderBlockBreakOverlay(const Camera& camera, const glm::ivec3& blockPos, float progress, int windowWidth, int windowHeight);
     
-    // Render debris particles as small textured cubes
-    struct DebrisRenderData {
-        glm::vec3 position;
-        glm::quat rotation;
-        float scale;
-        BlockType blockType;
-        float alpha;
-    };
     void renderDebris(const Camera& camera, const std::vector<DebrisRenderData>& debris, int windowWidth, int windowHeight);
+    void renderDebrisShadow(const std::vector<DebrisRenderData>& debris, const glm::mat4& lightSpaceMatrix, const glm::dvec3& renderOrigin);
     
     void setShowCrosshair(bool show) { showCrosshair = show; }
 

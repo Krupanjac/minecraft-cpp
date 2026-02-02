@@ -1786,6 +1786,11 @@ private:
                     Audio::SoundType digSound = Audio::getDigSoundForBlock(static_cast<uint8_t>(breakingBlockType));
                     Audio::AudioManager::instance().playSoundAt(digSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f));
                     
+                    // Spawn dropped item debris before removing block
+                    #if ENABLE_PHYSICS_TEST
+                    physicsTest.spawnDroppedItem(glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f), breakingBlockType);
+                    #endif
+                    
                     chunkManager.setBlockAt(x, y, z, Block(BlockType::AIR));
                     
                     // Broadcast block change to network
@@ -2354,20 +2359,25 @@ private:
             renderer.setUseBiomeColors(true);
         }
         
-        renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight());
+        // Get debris data for rendering (includes shadow pass)
+        std::vector<Renderer::DebrisRenderData> debrisData;
+#if ENABLE_PHYSICS_TEST
+        if (physicsTest.isEnabled()) {
+            debrisData = physicsTest.getDebrisRenderData();
+        }
+#endif
+        
+        renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight(), debrisData);
         // Clean up any GPU meshes for chunks that have been unloaded by ChunkManager
         renderer.cleanUnusedMeshes(chunkManager);
         
         // Blit depth buffer to default framebuffer so held items can properly occlude/be occluded
         renderer.blitDepthToScreen(window->getWidth(), window->getHeight());
         
-        // Render physics debris
+        // Render physics debris (main pass)
 #if ENABLE_PHYSICS_TEST
-        if (physicsTest.isEnabled()) {
-            auto debrisData = physicsTest.getDebrisRenderData();
-            if (!debrisData.empty()) {
-                renderer.renderDebris(camera, debrisData, window->getWidth(), window->getHeight());
-            }
+        if (!debrisData.empty()) {
+            renderer.renderDebris(camera, debrisData, window->getWidth(), window->getHeight());
         }
 #endif
         

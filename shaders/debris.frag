@@ -7,12 +7,16 @@ flat in int vFaceId;
 in vec4 vFragPosLightSpace;
 
 uniform sampler2D uTexture;
+uniform sampler2DArray uAlbedoArray;
+uniform sampler2DArray uNormalArray;
+uniform sampler2DArray uSpecularArray;
 uniform sampler2D uShadowMap;
 uniform vec3 uCameraPos;
 uniform vec3 uLightDir;
 uniform vec3 uSkyColor;
 uniform float uAlpha;
 uniform int uUseShadows;
+uniform int uUsePBR;
 
 // Texture atlas uniforms - one index per face
 uniform int uTexIndexTop;
@@ -60,25 +64,38 @@ void main() {
         texIndex = uTexIndexSide;
     }
     
-    // Calculate atlas UV
-    const float atlasSize = 16.0;
-    const float cellSize = 1.0 / atlasSize;
-    
-    float col = float(texIndex % 16);
-    float row = float(texIndex / 16);
-    row = 15.0 - row;  // Flip because OpenGL Y is inverted
-    
-    vec2 cellOrigin = vec2(col, row) * cellSize;
-    
-    // Inset to prevent bleeding
-    vec2 texelSize = 1.0 / vec2(textureSize(uTexture, 0));
+    vec3 baseColor;
     vec2 localUV = fract(vTexCoord);
-    vec2 uv = cellOrigin + localUV * (vec2(cellSize) - 2.0 * texelSize) + texelSize;
     
-    vec4 texColor = texture(uTexture, uv);
-    if (texColor.a < 0.1) discard;
-    
-    vec3 baseColor = texColor.rgb;
+    if (uUsePBR == 1) {
+        // Sample from PBR texture array
+        // Apply half-texel inset to prevent edge bleeding (matching block shader)
+        float texSize = 128.0;
+        float texelInset = 0.5 / texSize;
+        vec2 uv = localUV * (1.0 - 2.0 * texelInset) + texelInset;
+        
+        vec4 albedo = texture(uAlbedoArray, vec3(uv, float(texIndex)));
+        if (albedo.a < 0.1) discard;
+        baseColor = albedo.rgb;
+    } else {
+        // Calculate atlas UV for regular texture
+        const float atlasSize = 16.0;
+        const float cellSize = 1.0 / atlasSize;
+        
+        float col = float(texIndex % 16);
+        float row = float(texIndex / 16);
+        row = 15.0 - row;  // Flip because OpenGL Y is inverted
+        
+        vec2 cellOrigin = vec2(col, row) * cellSize;
+        
+        // Inset to prevent bleeding
+        vec2 texelSize = 1.0 / vec2(textureSize(uTexture, 0));
+        vec2 uv = cellOrigin + localUV * (vec2(cellSize) - 2.0 * texelSize) + texelSize;
+        
+        vec4 texColor = texture(uTexture, uv);
+        if (texColor.a < 0.1) discard;
+        baseColor = texColor.rgb;
+    }
     
     // Lighting
     vec3 lightDir = normalize(uLightDir);

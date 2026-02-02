@@ -72,7 +72,10 @@ public:
     Physics::AABB getAABB() const;
     
     // Configuration
-    void setConfig(const Config& cfg) { config = cfg; }
+    void setConfig(const Config& cfg) { 
+        config = cfg; 
+        lifetime = cfg.lifetime;  // Update lifetime member from config
+    }
     const Config& getConfig() const { return config; }
     
     // Terrain collision callback

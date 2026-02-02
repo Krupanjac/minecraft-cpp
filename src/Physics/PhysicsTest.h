@@ -222,6 +222,50 @@ public:
         return result;
     }
     
+    // Spawn a dropped item when a block is mined (survival mode)
+    // Unlike explosion debris, these are:
+    // - Smaller (like pickup items)
+    // - Gentle drop (no explosion velocity)
+    // - Much longer lifetime (can be picked up)
+    void spawnDroppedItem(const glm::vec3& blockCenter, BlockType blockType) {
+        if (!initialized || blockType == BlockType::AIR || blockType == BlockType::WATER) return;
+        
+        // Small random offset so item doesn't spawn exactly at block center
+        float offsetX = ((rand() % 100) - 50) / 200.0f; // -0.25 to 0.25
+        float offsetZ = ((rand() % 100) - 50) / 200.0f;
+        glm::vec3 spawnPos = blockCenter + glm::vec3(offsetX, 0.0f, offsetZ);
+        
+        // Gentle upward pop with slight random horizontal
+        glm::vec3 velocity(
+            ((rand() % 100) - 50) / 50.0f,  // -1 to 1
+            2.0f + (rand() % 30) / 10.0f,    // 2 to 5 upward
+            ((rand() % 100) - 50) / 50.0f   // -1 to 1
+        );
+        
+        // Slow tumble
+        glm::vec3 angularVel(
+            ((rand() % 100) - 50) / 20.0f,  // -2.5 to 2.5
+            ((rand() % 100) - 50) / 20.0f,
+            ((rand() % 100) - 50) / 20.0f
+        );
+        
+        // Smaller scale - like a pickup item (0.25 = quarter block size)
+        float scale = 0.25f;
+        
+        ::DebrisEntity* item = debrisManager.createDebris(spawnPos, blockType, velocity, angularVel, scale);
+        if (item) {
+            ::DebrisEntity::Config cfg;
+            cfg.lifetime = 300.0f;          // 5 minutes - long time to pick up
+            cfg.fadeTime = 10.0f;           // 10 second fade when expiring
+            cfg.bounceRestitution = 0.2f;   // Low bounce - more like dropped item
+            cfg.friction = 0.9f;            // High friction - stops quickly
+            cfg.linearDamping = 0.1f;       // Some air resistance
+            cfg.angularDamping = 0.15f;     // Slow spin decay
+            cfg.collideWithTerrain = true;
+            item->setConfig(cfg);
+        }
+    }
+    
     bool isEnabled() const { return enabled && initialized; }
     void setEnabled(bool e) { enabled = e; }
     
@@ -237,8 +281,8 @@ private:
         ::DebrisEntity* debris = debrisManager.createDebris(pos, type, vel, angVel, scale);
         if (debris) {
             ::DebrisEntity::Config cfg;
-            cfg.lifetime = 20.0f;          // Much longer lifetime
-            cfg.fadeTime = 5.0f;           // Longer fade time for smoother disappearance
+            cfg.lifetime = 30.0f;          // Long lifetime
+            cfg.fadeTime = 8.0f;           // Long fade time for smooth disappearance
             cfg.bounceRestitution = 0.35f; // Less bouncy for realism
             cfg.friction = 0.7f;           // More friction
             cfg.linearDamping = 0.03f;

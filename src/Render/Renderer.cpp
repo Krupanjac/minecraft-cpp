@@ -100,7 +100,8 @@ void Renderer::onResize(int width, int height) {
     }
 }
 
-void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, int windowWidth, int windowHeight) {
+void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, 
+                      int windowWidth, int windowHeight, const std::vector<DebrisRenderData>& debris) {
     // === HANDLE PBR SETTINGS CHANGES ===
     // When PBR mode is toggled, we may need to recalculate lighting/shadows
     if (Settings::instance().pbrSettingsChanged) {
@@ -310,6 +311,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
                 entity->renderWithMatrices(shadowModelShader, entityModel, entityModel);
             }
             shadowModelShader.unuse();
+        }
+        
+        // Render debris to shadow map (for debris shadows)
+        if (!debris.empty()) {
+            renderDebrisShadow(debris, lightSpaceMatrix, renderOrigin);
         }
 
         // Restore state
@@ -1870,6 +1876,10 @@ void Renderer::renderDebris(const Camera& camera, const std::vector<DebrisRender
     }
     if (!blockAtlas) return;
     
+    // Check if PBR is enabled - use PBR textures when resource pack is loaded and enabled
+    auto& resPack = ResourcePackManager::instance();
+    bool usePBR = Settings::instance().usePBRResourcePack && resPack.isLoaded();
+    
     // Setup matrices
     float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
     glm::mat4 projection = glm::perspective(glm::radians(camera.getFov()), aspect, 0.1f, 1000.0f);
@@ -1906,10 +1916,28 @@ void Renderer::renderDebris(const Camera& camera, const std::vector<DebrisRender
         debrisShader.setInt("uUseShadows", 0);
     }
     
-    // Bind block atlas
-    glActiveTexture(GL_TEXTURE0);
-    blockAtlas->bind(0);
-    debrisShader.setInt("uTexture", 0);
+    // Bind textures based on PBR mode
+    debrisShader.setInt("uUsePBR", usePBR ? 1 : 0);
+    
+    if (usePBR) {
+        // Bind PBR texture arrays - match block shader units (3, 4, 5)
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, resPack.getAlbedoTextureArray());
+        debrisShader.setInt("uAlbedoArray", 3);
+        
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, resPack.getNormalTextureArray());
+        debrisShader.setInt("uNormalArray", 4);
+        
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, resPack.getSpecularTextureArray());
+        debrisShader.setInt("uSpecularArray", 5);
+    } else {
+        // Bind regular block atlas
+        glActiveTexture(GL_TEXTURE0);
+        blockAtlas->bind(0);
+        debrisShader.setInt("uTexture", 0);
+    }
     
     // Enable blending for alpha fade
     glEnable(GL_BLEND);
@@ -1928,14 +1956,25 @@ void Renderer::renderDebris(const Camera& camera, const std::vector<DebrisRender
         debrisShader.setMat4("uModel", model);
         debrisShader.setFloat("uAlpha", d.alpha);
         
-        // Get texture indices for this block type using UIManager
-        int texTop = UIManager::getBlockTextureIndex(d.blockType, 0);    // face 0 = top
-        int texSide = UIManager::getBlockTextureIndex(d.blockType, 1);   // face 1 = side
-        int texBottom = UIManager::getBlockTextureIndex(d.blockType, 2); // face 2 = bottom
-        
-        debrisShader.setInt("uTexIndexTop", texTop);
-        debrisShader.setInt("uTexIndexSide", texSide);
-        debrisShader.setInt("uTexIndexBottom", texBottom);
+        if (usePBR) {
+            // Get PBR texture indices - normalDirection: 2=+Y (top), 3=-Y (bottom), others=side
+            int texTop = resPack.getTextureIndex(d.blockType, 2);     // +Y = top
+            int texBottom = resPack.getTextureIndex(d.blockType, 3);  // -Y = bottom  
+            int texSide = resPack.getTextureIndex(d.blockType, 4);    // +Z = side (north)
+            
+            debrisShader.setInt("uTexIndexTop", texTop);
+            debrisShader.setInt("uTexIndexSide", texSide);
+            debrisShader.setInt("uTexIndexBottom", texBottom);
+        } else {
+            // Get regular atlas texture indices using UIManager
+            int texTop = UIManager::getBlockTextureIndex(d.blockType, 0);    // face 0 = top
+            int texSide = UIManager::getBlockTextureIndex(d.blockType, 1);   // face 1 = side
+            int texBottom = UIManager::getBlockTextureIndex(d.blockType, 2); // face 2 = bottom
+            
+            debrisShader.setInt("uTexIndexTop", texTop);
+            debrisShader.setInt("uTexIndexSide", texSide);
+            debrisShader.setInt("uTexIndexBottom", texBottom);
+        }
         
         glDrawElements(GL_TRIANGLES, debrisIndexCount, GL_UNSIGNED_INT, 0);
     }
@@ -1946,9 +1985,45 @@ void Renderer::renderDebris(const Camera& camera, const std::vector<DebrisRender
     debrisShader.unuse();
     
     // Reset OpenGL state to avoid affecting UI rendering
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, 0);
-    glActiveTexture(GL_TEXTURE0); // Leave on texture unit 0
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+}
+
+void Renderer::renderDebrisShadow(const std::vector<DebrisRenderData>& debris, 
+                                   const glm::mat4& lightSpaceMatrix, 
+                                   const glm::dvec3& renderOrigin) {
+    if (debris.empty()) return;
+    if (debrisVAO == 0) {
+        initDebrisMesh();
+    }
+    
+    // Use the shadow shader (same as blocks)
+    shadowShader.use();
+    shadowShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
+    
+    glBindVertexArray(debrisVAO);
+    
+    for (const auto& d : debris) {
+        // Convert to render-origin relative position
+        glm::vec3 relPos = d.position - glm::vec3(renderOrigin);
+        
+        // Build model matrix: translate, rotate, scale
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), relPos);
+        model *= glm::mat4_cast(d.rotation);
+        model = glm::scale(model, glm::vec3(d.scale));
+        
+        shadowShader.setMat4("uModel", model);
+        
+        glDrawElements(GL_TRIANGLES, debrisIndexCount, GL_UNSIGNED_INT, 0);
+    }
+    
+    glBindVertexArray(0);
+    shadowShader.unuse();
 }
