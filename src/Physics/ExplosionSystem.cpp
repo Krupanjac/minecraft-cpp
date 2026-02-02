@@ -23,11 +23,6 @@ ExplosionResult ExplosionSystem::explode(const ExplosionParams& params) {
     
     float radius = params.getRadius();
     
-    // Play explosion sound
-    if (soundPlay) {
-        soundPlay(params.center, "entity.generic.explode", 4.0f);
-    }
-    
     // Generate rays for explosion sampling
     std::vector<ExplosionRay> rays;
     generateExplosionRays(rays, config.maxRays);
@@ -55,6 +50,13 @@ ExplosionResult ExplosionSystem::explode(const ExplosionParams& params) {
     // Process block damage
     if (params.breakBlocks) {
         processBlockDamage(params.center, params.power, affectedBlocks, result);
+    }
+    
+    // Only play sound if blocks were actually destroyed or affected
+    if (soundPlay && !result.destroyedBlocks.empty()) {
+        // Volume scales with explosion power (clamped between 0.5 and 1.5)
+        float volume = std::clamp(params.power * 0.25f, 0.5f, 1.5f);
+        soundPlay(params.center, "entity.generic.explode", volume);
     }
     
     // Process entity damage

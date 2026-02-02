@@ -17,6 +17,7 @@
 #include "../World/ChunkManager.h"
 #include "../Render/Camera.h"
 #include "../Render/Renderer.h"
+#include "../Audio/AudioManager.h"
 #include "../Core/Logger.h"
 
 #include <GLFW/glfw3.h>
@@ -68,6 +69,14 @@ public:
         explosionSystem->setDebrisSpawn([this](const glm::vec3& pos, BlockType type, 
                                                const glm::vec3& vel, const glm::vec3& angVel, float scale) {
             createDebrisInternal(pos, vel, angVel, type, scale);
+        });
+        
+        // Set up explosion sound callback
+        explosionSystem->setSoundPlay([](const glm::vec3& pos, const std::string&, float volume) {
+            // Play explosion sound at position with extended hearing range (128 blocks)
+            // Explosions are loud and should be heard from far away
+            Audio::AudioManager::instance().playSoundAtWithRange(
+                Audio::SoundType::EXPLOSION, pos, volume, 128.0f, 1.0f);
         });
         
         debrisManager.setTerrainQuery([this](int x, int y, int z) -> Block {

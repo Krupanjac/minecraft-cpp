@@ -469,6 +469,11 @@ uint32_t AudioManager::playSound(SoundType type, float volume, float pitch) {
 }
 
 uint32_t AudioManager::playSoundAt(SoundType type, const glm::vec3& position, float volume, float pitch) {
+    // Use default max distance of 32 blocks
+    return playSoundAtWithRange(type, position, volume, 32.0f, pitch);
+}
+
+uint32_t AudioManager::playSoundAtWithRange(SoundType type, const glm::vec3& position, float volume, float maxDistance, float pitch) {
     std::lock_guard<std::mutex> lock(m_mutex);
     
     auto it = m_sounds.find(type);
@@ -478,8 +483,19 @@ uint32_t AudioManager::playSoundAt(SoundType type, const glm::vec3& position, fl
     
     // Check distance - don't play if too far
     float distance = glm::length(position - m_listenerPos);
-    if (distance > 32.0f) {
+    if (distance > maxDistance) {
         return 0;
+    }
+    
+    // Calculate realistic attenuation based on distance
+    // Use inverse square law for more realistic falloff, but with a minimum
+    float attenuation = 1.0f;
+    if (distance > 1.0f) {
+        // Inverse distance falloff (more realistic than linear)
+        // Sound decreases with square of distance, but we use sqrt for less aggressive falloff
+        float normalizedDist = distance / maxDistance;
+        attenuation = 1.0f - std::sqrt(normalizedDist);  // Smoother falloff
+        attenuation = std::max(attenuation, 0.05f);  // Minimum audible level
     }
     
     // Pick random variant
@@ -491,7 +507,7 @@ uint32_t AudioManager::playSoundAt(SoundType type, const glm::vec3& position, fl
     sound->data = soundData;
     sound->type = type;
     sound->category = getCategoryForType(type);
-    sound->volume = volume;
+    sound->volume = volume * attenuation;  // Apply distance attenuation to volume
     sound->pitch = pitch;
     sound->is3D = true;
     sound->position = position;
