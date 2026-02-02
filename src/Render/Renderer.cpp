@@ -1781,11 +1781,18 @@ void Renderer::renderBlockBreakOverlay(const Camera& camera, const glm::ivec3& b
     
     destroyOverlayShader.unuse();
     
-    // Restore state
+    // Restore ALL state to avoid affecting UI rendering
     glDepthFunc(GL_LESS);
     glDisable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(0.0f, 0.0f);  // Reset polygon offset values
     glDisable(GL_BLEND);
     glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glDisable(GL_DEPTH_TEST);  // UI expects depth test disabled
+    
+    // Reset texture state
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Renderer::initDebrisMesh() {
@@ -1981,13 +1988,18 @@ void Renderer::renderDebris(const Camera& camera, const std::vector<DebrisRender
     
     glBindVertexArray(0);
     glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
     glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);  // UI expects depth test disabled
     debrisShader.unuse();
     
     // Reset OpenGL state to avoid affecting UI rendering
-    glActiveTexture(GL_TEXTURE3);
+    // Unbind all texture units we might have used (0, 1, 3, 4, 5)
+    glActiveTexture(GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-    glActiveTexture(GL_TEXTURE2);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -2008,6 +2020,9 @@ void Renderer::renderDebrisShadow(const std::vector<DebrisRenderData>& debris,
     shadowShader.use();
     shadowShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
     
+    // Ensure culling is disabled for small debris
+    glDisable(GL_CULL_FACE);
+    
     glBindVertexArray(debrisVAO);
     
     for (const auto& d : debris) {
@@ -2026,4 +2041,7 @@ void Renderer::renderDebrisShadow(const std::vector<DebrisRenderData>& debris,
     
     glBindVertexArray(0);
     shadowShader.unuse();
+    
+    // Reset active texture to unit 0
+    glActiveTexture(GL_TEXTURE0);
 }

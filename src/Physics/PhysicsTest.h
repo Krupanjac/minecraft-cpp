@@ -70,12 +70,24 @@ public:
             createDebrisInternal(pos, vel, angVel, type, scale);
         });
         
-        debrisManager.setTerrainQuery([this](int x, int y, int z) -> BlockType {
+        debrisManager.setTerrainQuery([this](int x, int y, int z) -> Block {
             if (chunkManager) {
-                return chunkManager->getBlockAt(x, y, z).getType();
+                return chunkManager->getBlockAt(x, y, z);
             }
-            return BlockType::AIR;
+            return Block(BlockType::AIR);
         });
+        
+        // Configure debris with longer lifetime
+        auto debrisCfg = debrisManager.getDefaultConfig();
+        debrisCfg.lifetime = 30.0f;           // 30 seconds
+        debrisCfg.fadeTime = 3.0f;            // 3 second fade
+        debrisCfg.bounceRestitution = 0.3f;
+        debrisCfg.friction = 0.8f;
+        debrisCfg.linearDamping = 0.1f;
+        debrisCfg.angularDamping = 0.3f;
+        debrisCfg.minVelocityToRest = 0.1f;
+        debrisCfg.collideWithTerrain = true;
+        debrisManager.setDefaultConfig(debrisCfg);
         
         initialized = true;
         LOG_INFO("[PhysicsTest] Initialized - X/C=explosion, V=debris, P=toggle");

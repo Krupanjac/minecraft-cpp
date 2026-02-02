@@ -3233,12 +3233,17 @@ void UIManager::drawBlockIcon(float x, float y, float size, BlockType type, floa
     // Enable depth test for proper face ordering
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+    glClear(GL_DEPTH_BUFFER_BIT);  // Clear depth to avoid stale values
+    
+    // Disable culling - we want to see all faces of the block icon
+    glDisable(GL_CULL_FACE);
     
     glBindVertexArray(blockIconVao);
     glDrawArrays(GL_TRIANGLES, 0, 36); // 6 faces * 6 vertices
     glBindVertexArray(0);
     
     glDisable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);  // Re-enable for other rendering
     
     // IMPORTANT: Reset texture binding to avoid affecting entity rendering
     glActiveTexture(GL_TEXTURE0);

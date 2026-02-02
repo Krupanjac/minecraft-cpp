@@ -66,7 +66,25 @@ void DebrisEntity::update(float deltaTime) {
 }
 
 void DebrisEntity::physicsUpdate(float fixedDeltaTime) {
-    if (isExpired() || atRest) return;
+    if (isExpired()) return;
+    
+    // Check if resting debris lost its support (ground destroyed)
+    if (atRest && terrainQuery) {
+        float halfSize = debrisScale * 0.5f;
+        // Check block below us
+        int bx = static_cast<int>(std::floor(position.x));
+        int by = static_cast<int>(std::floor(position.y - halfSize - 0.1f));
+        int bz = static_cast<int>(std::floor(position.z));
+        
+        Block below = terrainQuery(bx, by, bz);
+        if (below.type == BlockType::AIR || below.type == BlockType::WATER || !below.isSolid()) {
+            // No support - wake up!
+            atRest = false;
+            restFrames = 0;
+        }
+    }
+    
+    if (atRest) return;
     
     // Apply gravity
     applyGravity(fixedDeltaTime);
@@ -196,65 +214,156 @@ void DebrisEntity::handleTerrainCollision(float dt) {
     
     float halfSize = debrisScale * 0.5f;
     
-    // Multiple collision iterations for better stability
-    const int maxIterations = 4;
-    for (int iter = 0; iter < maxIterations; iter++) {
-        glm::vec3 normal;
-        float penetration;
+    // Check each axis separately for cleaner collision response
+    // This prevents debris from getting stuck in corners
+    
+    // Check all 6 directions and find solid blocks
+    struct AxisCheck {
+        glm::vec3 dir;
+        float overlap;
+        bool hit;
+    };
+    
+    AxisCheck checks[6] = {
+        {{1, 0, 0}, 0, false},   // +X
+        {{-1, 0, 0}, 0, false},  // -X
+        {{0, 1, 0}, 0, false},   // +Y
+        {{0, -1, 0}, 0, false},  // -Y
+        {{0, 0, 1}, 0, false},   // +Z
+        {{0, 0, -1}, 0, false}   // -Z
+    };
+    
+    // Check each face of the debris box
+    for (int i = 0; i < 6; i++) {
+        glm::vec3 checkPoint = position + checks[i].dir * halfSize;
+        int bx = static_cast<int>(std::floor(checkPoint.x));
+        int by = static_cast<int>(std::floor(checkPoint.y));
+        int bz = static_cast<int>(std::floor(checkPoint.z));
         
-        if (checkBoxTerrainCollision(position, halfSize, normal, penetration)) {
-            // Resolve penetration immediately
-            position += normal * (penetration * 1.05f); // Slight extra push to prevent sticking
+        Block block = terrainQuery(bx, by, bz);
+        if (block.type != BlockType::AIR && block.type != BlockType::WATER && block.isSolid()) {
+            checks[i].hit = true;
             
-            // Reflect velocity
-            float vDotN = glm::dot(linearVelocity, normal);
+            // Calculate penetration depth
+            glm::vec3 blockMin(bx, by, bz);
+            glm::vec3 blockMax(bx + 1.0f, by + 1.0f, bz + 1.0f);
             
-            if (vDotN < 0.0f) {
-                // Bounce with restitution
-                float impactSpeed = -vDotN;
-                linearVelocity -= (1.0f + config.bounceRestitution) * vDotN * normal;
-                
-                // Apply friction to tangential velocity
-                glm::vec3 tangent = linearVelocity - glm::dot(linearVelocity, normal) * normal;
-                float tangentSpeed = glm::length(tangent);
-                if (tangentSpeed > 0.01f) {
-                    float frictionForce = config.friction * impactSpeed;
-                    float frictionReduction = std::min(frictionForce, tangentSpeed);
-                    linearVelocity -= (tangent / tangentSpeed) * frictionReduction;
-                }
-                
-                // Reduce angular velocity on collision proportional to impact
-                float angularDampFactor = std::max(0.5f, 1.0f - impactSpeed * 0.1f);
-                angularVelocity *= angularDampFactor;
-                
-                // Add some spin from collision based on tangent
-                if (tangentSpeed > 0.5f) {
-                    glm::vec3 spinAxis = glm::cross(normal, tangent / tangentSpeed);
-                    angularVelocity += spinAxis * tangentSpeed * 1.5f;
-                }
-            }
-        } else {
-            break; // No collision, done
+            if (checks[i].dir.x > 0) checks[i].overlap = (position.x + halfSize) - blockMin.x;
+            else if (checks[i].dir.x < 0) checks[i].overlap = blockMax.x - (position.x - halfSize);
+            else if (checks[i].dir.y > 0) checks[i].overlap = (position.y + halfSize) - blockMin.y;
+            else if (checks[i].dir.y < 0) checks[i].overlap = blockMax.y - (position.y - halfSize);
+            else if (checks[i].dir.z > 0) checks[i].overlap = (position.z + halfSize) - blockMin.z;
+            else if (checks[i].dir.z < 0) checks[i].overlap = blockMax.z - (position.z - halfSize);
         }
     }
     
-    // Limit maximum velocity to prevent tunneling
+    // Track if we're touching ground (for angular friction)
+    bool onGround = false;
+    
+    // Resolve collisions - process each hit axis
+    for (int i = 0; i < 6; i++) {
+        if (!checks[i].hit || checks[i].overlap <= 0) continue;
+        
+        glm::vec3 normal = -checks[i].dir; // Normal points OUT of the block
+        float penetration = checks[i].overlap;
+        
+        // Check if this is ground contact (normal pointing up)
+        if (normal.y > 0.5f) {
+            onGround = true;
+        }
+        
+        // Push out of block
+        position += normal * (penetration + 0.001f);
+        
+        // Reflect velocity component along this axis
+        float velAlongNormal = glm::dot(linearVelocity, normal);
+        
+        if (velAlongNormal < 0) {
+            // Moving into the block - bounce!
+            float impactSpeed = -velAlongNormal;
+            float bounceVel = impactSpeed * config.bounceRestitution;
+            
+            // For walls (X and Z), give extra bounce
+            if (std::abs(normal.x) > 0.5f || std::abs(normal.z) > 0.5f) {
+                bounceVel *= 1.2f; // 20% extra bounce on walls
+            }
+            
+            // Remove incoming velocity and add bounce
+            linearVelocity -= normal * velAlongNormal; // Remove incoming
+            linearVelocity += normal * bounceVel;       // Add bounce
+            
+            // Only add spin on significant impacts (not tiny bounces)
+            if (impactSpeed > 2.0f) {
+                glm::vec3 tangent = linearVelocity - glm::dot(linearVelocity, normal) * normal;
+                float tangentSpeed = glm::length(tangent);
+                if (tangentSpeed > 0.5f) {
+                    glm::vec3 spinAxis = glm::cross(normal, tangent / tangentSpeed);
+                    // Add spin but cap it so it doesn't accumulate infinitely
+                    float currentAngSpeed = glm::length(angularVelocity);
+                    if (currentAngSpeed < 15.0f) {
+                        angularVelocity += spinAxis * std::min(impactSpeed * 0.5f, 5.0f);
+                    }
+                }
+            }
+            
+            // Dampen angular velocity on impact
+            angularVelocity *= 0.8f;
+        }
+    }
+    
+    // Apply friction and damping when on ground
+    if (onGround) {
+        float angSpeed = glm::length(angularVelocity);
+        float linSpeed = glm::length(linearVelocity);
+        
+        // Apply ground friction to horizontal velocity (not vertical)
+        float frictionFactor = config.friction * 0.15f; // Strong ground friction
+        linearVelocity.x *= (1.0f - frictionFactor);
+        linearVelocity.z *= (1.0f - frictionFactor);
+        
+        // If barely moving horizontally, stop completely
+        float horizSpeed = std::sqrt(linearVelocity.x * linearVelocity.x + 
+                                      linearVelocity.z * linearVelocity.z);
+        if (horizSpeed < 0.1f) {
+            linearVelocity.x = 0.0f;
+            linearVelocity.z = 0.0f;
+        }
+        
+        // Angular friction - dampen rotation when on ground
+        if (linSpeed < 0.5f) {
+            angularVelocity *= 0.85f; // Strong damping when nearly stopped
+        } else {
+            angularVelocity *= 0.92f; // Moderate damping when sliding
+        }
+        
+        // Stop tiny rotations completely
+        if (angSpeed < 0.1f) {
+            angularVelocity = glm::vec3(0.0f);
+        }
+    }
+    
+    // Limit maximum velocities
     float maxSpeed = 30.0f;
     float speed = glm::length(linearVelocity);
     if (speed > maxSpeed) {
         linearVelocity = (linearVelocity / speed) * maxSpeed;
     }
     
-    // Simple ground plane check as fallback (y=0)
+    float maxAngSpeed = 20.0f;
+    float angSpeed = glm::length(angularVelocity);
+    if (angSpeed > maxAngSpeed) {
+        angularVelocity = (angularVelocity / angSpeed) * maxAngSpeed;
+    }
+    
+    // Ground plane fallback (y=0)
     if (position.y < halfSize) {
         position.y = halfSize;
-        
+        onGround = true;
         if (linearVelocity.y < 0.0f) {
             linearVelocity.y = -linearVelocity.y * config.bounceRestitution;
-            
-            // Apply ground friction
             linearVelocity.x *= (1.0f - config.friction * 0.5f);
             linearVelocity.z *= (1.0f - config.friction * 0.5f);
+            angularVelocity *= 0.85f; // Dampen spin on ground bounce
         }
     }
 }
@@ -440,7 +549,8 @@ void DebrisManager::update(float deltaTime) {
 
 void DebrisManager::physicsUpdate(float fixedDeltaTime) {
     for (auto& debris : activeDebris) {
-        if (!debris->isAtRest() && !debris->isExpired()) {
+        if (!debris->isExpired()) {
+            // Always call physicsUpdate - it handles rest state and support checks internally
             debris->physicsUpdate(fixedDeltaTime);
         }
     }
