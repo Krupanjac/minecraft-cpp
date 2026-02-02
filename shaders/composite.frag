@@ -21,7 +21,7 @@ void main()
     vec3 hdrColor;
     if (uShakeStrength > 0.001) {
         // Simple 5-tap blur when shaking
-        vec2 blurOffset = vec2(0.0022) * uShakeStrength;
+        vec2 blurOffset = vec2(0.0034) * uShakeStrength;
         vec3 c0 = texture(scene, shakenUV).rgb;
         vec3 c1 = texture(scene, shakenUV + vec2( blurOffset.x, 0.0)).rgb;
         vec3 c2 = texture(scene, shakenUV + vec2(-blurOffset.x, 0.0)).rgb;

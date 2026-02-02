@@ -105,14 +105,16 @@ public:
                 // Calmer, more explosion-like shake
                 float baseIntensity = (power <= 4.0f) ? 0.12f : 0.20f;   // X vs C
                 float intensity = baseIntensity * power * distanceCurve;
+                float closeBoostStrong = distanceCurve * distanceCurve; // sharper boost when very close
+                intensity *= (1.0f + closeBoostStrong * 1.8f);
 
                 // Subtle variation to avoid identical shakes
                 float jitter = 0.85f + (static_cast<float>(std::rand() % 30) / 100.0f); // 0.85..1.14
                 intensity *= jitter;
                 
                 // Duration scales gently with power and proximity
-                float baseDuration = (power <= 4.0f) ? 0.22f : 0.32f;
-                float duration = baseDuration + (power * 0.04f) * distanceCurve;
+                float baseDuration = (power <= 4.0f) ? 0.28f : 0.40f;
+                float duration = baseDuration + (power * 0.05f) * distanceCurve + closeBoostStrong * 0.7f;
                 
                 LOG_INFO("[PhysicsTest] Adding shake: intensity=" + std::to_string(intensity) + 
                          " duration=" + std::to_string(duration));
@@ -123,10 +125,18 @@ public:
                 // Trigger explosion muffle/beep when very close
                 float nearRange = power * 6.0f;
                 if (distance < nearRange) {
-                    float nearNorm = 1.0f - (distance / nearRange);
-                    float muffleStrength = std::clamp(nearNorm * (power / 8.0f), 0.2f, 1.0f);
-                    float muffleDuration = 0.6f + power * 0.08f;
-                    Audio::AudioManager::instance().triggerExplosionMuffle(muffleStrength, muffleDuration, 0.9f);
+                    float nearNorm = 1.0f - (distance / nearRange); // 0..1 (closer = 1)
+                    float closeBoost = nearNorm * nearNorm;
+                    float closeBoostStrong = closeBoost * closeBoost;
+
+                    float muffleStrength = std::clamp(closeBoostStrong * (power / 7.0f), 0.3f, 1.0f);
+                    float muffleDuration = 0.45f + power * 0.07f + closeBoostStrong * 0.9f; // longer when closer
+
+                    float beepVolume = std::clamp(0.6f + closeBoostStrong * 1.0f, 0.6f, 1.6f);
+                    float beepPitch = std::clamp(0.9f + closeBoost * 0.15f, 0.9f, 1.15f);
+
+                    Audio::AudioManager::instance().triggerExplosionMuffle(
+                        muffleStrength, muffleDuration, beepVolume, beepPitch);
                 }
             }
         });

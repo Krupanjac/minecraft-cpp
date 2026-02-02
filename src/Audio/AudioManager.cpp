@@ -668,7 +668,7 @@ void AudioManager::setThundering(bool thundering) {
     m_thundering = thundering;
 }
 
-void AudioManager::triggerExplosionMuffle(float strength, float duration, float beepVolume) {
+void AudioManager::triggerExplosionMuffle(float strength, float duration, float beepVolume, float beepPitch) {
     if (!m_initialized) return;
 
     strength = std::clamp(strength, 0.0f, 1.0f);
@@ -684,8 +684,26 @@ void AudioManager::triggerExplosionMuffle(float strength, float duration, float 
 
     // Beep ring with cooldown to avoid spam
     if (m_muffleCooldown <= 0.0f && strength > 0.25f) {
-        playSound(SoundType::EXPLOSION_RING, beepVolume);
+        uint32_t beepHandle = playSound(SoundType::EXPLOSION_RING, beepVolume, beepPitch);
+        // Fade out more slowly so the ring doesn't end too quickly
+        if (beepHandle != 0) {
+            float fadeDuration = std::clamp(duration * (0.7f + strength * 0.6f), 0.7f, 1.8f);
+            fadeOutSound(beepHandle, fadeDuration);
+        }
         m_muffleCooldown = 1.25f;
+    }
+}
+
+void AudioManager::fadeOutSound(uint32_t handle, float duration) {
+    if (handle == 0 || duration <= 0.0f) return;
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto& sound : m_playingSounds) {
+        if (sound && sound->handle == handle && !sound->finished) {
+            sound->fadeTarget = 0.0f;
+            sound->fadeSpeed = (sound->fadeVolume > 0.0f) ? (sound->fadeVolume / duration) : 0.0f;
+            return;
+        }
     }
 }
 

@@ -143,6 +143,7 @@ public:
     void stopMusic(float fadeOut = 1.0f);
     void pauseAll();
     void resumeAll();
+    void fadeOutSound(uint32_t handle, float duration);
     
     // Volume control (0.0 - 1.0)
     void setMasterVolume(float volume);
@@ -160,7 +161,7 @@ public:
     void setThundering(bool thundering);
 
     // Explosion audio effects
-    void triggerExplosionMuffle(float strength, float duration, float beepVolume = 0.8f);
+    void triggerExplosionMuffle(float strength, float duration, float beepVolume = 0.8f, float beepPitch = 1.0f);
     
     // Status
     bool isInitialized() const { return m_initialized; }
