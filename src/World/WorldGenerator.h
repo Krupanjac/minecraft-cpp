@@ -109,6 +109,11 @@ private:
     float getTemperature(float x, float z) const;
     float getHumidity(float x, float z) const;
     
+    // River helpers - returns river strength [0,1] and mountain factor
+    float getRiverMask(float x, float z) const;
+    float getMountainFactor(float x, float z) const;
+    bool isUndergroundRiver(float x, float y, float z, float riverMask, float mountainFactor) const;
+    
     // Cave generation
     bool isCave(float x, float y, float z) const;
     bool isCave(float x, float y, float z, int precomputedSurfaceHeight) const;
@@ -120,3 +125,5 @@ private:
     BlockType getLogType(TreeType tree) const;
     BlockType getLeavesType(TreeType tree) const;
 };
+
+    

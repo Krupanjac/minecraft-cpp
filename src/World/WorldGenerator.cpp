@@ -174,6 +174,71 @@ float WorldGenerator::getHumidity(float x, float z) const {
     return std::clamp(h + globalHumidBias, 0.0f, 1.0f);
 }
 
+float WorldGenerator::getRiverMask(float x, float z) const {
+    // Calculate river strength at this position [0, 1]
+    float rX = x * 0.0035f + offsetPVX * 0.25f + 31000.0f;
+    float rZ = z * 0.0035f + offsetPVZ * 0.25f + 42000.0f;
+    float riverBase = fbm(rX, rZ, 3);
+    float riverVal = 1.0f - std::abs(riverBase);
+    return std::pow(std::clamp((riverVal - 0.78f) / 0.22f, 0.0f, 1.0f), 2.6f);
+}
+
+float WorldGenerator::getMountainFactor(float x, float z) const {
+    // Calculate mountain factor at this position [0, 1]
+    const float MOUNTAIN_SCALE = 0.002f * globalFrequencyBias;
+    float mtX = x * MOUNTAIN_SCALE + offsetErosionX;
+    float mtZ = z * MOUNTAIN_SCALE + offsetErosionZ;
+    float mtWarpX = mtX + 0.5f * noise2D(mtX * 0.5f + 1000.0f, mtZ * 0.5f + 2000.0f);
+    float mtWarpZ = mtZ + 0.5f * noise2D(mtX * 0.5f + 3000.0f, mtZ * 0.5f + 4000.0f);
+    float mountainNoise = ridgedMultifractal(mtWarpX, mtWarpZ, 5, 2.2f, 0.6f, 1.0f);
+    return std::clamp((mountainNoise - 0.40f) * 3.1f, 0.0f, 1.0f);
+}
+
+bool WorldGenerator::isUndergroundRiver(float x, float y, float z, float riverMask, float mountainFactor) const {
+    // Underground river caves - where rivers meet mountains, they go underground
+    // This creates natural cave river systems that follow the same path as surface rivers
+    
+    // Only create underground rivers where there's significant river AND mountain overlap
+    float undergroundRiverStrength = riverMask * mountainFactor;
+    if (undergroundRiverStrength < 0.15f) return false;
+    
+    // River tunnel should be around sea level (water level)
+    float riverBedY = static_cast<float>(SEA_LEVEL) - 3.0f;
+    float distFromRiverBed = y - riverBedY;  // Can be negative (below bed) or positive (above)
+    
+    // Tunnel shape - taller above water for air space, shorter below for riverbed
+    float tunnelHeightAbove = 5.0f + undergroundRiverStrength * 3.0f;  // 5-8 blocks above bed
+    float tunnelHeightBelow = 2.0f;  // 2 blocks below bed for gravel floor
+    
+    // Vertical check - are we within the tunnel?
+    if (distFromRiverBed > tunnelHeightAbove || distFromRiverBed < -tunnelHeightBelow) return false;
+    
+    // Use river mask directly - this follows the exact same river path as surface rivers
+    // riverMask is already calculated from the same noise, so underground river aligns perfectly
+    float tunnelWidth = 0.5f + undergroundRiverStrength * 0.3f;  // Threshold for being in tunnel
+    
+    if (riverMask < tunnelWidth) return false;  // Not in river path
+    
+    // Add some waviness to walls but keep core path stable
+    float wallWobble = noise2D(x * 0.06f + 8000.0f, z * 0.06f + 9000.0f) * 0.08f;
+    
+    // Smooth tunnel cross-section
+    float normalizedY = distFromRiverBed / (distFromRiverBed > 0 ? tunnelHeightAbove : tunnelHeightBelow);
+    float normalizedWidth = (tunnelWidth + wallWobble - riverMask) / 0.2f;  // How close to edge
+    
+    // Elliptical cross-section
+    float tunnelShape = normalizedWidth * normalizedWidth + normalizedY * normalizedY;
+    
+    if (tunnelShape < 0.8f) return true;
+    if (tunnelShape < 1.0f) {
+        // Noisy edges for natural look
+        float edgeNoise = noise3D(x * 0.12f + 500.0f, y * 0.18f + 600.0f, z * 0.12f + 700.0f);
+        return edgeNoise > (tunnelShape - 0.8f) * 3.5f;
+    }
+    
+    return false;
+}
+
 BiomeType WorldGenerator::getBiome(float x, float z) const {
     // Biome Selection matching the new terrain generation
     
@@ -292,7 +357,14 @@ bool WorldGenerator::isCave(float x, float y, float z) const {
     // Get surface height for this column
     int surfaceHeight = getSurfaceHeight(static_cast<int>(x), static_cast<int>(z));
     
-    // Don't carve caves through underwater areas (oceans/rivers)
+    // Check for underground river first (rivers entering mountains)
+    float riverMask = getRiverMask(x, z);
+    float mountainFactor = getMountainFactor(x, z);
+    if (isUndergroundRiver(x, y, z, riverMask, mountainFactor)) {
+        return true;  // Underground river carves through here
+    }
+    
+    // Don't carve regular caves through underwater areas (oceans/surface rivers)
     if (surfaceHeight < SEA_LEVEL && y < SEA_LEVEL) {
         return false;
     }
@@ -362,7 +434,14 @@ bool WorldGenerator::isCave(float x, float y, float z, int surfaceHeight) const 
     // Caves can go much deeper now (down to y=0, but not in bedrock)
     if (y < 2) return false;
     
-    // Don't carve caves through underwater areas (oceans/rivers)
+    // Check for underground river first (rivers entering mountains)
+    float riverMask = getRiverMask(x, z);
+    float mountainFactor = getMountainFactor(x, z);
+    if (isUndergroundRiver(x, y, z, riverMask, mountainFactor)) {
+        return true;  // Underground river carves through here
+    }
+    
+    // Don't carve regular caves through underwater areas (oceans/surface rivers)
     if (surfaceHeight < SEA_LEVEL && y < SEA_LEVEL) {
         return false;
     }
@@ -538,6 +617,9 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         BiomeType biome;
         const BiomeInfo* biomeInfo;
         float temp;
+        float riverMask;      // River strength for this column
+        float riverBankMask;  // Extended river bank influence
+        float mountainFactor; // Mountain factor for underground rivers
     };
     ColumnData columnCache[CHUNK_SIZE][CHUNK_SIZE];
     
@@ -553,6 +635,27 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             columnCache[x][z].biome = getBiome(worldXf, worldZf);
             columnCache[x][z].biomeInfo = &biomeInfoCache[static_cast<int>(columnCache[x][z].biome)];
             columnCache[x][z].temp = getTemperature(worldXf, worldZf);
+            columnCache[x][z].riverMask = getRiverMask(worldXf, worldZf);
+            columnCache[x][z].mountainFactor = getMountainFactor(worldXf, worldZf);
+            
+            // Calculate extended river bank mask (same calculation as in getHeight)
+            float rX = worldXf * 0.0035f + offsetPVX * 0.25f + 31000.0f;
+            float rZ = worldZf * 0.0035f + offsetPVZ * 0.25f + 42000.0f;
+            float riverBase = fbm(rX, rZ, 3);
+            float riverVal = 1.0f - std::abs(riverBase);
+            
+            // Continentalness for land factor
+            const float CONTINENT_SCALE = 0.0008f * globalFrequencyBias;
+            float contX = worldXf * CONTINENT_SCALE + offsetContinentX;
+            float contZ = worldZf * CONTINENT_SCALE + offsetContinentZ;
+            float warpX = contX, warpZ = contZ;
+            domainWarp(warpX, warpZ);
+            float continentalness = fbm(warpX, warpZ, 4);
+            continentalness = std::clamp(continentalness + 0.20f, -1.0f, 1.0f);
+            float landFactor = std::clamp((continentalness + 0.10f) * 3.5f, 0.0f, 1.0f);
+            
+            float riverBankMask = std::pow(std::clamp((riverVal - 0.70f) / 0.30f, 0.0f, 1.0f), 1.5f);
+            columnCache[x][z].riverBankMask = riverBankMask * landFactor * (1.0f - columnCache[x][z].mountainFactor * 0.95f);
         }
     }
     
@@ -561,6 +664,8 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         for (int z = 0; z < CHUNK_SIZE; ++z) {
             int worldX = static_cast<int>(worldPos.x) + x;
             int worldZ = static_cast<int>(worldPos.z) + z;
+            float worldXf = static_cast<float>(worldX);
+            float worldZf = static_cast<float>(worldZ);
             
             // Use precomputed column data
             const ColumnData& col = columnCache[x][z];
@@ -568,34 +673,72 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             const BiomeInfo& biomeInfo = *col.biomeInfo;
             float temp = col.temp;
             int height = col.height;
+            float riverMask = col.riverMask;
+            float mountainFactor = col.mountainFactor;
+            float undergroundRiverStrength = riverMask * mountainFactor;
+            
+            // River shore detection for sand/gravel placement
+            // surfaceRiverMask determines how close we are to river center
+            float surfaceRiverMask = riverMask * (1.0f - mountainFactor * 0.95f);
+            bool isRiverCenter = surfaceRiverMask > 0.5f;      // Underwater river bed
+            bool isRiverShore = surfaceRiverMask > 0.4f && surfaceRiverMask <= 0.5f;  // Shore at water edge
+            
+            // Sand only appears if terrain is close to water level (within 3 blocks above SEA_LEVEL)
+            // This prevents sand on top of cliffs where river goes underground
+            bool isNearWaterLevel = (height <= SEA_LEVEL + 3);
+            bool shouldHaveSand = isRiverShore && isNearWaterLevel;
             
             for (int y = 0; y < CHUNK_HEIGHT; ++y) {
                 int worldY = static_cast<int>(worldPos.y) + y;
                 BlockType blockType = BlockType::AIR;
                 
                 // Use optimized isCave overload with precomputed surface height
-                bool isInCave = isCave(static_cast<float>(worldX), static_cast<float>(worldY), static_cast<float>(worldZ), height);
+                bool isInCave = isCave(worldXf, static_cast<float>(worldY), worldZf, height);
+                
+                // Check if this is an underground river cave - creates its own tunnel
+                // regardless of natural cave system
+                bool isUndergroundRiverCave = false;
+                if (undergroundRiverStrength >= 0.15f && worldY < height - 2) {
+                    // Only check underground river in the underground (below surface)
+                    isUndergroundRiverCave = isUndergroundRiver(worldXf, static_cast<float>(worldY), worldZf, riverMask, mountainFactor);
+                }
                 
                 // Bedrock Layer at Y = -64
                 if (worldY <= -64) {
                     blockType = BlockType::BEDROCK;
                     isInCave = false; // No caves in bedrock
+                } else if (isUndergroundRiverCave) {
+                    // Underground river - either water or air depending on height
+                    if (worldY < SEA_LEVEL) {
+                        blockType = BlockType::WATER;
+                    } else {
+                        blockType = BlockType::AIR;  // Air above water in river cave
+                    }
                 } else if (!isInCave) {
                     if (worldY < height - biomeInfo.surfaceDepth) blockType = BlockType::STONE;
                     else if (worldY < height - 1) {
-                        // River: gravel under the bed (especially underwater), sand on dry banks
-                        if (biome == BiomeType::RIVER && height <= SEA_LEVEL) blockType = BlockType::GRAVEL;
-                        else blockType = biomeInfo.subsurfaceBlock;
+                        // Subsurface layer: gravel only for underwater river bed, normal otherwise
+                        if (isRiverCenter) {
+                            blockType = BlockType::GRAVEL;
+                        } else {
+                            blockType = biomeInfo.subsurfaceBlock;
+                        }
                     } else if (worldY < height) {
-                        blockType = biomeInfo.surfaceBlock;
-
-                        // River: if the bed is underwater, top layer should be gravel (sand is for shores)
-                        if (biome == BiomeType::RIVER && worldY < SEA_LEVEL) blockType = BlockType::GRAVEL;
+                        // Surface layer: sand for river shores, gravel for underwater river bed
+                        if (isRiverCenter) {
+                            // Underwater river bed - gravel
+                            blockType = BlockType::GRAVEL;
+                        } else if (shouldHaveSand) {
+                            // Sandy shore - only 1 block wide, only near water level
+                            blockType = BlockType::SAND;
+                        } else {
+                            blockType = biomeInfo.surfaceBlock;
+                        }
 
                         // MOUNTAINS: transition from grass to stone at higher elevations
                         // Below ~SEA_LEVEL+30: grass/dirt (tree zone)
                         // Above ~SEA_LEVEL+30: stone (barren peaks)
-                        if (biome == BiomeType::MOUNTAINS) {
+                        if (biome == BiomeType::MOUNTAINS && !isRiverCenter && !shouldHaveSand) {
                             int mountainTreeLine = SEA_LEVEL + 30;
                             if (worldY > mountainTreeLine) {
                                 // Use noise to create patchy transition zone
@@ -615,7 +758,8 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
 
                         if (blockType == BlockType::SNOW && worldY < SEA_LEVEL) blockType = BlockType::ICE;
                     } else if (worldY < SEA_LEVEL) {
-                        // Fill water to sea level - this covers open water bodies
+                        // Fill water to sea level - this covers oceans AND rivers
+                        // Rivers are carved below SEA_LEVEL, so this fills them automatically
                         if (biome == BiomeType::SNOWY_TUNDRA && worldY == SEA_LEVEL - 1) blockType = BlockType::ICE;
                         else blockType = BlockType::WATER;
                     }
@@ -708,6 +852,14 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         for (int nz = -pad; nz < CHUNK_SIZE + pad; ++nz) {
             int worldX = static_cast<int>(worldPos.x) + nx;
             int worldZ = static_cast<int>(worldPos.z) + nz;
+            float worldXf = static_cast<float>(worldX);
+            float worldZf = static_cast<float>(worldZ);
+            
+            // EARLY REJECTION: Check if this location is in a river (no trees in rivers)
+            float riverMaskCheck = getRiverMask(worldXf, worldZf);
+            float mountainFactorCheck = getMountainFactor(worldXf, worldZf);
+            float surfaceRiverCheck = riverMaskCheck * (1.0f - mountainFactorCheck * 0.95f);
+            if (surfaceRiverCheck > 0.35f) continue;  // Skip river and shore areas entirely
             
             // Use precomputed data if within chunk bounds, otherwise compute
             BiomeType biome;
@@ -721,16 +873,17 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                 treeBaseY = col.height;
                 temp = col.temp;
             } else {
-                float worldXf = static_cast<float>(worldX);
-                float worldZf = static_cast<float>(worldZ);
                 biome = getBiome(worldXf, worldZf);
                 treeBaseY = static_cast<int>(getHeight(worldXf, worldZf));
                 temp = getTemperature(worldXf, worldZf);
             }
             
+            // EARLY REJECTION: Below sea level or in cave - skip before hasTree check
+            if (treeBaseY < SEA_LEVEL) continue;
+            if (isCave(worldXf, static_cast<float>(treeBaseY - 1), worldZf, treeBaseY)) continue;
+            
             if (hasTree(worldX, worldZ, biome)) {
-                if (treeBaseY < SEA_LEVEL) continue;
-                if (isCave(static_cast<float>(worldX), static_cast<float>(treeBaseY - 1), static_cast<float>(worldZ), treeBaseY)) continue;
+                // Removed duplicate checks - already done above
 
                 // Check if surface block can support a tree (must be grass, dirt, or snow)
                 // This prevents trees from spawning on stone in mountains
@@ -1077,7 +1230,7 @@ float WorldGenerator::getHeight(float x, float z) const {
     // Detail adds small variations everywhere
     float detailHeight = detail * 3.0f * landFactor;
     
-    // Combine all layers
+    // Combine all layers - this is the base terrain height BEFORE river carving
     float finalHeight = baseHeight + finalHillHeight + mountainHeight + detailHeight;
 
     // River carving: create river-like water channels instead of random inland water.
@@ -1087,26 +1240,43 @@ float WorldGenerator::getHeight(float x, float z) const {
     float riverVal = 1.0f - std::abs(riverBase);
     float riverMask = std::pow(std::clamp((riverVal - 0.78f) / 0.22f, 0.0f, 1.0f), 2.6f);
     riverMask *= landFactor;
-    // Don't let rivers carve huge gashes through mountain cores
-    riverMask *= (1.0f - mountainFactor * 0.85f);
-
-    // River bed should be below sea level so water fills properly
-    // Use a fixed river bed depth and force terrain down when riverMask is strong
-    float riverBed = (float)SEA_LEVEL - 3.0f;  // River beds at Y=29
     
-    if (riverMask > 0.3f) {
-        // Strong river influence - force terrain below water level
-        // The stronger the riverMask, the deeper we carve
-        float carveDepth = riverMask * 4.0f;  // Max 4 blocks below riverBed
-        float targetHeight = riverBed - (riverMask - 0.3f) * 2.0f;
-        finalHeight = std::min(finalHeight, targetHeight);
-    } else if (riverMask > 0.0f) {
-        // Gentle river influence - smooth transition to river banks
-        finalHeight = lerp(finalHeight, riverBed + 2.0f, riverMask / 0.3f * 0.5f);
+    // UNDERGROUND RIVERS: When rivers meet mountains, they go underground instead of cutting through
+    // Calculate how much the river should be suppressed (goes underground) vs carve surface
+    float undergroundRiverFactor = riverMask * mountainFactor;
+    
+    // Reduce surface river carving based on mountain presence
+    // Rivers in mountains become underground rivers (handled by isCave/isUndergroundRiver)
+    float surfaceRiverMask = riverMask * (1.0f - mountainFactor * 0.95f);
+
+    // SIMPLE RIVER SYSTEM: Fixed water level, carve terrain down to it
+    // River water surface is always at SEA_LEVEL (flat like a real river)
+    // River bed is 3 blocks below water surface
+    float riverWaterSurface = (float)SEA_LEVEL;
+    float riverBedLevel = riverWaterSurface - 3.0f;
+    
+    if (surfaceRiverMask > 0.3f && finalHeight > riverBedLevel) {
+        if (surfaceRiverMask > 0.5f) {
+            // River center - carve down to river bed (underwater)
+            float depthFactor = (surfaceRiverMask - 0.5f) / 0.5f;
+            float bedDepth = riverBedLevel - depthFactor * 2.0f;  // Center slightly deeper
+            finalHeight = std::min(finalHeight, bedDepth);
+        } else if (surfaceRiverMask > 0.4f) {
+            // Inner shore - slopes from water edge down to river bed
+            float slopeFactor = (surfaceRiverMask - 0.4f) / 0.1f;
+            float shoreLevel = lerp(riverWaterSurface + 1.0f, riverBedLevel, slopeFactor);
+            finalHeight = std::min(finalHeight, shoreLevel);
+        } else {
+            // Outer shore (0.3-0.4) - just above water, sandy beach
+            float slopeFactor = (surfaceRiverMask - 0.3f) / 0.1f;
+            float beachLevel = lerp(finalHeight, riverWaterSurface + 1.0f, slopeFactor);
+            finalHeight = std::min(finalHeight, beachLevel);
+        }
     }
 
     // Prevent random inland lakes: keep most land above sea level unless we're in a river.
-    if (continentalness > 0.00f && riverMask < 0.15f) {
+    // But allow underground river areas to have normal mountain height
+    if (continentalness > 0.00f && surfaceRiverMask < 0.15f && undergroundRiverFactor < 0.15f) {
         finalHeight = std::max(finalHeight, (float)SEA_LEVEL + 3.0f);
     }
     
