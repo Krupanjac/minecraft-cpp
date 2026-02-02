@@ -26,6 +26,7 @@
 #include "Entity/MobSpawnManager.h"
 #include "Network/NetworkManager.h"
 #include "Audio/AudioManager.h"
+#include "Physics/PhysicsTest.h"
 
 #include <memory>
 #include <iostream>
@@ -1012,6 +1013,12 @@ public:
         
         // Initialize legacy mob spawn manager (fallback)
         mobSpawnManager = std::make_unique<MobSpawnManager>(chunkManager, worldGenerator);
+        
+        // Initialize physics test system
+#if ENABLE_PHYSICS_TEST
+        physicsTest.initialize(&chunkManager);
+        LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
+#endif
     }
     
     bool loadWorld(const std::string& name = "world.dat") {
@@ -1054,6 +1061,12 @@ public:
             
             // Initialize legacy mob spawn manager for loaded world
             mobSpawnManager = std::make_unique<MobSpawnManager>(chunkManager, worldGenerator);
+            
+            // Initialize physics test system for loaded world
+#if ENABLE_PHYSICS_TEST
+            physicsTest.initialize(&chunkManager);
+            LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
+#endif
 
             LOG_INFO("World loaded successfully");
             return true;
@@ -1204,6 +1217,9 @@ private:
     WorldSerializer worldSerializer;
     Network::NetworkManager networkManager;
     HeldItemRenderer heldItemRenderer;
+    
+    // Physics test system (can be disabled via ENABLE_PHYSICS_TEST in PhysicsTest.h)
+    Physics::PhysicsTestSystem physicsTest;
     
     std::mutex meshMutex;
     std::vector<std::pair<ChunkPos, MeshData>> pendingMeshes;
@@ -1917,6 +1933,14 @@ private:
             f7Pressed = false;
         }
         
+        // Physics Test System - Isolated testing controls (X, C, V, P keys)
+#if ENABLE_PHYSICS_TEST
+        if (!skipPlayerControls && uiManager.isWorldLoaded()) {
+            physicsTest.handleInput(window->getNative(), camera, deltaTime);
+            physicsTest.update(deltaTime);
+        }
+#endif
+        
         // renderer.setShowShadows(uiManager.showShadows); // Removed, Renderer uses Settings directly
 
         // Time control - host/offline can manually control, all players update time locally for smoothness
@@ -2336,6 +2360,16 @@ private:
         
         // Blit depth buffer to default framebuffer so held items can properly occlude/be occluded
         renderer.blitDepthToScreen(window->getWidth(), window->getHeight());
+        
+        // Render physics debris
+#if ENABLE_PHYSICS_TEST
+        if (physicsTest.isEnabled()) {
+            auto debrisData = physicsTest.getDebrisRenderData();
+            if (!debrisData.empty()) {
+                renderer.renderDebris(camera, debrisData, window->getWidth(), window->getHeight());
+            }
+        }
+#endif
         
         // Render block break overlay when breaking blocks in survival mode
         if (isBreakingBlock && !uiManager.isCreativeMode && blockBreakProgress > 0.0f) {

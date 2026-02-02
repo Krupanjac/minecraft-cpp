@@ -10,6 +10,7 @@
 #include "VoxelRayTracer.h"
 #include "../World/ChunkManager.h"
 #include "../Mesh/Mesh.h"
+#include "../World/Block.h"
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -61,6 +62,16 @@ public:
     void renderLoadingScreen(int windowWidth, int windowHeight, float progress);
     void renderBlockBreakOverlay(const Camera& camera, const glm::ivec3& blockPos, float progress, int windowWidth, int windowHeight);
     
+    // Render debris particles as small textured cubes
+    struct DebrisRenderData {
+        glm::vec3 position;
+        glm::quat rotation;
+        float scale;
+        BlockType blockType;
+        float alpha;
+    };
+    void renderDebris(const Camera& camera, const std::vector<DebrisRenderData>& debris, int windowWidth, int windowHeight);
+    
     void setShowCrosshair(bool show) { showCrosshair = show; }
 
     // Access PostProcess for debug/metrics
@@ -80,6 +91,7 @@ private:
     Shader cloudShader;
     Shader modelShader; // New shader for entities
     Shader destroyOverlayShader; // Shader for block destruction overlay
+    Shader debrisShader; // Shader for debris particles
     
     std::unique_ptr<Mesh> crosshairMesh;
     bool showCrosshair = true;
@@ -91,6 +103,13 @@ private:
     GLuint destroyOverlayVBO = 0;
     GLuint destroyOverlayEBO = 0;
     int destroyOverlayIndexCount = 0;
+    
+    // Debris rendering
+    GLuint debrisVAO = 0;
+    GLuint debrisVBO = 0;
+    GLuint debrisEBO = 0;
+    int debrisIndexCount = 0;
+    
     std::unique_ptr<Texture> blockAtlas;
     
     // Post Processing
@@ -146,4 +165,5 @@ private:
     void initClouds();
     void renderClouds(const Camera& camera, int windowWidth, int windowHeight, const glm::mat4& lightSpaceMatrix);
     void initDestroyOverlay();
+    void initDebrisMesh();
 };

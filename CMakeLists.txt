@@ -140,7 +140,15 @@ set(SOURCES
     src/Entity/SkeletonEntity.cpp
     src/Entity/MobSpawnManager.cpp
     src/Entity/EntityManager.cpp
+    src/Entity/DebrisEntity.cpp
     src/Model/Model.cpp
+    src/Physics/RigidBody.cpp
+    src/Physics/Collider.cpp
+    src/Physics/CollisionDetection.cpp
+    src/Physics/Broadphase.cpp
+    src/Physics/PhysicsWorld.cpp
+    src/Physics/DestructionSystem.cpp
+    src/Physics/ExplosionSystem.cpp
     src/Audio/AudioManager.cpp
     src/Audio/stb_vorbis_impl.c
     ${GLAD_DIR}/src/glad.c

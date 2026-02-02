@@ -6,6 +6,7 @@
 #include "../Core/Settings.h"
 #include "../Entity/Entity.h"
 #include <GLFW/glfw3.h>
+#include <glm/gtc/quaternion.hpp>
 #include <random>
 #include <cmath>
 #include <fstream> // For debug shadow dump
@@ -978,6 +979,10 @@ bool Renderer::loadShaders() {
         LOG_ERROR("Failed to load destroy overlay shader");
         success = false;
     }
+    if (!debrisShader.loadFromFiles("shaders/debris.vert", "shaders/debris.frag")) {
+        LOG_ERROR("Failed to load debris shader");
+        success = false;
+    }
     // Create simple shader for crosshair inline or load from file
     // For simplicity, we'll use a very basic shader source here
     const char* crosshairVert = R"(
@@ -1775,4 +1780,175 @@ void Renderer::renderBlockBreakOverlay(const Camera& camera, const glm::ivec3& b
     glDisable(GL_POLYGON_OFFSET_FILL);
     glDisable(GL_BLEND);
     glEnable(GL_CULL_FACE);
+}
+
+void Renderer::initDebrisMesh() {
+    // Create a unit cube mesh centered at origin for debris rendering
+    // Format: position (3), normal (3), texcoord (2), faceId (1 as int)
+    // Each face has 4 vertices, 6 faces = 24 vertices
+    
+    struct DebrisVertex {
+        float x, y, z;       // position
+        float nx, ny, nz;    // normal
+        float u, v;          // texcoord
+        int faceId;          // face identifier (0=front, 1=back, 2=right, 3=left, 4=top, 5=bottom)
+    };
+    
+    std::vector<DebrisVertex> vertices;
+    std::vector<unsigned int> indices;
+    
+    const float h = 0.5f;
+    
+    // Helper to add a face
+    auto addFace = [&](glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, 
+                       glm::vec3 normal, int faceId) {
+        unsigned int base = static_cast<unsigned int>(vertices.size());
+        
+        vertices.push_back({p0.x, p0.y, p0.z, normal.x, normal.y, normal.z, 0.0f, 0.0f, faceId});
+        vertices.push_back({p1.x, p1.y, p1.z, normal.x, normal.y, normal.z, 1.0f, 0.0f, faceId});
+        vertices.push_back({p2.x, p2.y, p2.z, normal.x, normal.y, normal.z, 1.0f, 1.0f, faceId});
+        vertices.push_back({p3.x, p3.y, p3.z, normal.x, normal.y, normal.z, 0.0f, 1.0f, faceId});
+        
+        indices.push_back(base + 0);
+        indices.push_back(base + 1);
+        indices.push_back(base + 2);
+        indices.push_back(base + 0);
+        indices.push_back(base + 2);
+        indices.push_back(base + 3);
+    };
+    
+    // Front (Z+) - face 0 (side)
+    addFace({-h, -h, h}, {h, -h, h}, {h, h, h}, {-h, h, h}, {0, 0, 1}, 0);
+    // Back (Z-) - face 1 (side)
+    addFace({h, -h, -h}, {-h, -h, -h}, {-h, h, -h}, {h, h, -h}, {0, 0, -1}, 1);
+    // Right (X+) - face 2 (side)
+    addFace({h, -h, h}, {h, -h, -h}, {h, h, -h}, {h, h, h}, {1, 0, 0}, 2);
+    // Left (X-) - face 3 (side)
+    addFace({-h, -h, -h}, {-h, -h, h}, {-h, h, h}, {-h, h, -h}, {-1, 0, 0}, 3);
+    // Top (Y+) - face 4
+    addFace({-h, h, h}, {h, h, h}, {h, h, -h}, {-h, h, -h}, {0, 1, 0}, 4);
+    // Bottom (Y-) - face 5
+    addFace({-h, -h, -h}, {h, -h, -h}, {h, -h, h}, {-h, -h, h}, {0, -1, 0}, 5);
+    
+    glGenVertexArrays(1, &debrisVAO);
+    glGenBuffers(1, &debrisVBO);
+    glGenBuffers(1, &debrisEBO);
+    
+    glBindVertexArray(debrisVAO);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, debrisVBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(DebrisVertex), vertices.data(), GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, debrisEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+    
+    // Position (location 0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(DebrisVertex), (void*)offsetof(DebrisVertex, x));
+    glEnableVertexAttribArray(0);
+    
+    // Normal (location 1)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(DebrisVertex), (void*)offsetof(DebrisVertex, nx));
+    glEnableVertexAttribArray(1);
+    
+    // TexCoord (location 2)
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(DebrisVertex), (void*)offsetof(DebrisVertex, u));
+    glEnableVertexAttribArray(2);
+    
+    // FaceId (location 3) - use integer attribute
+    glVertexAttribIPointer(3, 1, GL_INT, sizeof(DebrisVertex), (void*)offsetof(DebrisVertex, faceId));
+    glEnableVertexAttribArray(3);
+    
+    glBindVertexArray(0);
+    
+    debrisIndexCount = static_cast<int>(indices.size());
+}
+
+void Renderer::renderDebris(const Camera& camera, const std::vector<DebrisRenderData>& debris, int windowWidth, int windowHeight) {
+    if (debris.empty()) return;
+    if (debrisVAO == 0) {
+        initDebrisMesh();
+    }
+    if (!blockAtlas) return;
+    
+    // Setup matrices
+    float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
+    glm::mat4 projection = glm::perspective(glm::radians(camera.getFov()), aspect, 0.1f, 1000.0f);
+    glm::mat4 view = camera.getViewMatrix();
+    
+    // Use debris shader for proper per-face texturing
+    debrisShader.use();
+    debrisShader.setMat4("uView", view);
+    debrisShader.setMat4("uProjection", projection);
+    debrisShader.setVec3("uLightDir", glm::normalize(lightDirection));
+    debrisShader.setVec3("uSkyColor", skyColor);
+    debrisShader.setVec3("uCameraPos", camera.getPosition());
+    
+    // Calculate a simple light space matrix for debris shadows
+    // Use a simplified shadow projection for debris
+    glm::mat4 lightSpaceMatrix = glm::mat4(1.0f);
+    bool useShadows = Settings::instance().enableShadows && shadowMap;
+    if (useShadows) {
+        // Use a simple orthographic projection for light
+        float shadowRange = 50.0f;
+        glm::vec3 lightDir = glm::normalize(lightDirection);
+        glm::vec3 lightPos = camera.getPosition() + lightDir * shadowRange;
+        glm::mat4 lightView = glm::lookAt(lightPos, camera.getPosition(), glm::vec3(0, 1, 0));
+        glm::mat4 lightProjection = glm::ortho(-shadowRange, shadowRange, -shadowRange, shadowRange, 1.0f, shadowRange * 3.0f);
+        lightSpaceMatrix = lightProjection * lightView;
+        
+        debrisShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, shadowMap->getDepthMap());
+        debrisShader.setInt("uShadowMap", 1);
+        debrisShader.setInt("uUseShadows", 1);
+    } else {
+        debrisShader.setMat4("uLightSpaceMatrix", glm::mat4(1.0f));
+        debrisShader.setInt("uUseShadows", 0);
+    }
+    
+    // Bind block atlas
+    glActiveTexture(GL_TEXTURE0);
+    blockAtlas->bind(0);
+    debrisShader.setInt("uTexture", 0);
+    
+    // Enable blending for alpha fade
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE); // Show all faces since debris tumbles
+    
+    glBindVertexArray(debrisVAO);
+    
+    for (const auto& d : debris) {
+        // Build model matrix: translate, rotate, scale
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), d.position);
+        model *= glm::mat4_cast(d.rotation);
+        model = glm::scale(model, glm::vec3(d.scale));
+        
+        debrisShader.setMat4("uModel", model);
+        debrisShader.setFloat("uAlpha", d.alpha);
+        
+        // Get texture indices for this block type using UIManager
+        int texTop = UIManager::getBlockTextureIndex(d.blockType, 0);    // face 0 = top
+        int texSide = UIManager::getBlockTextureIndex(d.blockType, 1);   // face 1 = side
+        int texBottom = UIManager::getBlockTextureIndex(d.blockType, 2); // face 2 = bottom
+        
+        debrisShader.setInt("uTexIndexTop", texTop);
+        debrisShader.setInt("uTexIndexSide", texSide);
+        debrisShader.setInt("uTexIndexBottom", texBottom);
+        
+        glDrawElements(GL_TRIANGLES, debrisIndexCount, GL_UNSIGNED_INT, 0);
+    }
+    
+    glBindVertexArray(0);
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+    debrisShader.unuse();
+    
+    // Reset OpenGL state to avoid affecting UI rendering
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE0); // Leave on texture unit 0
 }
