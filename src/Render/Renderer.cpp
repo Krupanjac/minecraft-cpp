@@ -816,8 +816,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         glm::vec2 shakeUV(shake.x * 0.02f, shake.y * 0.02f);
         float shakeStrength = glm::clamp(glm::length(shakeUV) * 50.0f, 0.0f, 1.5f);
         postProcess->setScreenShake(shakeUV, shakeStrength);
+        float vignetteStrength = glm::clamp(0.15f + shakeStrength * 0.9f, 0.0f, 1.0f);
+        postProcess->setExplosionVignette(vignetteStrength);
     } else {
         postProcess->setScreenShake(glm::vec2(0.0f), 0.0f);
+        postProcess->setExplosionVignette(0.0f);
     }
 
     postProcess->render(mainFBO->getTexture(), mainFBO->getDepthTexture(), mainFBO->getVelocityTexture(), 

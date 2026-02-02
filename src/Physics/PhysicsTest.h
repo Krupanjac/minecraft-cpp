@@ -79,7 +79,7 @@ public:
             // Play explosion sound at position with extended hearing range (128 blocks)
             // Explosions are loud and should be heard from far away
             Audio::AudioManager::instance().playSoundAtWithRange(
-                Audio::SoundType::EXPLOSION, pos, volume, 128.0f, 1.0f);
+                Audio::SoundType::EXPLOSION, pos, volume, 64.0f, 1.0f);
         });
         
         // Set up screen shake callback

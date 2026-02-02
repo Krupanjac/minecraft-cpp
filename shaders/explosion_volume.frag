@@ -58,6 +58,8 @@ void main() {
         float firePhase = smoothstep(0.0, 0.25, 1.0 - t);
         alpha = vColor.a * edgeFade * fade * (0.5 + core * 0.9) * firePhase;
     } else {
+        // Smoke uses smokeColor only
+        color = smokeColor * (0.18 + 0.55 * light) + fresnel * 0.2;
         float smokePhase = smoothstep(0.02, 1.0, t);
         float heightSmoke = smoothstep(0.05, 1.0, height);
         float smokeEdge = smoothstep(1.2, 0.55, dist / max(uRadius, 0.001));

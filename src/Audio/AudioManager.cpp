@@ -44,6 +44,7 @@ struct PlayingSound {
     
     bool is3D = false;
     glm::vec3 position{0.0f};
+    float maxDistance = 32.0f;
     
     bool loop = false;
     bool finished = false;
@@ -134,7 +135,7 @@ void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
         float panLeft = 1.0f;
         float panRight = 1.0f;
         if (sound->is3D) {
-            effectiveVolume *= calculateAttenuationStatic(sound->position);
+            effectiveVolume *= calculateAttenuationStatic(sound->position, sound->maxDistance);
             calculateStereoPanStatic(sound->position, panLeft, panRight);
         }
         
@@ -531,6 +532,7 @@ uint32_t AudioManager::playSoundAtWithRange(SoundType type, const glm::vec3& pos
     sound->pitch = pitch;
     sound->is3D = true;
     sound->position = position;
+    sound->maxDistance = maxDistance;
     
     uint32_t handle = sound->handle;
     m_playingSounds.push_back(std::move(sound));

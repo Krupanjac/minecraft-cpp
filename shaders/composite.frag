@@ -12,6 +12,7 @@ uniform float gamma;
 uniform float uAOStrength; // 0..1 (mix between no AO and full SSAO)
 uniform vec2 uScreenShake; // Screen shake offset in UV space
 uniform float uShakeStrength; // 0..1, controls blur strength
+uniform float uExplosionVignette; // 0..1
 
 void main()
 {
@@ -70,5 +71,13 @@ void main()
     // Gamma correction
     mapped = pow(mapped, vec3(1.0 / gamma));
     
-    FragColor = vec4(mapped, 1.0);
+    // Explosion vignette
+    float vig = 1.0;
+    if (uExplosionVignette > 0.001) {
+        float d = distance(TexCoords, vec2(0.5));
+        float v = smoothstep(0.25, 0.85, d);
+        vig = 1.0 - v * uExplosionVignette;
+    }
+
+    FragColor = vec4(mapped * vig, 1.0);
 }

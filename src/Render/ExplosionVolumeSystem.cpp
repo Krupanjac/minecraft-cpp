@@ -583,12 +583,18 @@ void ExplosionVolumeSystem::buildMesh(ExplosionVolume& volume) {
                     float smoke = glm::clamp(t * 1.1f, 0.0f, 1.0f);
                     float height = glm::clamp((pa.y - volume.center.y) / radius + 0.5f, 0.0f, 1.0f);
 
-                    glm::vec4 color = glm::mix(glm::vec4(1.0f, 0.45f, 0.15f, 0.85f),
-                                               glm::vec4(0.35f, 0.35f, 0.35f, 0.55f),
-                                               smoke);
-                    glm::vec3 rgb = glm::vec3(color) + heat * glm::vec3(0.7f, 0.25f, 0.05f);
-                    color = glm::vec4(rgb, color.a);
-                    color.a *= glm::mix(1.0f, 0.8f, height);
+                    glm::vec4 color;
+                    if (volume.type == VolumeType::Smoke) {
+                        color = glm::vec4(0.18f, 0.18f, 0.18f, 0.75f);
+                        color.a *= glm::mix(1.0f, 0.85f, height);
+                    } else {
+                        color = glm::mix(glm::vec4(1.0f, 0.45f, 0.15f, 0.85f),
+                                         glm::vec4(0.35f, 0.35f, 0.35f, 0.55f),
+                                         smoke);
+                        glm::vec3 rgb = glm::vec3(color) + heat * glm::vec3(0.7f, 0.25f, 0.05f);
+                        color = glm::vec4(rgb, color.a);
+                        color.a *= glm::mix(1.0f, 0.8f, height);
+                    }
 
                     uint32_t baseIndex = static_cast<uint32_t>(vertices.size());
                     vertices.push_back({pa, na, color});
