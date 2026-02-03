@@ -1017,7 +1017,28 @@ public:
         
         // Initialize physics test system
 #if ENABLE_PHYSICS_TEST
-        physicsTest.initialize(&chunkManager, &camera, &explosionVolumes);
+        auto entityProvider = [this]() {
+            std::vector<Entity*> entities;
+            if (useNewEntityManager) {
+                auto managed = entityManager.getAllEntities();
+                entities.insert(entities.end(), managed.begin(), managed.end());
+            } else {
+                for (auto& z : zombies) { if (z) entities.push_back(z.get()); }
+                for (auto& s : skeletons) { if (s) entities.push_back(s.get()); }
+                for (auto& p : pigs) { if (p) entities.push_back(p.get()); }
+                for (auto& c : chickens) { if (c) entities.push_back(c.get()); }
+                for (auto& s : sheep) { if (s) entities.push_back(s.get()); }
+            }
+            auto remotePlayers = networkManager.getRemotePlayerEntities();
+            for (auto* rp : remotePlayers) { if (rp) entities.push_back(rp); }
+            return entities;
+        };
+
+        auto playerDamage = [this](float amount, const glm::vec3& knockback) {
+            playerTakeDamage(amount, knockback);
+        };
+
+        physicsTest.initialize(&chunkManager, &camera, &explosionVolumes, entityProvider, playerDamage);
         LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
 #endif
     }
@@ -1065,7 +1086,28 @@ public:
             
             // Initialize physics test system for loaded world
 #if ENABLE_PHYSICS_TEST
-            physicsTest.initialize(&chunkManager, &camera, &explosionVolumes);
+            auto entityProvider = [this]() {
+                std::vector<Entity*> entities;
+                if (useNewEntityManager) {
+                    auto managed = entityManager.getAllEntities();
+                    entities.insert(entities.end(), managed.begin(), managed.end());
+                } else {
+                    for (auto& z : zombies) { if (z) entities.push_back(z.get()); }
+                    for (auto& s : skeletons) { if (s) entities.push_back(s.get()); }
+                    for (auto& p : pigs) { if (p) entities.push_back(p.get()); }
+                    for (auto& c : chickens) { if (c) entities.push_back(c.get()); }
+                    for (auto& s : sheep) { if (s) entities.push_back(s.get()); }
+                }
+                auto remotePlayers = networkManager.getRemotePlayerEntities();
+                for (auto* rp : remotePlayers) { if (rp) entities.push_back(rp); }
+                return entities;
+            };
+
+            auto playerDamage = [this](float amount, const glm::vec3& knockback) {
+                playerTakeDamage(amount, knockback);
+            };
+
+            physicsTest.initialize(&chunkManager, &camera, &explosionVolumes, entityProvider, playerDamage);
             LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
 #endif
 
@@ -2595,6 +2637,9 @@ private:
     
     // Take damage as the player
     void playerTakeDamage(float amount, const glm::vec3& knockbackDir = glm::vec3(0.0f)) {
+        if (uiManager.isCreativeMode) {
+            return;
+        }
         if (playerInvulnerabilityTimer > 0.0f || playerHealth <= 0.0f) {
             return;
         }

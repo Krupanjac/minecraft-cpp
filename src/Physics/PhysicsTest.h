@@ -20,9 +20,12 @@
 #include "../Render/Renderer.h"
 #include "../Audio/AudioManager.h"
 #include "../Core/Logger.h"
+#include "../Entity/Entity.h"
 
 #include <GLFW/glfw3.h>
 #include <memory>
+#include <functional>
+#include <vector>
 
 namespace Physics {
 
@@ -40,10 +43,14 @@ public:
     PhysicsTestSystem() = default;
     ~PhysicsTestSystem() = default;
     
-    void initialize(ChunkManager* chunkMgr, Camera* cam, ExplosionVolumeSystem* explosionVfx) {
+    void initialize(ChunkManager* chunkMgr, Camera* cam, ExplosionVolumeSystem* explosionVfx,
+                    std::function<std::vector<Entity*>()> entityProviderFunc,
+                    std::function<void(float, const glm::vec3&)> playerDamageFunc) {
         chunkManager = chunkMgr;
         camera = cam;
         explosionVolumes = explosionVfx;
+        entityProvider = std::move(entityProviderFunc);
+        playerDamage = std::move(playerDamageFunc);
         
         PhysicsConfig config;
         config.gravity = glm::vec3(0.0f, -20.0f, 0.0f);
@@ -147,6 +154,40 @@ public:
         explosionSystem->setExplosionVfx([this](const glm::vec3& pos, float power) {
             if (explosionVolumes) {
                 explosionVolumes->spawn(pos, power);
+            }
+        });
+
+        // Set up entity damage callback
+        explosionSystem->setEntityDamage([this](const glm::vec3& pos, float radius, float damage, const glm::vec3& center) {
+            if (radius <= 0.01f) return;
+
+            // Damage player
+            if (playerDamage && camera) {
+                glm::vec3 playerPos = camera->getPosition();
+                float dist = glm::length(playerPos - pos);
+                if (dist < radius) {
+                    float falloff = 1.0f - (dist / radius);
+                    float appliedDamage = damage * falloff;
+                    glm::vec3 knockDir = (playerPos - center);
+                    if (glm::length(knockDir) > 0.001f) knockDir = glm::normalize(knockDir);
+                    playerDamage(appliedDamage, knockDir * (falloff * 8.0f));
+                }
+            }
+
+            // Damage mobs/entities
+            if (entityProvider) {
+                auto entities = entityProvider();
+                for (auto* entity : entities) {
+                    if (!entity || entity->isDead()) continue;
+                    float dist = glm::length(entity->getPosition() - pos);
+                    if (dist < radius) {
+                        float falloff = 1.0f - (dist / radius);
+                        float appliedDamage = damage * falloff;
+                        glm::vec3 knockDir = (entity->getPosition() - center);
+                        if (glm::length(knockDir) > 0.001f) knockDir = glm::normalize(knockDir);
+                        entity->takeDamage(appliedDamage, knockDir * (falloff * 8.0f));
+                    }
+                }
             }
         });
         
@@ -391,6 +432,8 @@ private:
     ChunkManager* chunkManager = nullptr;
     Camera* camera = nullptr;
     ExplosionVolumeSystem* explosionVolumes = nullptr;
+    std::function<std::vector<Entity*>()> entityProvider;
+    std::function<void(float, const glm::vec3&)> playerDamage;
     std::unique_ptr<PhysicsWorld> physicsWorld;
     std::unique_ptr<ExplosionSystem> explosionSystem;
     ::DebrisManager debrisManager;
@@ -403,7 +446,8 @@ private:
 namespace Physics {
 class PhysicsTestSystem {
 public:
-    void initialize(void*, void*, void*) {}
+    template <typename... Args>
+    void initialize(Args&&...) {}
     void update(float) {}
     bool handleInput(void*, const void&, float) { return false; }
     bool isEnabled() const { return false; }
