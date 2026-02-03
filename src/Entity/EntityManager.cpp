@@ -889,7 +889,9 @@ void EntityManager::serverUpdateSpawning(float deltaTime,
 
 // Spawning helper implementations
 bool EntityManager::isNightTime(float timeOfDay) {
-    return timeOfDay < 0.25f || timeOfDay > 0.75f;
+    float angle = timeOfDay * 6.28318530718f;
+    float sunY = std::sin(angle);
+    return sunY < -0.1f;
 }
 
 glm::vec3 EntityManager::findSpawnPosition(const glm::vec3& playerPos, float minDist, float maxDist) {
@@ -977,6 +979,7 @@ bool EntityManager::hasSideClearance(const glm::vec3& pos, int radius, int heigh
 }
 
 bool EntityManager::isValidHostileSpawn(const glm::vec3& pos, float timeOfDay) const {
+    if (!isNightTime(timeOfDay)) return false;
     int light = getLightLevel(pos, timeOfDay);
     if (light > 7) return false;
     

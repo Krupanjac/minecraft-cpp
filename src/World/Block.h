@@ -208,6 +208,16 @@ struct Block {
                type == BlockType::JUNGLE_PLANKS;
     }
     
+    bool isFlammable() const {
+        // Organic blocks that can catch fire and burn
+        return isLeaves() || isLog() || isPlanks() ||
+               type == BlockType::GRASS ||       // Grass-topped dirt
+               type == BlockType::TALL_GRASS ||  // Tall grass plants
+               type == BlockType::ROSE ||        // Flowers
+               type == BlockType::COBWEB ||      // Webs burn fast
+               type == BlockType::BOOKSHELF;     // Paper burns
+    }
+    
     bool isLightEmitting() const {
         return type == BlockType::GLOWSTONE ||
                type == BlockType::REDSTONE_LAMP;

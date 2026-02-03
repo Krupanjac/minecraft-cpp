@@ -328,8 +328,12 @@ static float valueNoise3D(float x, float y, float z) {
 
 ExplosionVolumeSystem::~ExplosionVolumeSystem() {
     for (auto& v : volumes) {
-        v.mesh.destroy();
+        if (!v.useSharedMesh) {
+            v.mesh.destroy();
+        }
     }
+    sharedFireSmall.destroy();
+    sharedFireMedium.destroy();
 }
 
 void ExplosionVolumeSystem::spawn(const glm::vec3& center, float power) {
@@ -347,7 +351,7 @@ void ExplosionVolumeSystem::spawn(const glm::vec3& center, float power) {
     fire.isoLevel = 0.1f;
     fire.rebuildTimer = 0.0f;
     fire.seed = seed;
-    fire.type = VolumeType::Fire;
+    fire.type = VolumeType::ExplosionFire;
     buildMesh(fire);
     volumes.push_back(std::move(fire));
 
@@ -367,6 +371,47 @@ void ExplosionVolumeSystem::spawn(const glm::vec3& center, float power) {
     volumes.push_back(std::move(smoke));
 }
 
+void ExplosionVolumeSystem::spawnFire(const glm::vec3& center, float radius, float duration) {
+    std::random_device rd;
+    float seed = static_cast<float>(rd() % 10000) * 0.01f;
+
+    ExplosionMesh* sharedMesh = nullptr;
+    if (radius <= 0.9f) {
+        ensureSharedFireMesh(0.9f, sharedFireSmall, sharedFireSmallReady);
+        sharedMesh = &sharedFireSmall;
+    } else {
+        ensureSharedFireMesh(1.3f, sharedFireMedium, sharedFireMediumReady);
+        sharedMesh = &sharedFireMedium;
+    }
+
+    ExplosionVolume fire;
+    fire.center = center;
+    fire.power = radius;
+    fire.duration = std::max(0.2f, duration);
+    fire.startDelay = 0.0f;
+    fire.radius = std::max(0.3f, radius);
+    fire.gridSize = (radius <= 1.0f) ? 16 : 20;
+    fire.isoLevel = 0.08f;
+    fire.rebuildTimer = 0.0f;
+    fire.seed = seed;
+    fire.type = VolumeType::BlockFire;
+    fire.useSharedMesh = (sharedMesh != nullptr);
+    fire.sharedMesh = sharedMesh;
+    fire.meshReady = (sharedMesh != nullptr);
+    if (!fire.useSharedMesh) {
+        buildMesh(fire);
+    }
+    volumes.push_back(std::move(fire));
+}
+
+size_t ExplosionVolumeSystem::getActiveFireCount() const {
+    size_t count = 0;
+    for (const auto& v : volumes) {
+        if (v.type == VolumeType::BlockFire) count++;
+    }
+    return count;
+}
+
 void ExplosionVolumeSystem::update(float deltaTime) {
     for (auto& v : volumes) {
         v.age += deltaTime;
@@ -374,7 +419,9 @@ void ExplosionVolumeSystem::update(float deltaTime) {
 
     volumes.erase(std::remove_if(volumes.begin(), volumes.end(), [](ExplosionVolume& v) {
         if (v.age >= v.duration) {
-            v.mesh.destroy();
+            if (!v.useSharedMesh) {
+                v.mesh.destroy();
+            }
             return true;
         }
         return false;
@@ -401,7 +448,8 @@ void ExplosionVolumeSystem::render(Shader& shader, const glm::mat4& view, const 
     glDepthMask(GL_FALSE);
 
     for (auto& v : volumes) {
-        if (!v.meshReady || v.mesh.indexCount == 0) continue;
+        ExplosionMesh* mesh = v.useSharedMesh ? v.sharedMesh : &v.mesh;
+        if (!mesh || !v.meshReady || mesh->indexCount == 0) continue;
         if (v.age < v.startDelay) continue;
 
         float localAge = v.age - v.startDelay;
@@ -415,11 +463,11 @@ void ExplosionVolumeSystem::render(Shader& shader, const glm::mat4& view, const 
         float t = glm::clamp(v.age / v.duration, 0.0f, 1.0f);
         float expand = 0.7f + 0.6f * (1.0f - std::exp(-v.age * 2.5f));
         float baseScale = glm::mix(0.7f, 1.25f, expand) * (1.0f + t * 0.1f);
-        float forceBoost = (v.type == VolumeType::Fire) ? 1.08f : 1.0f;
+        float forceBoost = (v.type == VolumeType::ExplosionFire || v.type == VolumeType::BlockFire) ? 1.08f : 1.0f;
         float scale = baseScale * forceBoost;
         shader.setFloat("uScale", scale);
         shader.setFloat("uNoisePhase", v.seed + v.age * 1.6f);
-        v.mesh.draw();
+        mesh->draw();
     }
 
     glDepthMask(GL_TRUE);
@@ -471,6 +519,24 @@ void ExplosionVolumeSystem::ExplosionMesh::destroy() {
     indexCount = 0;
 }
 
+void ExplosionVolumeSystem::ensureSharedFireMesh(float radius, ExplosionMesh& mesh, bool& readyFlag) {
+    if (readyFlag) return;
+
+    ExplosionVolume temp;
+    temp.center = glm::vec3(0.0f);
+    temp.power = radius;
+    temp.duration = 1.0f;
+    temp.radius = radius;
+    temp.gridSize = (radius <= 1.0f) ? 16 : 20;
+    temp.isoLevel = 0.08f;
+    temp.seed = 3.13f;
+    temp.type = VolumeType::BlockFire;
+
+    buildMesh(temp);
+    mesh = std::move(temp.mesh);
+    readyFlag = true;
+}
+
 float ExplosionVolumeSystem::sampleDensity(const ExplosionVolume& volume, const glm::vec3& p) const {
     float t = glm::clamp(volume.age / volume.duration, 0.0f, 1.0f);
     float expand = 0.6f + 0.6f * (1.0f - std::exp(-volume.age * 2.5f));
@@ -515,7 +581,7 @@ void ExplosionVolumeSystem::buildMesh(ExplosionVolume& volume) {
     float expand = 0.6f + 0.6f * (1.0f - std::exp(-volume.age * 2.5f));
     float radius = volume.radius * expand;
     float cell = (radius * 2.0f) / static_cast<float>(N - 1);
-    glm::vec3 origin = volume.center - glm::vec3(radius);
+    glm::vec3 origin = -glm::vec3(radius);
 
     for (int z = 0; z < N - 1; ++z) {
         for (int y = 0; y < N - 1; ++y) {
@@ -528,7 +594,7 @@ void ExplosionVolumeSystem::buildMesh(ExplosionVolume& volume) {
                     int iy = y + ((i & 2) ? 1 : 0);
                     int iz = z + ((i & 4) ? 1 : 0);
                     p[i] = origin + glm::vec3(ix * cell, iy * cell, iz * cell);
-                    val[i] = sampleDensity(volume, p[i]);
+                    val[i] = sampleDensity(volume, p[i] + volume.center);
                 }
 
                 int cubeIndex = 0;
@@ -575,13 +641,13 @@ void ExplosionVolumeSystem::buildMesh(ExplosionVolume& volume) {
                     glm::vec3 pb = vertList[a1];
                     glm::vec3 pc = vertList[a2];
 
-                    glm::vec3 na = sampleGradient(volume, pa);
-                    glm::vec3 nb = sampleGradient(volume, pb);
-                    glm::vec3 nc = sampleGradient(volume, pc);
+                    glm::vec3 na = sampleGradient(volume, pa + volume.center);
+                    glm::vec3 nb = sampleGradient(volume, pb + volume.center);
+                    glm::vec3 nc = sampleGradient(volume, pc + volume.center);
 
                     float heat = glm::clamp(1.0f - t * 1.1f, 0.0f, 1.0f);
                     float smoke = glm::clamp(t * 1.1f, 0.0f, 1.0f);
-                    float height = glm::clamp((pa.y - volume.center.y) / radius + 0.5f, 0.0f, 1.0f);
+                    float height = glm::clamp(pa.y / radius + 0.5f, 0.0f, 1.0f);
 
                     glm::vec4 color;
                     if (volume.type == VolumeType::Smoke) {

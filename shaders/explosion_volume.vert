@@ -25,14 +25,14 @@ void main() {
     float t = clamp(uAge / max(uDuration, 0.001), 0.0, 1.0);
 
     // Scale around explosion center and add subtle noise wobble
-    vec3 centered = aPos - uCenter;
+    vec3 centered = aPos;
     // Stretch upward to avoid perfect sphere
     vec3 stretched = centered * vec3(1.0, 1.25, 1.0);
     vec3 scaled = stretched * uScale;
 
     // Turbulence to break spherical shape
-    float n1 = sin((aPos.x + uNoisePhase) * 2.3) * sin((aPos.y + uNoisePhase) * 1.9) * sin((aPos.z + uNoisePhase) * 2.7);
-    float n2 = sin((aPos.x - uNoisePhase) * 3.1) * sin((aPos.y + uNoisePhase) * 2.4) * sin((aPos.z - uNoisePhase) * 3.3);
+    float n1 = sin((centered.x + uNoisePhase) * 2.3) * sin((centered.y + uNoisePhase) * 1.9) * sin((centered.z + uNoisePhase) * 2.7);
+    float n2 = sin((centered.x - uNoisePhase) * 3.1) * sin((centered.y + uNoisePhase) * 2.4) * sin((centered.z - uNoisePhase) * 3.3);
     float n = (n1 * 0.6 + n2 * 0.4);
     vec3 displaced = scaled + vNormal * n * 0.22 + vec3(0.0, n * 0.18, 0.0);
 

@@ -22,9 +22,9 @@ MobSpawnManager::MobSpawnManager(ChunkManager& chunkMgr, WorldGenerator& worldGe
 }
 
 bool MobSpawnManager::isNightTime(float timeOfDay) {
-    // Night is roughly from 0.75 (sunset) to 0.25 (sunrise)
-    // timeOfDay: 0.0 = midnight, 0.5 = noon
-    return timeOfDay < 0.25f || timeOfDay > 0.75f;
+    float angle = timeOfDay * 6.28318530718f;
+    float sunY = std::sin(angle);
+    return sunY < -0.1f;
 }
 
 int MobSpawnManager::getLightLevel(const glm::vec3& pos, float timeOfDay) const {
@@ -200,6 +200,7 @@ glm::vec3 MobSpawnManager::findSpawnPosition(const glm::vec3& playerPos, float m
 }
 
 bool MobSpawnManager::isValidHostileSpawn(const glm::vec3& pos, float timeOfDay) const {
+    if (!isNightTime(timeOfDay)) return false;
     // Check light level
     int light = getLightLevel(pos, timeOfDay);
     if (light > config.hostileMinLightLevel) {

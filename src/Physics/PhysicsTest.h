@@ -45,12 +45,14 @@ public:
     
     void initialize(ChunkManager* chunkMgr, Camera* cam, ExplosionVolumeSystem* explosionVfx,
                     std::function<std::vector<Entity*>()> entityProviderFunc,
-                    std::function<void(float, const glm::vec3&)> playerDamageFunc) {
+                    std::function<void(float, const glm::vec3&)> playerDamageFunc,
+                    std::function<void(const glm::ivec3&)> fireStartFunc) {
         chunkManager = chunkMgr;
         camera = cam;
         explosionVolumes = explosionVfx;
         entityProvider = std::move(entityProviderFunc);
         playerDamage = std::move(playerDamageFunc);
+        fireStart = std::move(fireStartFunc);
         
         PhysicsConfig config;
         config.gravity = glm::vec3(0.0f, -20.0f, 0.0f);
@@ -211,7 +213,7 @@ public:
         debrisManager.setDefaultConfig(debrisCfg);
         
         initialized = true;
-        LOG_INFO("[PhysicsTest] Initialized - X/C=explosion, V=debris, P=toggle");
+        LOG_INFO("[PhysicsTest] Initialized - X/C=explosion, V=debris, B=fire, P=toggle");
     }
     
     void update(float deltaTime) {
@@ -271,6 +273,15 @@ public:
                 return true;
             }
         } else { vPressed = false; }
+
+        static bool bPressed = false;
+        if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
+            if (!bPressed) {
+                startFireAtCrosshair(camera);
+                bPressed = true;
+                return true;
+            }
+        } else { bPressed = false; }
         
         return false;
     }
@@ -335,6 +346,21 @@ public:
                 LOG_INFO("[PhysicsTest] Debris created, total: " + 
                          std::to_string(debrisManager.getStats().activeDebris));
             }
+        }
+    }
+
+    void startFireAtCrosshair(const Camera& camera) {
+        if (!chunkManager || !fireStart) return;
+
+        glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
+        auto result = chunkManager->rayCast(eyePos, camera.getFront(), 50.0f);
+
+        if (result.hit) {
+            glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
+            int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
+            int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
+            int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
+            fireStart(glm::ivec3(x, y, z));
         }
     }
     
@@ -434,6 +460,7 @@ private:
     ExplosionVolumeSystem* explosionVolumes = nullptr;
     std::function<std::vector<Entity*>()> entityProvider;
     std::function<void(float, const glm::vec3&)> playerDamage;
+    std::function<void(const glm::ivec3&)> fireStart;
     std::unique_ptr<PhysicsWorld> physicsWorld;
     std::unique_ptr<ExplosionSystem> explosionSystem;
     ::DebrisManager debrisManager;

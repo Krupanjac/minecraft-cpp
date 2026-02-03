@@ -107,6 +107,7 @@ set(SOURCES
     src/World/WorldGenerator.cpp
     src/World/WorldSerializer.cpp
     src/World/Item.cpp
+    src/World/FireSystem.cpp
     src/Mesh/MeshBuilder.cpp
     src/Mesh/Mesh.cpp
     src/Render/Shader.cpp

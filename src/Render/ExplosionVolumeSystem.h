@@ -11,17 +11,20 @@ public:
     ~ExplosionVolumeSystem();
 
     void spawn(const glm::vec3& center, float power);
+    void spawnFire(const glm::vec3& center, float radius, float duration);
     void update(float deltaTime);
     void render(Shader& shader, const glm::mat4& view, const glm::mat4& projection,
                 const glm::vec3& cameraPos, const glm::vec3& lightDir,
                 const glm::vec3& renderOrigin);
 
     bool hasActiveVolumes() const { return !volumes.empty(); }
+    size_t getActiveFireCount() const;
 
 private:
     enum class VolumeType {
-        Fire = 0,
-        Smoke = 1
+        ExplosionFire = 0,
+        Smoke = 1,
+        BlockFire = 2
     };
 
     struct ExplosionVertex {
@@ -53,13 +56,21 @@ private:
         int gridSize = 32;
         float seed = 0.0f;
         ExplosionMesh mesh;
+        ExplosionMesh* sharedMesh = nullptr;
         bool meshReady = false;
-        VolumeType type = VolumeType::Fire;
+        bool useSharedMesh = false;
+        VolumeType type = VolumeType::ExplosionFire;
     };
 
     std::vector<ExplosionVolume> volumes;
 
+    ExplosionMesh sharedFireSmall;
+    ExplosionMesh sharedFireMedium;
+    bool sharedFireSmallReady = false;
+    bool sharedFireMediumReady = false;
+
     void buildMesh(ExplosionVolume& volume);
+    void ensureSharedFireMesh(float radius, ExplosionMesh& mesh, bool& readyFlag);
     float sampleDensity(const ExplosionVolume& volume, const glm::vec3& p) const;
     glm::vec3 sampleGradient(const ExplosionVolume& volume, const glm::vec3& p) const;
 };

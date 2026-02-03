@@ -28,6 +28,7 @@
 #include "Audio/AudioManager.h"
 #include "Physics/PhysicsTest.h"
 #include "Render/ExplosionVolumeSystem.h"
+#include "World/FireSystem.h"
 
 #include <memory>
 #include <iostream>
@@ -618,6 +619,52 @@ public:
             LOG_ERROR("Failed to host multiplayer game");
         }
     }
+
+    bool isDayTime(float normalizedTime) const {
+        float angle = normalizedTime * 6.28318530718f;
+        float sunY = std::sin(angle);
+        return sunY > 0.1f;
+    }
+
+    bool isExposedToSky(const glm::vec3& pos) {
+        int x = static_cast<int>(std::floor(pos.x));
+        int y = static_cast<int>(std::floor(pos.y));
+        int z = static_cast<int>(std::floor(pos.z));
+
+        for (int checkY = y + 1; checkY < y + 32 && checkY < 256; ++checkY) {
+            Block block = chunkManager.getBlockAt(x, checkY, z);
+            if (block.isSolid() && !block.isLeaves()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void applyDaylightBurn(Entity* entity, float deltaTime) {
+        if (!entity || entity->isDead()) {
+            mobBurnStates.erase(entity);
+            return;
+        }
+
+        if (!isExposedToSky(entity->getPosition())) {
+            mobBurnStates.erase(entity);
+            return;
+        }
+
+        auto& state = mobBurnStates[entity];
+        state.damageTimer += deltaTime;
+        state.vfxTimer += deltaTime;
+
+        if (state.damageTimer >= 1.0f) {
+            state.damageTimer = 0.0f;
+            entity->takeDamage(1.0f);
+        }
+
+        if (state.vfxTimer >= 0.35f) {
+            state.vfxTimer = 0.0f;
+            explosionVolumes.spawnFire(entity->getPosition() + glm::vec3(0.0f, 0.6f, 0.0f), 1.0f, 0.9f);
+        }
+    }
     
     void joinMultiplayerGame(const std::string& playerName, const std::string& address, uint16_t port) {
         uiManager.setNetworkStatus("Connecting...");
@@ -1038,7 +1085,21 @@ public:
             playerTakeDamage(amount, knockback);
         };
 
-        physicsTest.initialize(&chunkManager, &camera, &explosionVolumes, entityProvider, playerDamage);
+        auto fireStart = [this](const glm::ivec3& pos) {
+            Block block = chunkManager.getBlockAt(pos.x, pos.y, pos.z);
+            if (block.isLeaves() || block.isLog() || block.isPlanks()) {
+                fireSystem.igniteBlock(pos, 4.0f, true, true);
+            } else {
+                glm::ivec3 topPos = pos + glm::ivec3(0, 1, 0);
+                Block above = chunkManager.getBlockAt(topPos.x, topPos.y, topPos.z);
+                if (above.isSolid()) {
+                    topPos = pos;
+                }
+                fireSystem.igniteBlock(topPos, 3.0f, false, false);
+            }
+        };
+
+        physicsTest.initialize(&chunkManager, &camera, &explosionVolumes, entityProvider, playerDamage, fireStart);
         LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
 #endif
     }
@@ -1107,7 +1168,21 @@ public:
                 playerTakeDamage(amount, knockback);
             };
 
-            physicsTest.initialize(&chunkManager, &camera, &explosionVolumes, entityProvider, playerDamage);
+            auto fireStart = [this](const glm::ivec3& pos) {
+                Block block = chunkManager.getBlockAt(pos.x, pos.y, pos.z);
+                if (block.isLeaves() || block.isLog() || block.isPlanks()) {
+                    fireSystem.igniteBlock(pos, 4.0f, true, true);
+                } else {
+                    glm::ivec3 topPos = pos + glm::ivec3(0, 1, 0);
+                    Block above = chunkManager.getBlockAt(topPos.x, topPos.y, topPos.z);
+                    if (above.isSolid()) {
+                        topPos = pos;
+                    }
+                    fireSystem.igniteBlock(topPos, 3.0f, false, false);
+                }
+            };
+
+            physicsTest.initialize(&chunkManager, &camera, &explosionVolumes, entityProvider, playerDamage, fireStart);
             LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
 #endif
 
@@ -1261,6 +1336,7 @@ private:
     Network::NetworkManager networkManager;
     HeldItemRenderer heldItemRenderer;
     ExplosionVolumeSystem explosionVolumes;
+    FireSystem fireSystem;
     
     // Physics test system (can be disabled via ENABLE_PHYSICS_TEST in PhysicsTest.h)
     Physics::PhysicsTestSystem physicsTest;
@@ -1307,6 +1383,12 @@ private:
     
     // Flag to use new EntityManager vs legacy system
     bool useNewEntityManager = true;
+
+    struct BurnState {
+        float damageTimer = 0.0f;
+        float vfxTimer = 0.0f;
+    };
+    std::unordered_map<const Entity*, BurnState> mobBurnStates;
     
     // Menu background world
     bool menuWorldInitialized = false;
@@ -1991,6 +2073,7 @@ private:
 #endif
         if (uiManager.isWorldLoaded()) {
             explosionVolumes.update(deltaTime);
+            fireSystem.update(deltaTime, chunkManager, &explosionVolumes);
         }
         
         // renderer.setShowShadows(uiManager.showShadows); // Removed, Renderer uses Settings directly
@@ -2137,6 +2220,17 @@ private:
                     for (const auto& attack : attacks) {
                         camera.velocity += attack.knockback;
                     }
+
+                    if (isDayTime(normalizedTime)) {
+                        auto entities = entityManager.getAllEntities();
+                        for (auto* entity : entities) {
+                            if (dynamic_cast<ZombieEntity*>(entity) || dynamic_cast<SkeletonEntity*>(entity)) {
+                                applyDaylightBurn(entity, deltaTime);
+                            }
+                        }
+                    } else {
+                        mobBurnStates.clear();
+                    }
                     
                     // If hosting, broadcast entity events to clients
                     if (networkManager.isHost()) {
@@ -2204,6 +2298,17 @@ private:
                             if (attacked && !s->isDead()) {
                                 camera.velocity += s->consumeAttackImpulse();
                             }
+                        }
+
+                        if (isDayTime(normalizedTime)) {
+                            for (auto& z : zombies) {
+                                if (z) applyDaylightBurn(z.get(), deltaTime);
+                            }
+                            for (auto& s : skeletons) {
+                                if (s) applyDaylightBurn(s.get(), deltaTime);
+                            }
+                        } else {
+                            mobBurnStates.clear();
                         }
                         
                         // Update passive mobs (always update for death timer)
