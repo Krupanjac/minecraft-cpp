@@ -41,6 +41,9 @@
 #include "Game/MobUpdateSystem.h"
 #include "Game/RenderPipelineSystem.h"
 #include "Game/AudioSystem.h"
+#include "Game/BlockBreakingSystem.h"
+#include "Game/DebugInfoSystem.h"
+#include "Game/PlayerEntitySystem.h"
 
 #include <memory>
 #include <iostream>
@@ -77,7 +80,11 @@ public:
                                                                                  zombies, skeletons, pigs, chickens, sheep, useNewEntityManager),
                     lastSpaceTime(0.0),
                     running(true),
-                    audioSystem(uiManager, camera, chunkManager, isUnderwater, wasUnderwater) {
+                    audioSystem(uiManager, camera, chunkManager, isUnderwater, wasUnderwater),
+                    blockBreakingSystem(uiManager, camera, chunkManager, heldItemRenderer, networkManager, physicsTest,
+                                        isBreakingBlock, blockBreakProgress, breakingBlockPos, breakingBlockType),
+                    debugInfoSystem(uiManager, camera, chunkManager, renderer),
+                    playerEntitySystem(camera, playerEntity) {
                 std::random_device rd;
                 rng.seed(rd());
     }
@@ -437,36 +444,33 @@ public:
                     } else {
                         worldGenerator.generate(chunk);
                     }
+
                     chunk->setState(ChunkState::MESH_BUILD);
+
+                    auto neighbors = chunkManager.getNeighbors(pos);
+                    for (auto& n : neighbors) {
+                        if (n && n->getState() != ChunkState::UNLOADED) {
+                            n->setState(ChunkState::MESH_BUILD);
+                        }
+                    }
                 }
             }
-            // Mesh synchronously (avoid large freeze by limiting count)
-            auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), 1000);
-            int meshed = 0;
+
+            auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), 10000);
             for (auto& chunk : chunksToMesh) {
-                if (meshed > 200) break; // cap work this frame to avoid massive hitch; still much faster than falling through
                 auto neighbors = chunkManager.getNeighbors(chunk->getPosition());
+
                 MeshData meshData = meshBuilder.buildChunkMesh(chunk,
                     neighbors[0], neighbors[1], neighbors[2], neighbors[3], neighbors[4], neighbors[5], chunk->getCurrentLOD());
 
-                renderer.uploadChunkMesh(chunk->getPosition(), meshData.vertices, meshData.indices, meshData.waterVertices, meshData.waterIndices);
-                chunk->setState(ChunkState::GPU_UPLOADED);
-                meshed++;
-            }
+                renderer.uploadChunkMesh(chunk->getPosition(),
+                    meshData.vertices, meshData.indices,
+                    meshData.waterVertices, meshData.waterIndices);
 
-            // After some synchronous meshing, lower camera to safe spawn height based on blocks now present
-            int terrainY = chunkManager.getHeightAt(static_cast<int>(x), static_cast<int>(z));
-            camera.setPosition(glm::vec3(x, static_cast<float>(terrainY) + 2.0f, z));
+                chunk->setState(ChunkState::GPU_UPLOADED);
+            }
         });
-        
-        // Give UIManager access to world generator for map
-        uiManager.setWorldGenerator(&worldGenerator);
-        
-        // Setup multiplayer callbacks
-        uiManager.setOnHostGame([this](std::string playerName, int port) {
-            hostMultiplayerGame(playerName, static_cast<uint16_t>(port));
-        });
-        
+
         uiManager.setOnJoinGame([this](std::string playerName, std::string address, int port) {
             joinMultiplayerGame(playerName, address, static_cast<uint16_t>(port));
         });
@@ -726,54 +730,10 @@ public:
             inputSystem.processInput(deltaTime); // Input/GUI can use full frame delta
             update(clampedDelta); // Physics/render updates use clamped delta
             audioSystem.update(deltaTime);
-
-            // Update Debug Info
-            // Use a smoothed FPS for display to avoid 0 or flickering
-            static float displayFPS = 0.0f;
-            static float fpsAccumulator = 0.0f;
-            static int frameAccumulator = 0;
-            static float fpsUpdateTimer = 0.0f;
-            
-            fpsAccumulator += Time::instance().getFPS();
-            frameAccumulator++;
-            fpsUpdateTimer += deltaTime;
-            
-            if (playerEntity) {
-                // Sync velocity from camera before update so animation state machine can use it
-                playerEntity->setVelocity(camera.velocity);
-                playerEntity->updateWithCamera(deltaTime, camera);
-            }
+            playerEntitySystem.updateWithCamera(deltaTime);
             
             
-            if (fpsUpdateTimer >= 0.5f) {
-                displayFPS = fpsAccumulator / frameAccumulator;
-                fpsAccumulator = 0.0f;
-                frameAccumulator = 0;
-                fpsUpdateTimer = 0.0f;
-            }
-
-            std::string blockName = "None";
-            
-            // Increase raycast distance to ensure we hit the ground even from high up
-            glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
-            auto result = chunkManager.rayCast(eyePos, camera.getFront(), 100.0f);
-            if (result.hit) {
-                glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
-                int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
-                int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
-                int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
-                Block block = chunkManager.getBlockAt(x, y, z);
-                
-                blockName = uiManager.getBlockName(block.getType());
-            }
-            
-            // Pass estimated TAA metrics to UI for debugging
-            float taaMotion = 0.0f, taaHistoryWeight = 0.0f;
-            if (renderer.getPostProcess()) {
-                taaMotion = renderer.getPostProcess()->getLastTaaMotionMag();
-                taaHistoryWeight = renderer.getPostProcess()->getLastTaaBlendEstimate();
-            }
-            uiManager.updateDebugInfo(displayFPS, blockName, camera.getPosition(), camera.velocity, taaMotion, taaHistoryWeight);
+            debugInfoSystem.update(deltaTime);
 
             renderPipelineSystem.renderFrame(isBreakingBlock, blockBreakProgress, breakingBlockPos);
             
@@ -855,6 +815,9 @@ private:
     bool wasUnderwater = false;
     bool wasOnGround = true; // For detecting jump
     AudioSystem audioSystem;
+    BlockBreakingSystem blockBreakingSystem;
+    DebugInfoSystem debugInfoSystem;
+    PlayerEntitySystem playerEntitySystem;
 
     // Loading tips
     std::vector<std::string> loadingTips = {
@@ -958,82 +921,13 @@ private:
         // Update held item from current hotbar selection
         ItemType currentHeldItem = uiManager.getSelectedItem();
         heldItemRenderer.setHeldItem(currentHeldItem);
-        
-        // Sync held item to playerEntity for animation purposes
-        if (playerEntity) {
-            playerEntity->setHeldItem(currentHeldItem);
-        }
+        playerEntitySystem.syncHeldItem(currentHeldItem);
         
         // Update held item renderer
         bool isMoving = glm::length(glm::vec2(camera.velocity.x, camera.velocity.z)) > 0.5f;
         heldItemRenderer.update(deltaTime, camera.velocity, camera.onGround, isMoving);
         
-        // Handle survival mode block breaking
-        if (isBreakingBlock && !uiManager.isCreativeMode && uiManager.isWorldLoaded()) {
-            glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
-            auto result = chunkManager.rayCast(eyePos, camera.getFront(), 5.0f);
-            
-            if (result.hit) {
-                glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
-                int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
-                int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
-                int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
-                
-                // Check if target block changed
-                if (breakingBlockPos != glm::ivec3(x, y, z)) {
-                    breakingBlockPos = glm::ivec3(x, y, z);
-                    blockBreakProgress = 0.0f;
-                    breakingBlockType = chunkManager.getBlockAt(x, y, z).getType();
-                }
-                
-                // Calculate break speed based on tool
-                float baseBreakTime = getBlockBreakTime(breakingBlockType);
-                float toolMultiplier = ItemRegistry::instance().getMiningMultiplier(currentHeldItem, breakingBlockType);
-                float effectiveBreakTime = baseBreakTime / toolMultiplier;
-                
-                // Progress breaking
-                blockBreakProgress += deltaTime / effectiveBreakTime;
-                
-                // Trigger mining animation
-                heldItemRenderer.setMining(true);
-                
-                // Play dig hit sound periodically
-                static float digSoundTimer = 0.0f;
-                digSoundTimer += deltaTime;
-                if (digSoundTimer >= 0.25f) {
-                    Audio::SoundType digHitSound = Audio::getDigSoundForBlock(static_cast<uint8_t>(breakingBlockType));
-                    Audio::AudioManager::instance().playSoundAt(digHitSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f), 0.3f);
-                    digSoundTimer = 0.0f;
-                }
-                
-                // Check if block is broken
-                if (blockBreakProgress >= 1.0f) {
-                    // Break the block
-                    Audio::SoundType digSound = Audio::getDigSoundForBlock(static_cast<uint8_t>(breakingBlockType));
-                    Audio::AudioManager::instance().playSoundAt(digSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f));
-                    
-                    // Spawn dropped item debris before removing block
-                    #if ENABLE_PHYSICS_TEST
-                    physicsTest.spawnDroppedItem(glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f), breakingBlockType);
-                    #endif
-                    
-                    chunkManager.setBlockAt(x, y, z, Block(BlockType::AIR));
-                    
-                    // Broadcast block change to network
-                    if (networkManager.isOnline()) {
-                        networkManager.sendBlockChange(x, y, z, static_cast<uint8_t>(BlockType::AIR));
-                    }
-                    
-                    blockBreakProgress = 0.0f;
-                }
-            } else {
-                // No block in range, reset progress
-                blockBreakProgress = 0.0f;
-                heldItemRenderer.setMining(false);
-            }
-        } else {
-            heldItemRenderer.setMining(false);
-        }
+        blockBreakingSystem.update(deltaTime, currentHeldItem);
         
         // Send local player position to network
         // Send foot position (camera is at FEET level)
@@ -1118,55 +1012,6 @@ private:
                     playerHealthSystem.takeDamage(amount, knockback, playHurtSound);
                 }
             );
-        }
-    }
-    
-    
-    // Get base break time for a block type (in seconds, with bare hands)
-    float getBlockBreakTime(BlockType type) const {
-        switch (type) {
-            // Instant break
-            case BlockType::AIR:
-            case BlockType::TALL_GRASS:
-            case BlockType::ROSE:
-                return 0.0f;
-            
-            // Very soft
-            case BlockType::LEAVES:
-                return 0.35f;
-            
-            // Soft blocks (shovel effective)
-            case BlockType::DIRT:
-            case BlockType::GRASS:
-            case BlockType::SAND:
-            case BlockType::GRAVEL:
-            case BlockType::SNOW:
-                return 0.75f;
-            
-            // Wood (axe effective)
-            case BlockType::WOOD:
-            case BlockType::LOG:
-                return 3.0f;
-            
-            // Stone (pickaxe effective)
-            case BlockType::STONE:
-            case BlockType::SANDSTONE:
-                return 7.5f;
-            
-            // Ice (pickaxe effective, but breaks easily)
-            case BlockType::ICE:
-                return 0.7f;
-            
-            // Water (can't break)
-            case BlockType::WATER:
-                return 100000.0f;
-            
-            // Bedrock (unbreakable)
-            case BlockType::BEDROCK:
-                return 100000.0f;
-            
-            default:
-                return 1.5f;
         }
     }
     

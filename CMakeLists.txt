@@ -120,6 +120,9 @@ set(SOURCES
     src/Game/MobUpdateSystem.cpp
     src/Game/RenderPipelineSystem.cpp
     src/Game/AudioSystem.cpp
+    src/Game/BlockBreakingSystem.cpp
+    src/Game/DebugInfoSystem.cpp
+    src/Game/PlayerEntitySystem.cpp
     src/Mesh/MeshBuilder.cpp
     src/Mesh/Mesh.cpp
     src/Render/Shader.cpp
