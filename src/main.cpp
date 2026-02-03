@@ -33,6 +33,7 @@
 #include "Game/PlayerHealthSystem.h"
 #include "Game/MenuWorldSystem.h"
 #include "Game/WorldLifecycleSystem.h"
+#include "Game/InputSystem.h"
 
 #include <memory>
 #include <iostream>
@@ -54,7 +55,10 @@ public:
                                                              uiManager, entityManager, networkManager, playerHealthSystem, explosionVolumes, fireSystem,
                                                              camera, playerEntity, mobSpawnManager, zombies, skeletons, pigs, chickens, sheep,
                                                              useNewEntityManager, physicsTest, currentWorldName, currentSeed),
-          lastX(0.0), lastY(0.0), lastSpaceTime(0.0), firstMouse(true),
+                    inputSystem(uiManager, camera, chunkManager, heldItemRenderer, entityManager, networkManager,
+                                            playerEntity, zombies, skeletons, pigs, chickens, sheep, useNewEntityManager,
+                                            attackCooldown, isBreakingBlock, blockBreakProgress, breakingBlockPos, breakingBlockType, isUnderwater),
+                    lastSpaceTime(0.0),
                     running(true) {
                 std::random_device rd;
                 rng.seed(rd());
@@ -79,6 +83,8 @@ public:
             LOG_ERROR("Failed to create window: " + std::string(e.what()));
             return false;
         }
+
+        inputSystem.setWindow(window.get());
         
         // Get GPU info now that OpenGL context is created
         const char* glRenderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
@@ -103,7 +109,7 @@ public:
                 Console::instance().handleMouseButton(button, action, mx, my, window->getHeight());
                 // Don't return - still allow game to process if needed
             }
-            onMouseButton(button, action, mods);
+            inputSystem.handleMouseButton(button, action, mods);
         });
         
         window->setCursorPosCallback([this](double xpos, double ypos) {
@@ -712,7 +718,7 @@ public:
                 menuWorldSystem.update(clampedDelta);
             }
             
-            processInput(deltaTime); // Input/GUI can use full frame delta
+            inputSystem.processInput(deltaTime); // Input/GUI can use full frame delta
             update(clampedDelta); // Physics/render updates use clamped delta
 
             // Update Debug Info
@@ -837,13 +843,12 @@ private:
     ExplosionVolumeSystem explosionVolumes;
     FireSystem fireSystem;
     StatusEffectsSystem statusEffectsSystem;
+    InputSystem inputSystem;
     
     // Physics test system (can be disabled via ENABLE_PHYSICS_TEST in PhysicsTest.h)
     Physics::PhysicsTestSystem physicsTest;
     
-    double lastX, lastY;
     double lastSpaceTime;
-    bool firstMouse;
     bool running;
     
     // Game State
@@ -974,340 +979,6 @@ private:
         // AO and Gamma are handled in Renderer::render
     }
 
-    void onMouseButton(int button, int action, int /*mods*/) {
-        if (uiManager.isMenuOpen()) return;
-
-        if (action == GLFW_PRESS) {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                // Get current held item
-                ItemType heldItem = uiManager.getSelectedItem();
-                bool isHoldingTool = heldItem != ItemType::NONE;
-                bool isSword = isHoldingTool && ItemRegistry::getCategory(heldItem) == ToolCategory::SWORD;
-                
-                // Trigger swing animation for first person view
-                heldItemRenderer.triggerSwing();
-                
-                // Trigger attack animation for third person view
-                if (playerEntity) {
-                    playerEntity->playAttackAnimation();
-                }
-                
-                // Send attack animation to network for multiplayer
-                if (networkManager.isOnline()) {
-                    networkManager.sendPlayerAnimation(Network::PlayerAnimationPacket::ANIM_ATTACK);
-                }
-                
-                // First, try to attack an entity
-                bool attackedEntity = false;
-                if (attackCooldown <= 0.0f) {
-                    glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
-                    float attackRange = 4.0f; // Reach distance for attacks
-                    
-                    // Find closest entity in attack range
-                    Entity* targetEntity = nullptr;
-                    float closestDist = attackRange;
-                    
-                    std::vector<Entity*> entities;
-                    if (useNewEntityManager) {
-                        entities = entityManager.getAllEntities();
-                    } else {
-                        for(auto& m : zombies) if(m) entities.push_back(m.get());
-                        for(auto& m : skeletons) if(m && !m->isDead()) entities.push_back(m.get());
-                        for(auto& m : pigs) if(m && !m->isDead()) entities.push_back(m.get());
-                        for(auto& m : chickens) if(m && !m->isDead()) entities.push_back(m.get());
-                        for(auto& m : sheep) if(m && !m->isDead()) entities.push_back(m.get());
-                    }
-                    
-                    // Also check remote players
-                    auto remotePlayers = networkManager.getRemotePlayerEntities();
-                    for (auto* rp : remotePlayers) {
-                        entities.push_back(rp);
-                    }
-                    
-                    for (Entity* e : entities) {
-                        if (e->isDead()) continue;
-                        
-                        // Check if entity is in front of player and within range
-                        glm::vec3 toEntity = e->getPosition() + glm::vec3(0.0f, 0.9f, 0.0f) - eyePos; // Aim at chest
-                        float dist = glm::length(toEntity);
-                        
-                        if (dist < closestDist) {
-                            // Check if entity is roughly in front (within ~60 degree cone)
-                            float dot = glm::dot(glm::normalize(toEntity), camera.getFront());
-                            if (dot > 0.5f) {
-                                // Additional AABB check for more accuracy
-                                glm::vec3 entityMin = e->getPosition() - glm::vec3(0.3f, 0.0f, 0.3f);
-                                glm::vec3 entityMax = e->getPosition() + glm::vec3(0.3f, 1.8f, 0.3f);
-                                
-                                // Ray-box intersection
-                                glm::vec3 rayDir = camera.getFront();
-                                float tMin = 0.0f, tMax = attackRange;
-                                
-                                for (int i = 0; i < 3; ++i) {
-                                    if (std::abs(rayDir[i]) < 0.0001f) {
-                                        if (eyePos[i] < entityMin[i] || eyePos[i] > entityMax[i]) {
-                                            tMin = attackRange + 1.0f; // Miss
-                                        }
-                                    } else {
-                                        float t1 = (entityMin[i] - eyePos[i]) / rayDir[i];
-                                        float t2 = (entityMax[i] - eyePos[i]) / rayDir[i];
-                                        if (t1 > t2) std::swap(t1, t2);
-                                        tMin = std::max(tMin, t1);
-                                        tMax = std::min(tMax, t2);
-                                    }
-                                }
-                                
-                                if (tMin <= tMax && tMin < closestDist) {
-                                    closestDist = tMin;
-                                    targetEntity = e;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Attack the target entity if found
-                    if (targetEntity) {
-                        attackedEntity = true;
-                        
-                        // Calculate damage
-                        float damage = ItemRegistry::instance().getAttackDamage(heldItem);
-                        float knockback = ItemRegistry::instance().getKnockback(heldItem);
-                        
-                        // Apply damage
-                        glm::vec3 knockbackDir = glm::normalize(targetEntity->getPosition() - camera.getPosition());
-                        knockbackDir.y = 0.0f;
-                        if (glm::length(knockbackDir) > 0.001f) {
-                            knockbackDir = glm::normalize(knockbackDir);
-                        }
-                        
-                        glm::vec3 knockbackVec = knockbackDir * knockback * 10.0f;
-                        
-                        // Check if target is a remote player - send damage over network
-                        Network::RemotePlayerEntity* remotePlayer = dynamic_cast<Network::RemotePlayerEntity*>(targetEntity);
-                        if (remotePlayer && networkManager.isOnline()) {
-                            // Send damage over network
-                            networkManager.sendPlayerDamage(remotePlayer->getPlayerId(), damage, knockbackVec);
-                            LOG_INFO("Sent damage to remote player " + std::to_string(remotePlayer->getPlayerId()) + " for " + std::to_string(damage) + " damage");
-                        } else {
-                            // Local entity (mob) - apply damage directly
-                            targetEntity->takeDamage(damage, knockbackVec);
-                        }
-                        
-                        // Play hit sound
-                        Audio::AudioManager::instance().playSoundAt(Audio::SoundType::PLAYER_HURT, targetEntity->getPosition());
-                        
-                        // Set attack cooldown based on weapon
-                        const auto& props = ItemRegistry::instance().getProperties(heldItem);
-                        attackCooldown = 1.0f / props.attackSpeed;
-                        
-                        LOG_INFO("Attacked entity for " + std::to_string(damage) + " damage");
-                    }
-                }
-                
-                // If we didn't attack an entity, try to break a block
-                if (!attackedEntity) {
-                    // In creative mode, instant break
-                    // In survival mode, need to hold to break (handled in update)
-                    if (uiManager.isCreativeMode) {
-                        // Instant break in creative
-                        glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
-                        auto result = chunkManager.rayCast(eyePos, camera.getFront(), 5.0f);
-                        if (result.hit) {
-                            glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
-                            int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x;
-                            int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y;
-                            int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z;
-                            
-                            // Get block type before breaking for sound
-                            Block block = chunkManager.getBlockAt(x, y, z);
-                            uint8_t blockTypeVal = static_cast<uint8_t>(block.getType());
-                            
-                            // Play dig sound at block position
-                            Audio::SoundType digSound = Audio::getDigSoundForBlock(blockTypeVal);
-                            Audio::AudioManager::instance().playSoundAt(digSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f));
-                            
-                            chunkManager.setBlockAt(x, y, z, Block(BlockType::AIR));
-                            
-                            // Broadcast block change to network
-                            if (networkManager.isOnline()) {
-                                networkManager.sendBlockChange(x, y, z, static_cast<uint8_t>(BlockType::AIR));
-                            }
-                        }
-                    } else {
-                        // Start breaking in survival mode - actual breaking happens in update()
-                        isBreakingBlock = true;
-                    }
-                }
-            } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-                // Check if holding an item that can't place blocks
-                if (uiManager.isSelectedSlotItem()) {
-                    // Holding a tool/item - can't place blocks with right click
-                    // Could add "use" functionality here for certain items
-                    return;
-                }
-                
-                // Place block
-                glm::vec3 eyePos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
-                auto result = chunkManager.rayCast(eyePos, camera.getFront(), 5.0f);
-                if (result.hit) {
-                    glm::vec3 chunkOrigin = ChunkManager::chunkToWorld(result.chunkPos);
-                    int x = static_cast<int>(chunkOrigin.x) + result.blockPos.x + result.normal.x;
-                    int y = static_cast<int>(chunkOrigin.y) + result.blockPos.y + result.normal.y;
-                    int z = static_cast<int>(chunkOrigin.z) + result.blockPos.z + result.normal.z;
-                    
-                    // Check intersection with any entity or player to prevent getting stuck
-                    bool entityCollision = false;
-                    
-                    // Block AABB
-                    float bx1 = static_cast<float>(x);
-                    float by1 = static_cast<float>(y);
-                    float bz1 = static_cast<float>(z);
-                    float bx2 = bx1 + 1.0f;
-                    float by2 = by1 + 1.0f;
-                    float bz2 = bz1 + 1.0f;
-
-                    // Function to check AABB overlap
-                    auto checkOverlap = [&](const glm::vec3& pos, float width, float height) -> bool {
-                        float ex1 = pos.x - width/2.0f;
-                        float ey1 = pos.y;
-                        float ez1 = pos.z - width/2.0f;
-                        float ex2 = pos.x + width/2.0f;
-                        float ey2 = pos.y + height;
-                        float ez2 = pos.z + width/2.0f;
-                        
-                        return (bx1 < ex2 && bx2 > ex1) &&
-                               (by1 < ey2 && by2 > ey1) &&
-                               (bz1 < ez2 && bz2 > ez1);
-                    };
-
-                    // Check Player
-                    if (checkOverlap(camera.getPosition(), 0.6f, 1.8f)) {
-                        entityCollision = true;
-                    }
-
-                    // Check Mobs
-                    if (!entityCollision) {
-                         // Collect entities to check
-                         std::vector<Entity*> entities;
-                         if (useNewEntityManager) {
-                             auto managed = entityManager.getAllEntities();
-                             entities.insert(entities.end(), managed.begin(), managed.end());
-                         } else {
-                             for(auto& m : zombies) if(m) entities.push_back(m.get());
-                             for(auto& m : skeletons) if(m && !m->isDead()) entities.push_back(m.get());
-                             for(auto& m : pigs) if(m && !m->isDead()) entities.push_back(m.get());
-                             for(auto& m : chickens) if(m && !m->isDead()) entities.push_back(m.get());
-                             for(auto& m : sheep) if(m && !m->isDead()) entities.push_back(m.get());
-                         }
-                         
-                         for (Entity* e : entities) {
-                             // Assuming standard human/animal size for now (0.6w, 1.8h or smaller)
-                             if (checkOverlap(e->getPosition(), 0.6f, 1.5f)) {
-                                 entityCollision = true;
-                                 break;
-                             }
-                         }
-                    }
-
-                    if (!entityCollision) { 
-                        BlockType blockType = uiManager.getSelectedBlock();
-                        chunkManager.setBlockAt(x, y, z, Block(blockType));
-                        
-                        // Play place sound at block position
-                        Audio::SoundType placeSound = Audio::getPlaceSoundForBlock(static_cast<uint8_t>(blockType));
-                        Audio::AudioManager::instance().playSoundAt(placeSound, glm::vec3(x + 0.5f, y + 0.5f, z + 0.5f));
-                        
-                        // Broadcast block change to network
-                        if (networkManager.isOnline()) {
-                            networkManager.sendBlockChange(x, y, z, static_cast<uint8_t>(blockType));
-                        }
-                    }
-                }
-            }
-        } else if (action == GLFW_RELEASE) {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                // Stop breaking block
-                isBreakingBlock = false;
-                blockBreakProgress = 0.0f;
-            }
-        }
-    }
-
-    void processInput(float deltaTime) {
-        // Mouse input
-        double xpos, ypos;
-        glfwGetCursorPos(window->getNative(), &xpos, &ypos);
-        
-        // Handle DPI scaling for UI only
-        int winW, winH;
-        glfwGetWindowSize(window->getNative(), &winW, &winH);
-        int fbW, fbH;
-        glfwGetFramebufferSize(window->getNative(), &fbW, &fbH);
-        
-        double uiX = xpos;
-        double uiY = ypos;
-        
-        if (winW > 0 && winH > 0) {
-            uiX *= (double)fbW / winW;
-            uiY *= (double)fbH / winH;
-        }
-
-        bool mousePressed = glfwGetMouseButton(window->getNative(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-        bool rightMousePressed = glfwGetMouseButton(window->getNative(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-        
-        if (uiManager.isMenuOpen()) {
-            uiManager.update(deltaTime, uiX, uiY, mousePressed, rightMousePressed);
-            firstMouse = true; // Reset mouse look when returning to game
-            return;
-        }
-
-        const auto& keys = Settings::instance().keys;
-        bool forward = window->isKeyPressed(keys.forward);
-        bool backward = window->isKeyPressed(keys.backward);
-        bool left = window->isKeyPressed(keys.left);
-        bool right = window->isKeyPressed(keys.right);
-        bool up = window->isKeyPressed(keys.jump);
-        
-        bool sprint = window->isKeyPressed(keys.sprint);
-        bool sneak = window->isKeyPressed(keys.sneak);
-        bool down = sneak; // Use sneak key for flying down
-
-        // Track onGround state before processing input for jump detection
-        bool wasOnGroundBefore = camera.onGround;
-        
-        camera.processInput(forward, backward, left, right, up, down, sprint, sneak, deltaTime);
-        
-        // Detect jump: was on ground, pressed jump, now not on ground (and not flying)
-        if (wasOnGroundBefore && up && !camera.onGround && !camera.isFlying && uiManager.isWorldLoaded() && !isUnderwater) {
-            // Play footstep sound as jump sound (Minecraft behavior)
-            glm::vec3 playerPos = camera.getPosition();
-            int blockX = static_cast<int>(std::floor(playerPos.x));
-            int blockY = static_cast<int>(std::floor(playerPos.y - 0.1f));
-            int blockZ = static_cast<int>(std::floor(playerPos.z));
-            Block blockBelow = chunkManager.getBlockAt(blockX, blockY, blockZ);
-            Audio::SoundType stepSound = Audio::getStepSoundForBlock(static_cast<uint8_t>(blockBelow.getType()));
-            Audio::AudioManager::instance().playSound(stepSound, 0.6f);
-        }
-        
-        if (firstMouse) {
-            lastX = xpos;
-            lastY = ypos;
-            firstMouse = false;
-        }
-        
-        // Use raw coordinates for camera movement to avoid DPI scaling artifacts
-        float xoffset = static_cast<float>(xpos - lastX);
-        float yoffset = static_cast<float>(lastY - ypos); // Reversed
-        
-        lastX = xpos;
-        lastY = ypos;
-        
-        // Ignore micro-movements (jitter) from high-DPI mice or sensor noise
-        if (std::abs(xoffset) < 0.1f) xoffset = 0.0f;
-        if (std::abs(yoffset) < 0.1f) yoffset = 0.0f;
-
-        camera.processMouseMovement(xoffset, yoffset);
-    }
     
     void update(float deltaTime) {
         // Always update network (even in menu for connection handling)

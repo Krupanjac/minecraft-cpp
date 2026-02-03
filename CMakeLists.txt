@@ -112,6 +112,7 @@ set(SOURCES
     src/Game/PlayerHealthSystem.cpp
     src/Game/MenuWorldSystem.cpp
     src/Game/WorldLifecycleSystem.cpp
+    src/Game/InputSystem.cpp
     src/Mesh/MeshBuilder.cpp
     src/Mesh/Mesh.cpp
     src/Render/Shader.cpp
