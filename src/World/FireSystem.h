@@ -29,6 +29,9 @@ private:
         float duration = 4.0f;
         float spreadTimer = 0.0f;
         float vfxTimer = 0.0f;
+        bool vfxSpawned = false;
+        float vfxActiveTime = 0.0f;
+        float vfxDuration = 0.0f;
         bool consumes = true;
         bool canSpread = true;
     };
@@ -48,10 +51,10 @@ private:
 
     float spreadChance = 0.22f;
     float spreadInterval = 0.8f;
-    float fireVfxInterval = 0.6f;      // Increased from 0.35f - less frequent VFX spawns
+    float fireVfxInterval = 0.6f;      // Used only to delay initial spawn
     int maxVfxPerUpdate = 8;           // Reduced from 12 - fewer VFX per frame
     int maxSpreadsPerUpdate = 16;      // Reduced from 24 - slower spread
-    int maxActiveFireVfx = 40;         // NEW: Cap total active fire VFX
+    int maxActiveFireVfx = 80;         // Cap total active fire VFX (higher for multi-sided fire)
 
     bool isFlammableBlock(const Block& block) const;
     void removeAtIndex(size_t i);

@@ -15,23 +15,18 @@ bool FireSystem::isBurning(const glm::ivec3& pos) const {
 }
 
 bool FireSystem::isFlammableBlock(const Block& block) const {
-    // Organic materials that can burn
-    if (block.isLeaves() || block.isLog() || block.isPlanks()) return true;
-    
-    // Grass block (the grass-topped dirt), plants and flowers
-    BlockType t = block.getType();
-    return t == BlockType::GRASS ||
-           t == BlockType::TALL_GRASS ||
-           t == BlockType::ROSE ||
-           t == BlockType::COBWEB ||       // Spider webs burn fast
-           t == BlockType::BOOKSHELF;      // Paper burns
+    return block.isFlammable();
 }
 
 void FireSystem::igniteBlock(const glm::ivec3& pos, float durationSeconds, bool consumes, bool canSpread) {
     auto it = index.find(pos);
     if (it != index.end()) {
         auto& existing = burning[it->second];
-        existing.duration = std::max(existing.duration, durationSeconds);
+        float newDuration = std::max(existing.duration, durationSeconds);
+        if (newDuration > existing.duration + 0.1f) {
+            existing.vfxSpawned = false; // refresh VFX if fire duration extended
+        }
+        existing.duration = newDuration;
         existing.consumes = existing.consumes || consumes;
         existing.canSpread = existing.canSpread || canSpread;
         return;
@@ -42,6 +37,7 @@ void FireSystem::igniteBlock(const glm::ivec3& pos, float durationSeconds, bool 
     b.duration = std::max(1.0f, durationSeconds);
     b.consumes = consumes;
     b.canSpread = canSpread;
+    b.vfxSpawned = false;
     burning.push_back(b);
     index[pos] = burning.size() - 1;
 }
@@ -75,14 +71,42 @@ void FireSystem::update(float deltaTime, ChunkManager& chunkManager, ExplosionVo
         b.age += deltaTime;
         b.spreadTimer += deltaTime;
         b.vfxTimer += deltaTime;
+        b.vfxActiveTime += deltaTime;
 
         // Only spawn VFX if under global cap and per-frame budget
-        if (vfx && canSpawnVfx && b.vfxTimer >= fireVfxInterval && vfxSpawned < maxVfxPerUpdate) {
-            glm::vec3 center = glm::vec3(b.pos) + glm::vec3(0.5f, 0.25f, 0.5f);
-            // Smaller fire VFX (0.7 radius instead of 0.9) for better performance
-            vfx->spawnFire(center, 0.7f, 1.0f);
+        bool needsVfx = !b.vfxSpawned;
+        if (b.vfxSpawned && b.vfxDuration > 0.0f) {
+            float refreshAt = b.vfxDuration * 0.85f;
+            if (b.vfxActiveTime >= refreshAt) {
+                needsVfx = true;
+            }
+        }
+
+        if (vfx && canSpawnVfx && needsVfx && b.vfxTimer >= fireVfxInterval && vfxSpawned < maxVfxPerUpdate) {
+            float remaining = std::max(1.2f, b.duration - b.age);
+            float vfxDuration = std::max(2.4f, remaining);
+
+            // Multi-sided fire VFX around the block (top + 4 sides)
+            glm::vec3 base = glm::vec3(b.pos);
+            const glm::vec3 offsets[] = {
+                {0.5f, 0.85f, 0.5f},  // top
+                {0.1f, 0.45f, 0.5f},  // west
+                {0.9f, 0.45f, 0.5f},  // east
+                {0.5f, 0.45f, 0.1f},  // north
+                {0.5f, 0.45f, 0.9f}   // south
+            };
+
+            const float radii[] = {0.9f, 0.75f, 0.75f, 0.75f, 0.75f};
+
+            for (int si = 0; si < 5 && vfxSpawned < maxVfxPerUpdate; ++si) {
+                vfx->spawnFire(base + offsets[si], radii[si], vfxDuration);
+                vfxSpawned++;
+            }
+
             b.vfxTimer = 0.0f;
-            vfxSpawned++;
+            b.vfxSpawned = true;
+            b.vfxActiveTime = 0.0f;
+            b.vfxDuration = vfxDuration;
         }
 
         if (b.canSpread && b.spreadTimer >= spreadInterval && spreadsThisFrame < maxSpreadsPerUpdate) {
@@ -97,7 +121,9 @@ void FireSystem::update(float deltaTime, ChunkManager& chunkManager, ExplosionVo
                 if (isBurning(npos)) continue;
 
                 Block neighbor = chunkManager.getBlockAt(npos.x, npos.y, npos.z);
-                if (isFlammableBlock(neighbor) && chanceDist(rng) < spreadChance) {
+                bool canBurn = isFlammableBlock(neighbor);
+                bool canSpreadTo = canBurn && (neighbor.getType() != BlockType::GRASS);
+                if (canSpreadTo && chanceDist(rng) < spreadChance) {
                     igniteBlock(npos, b.duration, true, true);
                     spreadsThisFrame++;
                     if (spreadsThisFrame >= maxSpreadsPerUpdate) break;
@@ -108,7 +134,11 @@ void FireSystem::update(float deltaTime, ChunkManager& chunkManager, ExplosionVo
         if (b.age >= b.duration) {
             Block block = chunkManager.getBlockAt(b.pos.x, b.pos.y, b.pos.z);
             if (b.consumes && isFlammableBlock(block)) {
-                chunkManager.setBlockAt(b.pos.x, b.pos.y, b.pos.z, Block(BlockType::AIR));
+                if (block.getType() == BlockType::GRASS) {
+                    chunkManager.setBlockAt(b.pos.x, b.pos.y, b.pos.z, Block(BlockType::DIRT));
+                } else {
+                    chunkManager.setBlockAt(b.pos.x, b.pos.y, b.pos.z, Block(BlockType::AIR));
+                }
             }
             removeAtIndex(i);
             continue;

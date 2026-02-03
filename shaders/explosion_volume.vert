@@ -26,8 +26,9 @@ void main() {
 
     // Scale around explosion center and add subtle noise wobble
     vec3 centered = aPos;
-    // Stretch upward to avoid perfect sphere
-    vec3 stretched = centered * vec3(1.0, 1.25, 1.0);
+    // Stretch upward to avoid perfect sphere (taller for block fire)
+    float fireStretch = (uVolumeType == 2) ? 1.7 : 1.25;
+    vec3 stretched = centered * vec3(1.0, fireStretch, 1.0);
     vec3 scaled = stretched * uScale;
 
     // Turbulence to break spherical shape
@@ -35,6 +36,12 @@ void main() {
     float n2 = sin((centered.x - uNoisePhase) * 3.1) * sin((centered.y + uNoisePhase) * 2.4) * sin((centered.z - uNoisePhase) * 3.3);
     float n = (n1 * 0.6 + n2 * 0.4);
     vec3 displaced = scaled + vNormal * n * 0.22 + vec3(0.0, n * 0.18, 0.0);
+
+    if (uVolumeType == 2) {
+        // Extra upward lick for block fire tongues
+        float lick = (n * 0.22 + 0.18) * (0.6 + t * 0.4) * uRadius;
+        displaced.y += lick;
+    }
 
     // Buoyant rise + lateral drift for smoke
     float smokeFactor = (uVolumeType == 1) ? 1.0 : 0.0;

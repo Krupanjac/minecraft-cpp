@@ -665,6 +665,84 @@ public:
             explosionVolumes.spawnFire(entity->getPosition() + glm::vec3(0.0f, 0.6f, 0.0f), 1.0f, 0.9f);
         }
     }
+
+    bool isPositionInFire(const glm::vec3& pos) const {
+        glm::ivec3 blockPos(
+            static_cast<int>(std::floor(pos.x)),
+            static_cast<int>(std::floor(pos.y)),
+            static_cast<int>(std::floor(pos.z))
+        );
+
+        if (fireSystem.isBurning(blockPos)) return true;
+        if (fireSystem.isBurning(blockPos + glm::ivec3(0, 1, 0))) return true;
+        if (fireSystem.isBurning(blockPos + glm::ivec3(0, -1, 0))) return true;
+
+        return false;
+    }
+
+    void applyFireBurn(Entity* entity, float deltaTime) {
+        if (!entity || entity->isDead()) {
+            fireBurnStates.erase(entity);
+            return;
+        }
+
+        glm::vec3 pos = entity->getPosition();
+        bool inFire = isPositionInFire(pos + glm::vec3(0.0f, 0.2f, 0.0f)) ||
+                      isPositionInFire(pos + glm::vec3(0.0f, 0.9f, 0.0f));
+
+        if (!inFire) {
+            fireBurnStates.erase(entity);
+            return;
+        }
+
+        auto& state = fireBurnStates[entity];
+        state.damageTimer += deltaTime;
+        state.vfxTimer += deltaTime;
+
+        if (state.damageTimer >= 0.6f) {
+            state.damageTimer = 0.0f;
+            entity->takeDamage(1.0f);
+        }
+
+        if (state.vfxTimer >= 0.4f) {
+            state.vfxTimer = 0.0f;
+            explosionVolumes.spawnFire(pos + glm::vec3(0.0f, 0.6f, 0.0f), 1.0f, 0.9f);
+        }
+    }
+
+    void applyPlayerFireBurn(float deltaTime) {
+        if (playerHealth <= 0.0f) {
+            playerFireState = BurnState{};
+            return;
+        }
+
+        if (isUnderwater) {
+            playerFireState = BurnState{};
+            return;
+        }
+
+        glm::vec3 pos = camera.getPosition();
+        bool inFire = isPositionInFire(pos + glm::vec3(0.0f, 0.2f, 0.0f)) ||
+                      isPositionInFire(pos + glm::vec3(0.0f, 1.0f, 0.0f));
+
+        if (!inFire) {
+            playerFireState = BurnState{};
+            return;
+        }
+
+        playerFireState.damageTimer += deltaTime;
+        playerFireState.vfxTimer += deltaTime;
+
+        if (playerFireState.damageTimer >= 0.6f) {
+            playerFireState.damageTimer = 0.0f;
+            playerTakeDamage(1.0f, glm::vec3(0.0f));
+        }
+
+        if (playerFireState.vfxTimer >= 0.4f) {
+            playerFireState.vfxTimer = 0.0f;
+            explosionVolumes.spawnFire(pos + glm::vec3(0.0f, 0.6f, 0.0f), 1.0f, 0.9f);
+        }
+    }
     
     void joinMultiplayerGame(const std::string& playerName, const std::string& address, uint16_t port) {
         uiManager.setNetworkStatus("Connecting...");
@@ -1087,8 +1165,18 @@ public:
 
         auto fireStart = [this](const glm::ivec3& pos) {
             Block block = chunkManager.getBlockAt(pos.x, pos.y, pos.z);
-            if (block.isLeaves() || block.isLog() || block.isPlanks()) {
+            if (block.isFlammable()) {
                 fireSystem.igniteBlock(pos, 4.0f, true, true);
+
+                // If we hit tall grass/flower sitting on a grass block, burn the grass block too
+                BlockType t = block.getType();
+                if (t == BlockType::TALL_GRASS || t == BlockType::ROSE) {
+                    glm::ivec3 belowPos = pos + glm::ivec3(0, -1, 0);
+                    Block below = chunkManager.getBlockAt(belowPos.x, belowPos.y, belowPos.z);
+                    if (below.getType() == BlockType::GRASS) {
+                        fireSystem.igniteBlock(belowPos, 4.0f, true, true);
+                    }
+                }
             } else {
                 glm::ivec3 topPos = pos + glm::ivec3(0, 1, 0);
                 Block above = chunkManager.getBlockAt(topPos.x, topPos.y, topPos.z);
@@ -1170,8 +1258,18 @@ public:
 
             auto fireStart = [this](const glm::ivec3& pos) {
                 Block block = chunkManager.getBlockAt(pos.x, pos.y, pos.z);
-                if (block.isLeaves() || block.isLog() || block.isPlanks()) {
+                if (block.isFlammable()) {
                     fireSystem.igniteBlock(pos, 4.0f, true, true);
+
+                    // If we hit tall grass/flower sitting on a grass block, burn the grass block too
+                    BlockType t = block.getType();
+                    if (t == BlockType::TALL_GRASS || t == BlockType::ROSE) {
+                        glm::ivec3 belowPos = pos + glm::ivec3(0, -1, 0);
+                        Block below = chunkManager.getBlockAt(belowPos.x, belowPos.y, belowPos.z);
+                        if (below.getType() == BlockType::GRASS) {
+                            fireSystem.igniteBlock(belowPos, 4.0f, true, true);
+                        }
+                    }
                 } else {
                     glm::ivec3 topPos = pos + glm::ivec3(0, 1, 0);
                     Block above = chunkManager.getBlockAt(topPos.x, topPos.y, topPos.z);
@@ -1389,6 +1487,8 @@ private:
         float vfxTimer = 0.0f;
     };
     std::unordered_map<const Entity*, BurnState> mobBurnStates;
+    std::unordered_map<const Entity*, BurnState> fireBurnStates;
+    BurnState playerFireState;
     
     // Menu background world
     bool menuWorldInitialized = false;
@@ -2221,8 +2321,8 @@ private:
                         camera.velocity += attack.knockback;
                     }
 
+                    auto entities = entityManager.getAllEntities();
                     if (isDayTime(normalizedTime)) {
-                        auto entities = entityManager.getAllEntities();
                         for (auto* entity : entities) {
                             if (dynamic_cast<ZombieEntity*>(entity) || dynamic_cast<SkeletonEntity*>(entity)) {
                                 applyDaylightBurn(entity, deltaTime);
@@ -2230,6 +2330,10 @@ private:
                         }
                     } else {
                         mobBurnStates.clear();
+                    }
+
+                    for (auto* entity : entities) {
+                        applyFireBurn(entity, deltaTime);
                     }
                     
                     // If hosting, broadcast entity events to clients
@@ -2321,10 +2425,20 @@ private:
                         for (auto& s : sheep) {
                             if (s) s->updateAI(deltaTime, chunkManager);
                         }
+
+                        for (auto& z : zombies) { if (z) applyFireBurn(z.get(), deltaTime); }
+                        for (auto& s : skeletons) { if (s) applyFireBurn(s.get(), deltaTime); }
+                        for (auto& p : pigs) { if (p) applyFireBurn(p.get(), deltaTime); }
+                        for (auto& c : chickens) { if (c) applyFireBurn(c.get(), deltaTime); }
+                        for (auto& s : sheep) { if (s) applyFireBurn(s.get(), deltaTime); }
                     }
                 }
             }
         } // End of mob update code
+
+        if (!skipPlayerControls) {
+            applyPlayerFireBurn(deltaTime);
+        }
         
         // Generate chunks - always run if world is loaded
         if (continueWorldUpdates) {
