@@ -2550,6 +2550,7 @@ private:
         if (inMainMenu) {
             // Render menu background world
             std::vector<Entity*> emptyEntities;
+            renderer.setFireLightPositions({});
             renderer.render(chunkManager, menuCamera, emptyEntities, window->getWidth(), window->getHeight(), {}, nullptr);
             renderer.cleanUnusedMeshes(chunkManager);
             uiManager.render();
@@ -2632,8 +2633,12 @@ private:
             debrisData = physicsTest.getDebrisRenderData();
         }
 #endif
-        
-        renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight(), debrisData, &explosionVolumes);
+
+    std::vector<glm::vec3> fireLights;
+    fireSystem.getFireLightPositions(fireLights, 16);
+    renderer.setFireLightPositions(fireLights);
+
+    renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight(), debrisData, &explosionVolumes);
         // Clean up any GPU meshes for chunks that have been unloaded by ChunkManager
         renderer.cleanUnusedMeshes(chunkManager);
         

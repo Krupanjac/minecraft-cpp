@@ -315,36 +315,16 @@ void ExplosionSystem::spreadFire(const glm::vec3& center,
                                   const std::vector<glm::ivec3>& affectedBlocks,
                                   ExplosionResult& result) {
     std::uniform_real_distribution<float> fireChance(0.0f, 1.0f);
+    if (!fireStart) return;
     
     for (const auto& pos : affectedBlocks) {
         Block block = blockQuery(pos.x, pos.y, pos.z);
-        
-        // Only spread fire on air blocks adjacent to flammable blocks
-        if (block.type != BlockType::AIR) continue;
-        
-        // Check for flammable neighbors
-        bool hasFlammableNeighbor = false;
-        const glm::ivec3 offsets[] = {
-            {1,0,0}, {-1,0,0}, {0,1,0}, {0,-1,0}, {0,0,1}, {0,0,-1}
-        };
-        
-        for (const auto& offset : offsets) {
-            glm::ivec3 neighbor = pos + offset;
-            Block neighborBlock = blockQuery(neighbor.x, neighbor.y, neighbor.z);
-            
-            if (isBlockFlammable(neighborBlock.type)) {
-                hasFlammableNeighbor = true;
-                break;
-            }
+
+        // Ignite flammable blocks directly hit by the blast
+        if (block.isFlammable() && fireChance(rng) < config.fireSpreadChance) {
+            fireStart(pos);
+            result.fireBlocks.push_back(pos);
         }
-        
-        // Fire spreading disabled - no FIRE block type in current engine
-        // if (hasFlammableNeighbor && fireChance(rng) < config.fireSpreadChance) {
-        //     blockSet(pos.x, pos.y, pos.z, Block(BlockType::FIRE));
-        //     result.fireBlocks.push_back(pos);
-        // }
-        (void)hasFlammableNeighbor;
-        (void)fireChance;
     }
 }
 
@@ -384,6 +364,7 @@ void ExplosionSystem::triggerChainReactions(const glm::vec3& center, float radiu
                     tntParams.center = glm::vec3(pos) + 0.5f;
                     tntParams.power = physics.explosionPower;
                     tntParams.chainReaction = true;
+                    tntParams.createFire = true;
                     
                     float delay = delayDist(rng);
                     queueExplosion(tntParams, delay);

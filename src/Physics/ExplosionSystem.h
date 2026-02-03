@@ -85,6 +85,7 @@ public:
     using SoundPlayFunc = std::function<void(const glm::vec3& pos, const std::string& sound, float volume)>;
     using ScreenShakeFunc = std::function<void(const glm::vec3& explosionPos, float power)>;
     using ExplosionVfxFunc = std::function<void(const glm::vec3& explosionPos, float power)>;
+    using FireStartFunc = std::function<void(const glm::ivec3& pos)>;
 
     ExplosionSystem();
     ~ExplosionSystem() = default;
@@ -97,6 +98,7 @@ public:
     void setSoundPlay(SoundPlayFunc func) { soundPlay = func; }
     void setScreenShake(ScreenShakeFunc func) { screenShake = func; }
     void setExplosionVfx(ExplosionVfxFunc func) { explosionVfx = func; }
+    void setFireStart(FireStartFunc func) { fireStart = func; }
     
     // Create an explosion
     ExplosionResult explode(const ExplosionParams& params);
@@ -144,6 +146,7 @@ private:
     SoundPlayFunc soundPlay;
     ScreenShakeFunc screenShake;
     ExplosionVfxFunc explosionVfx;
+    FireStartFunc fireStart;
     
     // Configuration
     Config config;

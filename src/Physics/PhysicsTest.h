@@ -159,6 +159,13 @@ public:
             }
         });
 
+        // Set up fire-start callback for explosions
+        explosionSystem->setFireStart([this](const glm::ivec3& pos) {
+            if (fireStart) {
+                fireStart(pos);
+            }
+        });
+
         // Set up entity damage callback
         explosionSystem->setEntityDamage([this](const glm::vec3& pos, float radius, float damage, const glm::vec3& center) {
             if (radius <= 0.01f) return;
@@ -304,6 +311,7 @@ public:
         params.center = explosionPos;
         params.power = power;
         params.breakBlocks = true;
+        params.createFire = true;
         params.createDebris = true;
         params.chainReaction = true;
         

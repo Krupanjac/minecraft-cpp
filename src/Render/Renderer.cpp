@@ -493,6 +493,13 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
     blockShader.setVec3("uLightDir", lightDirection);
     blockShader.setFloat("uAOStrength", Settings::instance().aoStrength);
     blockShader.setFloat("uGamma", Settings::instance().gamma);
+
+    int fireLightCount = std::min(static_cast<int>(fireLightPositions.size()), MAX_FIRE_LIGHTS);
+    blockShader.setInt("uFireLightCount", fireLightCount);
+    if (fireLightCount > 0) {
+        glUniform3fv(glGetUniformLocation(blockShader.getProgram(), "uFireLightPos"),
+                     fireLightCount, &fireLightPositions[0].x);
+    }
     
     const int blockTypeCount = static_cast<int>(BlockType::BLOCK_TYPE_COUNT);
 

@@ -14,6 +14,18 @@ bool FireSystem::isBurning(const glm::ivec3& pos) const {
     return index.find(pos) != index.end();
 }
 
+void FireSystem::getFireLightPositions(std::vector<glm::vec3>& outPositions, size_t maxCount) const {
+    outPositions.clear();
+    if (burning.empty() || maxCount == 0) return;
+
+    size_t count = std::min(maxCount, burning.size());
+    outPositions.reserve(count);
+    for (size_t i = 0; i < burning.size() && outPositions.size() < count; ++i) {
+        const auto& b = burning[i];
+        outPositions.push_back(glm::vec3(b.pos) + glm::vec3(0.5f, 0.8f, 0.5f));
+    }
+}
+
 bool FireSystem::isFlammableBlock(const Block& block) const {
     return block.isFlammable();
 }
@@ -82,7 +94,9 @@ void FireSystem::update(float deltaTime, ChunkManager& chunkManager, ExplosionVo
             }
         }
 
-        if (vfx && canSpawnVfx && needsVfx && b.vfxTimer >= fireVfxInterval && vfxSpawned < maxVfxPerUpdate) {
+        const int vfxPerBlock = 5;
+        if (vfx && canSpawnVfx && needsVfx && b.vfxTimer >= fireVfxInterval &&
+            (vfxSpawned + vfxPerBlock) <= maxVfxPerUpdate) {
             float remaining = std::max(1.2f, b.duration - b.age);
             float vfxDuration = std::max(2.4f, remaining);
 
@@ -98,7 +112,7 @@ void FireSystem::update(float deltaTime, ChunkManager& chunkManager, ExplosionVo
 
             const float radii[] = {0.9f, 0.75f, 0.75f, 0.75f, 0.75f};
 
-            for (int si = 0; si < 5 && vfxSpawned < maxVfxPerUpdate; ++si) {
+            for (int si = 0; si < 5; ++si) {
                 vfx->spawnFire(base + offsets[si], radii[si], vfxDuration);
                 vfxSpawned++;
             }

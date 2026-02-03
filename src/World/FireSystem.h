@@ -17,6 +17,7 @@ public:
                      bool consumes = true, bool canSpread = true);
     void update(float deltaTime, ChunkManager& chunkManager, ExplosionVolumeSystem* vfx);
     bool isBurning(const glm::ivec3& pos) const;
+    void getFireLightPositions(std::vector<glm::vec3>& outPositions, size_t maxCount) const;
 
     void setSpreadChance(float chance) { spreadChance = chance; }
     void setSpreadInterval(float interval) { spreadInterval = interval; }
@@ -52,9 +53,9 @@ private:
     float spreadChance = 0.22f;
     float spreadInterval = 0.8f;
     float fireVfxInterval = 0.6f;      // Used only to delay initial spawn
-    int maxVfxPerUpdate = 8;           // Reduced from 12 - fewer VFX per frame
+    int maxVfxPerUpdate = 32;          // Allow multi-sided fire spawns per frame
     int maxSpreadsPerUpdate = 16;      // Reduced from 24 - slower spread
-    int maxActiveFireVfx = 80;         // Cap total active fire VFX (higher for multi-sided fire)
+    int maxActiveFireVfx = 160;        // Cap total active fire VFX (higher for multi-sided fire)
 
     bool isFlammableBlock(const Block& block) const;
     void removeAtIndex(size_t i);

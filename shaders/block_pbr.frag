@@ -44,6 +44,8 @@ uniform int uUseShadows;
 uniform int uShadowMethod;
 uniform int uUseRTShadows;
 uniform float uAOStrength;
+uniform int uFireLightCount;
+uniform vec3 uFireLightPos[16];
 
 // Debug uniforms
 uniform int uDebugNoTexture;
@@ -418,7 +420,20 @@ void main() {
     vec3 tint = mix(warmTint, coolTint, shadowContrast);
     
     vec3 lighting = vec3(ambient + (1.0 - shadowContrast) * (diffuse + specular) * directLightStrength) * aoFactor;
-    vec3 color = baseColor * lighting * tint;
+
+    float fireLight = 0.0;
+    for (int i = 0; i < uFireLightCount; ++i) {
+        vec3 toLight = uFireLightPos[i] - vWorldPos;
+        float d = length(toLight);
+        vec3 ldir = (d > 0.001) ? (toLight / d) : vec3(0.0, 1.0, 0.0);
+        float ndl = clamp(dot(normal, ldir), 0.0, 1.0);
+        float att = clamp(1.0 - d / 4.0, 0.0, 1.0);
+        fireLight += att * att * (0.35 + 0.65 * ndl);
+    }
+    fireLight = clamp(fireLight, 0.0, 0.28);
+    vec3 fireContribution = vec3(1.0, 0.55, 0.18) * fireLight;
+
+    vec3 color = baseColor * lighting * tint + fireContribution;
     
     // Apply metallic
     if (metallic > 0.0 && uUsePBRResourcePack == 1) {

@@ -50,6 +50,7 @@ public:
     void setBiomeGrassColor(const glm::vec3& color) { biomeGrassColor = color; }
     void setBiomeFoliageColor(const glm::vec3& color) { biomeFoliageColor = color; }
     void setUseBiomeColors(bool use) { useBiomeColors = use; }
+    void setFireLightPositions(const std::vector<glm::vec3>& positions) { fireLightPositions = positions; }
     // void setShowShadows(bool show) { showShadows = show; } // Removed, uses Settings
 
     Shader& getBlockShader() { return blockShader; }
@@ -146,6 +147,9 @@ private:
     glm::vec3 biomeGrassColor = glm::vec3(0.5f, 0.85f, 0.4f);   // Default green
     glm::vec3 biomeFoliageColor = glm::vec3(0.45f, 0.75f, 0.35f); // Default foliage
     bool useBiomeColors = true;
+
+    static constexpr int MAX_FIRE_LIGHTS = 16;
+    std::vector<glm::vec3> fireLightPositions;
     
     // Camera-Relative Rendering for TAA stability
     glm::dvec3 renderOrigin = glm::dvec3(0.0); // Origin for rendering (rebased periodically)
