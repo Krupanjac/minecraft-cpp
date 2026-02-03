@@ -113,6 +113,13 @@ set(SOURCES
     src/Game/MenuWorldSystem.cpp
     src/Game/WorldLifecycleSystem.cpp
     src/Game/InputSystem.cpp
+    src/Game/ChunkUpdateSystem.cpp
+    src/Game/TimeOfDaySystem.cpp
+    src/Game/PlayerPhysicsSystem.cpp
+    src/Game/DebugInputSystem.cpp
+    src/Game/MobUpdateSystem.cpp
+    src/Game/RenderPipelineSystem.cpp
+    src/Game/AudioSystem.cpp
     src/Mesh/MeshBuilder.cpp
     src/Mesh/Mesh.cpp
     src/Render/Shader.cpp

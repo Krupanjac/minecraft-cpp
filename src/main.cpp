@@ -34,6 +34,13 @@
 #include "Game/MenuWorldSystem.h"
 #include "Game/WorldLifecycleSystem.h"
 #include "Game/InputSystem.h"
+#include "Game/ChunkUpdateSystem.h"
+#include "Game/TimeOfDaySystem.h"
+#include "Game/PlayerPhysicsSystem.h"
+#include "Game/DebugInputSystem.h"
+#include "Game/MobUpdateSystem.h"
+#include "Game/RenderPipelineSystem.h"
+#include "Game/AudioSystem.h"
 
 #include <memory>
 #include <iostream>
@@ -58,8 +65,19 @@ public:
                     inputSystem(uiManager, camera, chunkManager, heldItemRenderer, entityManager, networkManager,
                                             playerEntity, zombies, skeletons, pigs, chickens, sheep, useNewEntityManager,
                                             attackCooldown, isBreakingBlock, blockBreakProgress, breakingBlockPos, breakingBlockType, isUnderwater),
+                      chunkUpdateSystem(chunkManager, worldGenerator, meshBuilder, renderer, threadPool, meshMutex, pendingMeshes),
+                      timeOfDaySystem(uiManager, renderer, networkManager, camera),
+                                            playerPhysicsSystem(camera, chunkManager),
+                      debugInputSystem(uiManager),
+                    mobUpdateSystem(camera, chunkManager, entityManager, statusEffectsSystem, networkManager,
+                                                    mobSpawnManager, playerEntity, zombies, skeletons, pigs, chickens, sheep, useNewEntityManager),
+                                        renderPipelineSystem(renderer, chunkManager, menuWorldSystem, camera, entityManager,
+                                                                                 worldGenerator, heldItemRenderer, fireSystem, explosionVolumes,
+                                                                                 uiManager, networkManager, physicsTest, playerEntity,
+                                                                                 zombies, skeletons, pigs, chickens, sheep, useNewEntityManager),
                     lastSpaceTime(0.0),
-                    running(true) {
+                    running(true),
+                    audioSystem(uiManager, camera, chunkManager, isUnderwater, wasUnderwater) {
                 std::random_device rd;
                 rng.seed(rd());
     }
@@ -85,6 +103,7 @@ public:
         }
 
         inputSystem.setWindow(window.get());
+        renderPipelineSystem.setWindow(window.get());
         
         // Get GPU info now that OpenGL context is created
         const char* glRenderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
@@ -593,21 +612,7 @@ public:
             }
         });
         
-        // Initialize audio system
-        if (!Audio::AudioManager::instance().initialize()) {
-            LOG_WARNING("Failed to initialize audio system - continuing without sound");
-        } else {
-            Audio::AudioManager::instance().loadAllSounds();
-            // Set initial volume from settings
-            Audio::AudioManager::instance().setMasterVolume(Settings::instance().masterVolume);
-            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MUSIC, Settings::instance().musicVolume);
-            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::AMBIENT, Settings::instance().ambientVolume);
-            // soundVolume controls BLOCKS, MOBS, PLAYER, and UI categories
-            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::BLOCKS, Settings::instance().soundVolume);
-            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::MOBS, Settings::instance().soundVolume);
-            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::PLAYER, Settings::instance().soundVolume);
-            Audio::AudioManager::instance().setCategoryVolume(Audio::SoundCategory::UI, Settings::instance().soundVolume);
-        }
+        audioSystem.initialize();
         
         // Apply initial settings
         applySettings();
@@ -720,6 +725,7 @@ public:
             
             inputSystem.processInput(deltaTime); // Input/GUI can use full frame delta
             update(clampedDelta); // Physics/render updates use clamped delta
+            audioSystem.update(deltaTime);
 
             // Update Debug Info
             // Use a smoothed FPS for display to avoid 0 or flickering
@@ -738,51 +744,6 @@ public:
                 playerEntity->updateWithCamera(deltaTime, camera);
             }
             
-            // Handle footstep sounds
-            if (camera.onGround && !camera.isFlying && uiManager.isWorldLoaded() && !isUnderwater) {
-                float horizontalSpeed = glm::length(glm::vec2(camera.velocity.x, camera.velocity.z));
-                if (horizontalSpeed > 0.5f) {
-                    footstepTimer -= deltaTime;
-                    if (footstepTimer <= 0.0f) {
-                        // Get block below player
-                        glm::vec3 playerPos = camera.getPosition();
-                        int blockX = static_cast<int>(std::floor(playerPos.x));
-                        int blockY = static_cast<int>(std::floor(playerPos.y - 0.1f));
-                        int blockZ = static_cast<int>(std::floor(playerPos.z));
-                        Block blockBelow = chunkManager.getBlockAt(blockX, blockY, blockZ);
-                        
-                        // Play footstep sound based on block type
-                        Audio::SoundType stepSound = Audio::getStepSoundForBlock(static_cast<uint8_t>(blockBelow.getType()));
-                        Audio::AudioManager::instance().playSound(stepSound, 0.5f);
-                        
-                        // Adjust interval based on sprint
-                        footstepInterval = camera.isSprinting ? 0.3f : 0.45f;
-                        footstepTimer = footstepInterval;
-                    }
-                } else {
-                    footstepTimer = 0.0f; // Reset timer when not moving
-                }
-            }
-
-            // Handle swim sounds
-            if (uiManager.isWorldLoaded()) {
-                if (isUnderwater && !wasUnderwater) {
-                    Audio::AudioManager::instance().playSound(Audio::SoundType::WATER_SPLASH, 0.6f);
-                    swimTimer = 0.0f;
-                }
-
-                float swimSpeed = glm::length(glm::vec2(camera.velocity.x, camera.velocity.z));
-                if (isUnderwater && swimSpeed > 0.2f) {
-                    swimTimer -= deltaTime;
-                    if (swimTimer <= 0.0f) {
-                        Audio::AudioManager::instance().playSound(Audio::SoundType::WATER_SWIM, 0.5f);
-                        swimInterval = camera.isSprinting ? 0.45f : 0.7f;
-                        swimTimer = swimInterval;
-                    }
-                } else if (!isUnderwater) {
-                    swimTimer = 0.0f;
-                }
-            }
             
             if (fpsUpdateTimer >= 0.5f) {
                 displayFPS = fpsAccumulator / frameAccumulator;
@@ -814,7 +775,7 @@ public:
             }
             uiManager.updateDebugInfo(displayFPS, blockName, camera.getPosition(), camera.velocity, taaMotion, taaHistoryWeight);
 
-            render();
+            renderPipelineSystem.renderFrame(isBreakingBlock, blockBreakProgress, breakingBlockPos);
             
             window->pollEvents();
             window->swapBuffers();
@@ -844,6 +805,12 @@ private:
     FireSystem fireSystem;
     StatusEffectsSystem statusEffectsSystem;
     InputSystem inputSystem;
+    ChunkUpdateSystem chunkUpdateSystem;
+    TimeOfDaySystem timeOfDaySystem;
+    PlayerPhysicsSystem playerPhysicsSystem;
+    DebugInputSystem debugInputSystem;
+    MobUpdateSystem mobUpdateSystem;
+    RenderPipelineSystem renderPipelineSystem;
     
     // Physics test system (can be disabled via ENABLE_PHYSICS_TEST in PhysicsTest.h)
     Physics::PhysicsTestSystem physicsTest;
@@ -884,14 +851,10 @@ private:
     WorldLifecycleSystem worldLifecycleSystem;
 
     
-    // Audio - footstep timer
-    float footstepTimer = 0.0f;
-    float footstepInterval = 0.4f; // Time between footstep sounds
-    float swimTimer = 0.0f;
-    float swimInterval = 0.6f;
     bool isUnderwater = false;
     bool wasUnderwater = false;
     bool wasOnGround = true; // For detecting jump
+    AudioSystem audioSystem;
 
     // Loading tips
     std::vector<std::string> loadingTips = {
@@ -1072,38 +1035,6 @@ private:
             heldItemRenderer.setMining(false);
         }
         
-        // Update ambient audio state based on player position
-        if (uiManager.isWorldLoaded()) {
-            glm::vec3 headPos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
-            int hx = static_cast<int>(std::floor(headPos.x));
-            int hy = static_cast<int>(std::floor(headPos.y));
-            int hz = static_cast<int>(std::floor(headPos.z));
-
-            Block headBlock = chunkManager.getBlockAt(hx, hy, hz);
-            bool underwater = headBlock.getType() == BlockType::WATER;
-            wasUnderwater = isUnderwater;
-            isUnderwater = underwater;
-
-            Block ceilingBlock = chunkManager.getBlockAt(hx, hy + 2, hz);
-            bool inCave = ceilingBlock.getType() != BlockType::AIR && ceilingBlock.getType() != BlockType::WATER;
-
-            Audio::AudioManager::instance().setUnderwater(underwater);
-            Audio::AudioManager::instance().setInCave(inCave);
-        } else {
-            wasUnderwater = isUnderwater;
-            isUnderwater = false;
-            Audio::AudioManager::instance().setUnderwater(false);
-            Audio::AudioManager::instance().setInCave(false);
-        }
-        
-        // Update audio system with listener position
-        Audio::AudioManager::instance().setListenerPosition(
-            camera.getPosition(),
-            camera.getFront(),
-            camera.getUp()
-        );
-        Audio::AudioManager::instance().update(deltaTime);
-        
         // Send local player position to network
         // Send foot position (camera is at FEET level)
         if (networkManager.isOnline() && !uiManager.isMenuOpen()) {
@@ -1125,78 +1056,9 @@ private:
         bool continueWorldUpdates = networkManager.isOnline() || uiManager.isWorldLoaded() || menuWorldSystem.isInitialized();
 
         // Day/Night Cycle - ALWAYS update for sky effects (even in main menu)
-        constexpr float DAY_DURATION = 2400.0f; 
         
         // Debug Controls - only when not in menu
-        static bool f1Pressed = false;
-        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F1)) {
-            if (!f1Pressed) {
-                uiManager.toggleDebug();
-                f1Pressed = true;
-            }
-        } else {
-            f1Pressed = false;
-        }
-
-        static bool f2Pressed = false;
-        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F2)) {
-            if (!f2Pressed) {
-                uiManager.isDayNightPaused = !uiManager.isDayNightPaused;
-                f2Pressed = true;
-            }
-        } else {
-            f2Pressed = false;
-        }
-        
-        static bool f3Pressed = false;
-        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F3)) {
-            if (!f3Pressed) {
-                Settings::instance().enableShadows = !Settings::instance().enableShadows;
-                f3Pressed = true;
-            }
-        } else {
-            f3Pressed = false;
-        }
-
-        static bool f4Pressed = false;
-        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F4)) {
-            if (!f4Pressed) {
-                Settings::instance().debugShowTAA = !Settings::instance().debugShowTAA;
-                f4Pressed = true;
-            }
-        } else {
-            f4Pressed = false;
-        }
-
-        static bool f8Pressed = false;
-        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F8)) {
-            if (!f8Pressed) {
-                Settings::instance().debugNoTexture = !Settings::instance().debugNoTexture;
-                f8Pressed = true;
-            }
-        } else {
-            f8Pressed = false;
-        }
-
-        static bool f6Pressed = false;
-        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F6)) {
-            if (!f6Pressed) {
-                Settings::instance().debugWireframe = !Settings::instance().debugWireframe;
-                f6Pressed = true;
-            }
-        } else {
-            f6Pressed = false;
-        }
-
-        static bool f7Pressed = false;
-        if (!skipPlayerControls && window->isKeyPressed(GLFW_KEY_F7)) {
-            if (!f7Pressed) {
-                Settings::instance().debugShowNormals = !Settings::instance().debugShowNormals;
-                f7Pressed = true;
-            }
-        } else {
-            f7Pressed = false;
-        }
+        debugInputSystem.update(skipPlayerControls, *window);
         
         // Physics Test System - Isolated testing controls (X, C, V, P keys)
 #if ENABLE_PHYSICS_TEST
@@ -1212,264 +1074,31 @@ private:
         
         // renderer.setShowShadows(uiManager.showShadows); // Removed, Renderer uses Settings directly
 
-        // Time control - host/offline can manually control, all players update time locally for smoothness
-        bool canControlTime = !networkManager.isOnline() || networkManager.isHost();
-        
-        // All players update time locally for smooth progression
-        if (!uiManager.isDayNightPaused) {
-            uiManager.timeOfDay += deltaTime * 10.0f; // Still sped up slightly for gameplay, but slower than before
-        }
-        
-        // Manual Time Control (only for host/offline, and not in menu)
-        bool timeChanged = false;
-        if (canControlTime && !skipPlayerControls) {
-            if (window->isKeyPressed(GLFW_KEY_RIGHT)) {
-                uiManager.timeOfDay += deltaTime * 100.0f;
-                timeChanged = true;
-            }
-            if (window->isKeyPressed(GLFW_KEY_LEFT)) {
-                uiManager.timeOfDay -= deltaTime * 100.0f;
-                timeChanged = true;
-            }
-        }
-        
-        if (uiManager.timeOfDay >= DAY_DURATION) uiManager.timeOfDay -= DAY_DURATION;
-        if (uiManager.timeOfDay < 0.0f) uiManager.timeOfDay += DAY_DURATION;
-        
-        // Sync time to clients if hosting (every 2 seconds or when manually changed)
-        static float timeSyncTimer = 0.0f;
-        timeSyncTimer += deltaTime;
-        if (networkManager.isHost() && (timeChanged || timeSyncTimer >= 2.0f)) {
-            networkManager.sendTimeSync(uiManager.timeOfDay, uiManager.isDayNightPaused);
-            timeSyncTimer = 0.0f;
-        }
-        // Note: Clients also update time locally for smoothness, server syncs correct drift
-        
-        float angle = (uiManager.timeOfDay / DAY_DURATION) * glm::two_pi<float>();
-        
-        // Sun moves East (X+) -> Up (Y+) -> West (X-) -> Down (Y-)
-        // We start at sunrise (X+, Y=0)
-        float sunX = cos(angle);
-        float sunY = sin(angle);
-        float sunZ = 0.2f; // Slight tilt
-        
-        glm::vec3 sunDir = glm::normalize(glm::vec3(sunX, sunY, sunZ));
-        
-        // Night Logic: If sun is below horizon, use Moon
-        if (sunY < -0.1f) {
-            // Moon is opposite to sun
-            glm::vec3 moonDir = -sunDir;
-            renderer.setLightDirection(moonDir);
-            // Moon is dimmer
-            // We handle intensity in shader or by color, but direction is key for shadows
-        } else {
-            renderer.setLightDirection(sunDir);
-        }
-        
-        // Calculate sky color based on sun height (sunY)
-        glm::vec3 dayColor(0.53f, 0.81f, 0.92f);
-        glm::vec3 nightColor(0.05f, 0.05f, 0.1f);
-        glm::vec3 sunsetColor(0.8f, 0.4f, 0.2f);
-        
-        glm::vec3 currentSkyColor;
-        
-        if (sunY > 0.2f) {
-            // Day
-            currentSkyColor = dayColor;
-        } else if (sunY < -0.2f) {
-            // Night
-            currentSkyColor = nightColor;
-        } else {
-            // Transition (Sunrise/Sunset)
-            float t = (sunY + 0.2f) / 0.4f; // Map -0.2..0.2 to 0..1
-            if (sunX > 0) {
-                // Sunrise (Night -> Day)
-                // sunY goes -0.2 -> 0.2
-                currentSkyColor = glm::mix(nightColor, dayColor, t);
-                // Add some orange glow
-                float glow = 1.0f - abs(t - 0.5f) * 2.0f;
-                currentSkyColor = glm::mix(currentSkyColor, sunsetColor, glow * 0.5f);
-            } else {
-                // Sunset (Day -> Night)
-                // sunY goes 0.2 -> -0.2
-                currentSkyColor = glm::mix(nightColor, dayColor, t);
-                // Add some orange glow
-                float glow = 1.0f - abs(t - 0.5f) * 2.0f;
-                currentSkyColor = glm::mix(currentSkyColor, sunsetColor, glow * 0.5f);
-            }
-        }
-
-        // If player is deep underground, fade sky color to black
-        // This prevents seeing "bright sky" when looking into the void/unloaded chunks underground
-        if (camera.getPosition().y < 40.0f) {
-            float depthFactor = std::clamp((40.0f - camera.getPosition().y) / 20.0f, 0.0f, 1.0f);
-            currentSkyColor = glm::mix(currentSkyColor, glm::vec3(0.0f), depthFactor);
-        }
-
-        renderer.setSkyColor(currentSkyColor);
-        renderer.setSunHeight(sunY);
-        renderer.setTimeOfDay(uiManager.timeOfDay);
+        timeOfDaySystem.update(deltaTime, skipPlayerControls, *window);
 
         // Physics and player updates - only when not in menu
         if (!skipPlayerControls) {
-            updatePhysics(deltaTime);
+            playerPhysicsSystem.update(deltaTime, *window);
             camera.update(deltaTime);
         }
         
         // Chunk updates - always run if world is loaded or in multiplayer
         if (continueWorldUpdates) {
-            chunkManager.update(camera.getPosition(), camera.getFront(), camera.getViewMatrix());
+            chunkUpdateSystem.updateWorldChunks(
+                camera.getPosition(),
+                camera.getFront(),
+                camera.getViewMatrix(),
+                Settings::instance().renderDistance,
+                10,
+                MAX_MESHES_PER_FRAME
+            );
         }
         
-        // NOTE: playerEntity->updateWithCamera() is called earlier in the main loop (around line 1088)
-        // which already calls Entity::update() internally. Do NOT call update() again here
-        // as it would double-update the animation system.
-
         // === Mob Spawning & AI ===
         // Mobs can run in single-player (offline) or server mode
         // In client mode, server handles mob state
-        if (!skipPlayerControls) {
-            glm::vec3 playerFeet = camera.getPosition(); // Camera is at feet
-            float normalizedTime = uiManager.timeOfDay / DAY_DURATION;
-            
-            if (useNewEntityManager) {
-                // New EntityManager system - handles spawning, AI, despawning with no stutters
-                bool isOfflineOrServer = (networkManager.getMode() == Network::NetworkMode::OFFLINE) || 
-                                          networkManager.isHost();
-                
-                static bool loggedOnce = false;
-                if (!loggedOnce && networkManager.isOnline()) {
-                    LOG_INFO("EntityManager: isOfflineOrServer=" + std::to_string(isOfflineOrServer) + 
-                             ", mode=" + std::to_string(static_cast<int>(networkManager.getMode())) +
-                             ", isHost=" + std::to_string(networkManager.isHost()) +
-                             ", isClient=" + std::to_string(networkManager.isClient()));
-                    loggedOnce = true;
-                }
-                
-                if (isOfflineOrServer) {
-                    // Update EntityManager - returns attack events
-                    auto attacks = entityManager.update(deltaTime, playerFeet, normalizedTime);
-                    
-                    // Apply knockback from attacks
-                    for (const auto& attack : attacks) {
-                        camera.velocity += attack.knockback;
-                    }
-
-                    auto entities = entityManager.getAllEntities();
-                    if (isDayTime(normalizedTime)) {
-                        for (auto* entity : entities) {
-                            if (dynamic_cast<ZombieEntity*>(entity) || dynamic_cast<SkeletonEntity*>(entity)) {
-                                statusEffectsSystem.applyDaylightBurn(entity, deltaTime);
-                            }
-                        }
-                    } else {
-                        statusEffectsSystem.clearDaylightBurnStates();
-                    }
-
-                    for (auto* entity : entities) {
-                        statusEffectsSystem.applyFireBurn(entity, deltaTime);
-                        statusEffectsSystem.applyEntityFallDamage(entity);
-                    }
-                    
-                    // If hosting, broadcast entity events to clients
-                    if (networkManager.isHost()) {
-                        // Broadcast spawn events immediately
-                        auto spawnEvents = entityManager.consumeSpawnEvents();
-                        for (const auto& spawn : spawnEvents) {
-                            networkManager.broadcastEntitySpawn(
-                                spawn.id,
-                                static_cast<uint8_t>(spawn.type),
-                                spawn.position,
-                                spawn.yaw
-                            );
-                        }
-                        
-                        // Broadcast despawn events immediately
-                        auto despawnEvents = entityManager.consumeDespawnEvents();
-                        for (EntityId id : despawnEvents) {
-                            networkManager.broadcastEntityDespawn(id);
-                        }
-                        
-                        // Broadcast position updates at 10Hz
-                        static float entitySyncTimer = 0.0f;
-                        entitySyncTimer += deltaTime;
-                        if (entitySyncTimer >= 0.1f) { // 10Hz sync rate
-                            entitySyncTimer = 0.0f;
-                            
-                            // Get all entity states and broadcast them
-                            auto entityStates = entityManager.getEntityStatesForSync();
-                            for (const auto& state : entityStates) {
-                                uint8_t flags = state.isDead ? 1 : 0;
-                                
-                                networkManager.broadcastEntityUpdate(
-                                    state.id,
-                                    state.position, state.velocity, state.yaw, state.health, flags
-                                );
-                            }
-                        }
-                    }
-                } else if (networkManager.isClient()) {
-                    // Client mode - just render, server handles AI
-                    // EntityManager state comes from server sync packets
-                }
-            } else {
-                // Legacy system - uses MobSpawnManager (can cause stutters)
-                if (networkManager.getMode() == Network::NetworkMode::OFFLINE) {
-                    if (mobSpawnManager && playerEntity) {
-                        mobSpawnManager->update(deltaTime, playerFeet, normalizedTime,
-                                               zombies, skeletons, pigs, chickens, sheep);
-                    }
-                    
-                    // Update zombie AI
-                    if (playerEntity) {
-                        for (auto& z : zombies) {
-                            if (!z) continue;
-                            bool attacked = z->updateAI(deltaTime, chunkManager, playerFeet);
-                            if (attacked && !z->isDead()) {
-                                camera.velocity += z->consumeAttackImpulse();
-                            }
-                        }
-                        
-                        // Update skeleton AI
-                        for (auto& s : skeletons) {
-                            if (!s) continue;
-                            bool attacked = s->updateAI(deltaTime, chunkManager, playerFeet);
-                            if (attacked && !s->isDead()) {
-                                camera.velocity += s->consumeAttackImpulse();
-                            }
-                        }
-
-                        if (isDayTime(normalizedTime)) {
-                            for (auto& z : zombies) {
-                                if (z) statusEffectsSystem.applyDaylightBurn(z.get(), deltaTime);
-                            }
-                            for (auto& s : skeletons) {
-                                if (s) statusEffectsSystem.applyDaylightBurn(s.get(), deltaTime);
-                            }
-                        } else {
-                            statusEffectsSystem.clearDaylightBurnStates();
-                        }
-                        
-                        // Update passive mobs (always update for death timer)
-                        for (auto& p : pigs) {
-                            if (p) p->updateAI(deltaTime, chunkManager);
-                        }
-                        for (auto& c : chickens) {
-                            if (c) c->updateAI(deltaTime, chunkManager);
-                        }
-                        for (auto& s : sheep) {
-                            if (s) s->updateAI(deltaTime, chunkManager);
-                        }
-
-                        for (auto& z : zombies) { if (z) { statusEffectsSystem.applyFireBurn(z.get(), deltaTime); statusEffectsSystem.applyEntityFallDamage(z.get()); } }
-                        for (auto& s : skeletons) { if (s) { statusEffectsSystem.applyFireBurn(s.get(), deltaTime); statusEffectsSystem.applyEntityFallDamage(s.get()); } }
-                        for (auto& p : pigs) { if (p) { statusEffectsSystem.applyFireBurn(p.get(), deltaTime); statusEffectsSystem.applyEntityFallDamage(p.get()); } }
-                        for (auto& c : chickens) { if (c) { statusEffectsSystem.applyFireBurn(c.get(), deltaTime); statusEffectsSystem.applyEntityFallDamage(c.get()); } }
-                        for (auto& s : sheep) { if (s) { statusEffectsSystem.applyFireBurn(s.get(), deltaTime); statusEffectsSystem.applyEntityFallDamage(s.get()); } }
-                    }
-                }
-            }
-        } // End of mob update code
+        float normalizedTime = uiManager.timeOfDay / TimeOfDaySystem::kDayDuration;
+        mobUpdateSystem.update(deltaTime, normalizedTime, skipPlayerControls);
 
         if (!skipPlayerControls) {
             statusEffectsSystem.applyPlayerFireBurn(
@@ -1490,377 +1119,8 @@ private:
                 }
             );
         }
-        
-        // Generate chunks - always run if world is loaded
-        if (continueWorldUpdates) {
-            auto chunksToGenerate = chunkManager.getChunksToGenerate(camera.getPosition(), Settings::instance().renderDistance, 10);
-            for (const auto& pos : chunksToGenerate) {
-                chunkManager.requestChunkGeneration(pos);
-                auto chunk = chunkManager.getChunk(pos);
-                if (chunk && chunk->getState() == ChunkState::UNLOADED) {
-                    chunk->setState(ChunkState::GENERATING);
-                    
-                    // Generate in thread pool
-                    threadPool.enqueue([this, chunk]() {
-                        if (chunkManager.hasPreloadedData(chunk->getPosition())) {
-                            auto blocks = chunkManager.getPreloadedData(chunk->getPosition());
-                            std::copy(blocks.begin(), blocks.end(), chunk->getBlocks().begin());
-                            chunk->setModified(true);
-                        } else {
-                            worldGenerator.generate(chunk);
-                        }
-                        
-                        // Scan for water to initialize fluid simulation
-                        for (int x = 0; x < CHUNK_SIZE; ++x) {
-                            for (int y = 0; y < CHUNK_HEIGHT; ++y) {
-                                for (int z = 0; z < CHUNK_SIZE; ++z) {
-                                    if (chunk->getBlock(x, y, z).getType() == BlockType::WATER) {
-                                        glm::vec3 worldPos = ChunkManager::chunkToWorld(chunk->getPosition());
-                                        chunkManager.scheduleFluidUpdate(
-                                            static_cast<int>(worldPos.x) + x,
-                                            static_cast<int>(worldPos.y) + y,
-                                            static_cast<int>(worldPos.z) + z
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                        
-                        chunk->setState(ChunkState::MESH_BUILD);
-                    });
-                }
-            }
-        
-            // Build meshes
-            auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), MAX_MESHES_PER_FRAME);
-            for (auto chunk : chunksToMesh) {
-                chunk->setState(ChunkState::READY);
-                
-                // Get neighbors for greedy meshing
-                const ChunkPos& pos = chunk->getPosition();
-                auto chunkXPos = chunkManager.getChunk(pos + ChunkPos(1, 0, 0));
-                auto chunkXNeg = chunkManager.getChunk(pos + ChunkPos(-1, 0, 0));
-                auto chunkYPos = chunkManager.getChunk(pos + ChunkPos(0, 1, 0));
-                auto chunkYNeg = chunkManager.getChunk(pos + ChunkPos(0, -1, 0));
-                auto chunkZPos = chunkManager.getChunk(pos + ChunkPos(0, 0, 1));
-                auto chunkZNeg = chunkManager.getChunk(pos + ChunkPos(0, 0, -1));
-                
-                int lod = chunk->getCurrentLOD();
-
-                threadPool.enqueue([this, chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg, lod]() {
-                    auto meshData = meshBuilder.buildChunkMesh(chunk, chunkXPos, chunkXNeg, chunkYPos, chunkYNeg, chunkZPos, chunkZNeg, lod);
-                    
-                    std::lock_guard<std::mutex> lock(meshMutex);
-                    pendingMeshes.emplace_back(chunk->getPosition(), std::move(meshData));
-                });
-            }
-
-            // Upload meshes
-            {
-                std::lock_guard<std::mutex> lock(meshMutex);
-                for (auto& [pos, meshData] : pendingMeshes) {
-                    if (!meshData.isEmpty()) {
-                        renderer.uploadChunkMesh(pos, meshData.vertices, meshData.indices, meshData.waterVertices, meshData.waterIndices);
-                        auto chunk = chunkManager.getChunk(pos);
-                        if (chunk) {
-                            chunk->setState(ChunkState::GPU_UPLOADED);
-                        }
-                    } else {
-                        // Empty mesh (e.g. air chunk), but still mark as processed
-                        auto chunk = chunkManager.getChunk(pos);
-                        if (chunk) {
-                            chunk->setState(ChunkState::GPU_UPLOADED);
-                        }
-                        // Ensure we clear any existing mesh for this chunk
-                        renderer.uploadChunkMesh(pos, {}, {}, {}, {});
-                    }
-                }
-                pendingMeshes.clear();
-            }
-        } // End of continueWorldUpdates block
     }
     
-    void render() {
-        // Check if we're in main menu without a world loaded
-        bool inMainMenu = !uiManager.isWorldLoaded() && 
-                          (uiManager.getMenuState() == MenuState::MAIN_MENU ||
-                           uiManager.getMenuState() == MenuState::MULTIPLAYER ||
-                           uiManager.getMenuState() == MenuState::HOST_GAME ||
-                           uiManager.getMenuState() == MenuState::JOIN_GAME ||
-                           uiManager.getMenuState() == MenuState::NEW_GAME ||
-                           uiManager.getMenuState() == MenuState::LOAD_GAME ||
-                           uiManager.getMenuState() == MenuState::SETTINGS ||
-                           uiManager.getMenuState() == MenuState::VIDEO_SETTINGS ||
-                           uiManager.getMenuState() == MenuState::PLAYER_SETTINGS ||
-                           uiManager.getMenuState() == MenuState::CONTROLS ||
-                           uiManager.getMenuState() == MenuState::ABOUT);
-        
-        // Hide crosshair when in any menu
-        renderer.setShowCrosshair(!uiManager.isMenuOpen());
-        
-        if (inMainMenu) {
-            // Render menu background world
-            std::vector<Entity*> emptyEntities;
-            renderer.setFireLightPositions({});
-            renderer.render(chunkManager, menuWorldSystem.getCamera(), emptyEntities, window->getWidth(), window->getHeight(), {}, nullptr);
-            renderer.cleanUnusedMeshes(chunkManager);
-            uiManager.render();
-            uiManager.renderConsole();
-            return;
-        }
-        
-        std::vector<Entity*> entities;
-        
-        // Sync player entity if it exists
-        if (playerEntity) {
-            // Visual sync: We want the model to be exactly where the player is.
-            // Camera position is FEET pos. 
-            // Model origin is usually at feet. 
-            // So we use camera position directly.
-            glm::vec3 footPos = camera.getPosition();
-            playerEntity->setPosition(footPos);
-            
-            // Yaw: Camera yaw 0 is safe, but GLTF might need rotation. 
-            // If camera looks -Z (yaw -90), model should face -Z.
-            // glTF default facing is usually +Z. So rotate 180?
-            // Let's try matching camera yaw + 180 or 90. 
-            // Camera::yaw is in degrees.
-            playerEntity->setRotation(glm::vec3(0.0f, -camera.getYaw() + 90.0f, 0.0f));
-            playerEntity->setVelocity(camera.velocity);
-
-            // Only render if we are in third person OR we want to see body parts (requires careful culling)
-            // User requested toggle.
-            if (camera.isThirdPerson()) {
-                entities.push_back(playerEntity.get());
-            }
-        }
-
-        // Get entities from EntityManager (new system) or legacy containers
-        if (useNewEntityManager) {
-            auto managedEntities = entityManager.getAllEntities();
-            entities.insert(entities.end(), managedEntities.begin(), managedEntities.end());
-        } else {
-            // Legacy: render from individual containers (include dead mobs for death fade)
-            for (auto& z : zombies) {
-                if (z) entities.push_back(z.get());
-            }
-            
-            for (auto& s : skeletons) {
-                if (s) entities.push_back(s.get());
-            }
-            
-            for (auto& p : pigs) {
-                if (p) entities.push_back(p.get());
-            }
-            for (auto& c : chickens) {
-                if (c) entities.push_back(c.get());
-            }
-            for (auto& s : sheep) {
-                if (s) entities.push_back(s.get());
-            }
-        }
-        
-        // Render remote players from network
-        auto remotePlayerEntities = networkManager.getRemotePlayerEntities();
-        for (auto* remotePlayer : remotePlayerEntities) {
-            entities.push_back(remotePlayer);
-        }
-        
-        // Update biome colors based on camera/player position
-        {
-            glm::vec3 camPos = camera.getPosition();
-            BiomeType currentBiome = worldGenerator.getBiome(camPos.x, camPos.z);
-            BiomeInfo biomeInfo = worldGenerator.getBiomeInfo(currentBiome);
-            
-            renderer.setBiomeGrassColor(glm::vec3(biomeInfo.grassColorR, biomeInfo.grassColorG, biomeInfo.grassColorB));
-            renderer.setBiomeFoliageColor(glm::vec3(biomeInfo.foliageColorR, biomeInfo.foliageColorG, biomeInfo.foliageColorB));
-            renderer.setUseBiomeColors(true);
-        }
-        
-        // Get debris data for rendering (includes shadow pass)
-        std::vector<Renderer::DebrisRenderData> debrisData;
-#if ENABLE_PHYSICS_TEST
-        if (physicsTest.isEnabled()) {
-            debrisData = physicsTest.getDebrisRenderData();
-        }
-#endif
-
-    std::vector<glm::vec3> fireLights;
-    fireSystem.getFireLightPositions(fireLights, 16);
-    renderer.setFireLightPositions(fireLights);
-
-    renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight(), debrisData, &explosionVolumes);
-        // Clean up any GPU meshes for chunks that have been unloaded by ChunkManager
-        renderer.cleanUnusedMeshes(chunkManager);
-        
-        // Blit depth buffer to default framebuffer so held items can properly occlude/be occluded
-        renderer.blitDepthToScreen(window->getWidth(), window->getHeight());
-        
-        // Render block break overlay when breaking blocks in survival mode
-        if (isBreakingBlock && !uiManager.isCreativeMode && blockBreakProgress > 0.0f) {
-            renderer.renderBlockBreakOverlay(camera, breakingBlockPos, blockBreakProgress, window->getWidth(), window->getHeight());
-        }
-        
-        // Render held items for players (third-person view)
-        if (uiManager.isWorldLoaded()) {
-            Shader& modelShader = renderer.getModelShader();
-            
-            // Render held items for remote players using bone-based attachment
-            for (auto* remotePlayer : remotePlayerEntities) {
-                uint8_t heldItemId = remotePlayer->getHeldItem();
-                if (heldItemId != 0) {
-                    ItemType itemType = static_cast<ItemType>(heldItemId);
-                    
-                    // Use bone-based rendering if supported
-                    if (remotePlayer->supportsHoldAnimations()) {
-                        glm::mat4 handTransform = remotePlayer->getRightHandTransform();
-                        heldItemRenderer.renderThirdPersonWithBone(modelShader, camera, handTransform, itemType,
-                                                                   window->getWidth(), window->getHeight());
-                    } else {
-                        // Fallback to simple position-based rendering
-                        float playerYaw = remotePlayer->getRotation().y;
-                        heldItemRenderer.renderThirdPerson(modelShader, camera, remotePlayer->getPosition(), 
-                                                           playerYaw, itemType, 
-                                                           window->getWidth(), window->getHeight());
-                    }
-                }
-            }
-            
-            // Render local player's held item in third-person view
-            if (camera.isThirdPerson() && playerEntity) {
-                ItemType currentHeldItem = uiManager.getSelectedItem();
-                if (currentHeldItem != ItemType::NONE) {
-                    if (playerEntity->supportsHoldAnimations()) {
-                        glm::mat4 handTransform = playerEntity->getRightHandTransform();
-                        heldItemRenderer.renderThirdPersonWithBone(modelShader, camera, handTransform, currentHeldItem,
-                                                                   window->getWidth(), window->getHeight());
-                    } else {
-                        // Fallback for non-Quaternius models
-                        float playerYaw = playerEntity->getRotation().y;
-                        heldItemRenderer.renderThirdPerson(modelShader, camera, playerEntity->getPosition(), 
-                                                           playerYaw, currentHeldItem, 
-                                                           window->getWidth(), window->getHeight());
-                    }
-                }
-            }
-        }
-        
-        // Render held item in first-person view (only when not in menu and in first person)
-        if (!camera.isThirdPerson() && uiManager.isWorldLoaded() && !uiManager.isMenuOpen()) {
-            // Get the model shader from renderer for held item
-            Shader& modelShader = renderer.getModelShader();
-            heldItemRenderer.renderFirstPerson(modelShader, camera, window->getWidth(), window->getHeight());
-        }
-        
-        uiManager.render();
-        uiManager.renderConsole();
-    }
-    
-    void updatePhysics(float deltaTime) {
-        if (camera.getFlightMode()) return;
-        
-        // Check if in water
-        bool inWater = false;
-        glm::vec3 camPos = camera.getPosition(); // Use feet position
-        
-        // Check eye level (Feet + 1.6) and feet level (Feet)
-        Block headBlock = chunkManager.getBlockAt(static_cast<int>(floor(camPos.x)), static_cast<int>(floor(camPos.y + 1.6f)), static_cast<int>(floor(camPos.z)));
-        Block feetBlock = chunkManager.getBlockAt(static_cast<int>(floor(camPos.x)), static_cast<int>(floor(camPos.y)), static_cast<int>(floor(camPos.z)));
-        
-        if (headBlock.isWater() || feetBlock.isWater()) {
-            inWater = true;
-        }
-        
-        if (inWater) {
-            // Water physics
-            // Drag
-            float drag = 1.0f - (2.0f * deltaTime);
-            drag = std::max(0.0f, drag);
-            camera.velocity.x *= drag;
-            camera.velocity.z *= drag;
-            camera.velocity.y *= drag;
-            
-            // Buoyancy / Swim
-            if (window->isKeyPressed(GLFW_KEY_SPACE)) {
-                camera.velocity.y += 10.0f * deltaTime;
-            } else if (window->isKeyPressed(GLFW_KEY_LEFT_SHIFT)) {
-                camera.velocity.y -= 10.0f * deltaTime;
-            }
-            
-            // Slight gravity if not swimming
-            if (!window->isKeyPressed(GLFW_KEY_SPACE)) {
-                 camera.velocity.y -= 2.0f * deltaTime;
-            }
-            
-            // Terminal velocity in water
-            camera.velocity.y = std::max(-4.0f, std::min(4.0f, camera.velocity.y));
-            
-        } else {
-            // Normal gravity
-            // Minecraft gravity is roughly 32 m/s^2
-            camera.velocity.y -= 32.0f * deltaTime;
-            
-            // Terminal velocity
-            camera.velocity.y = std::max(-78.4f, camera.velocity.y);
-        }
-        
-        // Apply velocity
-        glm::vec3 pos = camera.getPosition();
-        glm::vec3 vel = camera.velocity * deltaTime;
-        
-        // Try X movement
-        if (checkCollision(glm::vec3(pos.x + vel.x, pos.y, pos.z))) {
-            vel.x = 0;
-            camera.velocity.x = 0;
-        }
-        pos.x += vel.x;
-        
-        // Try Z movement
-        if (checkCollision(glm::vec3(pos.x, pos.y, pos.z + vel.z))) {
-            vel.z = 0;
-            camera.velocity.z = 0;
-        }
-        pos.z += vel.z;
-        
-        // Try Y movement
-        if (checkCollision(glm::vec3(pos.x, pos.y + vel.y, pos.z))) {
-            if (vel.y < 0) camera.onGround = true;
-            vel.y = 0;
-            camera.velocity.y = 0;
-        } else {
-            camera.onGround = false;
-        }
-        pos.y += vel.y;
-        
-        camera.setPosition(pos);
-        
-        // Friction is now handled in Camera::update() for better control
-        // float friction = camera.onGround ? 10.0f : 2.0f;
-        // ...
-    }
-    
-    bool checkCollision(const glm::vec3& pos) {
-        // Player Bounding Box relative to feet position
-        // Width: 0.6m (-0.3 to +0.3)
-        // Height: 1.8m (0.0 to 1.8)
-        
-        float minX = pos.x - 0.3f;
-        float maxX = pos.x + 0.3f;
-        float minY = pos.y;         // Feet level
-        float maxY = pos.y + 1.8f;  // Head level
-        float minZ = pos.z - 0.3f;
-        float maxZ = pos.z + 0.3f;
-        
-        for (int x = static_cast<int>(floor(minX)); x <= static_cast<int>(floor(maxX)); x++) {
-            for (int y = static_cast<int>(floor(minY)); y <= static_cast<int>(floor(maxY)); y++) {
-                for (int z = static_cast<int>(floor(minZ)); z <= static_cast<int>(floor(maxZ)); z++) {
-                    Block block = chunkManager.getBlockAt(x, y, z);
-                    if (block.isSolid()) return true;
-                }
-            }
-        }
-        return false;
-    }
     
     // Get base break time for a block type (in seconds, with bare hands)
     float getBlockBreakTime(BlockType type) const {
