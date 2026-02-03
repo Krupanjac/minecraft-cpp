@@ -108,6 +108,10 @@ set(SOURCES
     src/World/WorldSerializer.cpp
     src/World/Item.cpp
     src/World/FireSystem.cpp
+    src/Game/StatusEffectsSystem.cpp
+    src/Game/PlayerHealthSystem.cpp
+    src/Game/MenuWorldSystem.cpp
+    src/Game/WorldLifecycleSystem.cpp
     src/Mesh/MeshBuilder.cpp
     src/Mesh/Mesh.cpp
     src/Render/Shader.cpp

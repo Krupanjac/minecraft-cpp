@@ -29,6 +29,10 @@
 #include "Physics/PhysicsTest.h"
 #include "Render/ExplosionVolumeSystem.h"
 #include "World/FireSystem.h"
+#include "Game/StatusEffectsSystem.h"
+#include "Game/PlayerHealthSystem.h"
+#include "Game/MenuWorldSystem.h"
+#include "Game/WorldLifecycleSystem.h"
 
 #include <memory>
 #include <iostream>
@@ -36,8 +40,6 @@
 #include <vector>
 #include <ctime>
 #include <cstdlib>
-#include <chrono>
-#include <unordered_map>
 #include <random>
 
 class Application {
@@ -45,6 +47,13 @@ public:
     Application() 
         : camera(glm::vec3(0.0f, 80.0f, 0.0f)),
           threadPool(HardwareInfo::getOptimalThreadCount()),
+          playerHealthSystem(uiManager, camera),
+          menuWorldSystem(chunkManager, worldGenerator, meshBuilder, renderer, threadPool, meshMutex, pendingMeshes),
+          statusEffectsSystem(chunkManager, fireSystem, explosionVolumes, camera),
+                    worldLifecycleSystem(renderer, chunkManager, worldGenerator, meshBuilder, threadPool, meshMutex, pendingMeshes,
+                                                             uiManager, entityManager, networkManager, playerHealthSystem, explosionVolumes, fireSystem,
+                                                             camera, playerEntity, mobSpawnManager, zombies, skeletons, pigs, chickens, sheep,
+                                                             useNewEntityManager, physicsTest, currentWorldName, currentSeed),
           lastX(0.0), lastY(0.0), lastSpaceTime(0.0), firstMouse(true),
                     running(true) {
                 std::random_device rd;
@@ -296,6 +305,19 @@ public:
         // Pick a main menu tip for this session
         mainMenuTip = pickRandomTip();
         uiManager.setMainMenuTip(mainMenuTip);
+        worldLifecycleSystem.setShouldCloseCallback([this]() {
+            return window->shouldClose();
+        });
+        worldLifecycleSystem.setLoadingCallback([this](float progress) {
+            renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
+            updateLoadingTip();
+            uiManager.renderLoadingTip(currentLoadingTip);
+            window->swapBuffers();
+            window->pollEvents();
+        });
+        playerHealthSystem.setOnDeathCallback([this]() {
+            onPlayerDeath();
+        });
         
         // Setup UI Callbacks
         uiManager.setOnNewGame([this](std::string name, long seed) {
@@ -333,9 +355,8 @@ public:
         
         uiManager.setOnRespawn([this]() {
             // Kill player first if coming from menu, then respawn
-            if (playerHealth > 0) {
-                playerHealth = 0;
-                uiManager.playerHealth = 0;
+            if (playerHealthSystem.getHealth() > 0.0f) {
+                playerHealthSystem.setHealthSilent(0.0f);
             }
             respawnPlayer();
         });
@@ -362,7 +383,7 @@ public:
             chickens.clear();
             sheep.clear();
             
-            menuWorldInitialized = false; // Force reinitialization
+            menuWorldSystem.invalidate(); // Force reinitialization
             initializeMenuWorld();
         });
         
@@ -448,7 +469,7 @@ public:
             pigs.clear();
             chickens.clear();
             sheep.clear();
-            menuWorldInitialized = false;
+            menuWorldSystem.invalidate();
             initializeMenuWorld();
             uiManager.setMenuState(MenuState::MAIN_MENU);
         });
@@ -552,7 +573,7 @@ public:
             if (targetId == localPlayerId) {
                 // We received damage from another player
                 LOG_INFO("Received " + std::to_string(damage) + " damage from player " + std::to_string(attackerId));
-                playerTakeDamage(damage, knockback);
+                playerHealthSystem.takeDamage(damage, knockback);
             }
             
             // Find the remote player entity and apply damage for visual effects
@@ -625,195 +646,6 @@ public:
         float sunY = std::sin(angle);
         return sunY > 0.1f;
     }
-
-    bool isExposedToSky(const glm::vec3& pos) {
-        int x = static_cast<int>(std::floor(pos.x));
-        int y = static_cast<int>(std::floor(pos.y));
-        int z = static_cast<int>(std::floor(pos.z));
-
-        for (int checkY = y + 1; checkY < y + 32 && checkY < 256; ++checkY) {
-            Block block = chunkManager.getBlockAt(x, checkY, z);
-            if (block.isSolid() && !block.isLeaves()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    void applyDaylightBurn(Entity* entity, float deltaTime) {
-        if (!entity || entity->isDead()) {
-            mobBurnStates.erase(entity);
-            return;
-        }
-
-        if (!isExposedToSky(entity->getPosition())) {
-            mobBurnStates.erase(entity);
-            return;
-        }
-
-        auto& state = mobBurnStates[entity];
-        state.damageTimer += deltaTime;
-        state.vfxTimer += deltaTime;
-
-        if (state.damageTimer >= 1.0f) {
-            state.damageTimer = 0.0f;
-            entity->takeDamage(1.0f);
-        }
-
-        if (state.vfxTimer >= 0.35f) {
-            state.vfxTimer = 0.0f;
-            explosionVolumes.spawnFire(entity->getPosition() + glm::vec3(0.0f, 0.6f, 0.0f), 1.0f, 0.9f);
-        }
-    }
-
-    bool isPositionInFire(const glm::vec3& pos) const {
-        glm::ivec3 blockPos(
-            static_cast<int>(std::floor(pos.x)),
-            static_cast<int>(std::floor(pos.y)),
-            static_cast<int>(std::floor(pos.z))
-        );
-
-        if (fireSystem.isBurning(blockPos)) return true;
-        if (fireSystem.isBurning(blockPos + glm::ivec3(0, 1, 0))) return true;
-        if (fireSystem.isBurning(blockPos + glm::ivec3(0, -1, 0))) return true;
-
-        return false;
-    }
-
-    void applyFireBurn(Entity* entity, float deltaTime) {
-        if (!entity || entity->isDead()) {
-            fireBurnStates.erase(entity);
-            return;
-        }
-
-        glm::vec3 pos = entity->getPosition();
-        bool inFire = isPositionInFire(pos + glm::vec3(0.0f, 0.2f, 0.0f)) ||
-                      isPositionInFire(pos + glm::vec3(0.0f, 0.9f, 0.0f));
-
-        if (!inFire) {
-            fireBurnStates.erase(entity);
-            return;
-        }
-
-        auto& state = fireBurnStates[entity];
-        state.damageTimer += deltaTime;
-        state.vfxTimer += deltaTime;
-
-        if (state.damageTimer >= 0.6f) {
-            state.damageTimer = 0.0f;
-            entity->takeDamage(1.0f);
-        }
-
-        if (state.vfxTimer >= 0.4f) {
-            state.vfxTimer = 0.0f;
-            explosionVolumes.spawnFire(pos + glm::vec3(0.0f, 0.6f, 0.0f), 1.0f, 0.9f);
-        }
-    }
-
-    void applyPlayerFireBurn(float deltaTime) {
-        if (playerHealth <= 0.0f) {
-            playerFireState = BurnState{};
-            return;
-        }
-
-        if (isUnderwater) {
-            playerFireState = BurnState{};
-            return;
-        }
-
-        glm::vec3 pos = camera.getPosition();
-        bool inFire = isPositionInFire(pos + glm::vec3(0.0f, 0.2f, 0.0f)) ||
-                      isPositionInFire(pos + glm::vec3(0.0f, 1.0f, 0.0f));
-
-        if (!inFire) {
-            playerFireState = BurnState{};
-            return;
-        }
-
-        playerFireState.damageTimer += deltaTime;
-        playerFireState.vfxTimer += deltaTime;
-
-        if (playerFireState.damageTimer >= 0.6f) {
-            playerFireState.damageTimer = 0.0f;
-            playerTakeDamage(1.0f, glm::vec3(0.0f));
-        }
-
-        if (playerFireState.vfxTimer >= 0.4f) {
-            playerFireState.vfxTimer = 0.0f;
-            explosionVolumes.spawnFire(pos + glm::vec3(0.0f, 0.6f, 0.0f), 1.0f, 0.9f);
-        }
-    }
-
-    bool isGroundedAt(const glm::vec3& pos) {
-        int x = static_cast<int>(std::floor(pos.x));
-        int y = static_cast<int>(std::floor(pos.y - 0.1f));
-        int z = static_cast<int>(std::floor(pos.z));
-        Block below = chunkManager.getBlockAt(x, y, z);
-        return below.isSolid();
-    }
-
-    void applyPlayerFallDamage() {
-        if (uiManager.isCreativeMode || camera.isFlying || isUnderwater) {
-            playerFallState = FallState{};
-            return;
-        }
-
-        bool onGround = camera.onGround || isGroundedAt(camera.getPosition());
-        float y = camera.getPosition().y;
-
-        if (!playerFallState.falling && !onGround) {
-            playerFallState.falling = true;
-            playerFallState.startY = y;
-        }
-
-        if (playerFallState.falling && y > playerFallState.startY) {
-            playerFallState.startY = y;
-        }
-
-        if (playerFallState.falling && onGround) {
-            float fallDist = playerFallState.startY - y;
-            if (fallDist >= 4.0f) {
-                float damage = std::max(0.0f, fallDist - 4.0f);
-                playerTakeDamage(damage, glm::vec3(0.0f), false);
-                Audio::AudioManager::instance().playSound(Audio::SoundType::PLAYER_FALL_BIG, 0.9f);
-            } else if (fallDist > 0.1f) {
-                Audio::AudioManager::instance().playSound(Audio::SoundType::PLAYER_FALL_SMALL, 0.7f);
-            }
-            playerFallState.falling = false;
-        }
-    }
-
-    void applyEntityFallDamage(Entity* entity) {
-        if (!entity || entity->isDead()) {
-            entityFallStates.erase(entity);
-            return;
-        }
-
-        glm::vec3 pos = entity->getPosition();
-        bool onGround = isGroundedAt(pos);
-        auto& state = entityFallStates[entity];
-
-        if (!state.falling && !onGround) {
-            state.falling = true;
-            state.startY = pos.y;
-        }
-
-        if (state.falling && pos.y > state.startY) {
-            state.startY = pos.y;
-        }
-
-        if (state.falling && onGround) {
-            float fallDist = state.startY - pos.y;
-            if (fallDist >= 4.0f) {
-                float damage = std::max(0.0f, fallDist - 4.0f);
-                entity->takeDamage(damage);
-                Audio::AudioManager::instance().playSoundAt(Audio::SoundType::PLAYER_FALL_BIG, pos, 0.8f);
-            } else if (fallDist > 0.1f) {
-                Audio::AudioManager::instance().playSoundAt(Audio::SoundType::PLAYER_FALL_SMALL, pos, 0.6f);
-            }
-            state.falling = false;
-        }
-    }
     
     void joinMultiplayerGame(const std::string& playerName, const std::string& address, uint16_t port) {
         uiManager.setNetworkStatus("Connecting...");
@@ -838,529 +670,23 @@ public:
     }
     
     void initializeMenuWorld() {
-        LOG_INFO("Initializing menu background world...");
-        
-        // CRITICAL: Wait for all pending thread pool tasks to complete before clearing
-        // This prevents race conditions where game world chunks get mixed with menu world
-        threadPool.wait();
-        
-        // Clear pending meshes that were built for the previous world
-        {
-            std::lock_guard<std::mutex> lock(meshMutex);
-            pendingMeshes.clear();
-        }
-        
-        // Clear any existing world data first
-        chunkManager.unloadAll();
-        chunkManager.clear();
-        renderer.clear();
-        
-        // Initialize seed ONCE per .exe session (O(1) lookup for subsequent calls)
-        if (!menuSeedInitialized) {
-            menuWorldSeed = static_cast<long>(std::chrono::system_clock::now().time_since_epoch().count());
-            menuSeedInitialized = true;
-            LOG_INFO("Menu world seed initialized: " + std::to_string(menuWorldSeed));
-        } else {
-            LOG_INFO("Reusing cached menu world seed: " + std::to_string(menuWorldSeed));
-        }
-        worldGenerator.setSeed(static_cast<unsigned int>(menuWorldSeed));
-        
-        // Find a nice scenic spot - keep all camera positions within a reasonable area
-        int centerX = 0;
-        int centerZ = 0;
-        int terrainHeight = worldGenerator.getSurfaceHeight(centerX, centerZ);
-        float baseY = static_cast<float>(terrainHeight) + 25.0f; // Higher above ground
-        
-        // Scene positions with more movement but still within pre-loaded area (~50 block radius)
-        menuScenePositions[0] = glm::vec3(centerX, baseY, centerZ);
-        menuScenePositions[1] = glm::vec3(centerX + 40.0f, baseY + 8.0f, centerZ + 35.0f);
-        menuScenePositions[2] = glm::vec3(centerX - 35.0f, baseY + 5.0f, centerZ + 25.0f);
-        menuScenePositions[3] = glm::vec3(centerX + 25.0f, baseY + 3.0f, centerZ - 40.0f);
-        
-        menuCamera.setPosition(menuScenePositions[0]);
-        menuCamera.setYaw(menuCameraYaw);
-        menuCamera.setPitch(-15.0f); // Looking down at the terrain
-        menuCameraPitch = -15.0f;
-        menuCamera.setFov(70.0f);
-        
-        // Pre-generate a good sized area with loading screen
-        // Radius of 6 gives 13x13 chunks = ~208 blocks coverage, enough for 50 block camera movement
-        int menuRadius = 6;
-        int totalChunks = (menuRadius * 2 + 1) * (menuRadius * 2 + 1) * 8;
-        int generatedChunks = 0;
-        
-        // Check if we have cached data (O(1) cache lookup)
-        bool usingCache = menuCacheValid && !menuChunkCache.empty();
-        if (usingCache) {
-            LOG_INFO("Restoring menu world from cache (" + std::to_string(menuChunkCache.size()) + " chunks)...");
-        } else {
-            LOG_INFO("Generating menu world chunks with loading screen...");
-        }
-        
-        // Generate or restore all chunks with loading screen feedback
-        for (int x = -menuRadius; x <= menuRadius; x++) {
-            for (int z = -menuRadius; z <= menuRadius; z++) {
-                for (int y = 0; y < 8; y++) {
-                    ChunkPos pos = ChunkManager::worldToChunk(glm::vec3(centerX, 0, centerZ) + glm::vec3(x * CHUNK_SIZE, y * CHUNK_SIZE - 64, z * CHUNK_SIZE));
-                    chunkManager.requestChunkGeneration(pos);
-                    auto chunk = chunkManager.getChunk(pos);
-                    
-                    // Check for UNLOADED state (new chunks start as UNLOADED after requestChunkGeneration)
-                    if (chunk && chunk->getState() == ChunkState::UNLOADED) {
-                        // O(1) cache lookup - check if this chunk is already cached
-                        auto cacheIt = menuChunkCache.find(pos);
-                        if (usingCache && cacheIt != menuChunkCache.end()) {
-                            // Restore from cache (O(1) lookup + O(n) copy where n = blocks in chunk)
-                            chunk->setBlocks(cacheIt->second);
-                        } else {
-                            // Generate new chunk and cache it
-                            worldGenerator.generate(chunk);
-                            
-                            // Store in cache for future use (O(1) insert)
-                            menuChunkCache[pos] = chunk->getBlocks();
-                        }
-                        // Set to MESH_BUILD so getChunksToMesh will pick it up
-                        chunk->setState(ChunkState::MESH_BUILD);
-                    }
-                    generatedChunks++;
-                    
-                    // Update loading screen periodically
-                    if (generatedChunks % 20 == 0) {
-                        float progress = static_cast<float>(generatedChunks) / static_cast<float>(totalChunks) * 0.6f;
-                        renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
-                        updateLoadingTip();
-                        uiManager.renderLoadingTip(currentLoadingTip);
-                        window->swapBuffers();
-                        window->pollEvents();
-                    }
-                }
-            }
-        }
-        
-        // Mark cache as valid for future reloads
-        menuCacheValid = true;
-        
-        // Build meshes for all generated chunks with loading screen
-        LOG_INFO("Building menu world meshes...");
-        auto chunksToMesh = chunkManager.getChunksToMesh(menuCamera.getPosition(), 1000);
-        int totalMeshes = static_cast<int>(chunksToMesh.size());
-        int meshedCount = 0;
-        
-        for (auto& chunk : chunksToMesh) {
-            auto neighbors = chunkManager.getNeighbors(chunk->getPosition());
-            MeshData meshData = meshBuilder.buildChunkMesh(chunk, 
-                neighbors[0], neighbors[1], neighbors[2], neighbors[3], neighbors[4], neighbors[5], chunk->getCurrentLOD());
-            renderer.uploadChunkMesh(chunk->getPosition(), 
-                meshData.vertices, meshData.indices, 
-                meshData.waterVertices, meshData.waterIndices);
-            chunk->setState(ChunkState::GPU_UPLOADED);
-            meshedCount++;
-            
-            // Update loading screen periodically
-            if (meshedCount % 10 == 0) {
-                float progress = 0.6f + (static_cast<float>(meshedCount) / static_cast<float>(totalMeshes)) * 0.4f;
-                renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
-                updateLoadingTip();
-                uiManager.renderLoadingTip(currentLoadingTip);
-                window->swapBuffers();
-                window->pollEvents();
-            }
-        }
-        
-        // Show final 100% loading screen before transitioning
-        renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), 1.0f);
-        updateLoadingTip();
-        uiManager.renderLoadingTip(currentLoadingTip);
-        window->swapBuffers();
-        window->pollEvents();
-        
-        menuWorldInitialized = true;
-        LOG_INFO("Menu background world initialized with " + std::to_string(generatedChunks) + " chunks" + 
-                 (usingCache ? " (from cache)" : " (newly generated)"));
-    }
-    
-    void updateMenuCamera(float deltaTime) {
-        // Slowly rotate camera for panoramic effect
-        menuCameraYaw += deltaTime * 3.0f; // 3 degrees per second (slower rotation)
-        if (menuCameraYaw > 360.0f) menuCameraYaw -= 360.0f;
-        
-        menuCamera.setYaw(menuCameraYaw);
-        menuCamera.setPitch(menuCameraPitch);
-        
-        // Change scene every 20 seconds with smooth transition
-        menuCameraTimer += deltaTime;
-        if (menuCameraTimer >= 20.0f) {
-            menuCameraTimer = 0.0f;
-            menuSceneIndex = (menuSceneIndex + 1) % NUM_MENU_SCENES;
-        }
-        
-        // Smooth interpolation to target position (within pre-loaded area)
-        glm::vec3 targetPos = menuScenePositions[menuSceneIndex];
-        glm::vec3 currentPos = menuCamera.getPosition();
-        glm::vec3 newPos = currentPos + (targetPos - currentPos) * deltaTime * 0.3f;
-        menuCamera.setPosition(newPos);
-        
-        // NO dynamic chunk generation - everything is pre-loaded
-        // Just update the view matrix for rendering
-    }
-
-    void createWorld(const std::string& name, long seed = 12345) {
-        LOG_INFO("Creating new world: " + name + " with seed: " + std::to_string(seed));
-        
-        currentSeed = seed;
-        currentWorldName = name.empty() ? "World_" + std::to_string(seed) : name;
-        
-        // CRITICAL: Wait for all pending thread pool tasks to complete before clearing
-        // This prevents race conditions where old world chunks get inserted after clear()
-        threadPool.wait();
-        
-        // Clear pending meshes that were built for the previous world
-        {
-            std::lock_guard<std::mutex> lock(meshMutex);
-            pendingMeshes.clear();
-        }
-        
-        // Set seed BEFORE clearing so any residual generation uses new seed
-        worldGenerator.setSeed(static_cast<unsigned int>(seed));
-        
-        // Clear existing world data
-        chunkManager.unloadAll();
-        chunkManager.clear(); // Clear preloaded data too
-        renderer.clear(); // Clear GPU buffers from previous world
-        
-        // Find a safe spawn location (Land)
-        // If (0,0) is ocean, search outwards until we find land.
-        int spawnX = 0;
-        int spawnZ = 0;
-        int searchRadius = 0;
-        bool foundLand = false;
-        
-        // Check origin first
-        if (worldGenerator.getSurfaceHeight(0, 0) >= SEA_LEVEL) {
-            foundLand = true;
-        }
-        
-        while (!foundLand && searchRadius < 10000) {
-            searchRadius += 64; // Step by 4 chunks
-            
-            // Check 4 cardinal directions
-            if (worldGenerator.getSurfaceHeight(searchRadius, 0) >= SEA_LEVEL) { spawnX = searchRadius; spawnZ = 0; foundLand = true; break; }
-            if (worldGenerator.getSurfaceHeight(-searchRadius, 0) >= SEA_LEVEL) { spawnX = -searchRadius; spawnZ = 0; foundLand = true; break; }
-            if (worldGenerator.getSurfaceHeight(0, searchRadius) >= SEA_LEVEL) { spawnX = 0; spawnZ = searchRadius; foundLand = true; break; }
-            if (worldGenerator.getSurfaceHeight(0, -searchRadius) >= SEA_LEVEL) { spawnX = 0; spawnZ = -searchRadius; foundLand = true; break; }
-        }
-        
-        if (foundLand && (spawnX != 0 || spawnZ != 0)) {
-            LOG_INFO("Spawn moved to (" + std::to_string(spawnX) + ", " + std::to_string(spawnZ) + ") to avoid ocean.");
-        }
-
-        // Determine safe spawn height at the new coordinates
-        int terrainHeight = worldGenerator.getSurfaceHeight(spawnX, spawnZ);
-        // Start the camera high above the terrain to ensure we load the chunks *above* the ground
-        // and to avoid being inside a mountain before chunks load.
-        float initialSpawnY = static_cast<float>(terrainHeight) + 30.0f;
-
-        // Reset camera
-        camera.setPosition(glm::vec3(static_cast<float>(spawnX), initialSpawnY, static_cast<float>(spawnZ)));
-        camera.setYaw(-90.0f);
-        camera.setPitch(0.0f);
-                // Reset velocities when spawning
-                camera.velocity = glm::vec3(0.0f);
-        
-        // Load a small radius around player first (e.g. 4 chunks)
-        int initialRadius = 4;
-        
-        // Wait for generation of initial chunks
-        bool initialGenDone = false;
-        while (!initialGenDone && !window->shouldClose()) {
-            auto chunksToGen = chunkManager.getChunksToGenerate(camera.getPosition(), initialRadius, 10000);
-            
-            if (chunksToGen.empty()) {
-                initialGenDone = true;
-            } else {
-                int generated = 0;
-                int totalChunks = static_cast<int>(chunksToGen.size());
-                
-                for (const auto& pos : chunksToGen) {
-                    chunkManager.requestChunkGeneration(pos);
-                    auto chunk = chunkManager.getChunk(pos);
-                    if (chunk) {
-                        // Check if we have preloaded data
-                        if (chunkManager.hasPreloadedData(pos)) {
-                            auto blocks = chunkManager.getPreloadedData(pos);
-                            std::copy(blocks.begin(), blocks.end(), chunk->getBlocks().begin());
-                            chunk->setModified(true); // Mark as modified so it saves again
-                        } else {
-                            worldGenerator.generate(chunk);
-                        }
-                        
-                        chunk->setState(ChunkState::MESH_BUILD);
-                        
-                        // Mark neighbors for update to ensure no gaps
-                        auto neighbors = chunkManager.getNeighbors(pos);
-                        for (auto& n : neighbors) {
-                            if (n && n->getState() != ChunkState::UNLOADED) {
-                                n->setState(ChunkState::MESH_BUILD);
-                            }
-                        }
-                    }
-                    generated++;
-                    
-                    // Update loading screen
-                    if (generated % 5 == 0) {
-                        float progress = static_cast<float>(generated) / static_cast<float>(totalChunks) * 0.5f;
-                        renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
-                        updateLoadingTip();
-                        uiManager.renderLoadingTip(currentLoadingTip);
-                        window->swapBuffers();
-                        window->pollEvents();
-                    }
-                }
-            }
-        }
-        
-        // Now wait for initial meshing of this small radius
-        LOG_INFO("Building initial meshes...");
-        bool initialLoadDone = false;
-        int meshedCount = 0;
-        int totalInitialChunks = (initialRadius * 2 + 1) * (initialRadius * 2 + 1) * 5; // Approx count
-        
-        while (!initialLoadDone && !window->shouldClose()) {
-            auto chunksToMesh = chunkManager.getChunksToMesh(camera.getPosition(), 100); // Mesh as many as possible
-            
-            if (chunksToMesh.empty()) {
-                initialLoadDone = true;
-            } else {
-                for (auto& chunk : chunksToMesh) {
-                    auto neighbors = chunkManager.getNeighbors(chunk->getPosition());
-                    
-                    MeshData meshData = meshBuilder.buildChunkMesh(chunk, 
-                        neighbors[0], neighbors[1], neighbors[2], neighbors[3], neighbors[4], neighbors[5], chunk->getCurrentLOD());
-                        
-                    renderer.uploadChunkMesh(chunk->getPosition(), 
-                        meshData.vertices, meshData.indices, 
-                        meshData.waterVertices, meshData.waterIndices);
-                        
-                    chunk->setState(ChunkState::GPU_UPLOADED);
-                    meshedCount++;
-                }
-                
-                float progress = 0.5f + (static_cast<float>(meshedCount) / static_cast<float>(totalInitialChunks)) * 0.5f;
-                if (progress > 1.0f) progress = 1.0f;
-                
-                renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
-                updateLoadingTip();
-                uiManager.renderLoadingTip(currentLoadingTip);
-                window->swapBuffers();
-                window->pollEvents();
-            }
-        }
-        
-        // Spawn player entity
-        glm::vec3 spawnPos = camera.getPosition();
-        // Move slightly in front to see it initially, or at 0,0,0
-        spawnPos.z -= 5.0f; 
-        spawnPos.y = chunkManager.getHeightAt(static_cast<int>(spawnPos.x), static_cast<int>(spawnPos.z)) + 2.0f;
-        
-        playerEntity = std::make_unique<PlayerEntity>(spawnPos);
-        // Refine spawn position to ensure we are not inside a block (e.g. tree or mountain peak)
-        // We scan downwards from our high vantage point to find the first solid block.
-        // Since we started high (terrain + 30), we should be in air.
-        // We look for the first non-air block below us.
-        int scanStartY = static_cast<int>(camera.getPosition().y);
-        int currentSpawnX = static_cast<int>(camera.getPosition().x);
-        int currentSpawnZ = static_cast<int>(camera.getPosition().z);
-        
-        bool foundGround = false;
-        for (int y = scanStartY; y > 0; --y) {
-            Block block = chunkManager.getBlockAt(currentSpawnX, y, currentSpawnZ);
-            if (block.getType() != BlockType::AIR) {
-                // Found the highest block (could be leaves, wood, or ground)
-                // Set spawn point 2 blocks above it
-                camera.setPosition(glm::vec3(static_cast<float>(currentSpawnX), static_cast<float>(y) + 2.5f, static_cast<float>(currentSpawnZ)));
-                // Reset velocity to avoid falling when refinement happened during a long frame
-                camera.velocity = glm::vec3(0.0f);
-                LOG_INFO("Spawn position refined to Y=" + std::to_string(y + 2.5f));
-                foundGround = true;
-                break;
-            }
-        }
-        
-        // Fallback if something went wrong (e.g. chunks not loaded), though unlikely
-        if (!foundGround) {
-             LOG_INFO("Could not find ground via raycast, using default height.");
-        }
-        
-        // Initialize EntityManager (new system - stutter-free)
-        if (useNewEntityManager) {
-            entityManager.initialize(chunkManager, worldGenerator);
-            
-            // Preload models during loading screen to avoid runtime stutters
-            LOG_INFO("Preloading mob models...");
-            renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), 0.95f);
+        auto loadingCallback = [this](float progress) {
+            renderer.renderLoadingScreen(window->getWidth(), window->getHeight(), progress);
             updateLoadingTip();
             uiManager.renderLoadingTip(currentLoadingTip);
             window->swapBuffers();
             window->pollEvents();
-            entityManager.preloadModels();
-            
-            // Set network mode based on current state
-            entityManager.setNetworkMode(networkManager.isHost(), networkManager.isClient());
-        }
-        
-        // Initialize legacy mob spawn manager (fallback)
-        mobSpawnManager = std::make_unique<MobSpawnManager>(chunkManager, worldGenerator);
-        
-        // Initialize physics test system
-#if ENABLE_PHYSICS_TEST
-        auto entityProvider = [this]() {
-            std::vector<Entity*> entities;
-            if (useNewEntityManager) {
-                auto managed = entityManager.getAllEntities();
-                entities.insert(entities.end(), managed.begin(), managed.end());
-            } else {
-                for (auto& z : zombies) { if (z) entities.push_back(z.get()); }
-                for (auto& s : skeletons) { if (s) entities.push_back(s.get()); }
-                for (auto& p : pigs) { if (p) entities.push_back(p.get()); }
-                for (auto& c : chickens) { if (c) entities.push_back(c.get()); }
-                for (auto& s : sheep) { if (s) entities.push_back(s.get()); }
-            }
-            auto remotePlayers = networkManager.getRemotePlayerEntities();
-            for (auto* rp : remotePlayers) { if (rp) entities.push_back(rp); }
-            return entities;
         };
 
-        auto playerDamage = [this](float amount, const glm::vec3& knockback) {
-            playerTakeDamage(amount, knockback);
-        };
+        menuWorldSystem.initialize(loadingCallback);
+    }
 
-        auto fireStart = [this](const glm::ivec3& pos) {
-            Block block = chunkManager.getBlockAt(pos.x, pos.y, pos.z);
-            if (block.isFlammable()) {
-                fireSystem.igniteBlock(pos, 4.0f, true, true);
-
-                // If we hit tall grass/flower sitting on a grass block, burn the grass block too
-                BlockType t = block.getType();
-                if (t == BlockType::TALL_GRASS || t == BlockType::ROSE) {
-                    glm::ivec3 belowPos = pos + glm::ivec3(0, -1, 0);
-                    Block below = chunkManager.getBlockAt(belowPos.x, belowPos.y, belowPos.z);
-                    if (below.getType() == BlockType::GRASS) {
-                        fireSystem.igniteBlock(belowPos, 4.0f, true, true);
-                    }
-                }
-            } else {
-                glm::ivec3 topPos = pos + glm::ivec3(0, 1, 0);
-                Block above = chunkManager.getBlockAt(topPos.x, topPos.y, topPos.z);
-                if (above.isSolid()) {
-                    topPos = pos;
-                }
-                fireSystem.igniteBlock(topPos, 3.0f, false, false);
-            }
-        };
-
-        physicsTest.initialize(&chunkManager, &camera, &explosionVolumes, entityProvider, playerDamage, fireStart);
-        LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
-#endif
+    void createWorld(const std::string& name, long seed = 12345) {
+        worldLifecycleSystem.createWorld(name, seed);
     }
     
     bool loadWorld(const std::string& name = "world.dat") {
-        LOG_INFO("Loading world: " + name);
-        
-        // CRITICAL: Wait for all pending thread pool tasks to complete before clearing
-        threadPool.wait();
-        
-        // Clear pending meshes that were built for the previous world
-        {
-            std::lock_guard<std::mutex> lock(meshMutex);
-            pendingMeshes.clear();
-        }
-        
-        // Clear existing world
-        chunkManager.unloadAll();
-        chunkManager.clear();
-        renderer.clear();
-        entityManager.clear();
-        
-        glm::vec3 playerPos;
-        long seed;
-        
-        if (WorldSerializer::loadWorld(name, chunkManager, playerPos, seed)) {
-            camera.setPosition(playerPos);
-            currentWorldName = name;
-            currentSeed = seed;
-            worldGenerator.setSeed(static_cast<unsigned int>(seed));
-            
-            // Initialize player entity at loaded position
-            playerEntity = std::make_unique<PlayerEntity>(playerPos);
-            
-            // Initialize EntityManager for loaded world
-            if (useNewEntityManager) {
-                entityManager.initialize(chunkManager, worldGenerator);
-                if (!entityManager.isModelPreloadComplete()) {
-                    entityManager.preloadModels();
-                }
-            }
-            
-            // Initialize legacy mob spawn manager for loaded world
-            mobSpawnManager = std::make_unique<MobSpawnManager>(chunkManager, worldGenerator);
-            
-            // Initialize physics test system for loaded world
-#if ENABLE_PHYSICS_TEST
-            auto entityProvider = [this]() {
-                std::vector<Entity*> entities;
-                if (useNewEntityManager) {
-                    auto managed = entityManager.getAllEntities();
-                    entities.insert(entities.end(), managed.begin(), managed.end());
-                } else {
-                    for (auto& z : zombies) { if (z) entities.push_back(z.get()); }
-                    for (auto& s : skeletons) { if (s) entities.push_back(s.get()); }
-                    for (auto& p : pigs) { if (p) entities.push_back(p.get()); }
-                    for (auto& c : chickens) { if (c) entities.push_back(c.get()); }
-                    for (auto& s : sheep) { if (s) entities.push_back(s.get()); }
-                }
-                auto remotePlayers = networkManager.getRemotePlayerEntities();
-                for (auto* rp : remotePlayers) { if (rp) entities.push_back(rp); }
-                return entities;
-            };
-
-            auto playerDamage = [this](float amount, const glm::vec3& knockback) {
-                playerTakeDamage(amount, knockback);
-            };
-
-            auto fireStart = [this](const glm::ivec3& pos) {
-                Block block = chunkManager.getBlockAt(pos.x, pos.y, pos.z);
-                if (block.isFlammable()) {
-                    fireSystem.igniteBlock(pos, 4.0f, true, true);
-
-                    // If we hit tall grass/flower sitting on a grass block, burn the grass block too
-                    BlockType t = block.getType();
-                    if (t == BlockType::TALL_GRASS || t == BlockType::ROSE) {
-                        glm::ivec3 belowPos = pos + glm::ivec3(0, -1, 0);
-                        Block below = chunkManager.getBlockAt(belowPos.x, belowPos.y, belowPos.z);
-                        if (below.getType() == BlockType::GRASS) {
-                            fireSystem.igniteBlock(belowPos, 4.0f, true, true);
-                        }
-                    }
-                } else {
-                    glm::ivec3 topPos = pos + glm::ivec3(0, 1, 0);
-                    Block above = chunkManager.getBlockAt(topPos.x, topPos.y, topPos.z);
-                    if (above.isSolid()) {
-                        topPos = pos;
-                    }
-                    fireSystem.igniteBlock(topPos, 3.0f, false, false);
-                }
-            };
-
-            physicsTest.initialize(&chunkManager, &camera, &explosionVolumes, entityProvider, playerDamage, fireStart);
-            LOG_INFO("Physics test system ready - Press P to toggle, X/C for explosions");
-#endif
-
-            LOG_INFO("World loaded successfully");
-            return true;
-        } else {
-            LOG_ERROR("Failed to load world");
-            return false;
-        }
+        return worldLifecycleSystem.loadWorld(name);
     }
     
     void run() {
@@ -1383,7 +709,7 @@ public:
             
             if (inMainMenu) {
                 // Update menu camera for panoramic effect
-                updateMenuCamera(clampedDelta);
+                menuWorldSystem.update(clampedDelta);
             }
             
             processInput(deltaTime); // Input/GUI can use full frame delta
@@ -1501,18 +827,20 @@ private:
     MeshBuilder meshBuilder;
     ThreadPool threadPool;
     UIManager uiManager;
+    PlayerHealthSystem playerHealthSystem;
     WorldSerializer worldSerializer;
     Network::NetworkManager networkManager;
     HeldItemRenderer heldItemRenderer;
+    std::mutex meshMutex;
+    std::vector<std::pair<ChunkPos, MeshData>> pendingMeshes;
+    MenuWorldSystem menuWorldSystem;
     ExplosionVolumeSystem explosionVolumes;
     FireSystem fireSystem;
+    StatusEffectsSystem statusEffectsSystem;
     
     // Physics test system (can be disabled via ENABLE_PHYSICS_TEST in PhysicsTest.h)
     Physics::PhysicsTestSystem physicsTest;
     
-    std::mutex meshMutex;
-    std::vector<std::pair<ChunkPos, MeshData>> pendingMeshes;
-
     double lastX, lastY;
     double lastSpaceTime;
     bool firstMouse;
@@ -1521,11 +849,6 @@ private:
     // Game State
     std::string currentWorldName = "New World";
     long currentSeed = 12345;
-    
-    // Player health for local player
-    float playerHealth = 20.0f;
-    float playerMaxHealth = 20.0f;
-    float playerInvulnerabilityTimer = 0.0f;
     
     // Combat state
     float attackCooldown = 0.0f;
@@ -1553,35 +876,8 @@ private:
     // Flag to use new EntityManager vs legacy system
     bool useNewEntityManager = true;
 
-    struct BurnState {
-        float damageTimer = 0.0f;
-        float vfxTimer = 0.0f;
-    };
-    std::unordered_map<const Entity*, BurnState> mobBurnStates;
-    std::unordered_map<const Entity*, BurnState> fireBurnStates;
-    BurnState playerFireState;
+    WorldLifecycleSystem worldLifecycleSystem;
 
-    struct FallState {
-        bool falling = false;
-        float startY = 0.0f;
-    };
-    std::unordered_map<const Entity*, FallState> entityFallStates;
-    FallState playerFallState;
-    
-    // Menu background world
-    bool menuWorldInitialized = false;
-    Camera menuCamera{glm::vec3(0.0f, 100.0f, 0.0f)};
-    float menuCameraYaw = 0.0f;
-    float menuCameraPitch = -15.0f;
-    float menuCameraTimer = 0.0f;
-    int menuSceneIndex = 0;
-    static constexpr int NUM_MENU_SCENES = 4;
-    glm::vec3 menuScenePositions[NUM_MENU_SCENES] = {
-        glm::vec3(0.0f, 100.0f, 0.0f),
-        glm::vec3(200.0f, 85.0f, 200.0f),
-        glm::vec3(-150.0f, 110.0f, 100.0f),
-        glm::vec3(100.0f, 90.0f, -200.0f)
-    };
     
     // Audio - footstep timer
     float footstepTimer = 0.0f;
@@ -1652,10 +948,6 @@ private:
     std::mt19937 rng;
     
     // Menu world cache - O(1) lookup for chunks within session
-    long menuWorldSeed = 0; // Set once at startup, reused for entire session
-    bool menuSeedInitialized = false;
-    std::unordered_map<ChunkPos, std::array<Block, CHUNK_VOLUME>> menuChunkCache;
-    bool menuCacheValid = false; // True if cache contains valid data for current seed
 
     std::string pickRandomTip() {
         if (loadingTips.empty()) return std::string();
@@ -2026,12 +1318,8 @@ private:
             attackCooldown -= deltaTime;
             if (attackCooldown < 0.0f) attackCooldown = 0.0f;
         }
-        
-        // Update player invulnerability
-        if (playerInvulnerabilityTimer > 0.0f) {
-            playerInvulnerabilityTimer -= deltaTime;
-            if (playerInvulnerabilityTimer < 0.0f) playerInvulnerabilityTimer = 0.0f;
-        }
+
+        playerHealthSystem.update(deltaTime);
         
         // Update held item from current hotbar selection
         ItemType currentHeldItem = uiManager.getSelectedItem();
@@ -2113,9 +1401,6 @@ private:
             heldItemRenderer.setMining(false);
         }
         
-        // Sync player health to UI
-        uiManager.playerHealth = static_cast<int>(playerHealth);
-
         // Update ambient audio state based on player position
         if (uiManager.isWorldLoaded()) {
             glm::vec3 headPos = camera.getPosition() + glm::vec3(0.0f, camera.defaultY, 0.0f);
@@ -2166,7 +1451,7 @@ private:
         // Check if we should skip player controls but continue world updates
         bool skipPlayerControls = uiManager.isMenuOpen() || Console::instance().isVisible();
         // Always continue world updates in multiplayer OR when world is loaded OR in main menu (for background)
-        bool continueWorldUpdates = networkManager.isOnline() || uiManager.isWorldLoaded() || menuWorldInitialized;
+        bool continueWorldUpdates = networkManager.isOnline() || uiManager.isWorldLoaded() || menuWorldSystem.isInitialized();
 
         // Day/Night Cycle - ALWAYS update for sky effects (even in main menu)
         constexpr float DAY_DURATION = 2400.0f; 
@@ -2403,16 +1688,16 @@ private:
                     if (isDayTime(normalizedTime)) {
                         for (auto* entity : entities) {
                             if (dynamic_cast<ZombieEntity*>(entity) || dynamic_cast<SkeletonEntity*>(entity)) {
-                                applyDaylightBurn(entity, deltaTime);
+                                statusEffectsSystem.applyDaylightBurn(entity, deltaTime);
                             }
                         }
                     } else {
-                        mobBurnStates.clear();
+                        statusEffectsSystem.clearDaylightBurnStates();
                     }
 
                     for (auto* entity : entities) {
-                        applyFireBurn(entity, deltaTime);
-                        applyEntityFallDamage(entity);
+                        statusEffectsSystem.applyFireBurn(entity, deltaTime);
+                        statusEffectsSystem.applyEntityFallDamage(entity);
                     }
                     
                     // If hosting, broadcast entity events to clients
@@ -2485,13 +1770,13 @@ private:
 
                         if (isDayTime(normalizedTime)) {
                             for (auto& z : zombies) {
-                                if (z) applyDaylightBurn(z.get(), deltaTime);
+                                if (z) statusEffectsSystem.applyDaylightBurn(z.get(), deltaTime);
                             }
                             for (auto& s : skeletons) {
-                                if (s) applyDaylightBurn(s.get(), deltaTime);
+                                if (s) statusEffectsSystem.applyDaylightBurn(s.get(), deltaTime);
                             }
                         } else {
-                            mobBurnStates.clear();
+                            statusEffectsSystem.clearDaylightBurnStates();
                         }
                         
                         // Update passive mobs (always update for death timer)
@@ -2505,19 +1790,34 @@ private:
                             if (s) s->updateAI(deltaTime, chunkManager);
                         }
 
-                        for (auto& z : zombies) { if (z) { applyFireBurn(z.get(), deltaTime); applyEntityFallDamage(z.get()); } }
-                        for (auto& s : skeletons) { if (s) { applyFireBurn(s.get(), deltaTime); applyEntityFallDamage(s.get()); } }
-                        for (auto& p : pigs) { if (p) { applyFireBurn(p.get(), deltaTime); applyEntityFallDamage(p.get()); } }
-                        for (auto& c : chickens) { if (c) { applyFireBurn(c.get(), deltaTime); applyEntityFallDamage(c.get()); } }
-                        for (auto& s : sheep) { if (s) { applyFireBurn(s.get(), deltaTime); applyEntityFallDamage(s.get()); } }
+                        for (auto& z : zombies) { if (z) { statusEffectsSystem.applyFireBurn(z.get(), deltaTime); statusEffectsSystem.applyEntityFallDamage(z.get()); } }
+                        for (auto& s : skeletons) { if (s) { statusEffectsSystem.applyFireBurn(s.get(), deltaTime); statusEffectsSystem.applyEntityFallDamage(s.get()); } }
+                        for (auto& p : pigs) { if (p) { statusEffectsSystem.applyFireBurn(p.get(), deltaTime); statusEffectsSystem.applyEntityFallDamage(p.get()); } }
+                        for (auto& c : chickens) { if (c) { statusEffectsSystem.applyFireBurn(c.get(), deltaTime); statusEffectsSystem.applyEntityFallDamage(c.get()); } }
+                        for (auto& s : sheep) { if (s) { statusEffectsSystem.applyFireBurn(s.get(), deltaTime); statusEffectsSystem.applyEntityFallDamage(s.get()); } }
                     }
                 }
             }
         } // End of mob update code
 
         if (!skipPlayerControls) {
-            applyPlayerFireBurn(deltaTime);
-            applyPlayerFallDamage();
+            statusEffectsSystem.applyPlayerFireBurn(
+                deltaTime,
+                playerHealthSystem.getHealth(),
+                isUnderwater,
+                [this](float amount, const glm::vec3& knockback, bool playHurtSound) {
+                    playerHealthSystem.takeDamage(amount, knockback, playHurtSound);
+                }
+            );
+            statusEffectsSystem.applyPlayerFallDamage(
+                playerHealthSystem.getHealth(),
+                isUnderwater,
+                camera.isFlying,
+                uiManager.isCreativeMode,
+                [this](float amount, const glm::vec3& knockback, bool playHurtSound) {
+                    playerHealthSystem.takeDamage(amount, knockback, playHurtSound);
+                }
+            );
         }
         
         // Generate chunks - always run if world is loaded
@@ -2631,7 +1931,7 @@ private:
             // Render menu background world
             std::vector<Entity*> emptyEntities;
             renderer.setFireLightPositions({});
-            renderer.render(chunkManager, menuCamera, emptyEntities, window->getWidth(), window->getHeight(), {}, nullptr);
+            renderer.render(chunkManager, menuWorldSystem.getCamera(), emptyEntities, window->getWidth(), window->getHeight(), {}, nullptr);
             renderer.cleanUnusedMeshes(chunkManager);
             uiManager.render();
             uiManager.renderConsole();
@@ -2939,39 +2239,6 @@ private:
         }
     }
     
-    // Take damage as the player
-    void playerTakeDamage(float amount, const glm::vec3& knockbackDir = glm::vec3(0.0f), bool playHurtSound = true) {
-        if (uiManager.isCreativeMode) {
-            return;
-        }
-        if (playerInvulnerabilityTimer > 0.0f || playerHealth <= 0.0f) {
-            return;
-        }
-        
-        playerHealth -= amount;
-        playerInvulnerabilityTimer = 0.5f; // Half second of immunity
-        
-        // Play hurt sound (optional)
-        if (playHurtSound) {
-            Audio::AudioManager::instance().playSound(Audio::SoundType::PLAYER_HURT, 0.8f);
-        }
-        
-        // Apply knockback
-        if (glm::length(knockbackDir) > 0.001f) {
-            glm::vec3 normalizedKnockback = glm::normalize(knockbackDir);
-            camera.velocity += normalizedKnockback * 8.0f;
-            camera.velocity.y += 4.0f;
-        }
-        
-        if (playerHealth <= 0.0f) {
-            playerHealth = 0.0f;
-            onPlayerDeath();
-        }
-        
-        // Update UI
-        uiManager.playerHealth = static_cast<int>(playerHealth);
-    }
-    
     void onPlayerDeath() {
         LOG_INFO("Player died!");
         
@@ -2987,8 +2254,7 @@ private:
     
     void respawnPlayer() {
         // Reset health
-        playerHealth = playerMaxHealth;
-        uiManager.playerHealth = static_cast<int>(playerHealth);
+        playerHealthSystem.resetToMax();
         
         // Reset player entity death state so animation plays correctly
         if (playerEntity) {
