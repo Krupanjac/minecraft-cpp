@@ -135,6 +135,9 @@ public:
     uint32_t playSound(SoundType type, float volume = 1.0f, float pitch = 1.0f);
     uint32_t playSoundAt(SoundType type, const glm::vec3& position, float volume = 1.0f, float pitch = 1.0f);
     uint32_t playSoundAtWithRange(SoundType type, const glm::vec3& position, float volume, float maxDistance, float pitch = 1.0f);
+    bool setLoop(uint32_t handle, bool loop);
+    bool setLoopRegion(uint32_t handle, float startSeconds, float endSeconds);
+    bool setSoundPosition(uint32_t handle, const glm::vec3& position);
     uint32_t playMusic(SoundType type, bool loop = true, float fadeIn = 1.0f);
     
     // Sound control

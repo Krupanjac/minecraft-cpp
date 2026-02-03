@@ -81,7 +81,7 @@ ExplosionResult ExplosionSystem::explode(const ExplosionParams& params) {
     
     // Spread fire
     if (params.createFire) {
-        spreadFire(params.center, affectedBlocks, result);
+        spreadFire(params.center, affectedBlocks, result, params.fireChanceMultiplier);
     }
     
     // Trigger chain reactions
@@ -313,7 +313,7 @@ void ExplosionSystem::createExplosionDebris(const glm::vec3& center,
 
 void ExplosionSystem::spreadFire(const glm::vec3& center,
                                   const std::vector<glm::ivec3>& affectedBlocks,
-                                  ExplosionResult& result) {
+                                  ExplosionResult& result, float fireChanceMultiplier) {
     std::uniform_real_distribution<float> fireChance(0.0f, 1.0f);
     if (!fireStart) return;
     
@@ -321,9 +321,22 @@ void ExplosionSystem::spreadFire(const glm::vec3& center,
         Block block = blockQuery(pos.x, pos.y, pos.z);
 
         // Ignite flammable blocks directly hit by the blast
-        if (block.isFlammable() && fireChance(rng) < config.fireSpreadChance) {
-            fireStart(pos);
-            result.fireBlocks.push_back(pos);
+        if (block.isFlammable()) {
+            float chance = config.fireSpreadChance * fireChanceMultiplier;
+            if (fireChance(rng) < chance) {
+                fireStart(pos);
+                result.fireBlocks.push_back(pos);
+            }
+            continue;
+        }
+
+        // Scatter fire on non-flammable but solid/exposed blocks for visual impact
+        if (block.isSolid() && isBlockExposed(pos)) {
+            float scatterChance = config.fireSpreadChance * 0.25f * fireChanceMultiplier;
+            if (fireChance(rng) < scatterChance) {
+                fireStart(pos);
+                result.fireBlocks.push_back(pos);
+            }
         }
     }
 }

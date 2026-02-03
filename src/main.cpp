@@ -743,6 +743,77 @@ public:
             explosionVolumes.spawnFire(pos + glm::vec3(0.0f, 0.6f, 0.0f), 1.0f, 0.9f);
         }
     }
+
+    bool isGroundedAt(const glm::vec3& pos) {
+        int x = static_cast<int>(std::floor(pos.x));
+        int y = static_cast<int>(std::floor(pos.y - 0.1f));
+        int z = static_cast<int>(std::floor(pos.z));
+        Block below = chunkManager.getBlockAt(x, y, z);
+        return below.isSolid();
+    }
+
+    void applyPlayerFallDamage() {
+        if (uiManager.isCreativeMode || camera.isFlying || isUnderwater) {
+            playerFallState = FallState{};
+            return;
+        }
+
+        bool onGround = camera.onGround || isGroundedAt(camera.getPosition());
+        float y = camera.getPosition().y;
+
+        if (!playerFallState.falling && !onGround) {
+            playerFallState.falling = true;
+            playerFallState.startY = y;
+        }
+
+        if (playerFallState.falling && y > playerFallState.startY) {
+            playerFallState.startY = y;
+        }
+
+        if (playerFallState.falling && onGround) {
+            float fallDist = playerFallState.startY - y;
+            if (fallDist >= 4.0f) {
+                float damage = std::max(0.0f, fallDist - 4.0f);
+                playerTakeDamage(damage, glm::vec3(0.0f), false);
+                Audio::AudioManager::instance().playSound(Audio::SoundType::PLAYER_FALL_BIG, 0.9f);
+            } else if (fallDist > 0.1f) {
+                Audio::AudioManager::instance().playSound(Audio::SoundType::PLAYER_FALL_SMALL, 0.7f);
+            }
+            playerFallState.falling = false;
+        }
+    }
+
+    void applyEntityFallDamage(Entity* entity) {
+        if (!entity || entity->isDead()) {
+            entityFallStates.erase(entity);
+            return;
+        }
+
+        glm::vec3 pos = entity->getPosition();
+        bool onGround = isGroundedAt(pos);
+        auto& state = entityFallStates[entity];
+
+        if (!state.falling && !onGround) {
+            state.falling = true;
+            state.startY = pos.y;
+        }
+
+        if (state.falling && pos.y > state.startY) {
+            state.startY = pos.y;
+        }
+
+        if (state.falling && onGround) {
+            float fallDist = state.startY - pos.y;
+            if (fallDist >= 4.0f) {
+                float damage = std::max(0.0f, fallDist - 4.0f);
+                entity->takeDamage(damage);
+                Audio::AudioManager::instance().playSoundAt(Audio::SoundType::PLAYER_FALL_BIG, pos, 0.8f);
+            } else if (fallDist > 0.1f) {
+                Audio::AudioManager::instance().playSoundAt(Audio::SoundType::PLAYER_FALL_SMALL, pos, 0.6f);
+            }
+            state.falling = false;
+        }
+    }
     
     void joinMultiplayerGame(const std::string& playerName, const std::string& address, uint16_t port) {
         uiManager.setNetworkStatus("Connecting...");
@@ -1489,6 +1560,13 @@ private:
     std::unordered_map<const Entity*, BurnState> mobBurnStates;
     std::unordered_map<const Entity*, BurnState> fireBurnStates;
     BurnState playerFireState;
+
+    struct FallState {
+        bool falling = false;
+        float startY = 0.0f;
+    };
+    std::unordered_map<const Entity*, FallState> entityFallStates;
+    FallState playerFallState;
     
     // Menu background world
     bool menuWorldInitialized = false;
@@ -2334,6 +2412,7 @@ private:
 
                     for (auto* entity : entities) {
                         applyFireBurn(entity, deltaTime);
+                        applyEntityFallDamage(entity);
                     }
                     
                     // If hosting, broadcast entity events to clients
@@ -2426,11 +2505,11 @@ private:
                             if (s) s->updateAI(deltaTime, chunkManager);
                         }
 
-                        for (auto& z : zombies) { if (z) applyFireBurn(z.get(), deltaTime); }
-                        for (auto& s : skeletons) { if (s) applyFireBurn(s.get(), deltaTime); }
-                        for (auto& p : pigs) { if (p) applyFireBurn(p.get(), deltaTime); }
-                        for (auto& c : chickens) { if (c) applyFireBurn(c.get(), deltaTime); }
-                        for (auto& s : sheep) { if (s) applyFireBurn(s.get(), deltaTime); }
+                        for (auto& z : zombies) { if (z) { applyFireBurn(z.get(), deltaTime); applyEntityFallDamage(z.get()); } }
+                        for (auto& s : skeletons) { if (s) { applyFireBurn(s.get(), deltaTime); applyEntityFallDamage(s.get()); } }
+                        for (auto& p : pigs) { if (p) { applyFireBurn(p.get(), deltaTime); applyEntityFallDamage(p.get()); } }
+                        for (auto& c : chickens) { if (c) { applyFireBurn(c.get(), deltaTime); applyEntityFallDamage(c.get()); } }
+                        for (auto& s : sheep) { if (s) { applyFireBurn(s.get(), deltaTime); applyEntityFallDamage(s.get()); } }
                     }
                 }
             }
@@ -2438,6 +2517,7 @@ private:
 
         if (!skipPlayerControls) {
             applyPlayerFireBurn(deltaTime);
+            applyPlayerFallDamage();
         }
         
         // Generate chunks - always run if world is loaded
@@ -2860,7 +2940,7 @@ private:
     }
     
     // Take damage as the player
-    void playerTakeDamage(float amount, const glm::vec3& knockbackDir = glm::vec3(0.0f)) {
+    void playerTakeDamage(float amount, const glm::vec3& knockbackDir = glm::vec3(0.0f), bool playHurtSound = true) {
         if (uiManager.isCreativeMode) {
             return;
         }
@@ -2871,8 +2951,10 @@ private:
         playerHealth -= amount;
         playerInvulnerabilityTimer = 0.5f; // Half second of immunity
         
-        // Play hurt sound
-        Audio::AudioManager::instance().playSound(Audio::SoundType::PLAYER_HURT, 0.8f);
+        // Play hurt sound (optional)
+        if (playHurtSound) {
+            Audio::AudioManager::instance().playSound(Audio::SoundType::PLAYER_HURT, 0.8f);
+        }
         
         // Apply knockback
         if (glm::length(knockbackDir) > 0.001f) {

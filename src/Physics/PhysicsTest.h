@@ -314,6 +314,7 @@ public:
         params.createFire = true;
         params.createDebris = true;
         params.chainReaction = true;
+        params.fireChanceMultiplier = (power >= 8.0f) ? 3.0f : 1.5f;
         
         ExplosionResult res = explosionSystem->explode(params);
         

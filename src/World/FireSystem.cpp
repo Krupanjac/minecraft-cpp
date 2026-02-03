@@ -2,6 +2,7 @@
 #include "ChunkManager.h"
 #include "Block.h"
 #include "../Render/ExplosionVolumeSystem.h"
+#include "../Audio/AudioManager.h"
 
 #include <algorithm>
 
@@ -68,7 +69,13 @@ void FireSystem::removeAtIndex(size_t i) {
 }
 
 void FireSystem::update(float deltaTime, ChunkManager& chunkManager, ExplosionVolumeSystem* vfx) {
-    if (burning.empty()) return;
+    if (burning.empty()) {
+        if (fireLoopHandle != 0) {
+            Audio::AudioManager::instance().fadeOutSound(fireLoopHandle, 0.6f);
+            fireLoopHandle = 0;
+        }
+        return;
+    }
 
     std::uniform_real_distribution<float> chanceDist(0.0f, 1.0f);
     int vfxSpawned = 0;
@@ -159,5 +166,22 @@ void FireSystem::update(float deltaTime, ChunkManager& chunkManager, ExplosionVo
         }
 
         ++i;
+    }
+
+    // Loop fire sound while any blocks are burning
+    if (!burning.empty()) {
+        glm::vec3 firePos = glm::vec3(burning.front().pos) + glm::vec3(0.5f, 0.8f, 0.5f);
+        if (fireLoopHandle == 0) {
+            fireLoopHandle = Audio::AudioManager::instance().playSoundAtWithRange(
+                Audio::SoundType::FIRE, firePos, 0.7f, 24.0f, 1.0f);
+            Audio::AudioManager::instance().setLoopRegion(fireLoopHandle, 0.25f, 0.85f);
+        } else {
+            if (!Audio::AudioManager::instance().setSoundPosition(fireLoopHandle, firePos)) {
+                fireLoopHandle = 0;
+            }
+        }
+    } else if (fireLoopHandle != 0) {
+        Audio::AudioManager::instance().fadeOutSound(fireLoopHandle, 0.6f);
+        fireLoopHandle = 0;
     }
 }

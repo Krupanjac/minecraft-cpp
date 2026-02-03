@@ -48,6 +48,10 @@ struct PlayingSound {
     
     bool loop = false;
     bool finished = false;
+    bool useLoopRegion = false;
+    size_t loopStartFrame = 0;
+    size_t loopEndFrame = 0;
+    size_t loopFadeFrames = 0;
     
     // Fading
     float fadeVolume = 1.0f;
@@ -149,10 +153,20 @@ void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
         for (ma_uint32 frame = 0; frame < frameCount; frame++) {
             if (sound->samplePosition >= totalSamples) {
                 if (sound->loop) {
-                    sound->samplePosition = 0;
+                    if (sound->useLoopRegion && sound->loopEndFrame > sound->loopStartFrame) {
+                        sound->samplePosition = sound->loopStartFrame;
+                    } else {
+                        sound->samplePosition = 0;
+                    }
                 } else {
                     sound->finished = true;
                     break;
+                }
+            }
+
+            if (sound->loop && sound->useLoopRegion && sound->loopEndFrame > sound->loopStartFrame) {
+                if (sound->samplePosition >= sound->loopEndFrame) {
+                    sound->samplePosition = sound->loopStartFrame;
                 }
             }
             
@@ -170,9 +184,23 @@ void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
                 }
             }
             
-            // Apply volume and mix
-            output[frame * 2] += leftSample * effectiveVolume * panLeft;
-            output[frame * 2 + 1] += rightSample * effectiveVolume * panRight;
+            // Apply loop boundary fade to smooth looping
+            float loopFade = 1.0f;
+            if (sound->loop && sound->useLoopRegion && sound->loopFadeFrames > 0) {
+                if (sound->samplePosition < sound->loopStartFrame + sound->loopFadeFrames) {
+                    size_t into = sound->samplePosition - sound->loopStartFrame;
+                    loopFade = std::min(loopFade, static_cast<float>(into) / static_cast<float>(sound->loopFadeFrames));
+                }
+                if (sound->samplePosition > sound->loopEndFrame - sound->loopFadeFrames) {
+                    size_t remaining = sound->loopEndFrame - sound->samplePosition;
+                    loopFade = std::min(loopFade, static_cast<float>(remaining) / static_cast<float>(sound->loopFadeFrames));
+                }
+                loopFade = std::clamp(loopFade, 0.0f, 1.0f);
+            }
+
+            float finalVol = effectiveVolume * loopFade;
+            output[frame * 2] += leftSample * finalVol * panLeft;
+            output[frame * 2 + 1] += rightSample * finalVol * panRight;
             
             // Advance position (accounting for pitch would require resampling)
             sound->samplePosition++;
@@ -538,6 +566,56 @@ uint32_t AudioManager::playSoundAtWithRange(SoundType type, const glm::vec3& pos
     m_playingSounds.push_back(std::move(sound));
     
     return handle;
+}
+
+bool AudioManager::setLoop(uint32_t handle, bool loop) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto& sound : m_playingSounds) {
+        if (sound && sound->handle == handle) {
+            sound->loop = loop;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioManager::setLoopRegion(uint32_t handle, float startSeconds, float endSeconds) {
+    if (startSeconds < 0.0f) startSeconds = 0.0f;
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto& sound : m_playingSounds) {
+        if (!sound || sound->handle != handle || !sound->data) continue;
+
+        float duration = sound->data->duration;
+        float end = (endSeconds <= 0.0f) ? duration : std::min(endSeconds, duration);
+        float start = std::min(startSeconds, std::max(0.0f, end - 0.05f));
+        if (end <= start + 0.01f) {
+            sound->useLoopRegion = false;
+            return false;
+        }
+
+        size_t startFrame = static_cast<size_t>(start * sound->data->sampleRate);
+        size_t endFrame = static_cast<size_t>(end * sound->data->sampleRate);
+        size_t fadeFrames = static_cast<size_t>(sound->data->sampleRate * 0.03f); // 30ms crossfade
+        sound->loopStartFrame = startFrame;
+        sound->loopEndFrame = endFrame;
+        sound->loopFadeFrames = std::min(fadeFrames, (endFrame > startFrame + 1) ? (endFrame - startFrame) / 3 : fadeFrames);
+        sound->useLoopRegion = true;
+        sound->loop = true;
+        return true;
+    }
+    return false;
+}
+
+bool AudioManager::setSoundPosition(uint32_t handle, const glm::vec3& position) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto& sound : m_playingSounds) {
+        if (sound && sound->handle == handle) {
+            sound->position = position;
+            sound->is3D = true;
+            return true;
+        }
+    }
+    return false;
 }
 
 uint32_t AudioManager::playMusic(SoundType type, bool loop, float fadeIn) {

@@ -24,6 +24,7 @@ struct ExplosionParams {
     bool createDebris = true;      // Whether to spawn debris entities
     bool chainReaction = true;     // Whether to trigger TNT chain reactions
     float dropChance = 0.3f;       // Chance for destroyed blocks to drop items
+    float fireChanceMultiplier = 1.0f; // Multiplier for fire ignition chance
     
     // Calculated values
     float getRadius() const {
@@ -172,7 +173,7 @@ private:
     void createExplosionDebris(const glm::vec3& center, const std::vector<glm::ivec3>& destroyedBlocks,
                                float power, ExplosionResult& result);
     void spreadFire(const glm::vec3& center, const std::vector<glm::ivec3>& affectedBlocks,
-                    ExplosionResult& result);
+                    ExplosionResult& result, float fireChanceMultiplier);
     void triggerChainReactions(const glm::vec3& center, float radius, ExplosionResult& result);
     
     // Helpers

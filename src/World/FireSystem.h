@@ -50,6 +50,8 @@ private:
     std::unordered_map<glm::ivec3, size_t, IVec3Hash> index;
     std::mt19937 rng;
 
+    uint32_t fireLoopHandle = 0;
+
     float spreadChance = 0.22f;
     float spreadInterval = 0.8f;
     float fireVfxInterval = 0.6f;      // Used only to delay initial spawn
