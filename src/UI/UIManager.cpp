@@ -847,6 +847,28 @@ void UIManager::setupVideoSettingsMenu() {
     br.tooltip = "Overall scene brightness";
     elements.push_back(br);
     y += rowHeight + rowGap;
+
+    // Color Template
+    UIElement ct;
+    ct.x = rightCol; ct.y = y; ct.w = colWidth; ct.h = rowHeight;
+    ct.text = "Color Template: " + std::string(Settings::COLOR_TEMPLATE_NAMES[s.colorTemplate]);
+    ct.intValueRef = &s.colorTemplate;
+    ct.onClick = [](){};
+    ct.minVal = 0.0f; ct.maxVal = float(Settings::NUM_COLOR_TEMPLATES - 1);
+    ct.tooltip = "Cycle color grading templates";
+    elements.push_back(ct);
+    y += rowHeight + rowGap;
+
+    // Sharpness
+    UIElement shp;
+    shp.x = rightCol; shp.y = y; shp.w = colWidth; shp.h = rowHeight;
+    shp.text = "Sharpness: " + std::to_string(s.sharpness).substr(0, 3);
+    shp.isSlider = true;
+    shp.valueRef = &s.sharpness;
+    shp.minVal = 0.0f; shp.maxVal = 1.0f;
+    shp.tooltip = "Sharpen postprocess (0-1)";
+    elements.push_back(shp);
+    y += rowHeight + rowGap;
     
     // === RIGHT COLUMN - Resource Packs ===
     y += 15;
@@ -1960,6 +1982,8 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             el.text = "GAMMA: " + std::to_string(*el.valueRef).substr(0, 3);
                         else if (el.text.find("BRIGHTNESS") != std::string::npos)
                             el.text = "BRIGHTNESS: " + std::to_string(*el.valueRef).substr(0, 3);
+                        else if (el.text.find("Sharpness") != std::string::npos)
+                            el.text = "Sharpness: " + std::to_string(*el.valueRef).substr(0, 3);
                         else if (el.text.find("Shadow Distance") != std::string::npos)
                             el.text = "Shadow Distance: " + std::to_string((int)*el.valueRef);
                         else if (el.text.find("Master Volume") != std::string::npos) {
@@ -2024,6 +2048,16 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             if (el.text.find("RT Quality") != std::string::npos) {
                                 el.text = "RT Quality: " + std::string(Settings::RT_QUALITY_NAMES[*el.intValueRef]);
                             }
+
+                            if (el.text.find("Color Template") != std::string::npos) {
+                                Settings::instance().applyColorTemplate(*el.intValueRef);
+                                el.text = "Color Template: " + std::string(Settings::COLOR_TEMPLATE_NAMES[*el.intValueRef]);
+                                pendingClick = [this]() {
+                                    this->setupVideoSettingsMenu();
+                                    if (onSettingsChanged) onSettingsChanged();
+                                };
+                                break;
+                            }
                             
                             if (el.text.find("Shadows:") != std::string::npos && el.text.find("RT") == std::string::npos) {
                                 el.text = "Shadows: " + std::string(Settings::SHADOW_METHOD_NAMES[*el.intValueRef]);
@@ -2033,9 +2067,11 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
                             if (el.intValueRef == &Settings::instance().graphicsPreset) {
                                 Settings::instance().applyPreset(*el.intValueRef);
                                 // Refresh video settings UI to show updated values
-                                this->setupVideoSettingsMenu();
-                                if (onSettingsChanged) onSettingsChanged();
-                                return; // Exit early since we rebuilt the UI
+                                pendingClick = [this]() {
+                                    this->setupVideoSettingsMenu();
+                                    if (onSettingsChanged) onSettingsChanged();
+                                };
+                                break; // Exit early since we rebuild after loop
                             }
                             
                             if (onSettingsChanged) onSettingsChanged();

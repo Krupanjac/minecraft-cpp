@@ -271,6 +271,23 @@ void PostProcess::render(GLuint colorTexture, GLuint depthTexture, GLuint veloci
     compositeShader.setVec2("uScreenShake", screenShakeOffset);
     compositeShader.setFloat("uShakeStrength", screenShakeStrength);
     compositeShader.setFloat("uExplosionVignette", explosionVignette);
+    compositeShader.setFloat("uSaturation", settings.colorSaturation);
+    compositeShader.setFloat("uVibrance", settings.colorVibrance);
+    compositeShader.setFloat("uContrast", settings.colorContrast);
+    compositeShader.setFloat("uBrightness", settings.colorBrightness);
+    compositeShader.setFloat("uLift", settings.colorLift);
+    compositeShader.setFloat("uGammaLift", settings.colorGamma);
+    compositeShader.setFloat("uGain", settings.colorGain);
+    compositeShader.setFloat("uWhiteBalanceTemp", settings.whiteBalanceTemp);
+    compositeShader.setFloat("uWhiteBalanceTint", settings.whiteBalanceTint);
+    compositeShader.setFloat("uBloomStrength", settings.bloomStrength);
+    compositeShader.setFloat("uBloomThreshold", settings.bloomThreshold);
+    compositeShader.setFloat("uBloomKnee", settings.bloomKnee);
+    compositeShader.setFloat("uVignetteStrength", settings.vignetteStrength);
+    compositeShader.setFloat("uVignetteRoundness", settings.vignetteRoundness);
+    compositeShader.setFloat("uVignetteSmoothness", settings.vignetteSmoothness);
+    compositeShader.setFloat("uChromaticAberration", settings.chromaticAberration);
+    compositeShader.setFloat("uSharpness", settings.sharpness);
     
     glBindVertexArray(quadVAO); // Ensure VAO is bound
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);

@@ -21,6 +21,38 @@ public:
     float aoStrength = 1.0f; // Multiplier for AO
     float gamma = 2.2f;
     float exposure = 1.0f;
+    // Color grading / postprocessing
+    float colorSaturation = 1.15f;
+    float colorVibrance = 0.2f;
+    float colorContrast = 1.1f;
+    float colorBrightness = 0.02f;
+    float colorLift = 0.02f;
+    float colorGamma = 1.0f;
+    float colorGain = 1.05f;
+    float whiteBalanceTemp = 0.02f; // -1..1 (warm/cool)
+    float whiteBalanceTint = 0.01f; // -1..1 (green/magenta)
+    float bloomStrength = 0.25f;
+    float bloomThreshold = 1.1f;
+    float bloomKnee = 0.5f;
+    float vignetteStrength = 0.18f;
+    float vignetteRoundness = 0.7f;
+    float vignetteSmoothness = 0.6f;
+    float chromaticAberration = 0.0015f; // UV offset
+    float sharpness = 0.35f;
+    int colorTemplate = 0;
+    static constexpr int COLOR_TEMPLATE_NEUTRAL = 0;
+    static constexpr int COLOR_TEMPLATE_VIBRANT = 1;
+    static constexpr int COLOR_TEMPLATE_CINEMATIC_WARM = 2;
+    static constexpr int COLOR_TEMPLATE_COOL_MIST = 3;
+    static constexpr int COLOR_TEMPLATE_NOIR = 4;
+    static constexpr int NUM_COLOR_TEMPLATES = 5;
+    static constexpr const char* COLOR_TEMPLATE_NAMES[] = {
+        "Neutral",
+        "Vibrant",
+        "Cinematic Warm",
+        "Cool Mist",
+        "Noir"
+    };
     // Sizes for celestial bodies (in world units)
     float sunSize = 5.0f;
     float moonSize = 4.0f;
@@ -137,6 +169,95 @@ public:
                 break;
         }
     }
+
+    void applyColorTemplate(int templateId) {
+        colorTemplate = templateId;
+        // Keep brightness/gamma controlled only by their sliders
+        colorBrightness = 0.0f;
+        colorGamma = 1.0f;
+        switch (templateId) {
+            case COLOR_TEMPLATE_NEUTRAL:
+                colorSaturation = 1.05f;
+                colorVibrance = 0.05f;
+                colorContrast = 1.02f;
+                colorLift = 0.01f;
+                colorGain = 1.02f;
+                whiteBalanceTemp = 0.0f;
+                whiteBalanceTint = 0.0f;
+                bloomStrength = 0.18f;
+                bloomThreshold = 1.15f;
+                bloomKnee = 0.45f;
+                vignetteStrength = 0.12f;
+                vignetteRoundness = 0.7f;
+                vignetteSmoothness = 0.6f;
+                chromaticAberration = 0.001f;
+                break;
+            case COLOR_TEMPLATE_VIBRANT:
+                colorSaturation = 1.35f;
+                colorVibrance = 0.45f;
+                colorContrast = 1.12f;
+                colorLift = 0.03f;
+                colorGain = 1.08f;
+                whiteBalanceTemp = 0.04f;
+                whiteBalanceTint = 0.02f;
+                bloomStrength = 0.35f;
+                bloomThreshold = 1.05f;
+                bloomKnee = 0.55f;
+                vignetteStrength = 0.16f;
+                vignetteRoundness = 0.75f;
+                vignetteSmoothness = 0.6f;
+                chromaticAberration = 0.0025f;
+                break;
+            case COLOR_TEMPLATE_CINEMATIC_WARM:
+                colorSaturation = 1.15f;
+                colorVibrance = 0.2f;
+                colorContrast = 1.18f;
+                colorLift = 0.02f;
+                colorGain = 1.1f;
+                whiteBalanceTemp = 0.08f;
+                whiteBalanceTint = 0.01f;
+                bloomStrength = 0.3f;
+                bloomThreshold = 1.0f;
+                bloomKnee = 0.6f;
+                vignetteStrength = 0.22f;
+                vignetteRoundness = 0.8f;
+                vignetteSmoothness = 0.7f;
+                chromaticAberration = 0.0018f;
+                break;
+            case COLOR_TEMPLATE_COOL_MIST:
+                colorSaturation = 1.0f;
+                colorVibrance = 0.1f;
+                colorContrast = 1.05f;
+                colorLift = 0.03f;
+                colorGain = 1.0f;
+                whiteBalanceTemp = -0.08f;
+                whiteBalanceTint = -0.02f;
+                bloomStrength = 0.4f;
+                bloomThreshold = 1.2f;
+                bloomKnee = 0.5f;
+                vignetteStrength = 0.14f;
+                vignetteRoundness = 0.65f;
+                vignetteSmoothness = 0.6f;
+                chromaticAberration = 0.0012f;
+                break;
+            case COLOR_TEMPLATE_NOIR:
+                colorSaturation = 0.6f;
+                colorVibrance = 0.0f;
+                colorContrast = 1.3f;
+                colorLift = 0.0f;
+                colorGain = 1.05f;
+                whiteBalanceTemp = 0.0f;
+                whiteBalanceTint = 0.0f;
+                bloomStrength = 0.08f;
+                bloomThreshold = 1.3f;
+                bloomKnee = 0.3f;
+                vignetteStrength = 0.35f;
+                vignetteRoundness = 0.85f;
+                vignetteSmoothness = 0.8f;
+                chromaticAberration = 0.002f;
+                break;
+        }
+    }
     
     // Ray Tracing settings (OpenGL compute shader based)
     bool enableRayTracing = false; // Disabled by default (experimental)
@@ -226,6 +347,24 @@ public:
                     else if (key == "aoStrength") aoStrength = std::stof(value);
                     else if (key == "gamma") gamma = std::stof(value);
                     else if (key == "exposure") exposure = std::stof(value);
+                    else if (key == "colorSaturation") colorSaturation = std::stof(value);
+                    else if (key == "colorVibrance") colorVibrance = std::stof(value);
+                    else if (key == "colorContrast") colorContrast = std::stof(value);
+                    else if (key == "colorBrightness") colorBrightness = std::stof(value);
+                    else if (key == "colorLift") colorLift = std::stof(value);
+                    else if (key == "colorGamma") colorGamma = std::stof(value);
+                    else if (key == "colorGain") colorGain = std::stof(value);
+                    else if (key == "whiteBalanceTemp") whiteBalanceTemp = std::stof(value);
+                    else if (key == "whiteBalanceTint") whiteBalanceTint = std::stof(value);
+                    else if (key == "bloomStrength") bloomStrength = std::stof(value);
+                    else if (key == "bloomThreshold") bloomThreshold = std::stof(value);
+                    else if (key == "bloomKnee") bloomKnee = std::stof(value);
+                    else if (key == "vignetteStrength") vignetteStrength = std::stof(value);
+                    else if (key == "vignetteRoundness") vignetteRoundness = std::stof(value);
+                    else if (key == "vignetteSmoothness") vignetteSmoothness = std::stof(value);
+                    else if (key == "chromaticAberration") chromaticAberration = std::stof(value);
+                    else if (key == "sharpness") sharpness = std::stof(value);
+                    else if (key == "colorTemplate") colorTemplate = std::stoi(value);
                     else if (key == "sunSize") sunSize = std::stof(value);
                     else if (key == "moonSize") moonSize = std::stof(value);
                     else if (key == "vsync") vsync = (value == "1");
@@ -289,6 +428,24 @@ public:
         file << "aoStrength=" << aoStrength << "\n";
         file << "gamma=" << gamma << "\n";
         file << "exposure=" << exposure << "\n";
+        file << "colorSaturation=" << colorSaturation << "\n";
+        file << "colorVibrance=" << colorVibrance << "\n";
+        file << "colorContrast=" << colorContrast << "\n";
+        file << "colorBrightness=" << colorBrightness << "\n";
+        file << "colorLift=" << colorLift << "\n";
+        file << "colorGamma=" << colorGamma << "\n";
+        file << "colorGain=" << colorGain << "\n";
+        file << "whiteBalanceTemp=" << whiteBalanceTemp << "\n";
+        file << "whiteBalanceTint=" << whiteBalanceTint << "\n";
+        file << "bloomStrength=" << bloomStrength << "\n";
+        file << "bloomThreshold=" << bloomThreshold << "\n";
+        file << "bloomKnee=" << bloomKnee << "\n";
+        file << "vignetteStrength=" << vignetteStrength << "\n";
+        file << "vignetteRoundness=" << vignetteRoundness << "\n";
+        file << "vignetteSmoothness=" << vignetteSmoothness << "\n";
+        file << "chromaticAberration=" << chromaticAberration << "\n";
+        file << "sharpness=" << sharpness << "\n";
+        file << "colorTemplate=" << colorTemplate << "\n";
         file << "sunSize=" << sunSize << "\n";
         file << "moonSize=" << moonSize << "\n";
         file << "vsync=" << (vsync ? "1" : "0") << "\n";
