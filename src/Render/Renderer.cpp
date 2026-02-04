@@ -2001,6 +2001,7 @@ void Renderer::renderDebris(const Camera& camera, const std::vector<DebrisRender
         
         debrisShader.setMat4("uModel", model);
         debrisShader.setFloat("uAlpha", d.alpha);
+        debrisShader.setFloat("uWaterFactor", d.waterFactor);
         
         if (usePBR) {
             // Get PBR texture indices - normalDirection: 2=+Y (top), 3=-Y (bottom), others=side

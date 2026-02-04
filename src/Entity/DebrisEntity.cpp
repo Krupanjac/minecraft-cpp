@@ -24,6 +24,8 @@ DebrisEntity::DebrisEntity(const glm::vec3& position,
     , age(0.0f)
     , atRest(false)
     , restFrames(0)
+    , inWater(false)
+    , waterSubmersion(0.0f)
     , modelMatrixDirty(true)
 {
     // Set entity scale
@@ -67,6 +69,13 @@ void DebrisEntity::update(float deltaTime) {
 
 void DebrisEntity::physicsUpdate(float fixedDeltaTime) {
     if (isExpired()) return;
+
+    updateWaterState();
+
+    if (inWater && atRest) {
+        atRest = false;
+        restFrames = 0;
+    }
     
     // Check if resting debris lost its support (ground destroyed)
     if (atRest && terrainQuery) {
@@ -88,6 +97,9 @@ void DebrisEntity::physicsUpdate(float fixedDeltaTime) {
     
     // Apply gravity
     applyGravity(fixedDeltaTime);
+
+    // Apply water flow drift
+    applyWaterFlow(fixedDeltaTime);
     
     // Integrate physics
     integratePhysics(fixedDeltaTime);
@@ -198,15 +210,75 @@ void DebrisEntity::integratePhysics(float dt) {
 
 void DebrisEntity::applyGravity(float dt) {
     const float GRAVITY = -20.0f; // Slightly faster than real for game feel
-    linearVelocity.y += GRAVITY * dt;
+    float buoyancy = config.waterBuoyancy * waterSubmersion;
+    float gravityScale = 1.0f - buoyancy;
+    gravityScale = std::clamp(gravityScale, -0.6f, 1.0f);
+    linearVelocity.y += GRAVITY * gravityScale * dt;
+
+    if (inWater && terrainQuery) {
+        int bx = static_cast<int>(std::floor(position.x));
+        int by = static_cast<int>(std::floor(position.y));
+        int bz = static_cast<int>(std::floor(position.z));
+        Block above = terrainQuery(bx, by + 1, bz);
+
+        if (above.type == BlockType::AIR) {
+            float targetSubmersion = 0.45f;
+            float error = waterSubmersion - targetSubmersion;
+            float lift = error * 10.0f;
+            linearVelocity.y += lift * dt;
+
+            float damping = 6.0f;
+            linearVelocity.y -= linearVelocity.y * damping * dt;
+        }
+
+        if (waterSubmersion > 0.2f) {
+            linearVelocity.y *= (1.0f - 0.4f * dt);
+        }
+    }
 }
 
 void DebrisEntity::applyDamping(float dt) {
-    // Linear damping (air resistance)
-    linearVelocity *= (1.0f - config.linearDamping * dt);
+    float linearDamp = config.linearDamping + (config.waterLinearDamping - config.linearDamping) * waterSubmersion;
+    float angularDamp = config.angularDamping + (config.waterAngularDamping - config.angularDamping) * waterSubmersion;
+
+    // Linear damping (air/water resistance)
+    linearVelocity *= (1.0f - linearDamp * dt);
     
     // Angular damping
-    angularVelocity *= (1.0f - config.angularDamping * dt);
+    angularVelocity *= (1.0f - angularDamp * dt);
+}
+
+void DebrisEntity::applyWaterFlow(float dt) {
+    if (!inWater || !terrainQuery || config.waterFlowStrength <= 0.0f) return;
+
+    int bx = static_cast<int>(std::floor(position.x));
+    int by = static_cast<int>(std::floor(position.y));
+    int bz = static_cast<int>(std::floor(position.z));
+
+    Block center = terrainQuery(bx, by, bz);
+    if (center.type != BlockType::WATER) return;
+
+    glm::vec3 flow(0.0f);
+    const glm::ivec3 dirs[4] = {
+        {1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}
+    };
+
+    for (const auto& dir : dirs) {
+        Block neighbor = terrainQuery(bx + dir.x, by + dir.y, bz + dir.z);
+        if (neighbor.type == BlockType::AIR) {
+            flow += glm::vec3(dir);
+        } else if (neighbor.type == BlockType::WATER) {
+            Block neighborBelow = terrainQuery(bx + dir.x, by - 1, bz + dir.z);
+            if (neighborBelow.type == BlockType::AIR) {
+                flow += glm::vec3(dir) * 0.5f;
+            }
+        }
+    }
+
+    if (glm::length(flow) > 0.01f) {
+        flow = glm::normalize(flow) * (config.waterFlowStrength * waterSubmersion);
+        linearVelocity += flow * dt;
+    }
 }
 
 void DebrisEntity::handleTerrainCollision(float dt) {
@@ -454,6 +526,12 @@ bool DebrisEntity::checkBoxTerrainCollision(const glm::vec3& pos, float halfSize
 }
 
 void DebrisEntity::checkRestState() {
+    if (inWater) {
+        restFrames = 0;
+        atRest = false;
+        return;
+    }
+
     float linearSpeed = glm::length(linearVelocity);
     float angularSpeed = glm::length(angularVelocity);
     
@@ -474,6 +552,36 @@ void DebrisEntity::updateModelMatrix() {
     cachedModelMatrix *= glm::mat4_cast(orientationQuat);
     cachedModelMatrix = glm::scale(cachedModelMatrix, glm::vec3(debrisScale));
     modelMatrixDirty = false;
+}
+
+void DebrisEntity::updateWaterState() {
+    inWater = false;
+    waterSubmersion = 0.0f;
+
+    if (!terrainQuery) return;
+
+    float halfSize = debrisScale * 0.5f;
+    const glm::vec3 samples[3] = {
+        {0.0f, 0.0f, 0.0f},
+        {0.0f, -halfSize * 0.6f, 0.0f},
+        {0.0f, halfSize * 0.6f, 0.0f}
+    };
+
+    int waterHits = 0;
+    for (const auto& offset : samples) {
+        glm::vec3 samplePos = position + offset;
+        int bx = static_cast<int>(std::floor(samplePos.x));
+        int by = static_cast<int>(std::floor(samplePos.y));
+        int bz = static_cast<int>(std::floor(samplePos.z));
+
+        Block block = terrainQuery(bx, by, bz);
+        if (block.type == BlockType::WATER) {
+            waterHits++;
+        }
+    }
+
+    waterSubmersion = static_cast<float>(waterHits) / 3.0f;
+    inWater = waterSubmersion > 0.0f;
 }
 
 // ============================================================================

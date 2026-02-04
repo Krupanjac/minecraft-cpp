@@ -15,6 +15,7 @@ uniform vec3 uCameraPos;
 uniform vec3 uLightDir;
 uniform vec3 uSkyColor;
 uniform float uAlpha;
+uniform float uWaterFactor;
 uniform int uUseShadows;
 uniform int uUsePBR;
 
@@ -124,6 +125,13 @@ void main() {
     float rim = 1.0 - max(dot(viewDir, normal), 0.0);
     rim = pow(rim, 3.0) * 0.2;
     finalColor += rim * skyBrightness;
+
+    if (uWaterFactor > 0.001) {
+        vec3 waterTint = vec3(0.35, 0.65, 0.85);
+        vec3 waterFog = vec3(0.02, 0.05, 0.08);
+        float mixAmount = clamp(uWaterFactor * 0.75, 0.0, 1.0);
+        finalColor = mix(finalColor, finalColor * waterTint + waterFog, mixAmount);
+    }
     
     FragColor = vec4(finalColor, uAlpha);
 }

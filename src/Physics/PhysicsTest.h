@@ -384,6 +384,7 @@ public:
                 data.scale = debris->getDebrisScale();
                 data.blockType = debris->getBlockType();
                 data.alpha = debris->getFadeAlpha();
+                data.waterFactor = debris->getWaterSubmersion();
                 result.push_back(data);
             }
         }

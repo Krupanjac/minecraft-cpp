@@ -60,6 +60,7 @@ include_directories(${stb_SOURCE_DIR})
 # tinygltf
 set(TINYGLTF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(TINYGLTF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     tinygltf
     GIT_REPOSITORY https://github.com/syoyo/tinygltf.git

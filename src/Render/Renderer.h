@@ -27,6 +27,7 @@ public:
         float scale;
         BlockType blockType;
         float alpha;
+        float waterFactor;
     };
     
     Renderer();

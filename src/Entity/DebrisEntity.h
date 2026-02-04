@@ -28,6 +28,10 @@ public:
         float friction = 0.8f;           // Ground friction
         float linearDamping = 0.1f;      // Air resistance (linear)
         float angularDamping = 0.3f;     // Air resistance (angular)
+        float waterLinearDamping = 1.8f; // Water resistance (linear)
+        float waterAngularDamping = 1.9f; // Water resistance (angular)
+        float waterBuoyancy = 1.15f;     // Buoyancy factor (0 = none, 1 = neutral)
+        float waterFlowStrength = 4.0f;  // Strength of flow drift
         float minVelocityToRest = 0.1f;  // Velocity threshold to stop physics
         bool collideWithTerrain = true;  // Enable terrain collision
         bool collideWithEntities = false; // Enable entity collision (expensive)
@@ -67,6 +71,8 @@ public:
     float getFadeAlpha() const;
     bool isExpired() const { return age >= lifetime; }
     bool isAtRest() const { return atRest; }
+    bool isInWater() const { return inWater; }
+    float getWaterSubmersion() const { return waterSubmersion; }
     
     // Physics state
     Physics::AABB getAABB() const;
@@ -103,6 +109,10 @@ private:
     float age;
     bool atRest;
     int restFrames; // Count consecutive frames at rest
+
+    // Water state
+    bool inWater;
+    float waterSubmersion;
     
     // Configuration
     Config config;
@@ -118,9 +128,11 @@ private:
     void integratePhysics(float dt);
     void applyGravity(float dt);
     void applyDamping(float dt);
+    void applyWaterFlow(float dt);
     void handleTerrainCollision(float dt);
     void checkRestState();
     void updateModelMatrix();
+    void updateWaterState();
     
     // Collision detection
     bool checkBoxTerrainCollision(const glm::vec3& pos, float halfSize, glm::vec3& normal, float& penetration);
