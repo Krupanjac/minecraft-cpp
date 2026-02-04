@@ -66,7 +66,7 @@ public:
                                                              camera, playerEntity, mobSpawnManager, zombies, skeletons, pigs, chickens, sheep,
                                                              useNewEntityManager, physicsTest, currentWorldName, currentSeed),
                     inputSystem(uiManager, camera, chunkManager, heldItemRenderer, entityManager, networkManager,
-                                            playerEntity, zombies, skeletons, pigs, chickens, sheep, useNewEntityManager,
+                                            physicsTest, playerEntity, zombies, skeletons, pigs, chickens, sheep, useNewEntityManager,
                                             attackCooldown, isBreakingBlock, blockBreakProgress, breakingBlockPos, breakingBlockType, isUnderwater),
                       chunkUpdateSystem(chunkManager, worldGenerator, meshBuilder, renderer, threadPool, meshMutex, pendingMeshes),
                       timeOfDaySystem(uiManager, renderer, networkManager, camera),

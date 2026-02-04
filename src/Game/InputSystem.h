@@ -19,6 +19,10 @@ class PigEntity;
 class ChickenEntity;
 class SheepEntity;
 
+namespace Physics {
+class PhysicsTestSystem;
+}
+
 namespace Network {
 class NetworkManager;
 }
@@ -31,6 +35,7 @@ public:
                 HeldItemRenderer& heldItemRenderer,
                 EntityManager& entityManager,
                 Network::NetworkManager& networkManager,
+                Physics::PhysicsTestSystem& physicsTest,
                 std::unique_ptr<PlayerEntity>& playerEntity,
                 std::vector<std::unique_ptr<ZombieEntity>>& zombies,
                 std::vector<std::unique_ptr<SkeletonEntity>>& skeletons,
@@ -59,6 +64,7 @@ private:
     HeldItemRenderer& heldItemRenderer;
     EntityManager& entityManager;
     Network::NetworkManager& networkManager;
+    Physics::PhysicsTestSystem& physicsTest;
     std::unique_ptr<PlayerEntity>& playerEntity;
     std::vector<std::unique_ptr<ZombieEntity>>& zombies;
     std::vector<std::unique_ptr<SkeletonEntity>>& skeletons;

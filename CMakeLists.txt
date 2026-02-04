@@ -159,6 +159,7 @@ set(SOURCES
     src/Entity/MobSpawnManager.cpp
     src/Entity/EntityManager.cpp
     src/Entity/DebrisEntity.cpp
+    src/Entity/LimbDebrisEntity.cpp
     src/Model/Model.cpp
     src/Physics/RigidBody.cpp
     src/Physics/Collider.cpp

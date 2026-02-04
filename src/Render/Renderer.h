@@ -14,6 +14,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <functional>
 
 class Entity;
 class ExplosionVolumeSystem;
@@ -36,7 +37,8 @@ public:
     bool initialize(int windowWidth, int windowHeight);
     void render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, 
                 int windowWidth, int windowHeight, const std::vector<DebrisRenderData>& debris = {},
-                ExplosionVolumeSystem* explosionVolumes = nullptr);
+                ExplosionVolumeSystem* explosionVolumes = nullptr,
+                const std::function<void(Shader&, const glm::vec3&, const glm::vec3&)>& extraModelPass = nullptr);
     void onResize(int width, int height);
     
     void setLightDirection(const glm::vec3& direction) { lightDirection = direction; }

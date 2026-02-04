@@ -19,6 +19,7 @@
 #include "../Util/Config.h"
 #include "../World/ChunkManager.h"
 #include "../World/Item.h"
+#include "../Physics/PhysicsTest.h"
 
 #include <algorithm>
 #include <cmath>
@@ -29,6 +30,7 @@ InputSystem::InputSystem(UIManager& uiManagerRef,
                          HeldItemRenderer& heldItemRendererRef,
                          EntityManager& entityManagerRef,
                          Network::NetworkManager& networkManagerRef,
+                         Physics::PhysicsTestSystem& physicsTestRef,
                          std::unique_ptr<PlayerEntity>& playerEntityRef,
                          std::vector<std::unique_ptr<ZombieEntity>>& zombiesRef,
                          std::vector<std::unique_ptr<SkeletonEntity>>& skeletonsRef,
@@ -48,6 +50,7 @@ InputSystem::InputSystem(UIManager& uiManagerRef,
       heldItemRenderer(heldItemRendererRef),
       entityManager(entityManagerRef),
       networkManager(networkManagerRef),
+    physicsTest(physicsTestRef),
       playerEntity(playerEntityRef),
       zombies(zombiesRef),
       skeletons(skeletonsRef),
@@ -154,6 +157,8 @@ void InputSystem::handleMouseButton(int button, int action, int /*mods*/) {
                     float damage = ItemRegistry::instance().getAttackDamage(heldItem);
                     float knockback = ItemRegistry::instance().getKnockback(heldItem);
 
+                    LOG_INFO("[INPUT] Attacking entity! damage=" + std::to_string(damage));
+
                     glm::vec3 knockbackDir = glm::normalize(targetEntity->getPosition() - camera.getPosition());
                     knockbackDir.y = 0.0f;
                     if (glm::length(knockbackDir) > 0.001f) {
@@ -167,6 +172,10 @@ void InputSystem::handleMouseButton(int button, int action, int /*mods*/) {
                         networkManager.sendPlayerDamage(remotePlayer->getPlayerId(), damage, knockbackVec);
                         LOG_INFO("Sent damage to remote player " + std::to_string(remotePlayer->getPlayerId()) + " for " + std::to_string(damage) + " damage");
                     } else {
+                        // Always call handleAttackHit for limb damage (doesn't depend on physics toggle)
+                        LOG_INFO("[INPUT] Calling handleAttackHit...");
+                        physicsTest.handleAttackHit(targetEntity, eyePos, camera.getFront(), damage);
+                        LOG_INFO("[INPUT] handleAttackHit returned");
                         targetEntity->takeDamage(damage, knockbackVec);
                     }
 

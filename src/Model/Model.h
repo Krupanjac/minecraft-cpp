@@ -42,6 +42,13 @@ struct Node {
     // Calculated global transform
     glm::mat4 globalTransform = glm::mat4(1.0f);
 
+    // External override for local transform (ragdoll, IK)
+    bool overrideLocal = false;
+    glm::mat4 overrideLocalTransform = glm::mat4(1.0f);
+    
+    // Hidden flag for ragdoll limb detachment
+    bool hidden = false;
+
     std::vector<MeshPrimitive> primitives;
 };
 
@@ -79,6 +86,21 @@ public:
     
     // Get all node names (useful for debugging)
     std::vector<std::string> getNodeNames() const;
+
+    // Ragdoll/IK helpers
+    int getNodeIndexByName(const std::string& nodeName) const;
+    int getParentIndex(int nodeIndex) const;
+    glm::mat4 getNodeGlobalTransformByIndex(int nodeIndex) const;
+    void setNodeOverrideLocalTransform(int nodeIndex, const glm::mat4& local);
+    void clearNodeOverride(int nodeIndex);
+    void clearAllNodeOverrides();
+    void setExternalPoseEnabled(bool enabled) { externalPoseEnabled = enabled; }
+    bool getExternalPoseEnabled() const { return externalPoseEnabled; }
+    const std::vector<int>& getActiveSkinJoints() const;
+    
+    // Hide/show nodes (for ragdoll limb detachment)
+    void setNodeHidden(int nodeIndex, bool hidden);
+    void clearAllHiddenNodes();
 
 private:
     // Private constructor for cloning
@@ -126,6 +148,8 @@ private:
     bool lockRootMotionXZ = false;
     int rootMotionNodeIndex = -1;
     std::vector<uint8_t> lockRootXZMask; // per-node mask for XZ translation lock (skeleton nodes)
+
+    bool externalPoseEnabled = false;
     
     struct Impl;
     std::unique_ptr<Impl> impl;

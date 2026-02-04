@@ -103,7 +103,8 @@ void Renderer::onResize(int width, int height) {
 
 void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, 
                       int windowWidth, int windowHeight, const std::vector<DebrisRenderData>& debris,
-                      ExplosionVolumeSystem* explosionVolumes) {
+                      ExplosionVolumeSystem* explosionVolumes,
+                      const std::function<void(Shader&, const glm::vec3&, const glm::vec3&)>& extraModelPass) {
     // === HANDLE PBR SETTINGS CHANGES ===
     // When PBR mode is toggled, we may need to recalculate lighting/shadows
     if (Settings::instance().pbrSettingsChanged) {
@@ -677,6 +678,11 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
             glm::mat4 prevModel = buildMatrix(prevRelPos, entity->getPrevRotation(), entity->getPrevScale());
 
             entity->renderWithMatrices(modelShader, currentModel, prevModel);
+        }
+
+        if (extraModelPass) {
+            modelShader.setFloat("uAlphaMultiplier", 1.0f);
+            extraModelPass(modelShader, glm::vec3(renderOrigin), glm::vec3(prevRenderOrigin));
         }
         modelShader.unuse();
     }

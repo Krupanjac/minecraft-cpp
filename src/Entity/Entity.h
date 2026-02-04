@@ -37,6 +37,10 @@ public:
     const glm::vec3& getVelocity() const { return velocity; }
 
     void setModel(std::shared_ptr<ModelSystem::Model> newModel) { this->model = newModel; }
+    std::shared_ptr<ModelSystem::Model> getModel() const { return model; }
+
+    // Expose model matrix for external systems (ragdoll, debug tools)
+    glm::mat4 getModelMatrixWorld() const { return getModelMatrix(); }
 
     // Health system
     float getHealth() const { return health; }

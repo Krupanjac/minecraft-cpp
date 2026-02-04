@@ -23,6 +23,8 @@
 #include "../Game/MenuWorldSystem.h"
 #include "../UI/UIManager.h"
 #include "../Physics/PhysicsTest.h"
+#include "../Core/Logger.h"
+#include <functional>
 
 RenderPipelineSystem::RenderPipelineSystem(Renderer& rendererRef,
                                            ChunkManager& chunkManagerRef,
@@ -114,13 +116,31 @@ void RenderPipelineSystem::renderFrame(bool isBreakingBlock, float blockBreakPro
     if (physicsTest.isEnabled()) {
         debrisData = physicsTest.getDebrisRenderData();
     }
+    
+    // Log limb debris count for debugging
+    static int limbDebrisLogCount = 0;
+    if (limbDebrisLogCount < 20 && physicsTest.getLimbDebrisCount() > 0) {
+        LOG_INFO("[RenderPipeline] Limb debris count: " + std::to_string(physicsTest.getLimbDebrisCount()));
+        limbDebrisLogCount++;
+    }
 #endif
 
     std::vector<glm::vec3> fireLights;
     fireSystem.getFireLightPositions(fireLights, 16);
     renderer.setFireLightPositions(fireLights);
 
-    renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight(), debrisData, &explosionVolumes);
+    std::function<void(Shader&, const glm::vec3&, const glm::vec3&)> limbRenderPass;
+#if ENABLE_PHYSICS_TEST
+    if (physicsTest.isEnabled() && physicsTest.getLimbDebrisCount() > 0) {
+        limbRenderPass = [this](Shader& modelShader, const glm::vec3& renderOrigin, const glm::vec3&) {
+            modelShader.setInt("uUseShadows", 0);
+            modelShader.setFloat("uAlphaMultiplier", 1.0f);
+            physicsTest.renderLimbDebris(modelShader, renderOrigin);
+        };
+    }
+#endif
+    renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight(), debrisData, &explosionVolumes, limbRenderPass);
+
     renderer.cleanUnusedMeshes(chunkManager);
     renderer.blitDepthToScreen(window->getWidth(), window->getHeight());
 

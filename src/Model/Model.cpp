@@ -119,6 +119,7 @@ std::shared_ptr<Model> Model::clone() const {
     cloned->lockRootMotionXZ = false;
     cloned->rootMotionNodeIndex = -1;
     cloned->lockRootXZMask.clear();
+    cloned->externalPoseEnabled = false;
     
     // Reload skins for the cloned model
     cloned->loadSkins();
@@ -390,7 +391,9 @@ void Model::draw(Shader& shader, const glm::mat4& modelMatrix, const glm::mat4& 
 
 void Model::updateGlobalTransforms(Node* node, const glm::mat4& parentTransform) {
     glm::mat4 local = node->matrix;
-    if (node->useTRS) {
+    if (node->overrideLocal) {
+        local = node->overrideLocalTransform;
+    } else if (node->useTRS) {
         local = glm::mat4(1.0f);
         local = glm::translate(local, node->translation);
         local = local * glm::mat4_cast(node->rotation);
@@ -406,6 +409,20 @@ void Model::updateGlobalTransforms(Node* node, const glm::mat4& parentTransform)
 
 void Model::drawNode(Node* node, Shader& shader, const glm::mat4& modelMatrix, const glm::mat4& prevModelMatrix) {
     if (!node) return;
+    
+    // Skip hidden nodes (detached limbs)
+    if (node->hidden) {
+        static int hiddenLogCount = 0;
+        if (hiddenLogCount < 20) {
+            LOG_INFO("[Model] Skipping hidden node index=" + std::to_string(node->index));
+            hiddenLogCount++;
+        }
+        // Still recurse to children in case they need to be drawn separately
+        for (const auto& child : node->children) {
+            drawNode(child.get(), shader, modelMatrix, prevModelMatrix);
+        }
+        return;
+    }
 
     // Current node's world transform
     glm::mat4 worldTransform = modelMatrix * node->globalTransform;
@@ -572,7 +589,7 @@ void Model::updateAnimation(float deltaTime) {
         prevJointMatrices = jointMatrices;
     }
 
-    if (currentAnimation >= 0) {
+    if (!externalPoseEnabled && currentAnimation >= 0) {
         // Pick a root-motion node if not set: prefer active skin skeleton root.
         if (rootMotionNodeIndex < 0) {
             if (!skins.empty() && activeSkin >= 0 && static_cast<size_t>(activeSkin) < skins.size() && skins[activeSkin].skeletonRoot >= 0) {
@@ -699,6 +716,13 @@ void Model::updateAnimation(float deltaTime) {
             int jointNodeIdx = skin.joints[i];
             Node* jointNode = nodeMap[jointNodeIdx];
             if (jointNode) {
+                // If node is hidden (detached limb), scale the joint matrix to zero
+                // This will collapse all vertices weighted to this joint to origin
+                if (jointNode->hidden) {
+                    jointMatrices[i] = glm::mat4(0.0f);
+                    continue;
+                }
+                
                 glm::mat4 inverseBind = (i < skin.inverseBindMatrices.size()) ? skin.inverseBindMatrices[i] : glm::mat4(1.0f);
                 glm::mat4 global = jointNode->globalTransform;
                 
@@ -755,6 +779,74 @@ std::vector<std::string> Model::getNodeNames() const {
         names.push_back(node.name);
     }
     return names;
+}
+
+int Model::getNodeIndexByName(const std::string& nodeName) const {
+    for (size_t i = 0; i < impl->model.nodes.size(); ++i) {
+        if (impl->model.nodes[i].name == nodeName) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+int Model::getParentIndex(int nodeIndex) const {
+    if (nodeIndex < 0 || static_cast<size_t>(nodeIndex) >= nodeMap.size()) return -1;
+    Node* node = nodeMap[nodeIndex];
+    if (!node || !node->parent) return -1;
+    return node->parent->index;
+}
+
+glm::mat4 Model::getNodeGlobalTransformByIndex(int nodeIndex) const {
+    if (nodeIndex < 0 || static_cast<size_t>(nodeIndex) >= nodeMap.size()) {
+        return glm::mat4(1.0f);
+    }
+    Node* node = nodeMap[nodeIndex];
+    return node ? node->globalTransform : glm::mat4(1.0f);
+}
+
+void Model::setNodeOverrideLocalTransform(int nodeIndex, const glm::mat4& local) {
+    if (nodeIndex < 0 || static_cast<size_t>(nodeIndex) >= nodeMap.size()) return;
+    Node* node = nodeMap[nodeIndex];
+    if (!node) return;
+    node->overrideLocal = true;
+    node->overrideLocalTransform = local;
+}
+
+void Model::clearNodeOverride(int nodeIndex) {
+    if (nodeIndex < 0 || static_cast<size_t>(nodeIndex) >= nodeMap.size()) return;
+    Node* node = nodeMap[nodeIndex];
+    if (!node) return;
+    node->overrideLocal = false;
+}
+
+void Model::clearAllNodeOverrides() {
+    for (auto* node : nodeMap) {
+        if (node) node->overrideLocal = false;
+    }
+}
+
+void Model::setNodeHidden(int nodeIndex, bool hidden) {
+    if (nodeIndex >= 0 && static_cast<size_t>(nodeIndex) < nodeMap.size() && nodeMap[nodeIndex]) {
+        nodeMap[nodeIndex]->hidden = hidden;
+        LOG_INFO("[Model] setNodeHidden nodeIndex=" + std::to_string(nodeIndex) + " hidden=" + (hidden ? "true" : "false") + " nodeMapSize=" + std::to_string(nodeMap.size()));
+    } else {
+        LOG_INFO("[Model] setNodeHidden FAILED nodeIndex=" + std::to_string(nodeIndex) + " nodeMapSize=" + std::to_string(nodeMap.size()));
+    }
+}
+
+void Model::clearAllHiddenNodes() {
+    for (auto* node : nodeMap) {
+        if (node) node->hidden = false;
+    }
+}
+
+const std::vector<int>& Model::getActiveSkinJoints() const {
+    static const std::vector<int> empty;
+    if (skins.empty() || activeSkin < 0 || static_cast<size_t>(activeSkin) >= skins.size()) {
+        return empty;
+    }
+    return skins[activeSkin].joints;
 }
 
 }
