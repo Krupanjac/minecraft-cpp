@@ -45,13 +45,19 @@ public:
     static constexpr int COLOR_TEMPLATE_CINEMATIC_WARM = 2;
     static constexpr int COLOR_TEMPLATE_COOL_MIST = 3;
     static constexpr int COLOR_TEMPLATE_NOIR = 4;
-    static constexpr int NUM_COLOR_TEMPLATES = 5;
+    static constexpr int COLOR_TEMPLATE_GOLDEN_HOUR = 5;
+    static constexpr int COLOR_TEMPLATE_TWILIGHT = 6;
+    static constexpr int COLOR_TEMPLATE_ARCADIA = 7;
+    static constexpr int NUM_COLOR_TEMPLATES = 8;
     static constexpr const char* COLOR_TEMPLATE_NAMES[] = {
         "Neutral",
         "Vibrant",
         "Cinematic Warm",
         "Cool Mist",
-        "Noir"
+        "Noir",
+        "Golden Hour",
+        "Twilight",
+        "Arcadia"
     };
     // Sizes for celestial bodies (in world units)
     float sunSize = 5.0f;
@@ -248,13 +254,61 @@ public:
                 colorGain = 1.05f;
                 whiteBalanceTemp = 0.0f;
                 whiteBalanceTint = 0.0f;
-                bloomStrength = 0.08f;
-                bloomThreshold = 1.3f;
-                bloomKnee = 0.3f;
+                bloomStrength = 0.0f;
+                bloomThreshold = 1.5f;
+                bloomKnee = 0.2f;
                 vignetteStrength = 0.35f;
                 vignetteRoundness = 0.85f;
                 vignetteSmoothness = 0.8f;
-                chromaticAberration = 0.002f;
+                chromaticAberration = 0.0f;
+                break;
+            case COLOR_TEMPLATE_GOLDEN_HOUR:
+                colorSaturation = 1.2f;
+                colorVibrance = 0.25f;
+                colorContrast = 1.08f;
+                colorLift = 0.02f;
+                colorGain = 1.08f;
+                whiteBalanceTemp = 0.12f;
+                whiteBalanceTint = 0.02f;
+                bloomStrength = 0.38f;
+                bloomThreshold = 0.95f;
+                bloomKnee = 0.7f;
+                vignetteStrength = 0.2f;
+                vignetteRoundness = 0.78f;
+                vignetteSmoothness = 0.7f;
+                chromaticAberration = 0.0012f;
+                break;
+            case COLOR_TEMPLATE_TWILIGHT:
+                colorSaturation = 1.1f;
+                colorVibrance = 0.2f;
+                colorContrast = 1.15f;
+                colorLift = 0.01f;
+                colorGain = 1.03f;
+                whiteBalanceTemp = -0.06f;
+                whiteBalanceTint = 0.03f;
+                bloomStrength = 0.28f;
+                bloomThreshold = 1.1f;
+                bloomKnee = 0.5f;
+                vignetteStrength = 0.22f;
+                vignetteRoundness = 0.8f;
+                vignetteSmoothness = 0.7f;
+                chromaticAberration = 0.0016f;
+                break;
+            case COLOR_TEMPLATE_ARCADIA:
+                colorSaturation = 1.3f;
+                colorVibrance = 0.35f;
+                colorContrast = 1.05f;
+                colorLift = 0.03f;
+                colorGain = 1.06f;
+                whiteBalanceTemp = 0.02f;
+                whiteBalanceTint = -0.02f;
+                bloomStrength = 0.3f;
+                bloomThreshold = 1.0f;
+                bloomKnee = 0.6f;
+                vignetteStrength = 0.14f;
+                vignetteRoundness = 0.7f;
+                vignetteSmoothness = 0.6f;
+                chromaticAberration = 0.0018f;
                 break;
         }
     }
