@@ -30,6 +30,32 @@ public:
         float alpha;
         float waterFactor;
     };
+
+    struct BloodDecalRenderData {
+        glm::vec3 position;
+        glm::vec3 normal;
+        glm::vec2 size;
+        float rotation;
+        glm::vec3 color;
+        float alpha;
+        float seed;      // Random seed for pattern variation
+        int pattern;     // 0=splatter, 1=drip, 2=pool, 3=spray
+        bool attachedToBlock = false;  // For world-space clipping
+        glm::ivec3 blockPos = glm::ivec3(0);  // Block position for clipping
+    };
+    
+    // Model blood decals - projected directly onto model surfaces in the shader
+    struct ModelBloodDecal {
+        Entity* entity = nullptr;    // Which entity this decal belongs to
+        int boneIndex = -1;          // Bone/joint index for animation tracking (-1 = entity local)
+        glm::vec3 localPos;          // Position relative to bone (or entity if boneIndex=-1)
+        glm::vec3 localNormal;       // Direction decal faces (in bone/entity local space)
+        float radius = 0.15f;        // Radius of decal influence
+        float seed = 0.0f;           // Random seed for pattern
+        float alpha = 1.0f;          // Current alpha (for fading)
+        float age = 0.0f;            // Current age
+        float lifetime = 10.0f;      // How long until fade
+    };
     
     Renderer();
     ~Renderer() = default;
@@ -37,8 +63,10 @@ public:
     bool initialize(int windowWidth, int windowHeight);
     void render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, 
                 int windowWidth, int windowHeight, const std::vector<DebrisRenderData>& debris = {},
+                const std::vector<BloodDecalRenderData>& bloodDecals = {},
                 ExplosionVolumeSystem* explosionVolumes = nullptr,
-                const std::function<void(Shader&, const glm::vec3&, const glm::vec3&)>& extraModelPass = nullptr);
+                const std::function<void(Shader&, const glm::vec3&, const glm::vec3&)>& extraModelPass = nullptr,
+                const std::vector<ModelBloodDecal>& modelDecals = {});
     void onResize(int width, int height);
     
     void setLightDirection(const glm::vec3& direction) { lightDirection = direction; }
@@ -80,6 +108,7 @@ public:
     
     void renderDebris(const Camera& camera, const std::vector<DebrisRenderData>& debris, int windowWidth, int windowHeight);
     void renderDebrisShadow(const std::vector<DebrisRenderData>& debris, const glm::mat4& lightSpaceMatrix, const glm::dvec3& renderOrigin);
+    void renderBloodDecals(const std::vector<BloodDecalRenderData>& decals, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& renderOrigin);
     
     void setShowCrosshair(bool show) { showCrosshair = show; }
 
@@ -101,6 +130,7 @@ private:
     Shader modelShader; // New shader for entities
     Shader destroyOverlayShader; // Shader for block destruction overlay
     Shader debrisShader; // Shader for debris particles
+    Shader bloodDecalShader; // Shader for blood decals
     Shader explosionVolumeShader; // Shader for volumetric explosions
     
     std::unique_ptr<Mesh> crosshairMesh;
@@ -119,6 +149,12 @@ private:
     GLuint debrisVBO = 0;
     GLuint debrisEBO = 0;
     int debrisIndexCount = 0;
+
+    // Blood decal rendering
+    GLuint bloodDecalVAO = 0;
+    GLuint bloodDecalVBO = 0;
+    GLuint bloodDecalEBO = 0;
+    int bloodDecalIndexCount = 0;
     
     std::unique_ptr<Texture> blockAtlas;
     
@@ -179,4 +215,5 @@ private:
     void renderClouds(const Camera& camera, int windowWidth, int windowHeight, const glm::mat4& lightSpaceMatrix);
     void initDestroyOverlay();
     void initDebrisMesh();
+    void initBloodDecalMesh();
 };

@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -268,6 +269,8 @@ public:
         debrisManager.update(deltaTime);
         explosionSystem->update(deltaTime);
         updateRagdollPose();
+        updateBloodDecals(deltaTime);
+        updateModelBloodDecals(deltaTime);
         
         // Update limb debris
         for (auto& limb : limbDebris) {
@@ -290,6 +293,7 @@ public:
         for (auto* entity : entities) {
             if (!entity || !entity->isDead()) continue;
             if (!entity->getModel()) continue;
+            if (explodedEntities.find(entity) != explodedEntities.end()) continue;
             
             // Already has ragdoll?
             if (ragdolls.find(entity) != ragdolls.end()) continue;
@@ -451,6 +455,92 @@ public:
         }
         return result;
     }
+
+    // Get blood decals for rendering
+    std::vector<Renderer::BloodDecalRenderData> getBloodDecalRenderData() const {
+        std::vector<Renderer::BloodDecalRenderData> result;
+        result.reserve(bloodDecals.size());
+
+        for (const auto& d : bloodDecals) {
+            if (d.age >= d.lifetime) continue;
+
+            Renderer::BloodDecalRenderData out;
+            if (d.attached && d.entity) {
+                glm::mat4 entityWorld = buildEntityTransform(d.entity->getPosition(), d.entity->getRotation(), d.entity->getScale());
+                if (d.attachedToNode) {
+                    if (auto model = d.model.lock()) {
+                        glm::mat4 nodeWorld = entityWorld * model->getNodeGlobalTransformByIndex(d.nodeIndex);
+                        glm::vec4 wp = nodeWorld * glm::vec4(d.localPos, 1.0f);
+                        glm::vec3 wn = glm::normalize(glm::mat3(nodeWorld) * d.localNormal);
+                        // Offset position OUTWARD along normal to sit on model surface
+                        out.position = glm::vec3(wp) + wn * 0.01f;
+                        out.normal = wn;
+                    } else {
+                        glm::vec4 wp = entityWorld * glm::vec4(d.localPos, 1.0f);
+                        glm::vec3 wn = glm::normalize(glm::mat3(entityWorld) * d.localNormal);
+                        out.position = glm::vec3(wp) + wn * 0.01f;
+                        out.normal = wn;
+                    }
+                } else {
+                    glm::vec4 wp = entityWorld * glm::vec4(d.localPos, 1.0f);
+                    glm::vec3 wn = glm::normalize(glm::mat3(entityWorld) * d.localNormal);
+                    out.position = glm::vec3(wp) + wn * 0.01f;
+                    out.normal = wn;
+                }
+            } else if (d.attachedToBlock) {
+                out.position = glm::vec3(d.blockPos) + d.blockLocalPos;
+                out.normal = d.worldNormal;
+            } else {
+                out.position = d.worldPos;
+                out.normal = d.worldNormal;
+            }
+
+            float t = d.age / std::max(d.lifetime, 0.001f);
+            float alpha = 1.0f - std::clamp((t - 0.7f) / 0.3f, 0.0f, 1.0f);
+
+            out.size = d.size;
+            out.rotation = d.rotation;
+            out.color = d.color;
+            out.alpha = alpha * d.intensity;
+            out.seed = d.seed;
+            out.pattern = d.pattern;
+            out.attachedToBlock = d.attachedToBlock;
+            out.blockPos = d.blockPos;
+            result.push_back(out);
+        }
+
+        return result;
+    }
+    
+    // Get model blood decals for rendering (projected onto model surface in shader)
+    std::vector<Renderer::ModelBloodDecal> getModelBloodDecals() const {
+        std::vector<Renderer::ModelBloodDecal> result;
+        result.reserve(modelBloodDecals.size());
+        
+        for (const auto& d : modelBloodDecals) {
+            if (d.age >= d.lifetime) continue;
+            if (!d.entity) continue;
+            
+            Renderer::ModelBloodDecal out;
+            out.entity = d.entity;
+            out.boneIndex = d.boneIndex;
+            out.localPos = d.localPos;
+            out.localNormal = d.localNormal;
+            out.radius = d.radius;
+            out.seed = d.seed;
+            
+            // Calculate alpha with fade
+            float t = d.age / std::max(d.lifetime, 0.001f);
+            float fadeAlpha = 1.0f - std::clamp((t - 0.7f) / 0.3f, 0.0f, 1.0f);
+            out.alpha = d.alpha * fadeAlpha;
+            out.age = d.age;
+            out.lifetime = d.lifetime;
+            
+            result.push_back(out);
+        }
+        
+        return result;
+    }
     
     // Render limb debris (call after model rendering pass)
     void renderLimbDebris(Shader& shader, const glm::vec3& renderOrigin) {
@@ -608,6 +698,49 @@ private:
     };
 
     std::unordered_map<Entity*, RagdollInstance> ragdolls;
+    std::unordered_set<Entity*> explodedEntities;
+
+    struct BloodDecalInstance {
+        bool attached = false;
+        Entity* entity = nullptr;
+        bool attachedToNode = false;
+        int nodeIndex = -1;
+        std::weak_ptr<ModelSystem::Model> model;
+        bool attachedToBlock = false;
+        glm::ivec3 blockPos = glm::ivec3(0);
+        glm::vec3 blockLocalPos = glm::vec3(0.0f);
+        glm::vec3 localPos = glm::vec3(0.0f);
+        glm::vec3 localNormal = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::vec3 worldPos = glm::vec3(0.0f);
+        glm::vec3 worldNormal = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::vec2 size = glm::vec2(0.3f);
+        float rotation = 0.0f;
+        glm::vec3 color = glm::vec3(0.5f, 0.0f, 0.0f);
+        float intensity = 1.0f;
+        float age = 0.0f;
+        float lifetime = 12.0f;
+        float seed = 0.0f;  // Random seed for pattern variation
+        int pattern = 0;    // 0=splatter, 1=drip, 2=pool, 3=spray
+    };
+
+    std::vector<BloodDecalInstance> bloodDecals;
+    size_t maxBloodDecals = 256;
+    
+    // Model blood decals - projected directly onto model surface in shader
+    struct ModelBloodDecalInstance {
+        Entity* entity = nullptr;
+        int boneIndex = -1;                           // Joint/bone index for animation tracking
+        glm::vec3 localPos = glm::vec3(0.0f);         // Position in bone local space
+        glm::vec3 localNormal = glm::vec3(0.0f, 1.0f, 0.0f);  // Direction decal faces
+        float radius = 0.15f;
+        float seed = 0.0f;
+        float alpha = 1.0f;
+        float age = 0.0f;
+        float lifetime = 10.0f;
+    };
+    
+    std::vector<ModelBloodDecalInstance> modelBloodDecals;
+    size_t maxModelBloodDecals = 128;
 
     // Helper functions
     static std::string toLowerCopy(const std::string& s) {
@@ -690,7 +823,7 @@ private:
     }
 
     // Build entity world transform
-    glm::mat4 buildEntityTransform(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale) {
+    static glm::mat4 buildEntityTransform(const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale) {
         glm::mat4 m = glm::mat4(1.0f);
         m = glm::translate(m, position);
         m = glm::rotate(m, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -698,6 +831,445 @@ private:
         m = glm::rotate(m, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
         m = glm::scale(m, scale);
         return m;
+    }
+
+    static void buildTangentFrame(const glm::vec3& normal, glm::vec3& tangent, glm::vec3& bitangent) {
+        glm::vec3 n = glm::normalize(normal);
+        glm::vec3 up = (std::abs(n.y) < 0.99f) ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
+        tangent = glm::normalize(glm::cross(up, n));
+        bitangent = glm::normalize(glm::cross(n, tangent));
+    }
+
+    glm::vec3 randomDirectionInCone(const glm::vec3& baseDir, float angleRad) {
+        glm::vec3 n = glm::normalize(baseDir);
+        glm::vec3 t, b;
+        buildTangentFrame(n, t, b);
+
+        float u = frand(0.0f, 1.0f);
+        float v = frand(0.0f, 1.0f);
+        float theta = u * 6.2831853f;
+        float cosA = std::cos(angleRad);
+        float z = glm::mix(cosA, 1.0f, v);
+        float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
+
+        glm::vec3 dir = t * (std::cos(theta) * r) + b * (std::sin(theta) * r) + n * z;
+        return glm::normalize(dir);
+    }
+
+    float frand(float a, float b) {
+        return a + (b - a) * (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX));
+    }
+
+    void addWrappedAttachedDecals(const glm::mat4& invWorld, const BloodDecalInstance& base,
+                                  const glm::vec3& worldNormal, const glm::vec2& size, float rotation, float lifetime) {
+        if (bloodDecals.size() >= maxBloodDecals) return;
+
+        glm::vec3 t, b;
+        buildTangentFrame(worldNormal, t, b);
+
+        float wrapIntensity = 0.45f;
+        glm::vec2 wrapSize = size * 0.7f;
+
+        auto localOffset = [&](const glm::vec3& worldOffset) {
+            return glm::vec3(invWorld * glm::vec4(worldOffset, 0.0f));
+        };
+
+        glm::vec3 tOff = t * (size.x * 0.5f);
+        glm::vec3 bOff = b * (size.y * 0.5f);
+        glm::vec3 d1 = glm::normalize(t + b);
+        glm::vec3 d2 = glm::normalize(t - b);
+        glm::vec3 d1Off = tOff + bOff;
+        glm::vec3 d2Off = tOff - bOff;
+
+        std::vector<std::pair<glm::vec3, glm::vec3>> wraps = {
+            { t,  tOff },
+            { -t, -tOff },
+            { b,  bOff },
+            { -b, -bOff },
+            { d1,  d1Off },
+            { -d1, -d1Off },
+            { d2,  d2Off },
+            { -d2, -d2Off }
+        };
+
+        for (const auto& w : wraps) {
+            if (bloodDecals.size() >= maxBloodDecals) break;
+            BloodDecalInstance d = base;
+            d.localNormal = glm::normalize(glm::mat3(invWorld) * w.first);
+            d.localPos = base.localPos + localOffset(w.second);
+            d.size = wrapSize;
+            d.rotation = rotation;
+            d.intensity = wrapIntensity;
+            d.lifetime = lifetime;
+            d.seed = frand(0.0f, 1000.0f);  // New seed for variation
+            d.pattern = base.pattern;        // Inherit pattern type
+            bloodDecals.push_back(d);
+        }
+    }
+
+    void addWrappedWorldDecals(const glm::vec3& pos, const glm::vec3& normal, const glm::vec2& size, float rotation, float lifetime, int patternType = -1) {
+        if (!chunkManager || bloodDecals.size() >= maxBloodDecals) return;
+
+        glm::vec3 n = glm::normalize(normal);
+        glm::vec3 an = glm::abs(n);
+        int axis = 0;
+        if (an.y > an.x && an.y > an.z) axis = 1;
+        else if (an.z > an.x) axis = 2;
+
+        if (std::max(std::max(an.x, an.y), an.z) < 0.9f) return;
+
+        glm::vec3 inside = pos - n * 0.02f;
+        int bx = static_cast<int>(std::floor(inside.x));
+        int by = static_cast<int>(std::floor(inside.y));
+        int bz = static_cast<int>(std::floor(inside.z));
+
+        float wrapIntensity = 0.6f;
+        glm::vec2 wrapSize = size * 0.75f;
+        int wrapPattern = (patternType >= 0) ? patternType : (rand() % 4);
+
+        auto pushWorld = [&](const glm::vec3& p, const glm::vec3& nn) {
+            if (bloodDecals.size() >= maxBloodDecals) return;
+            glm::vec3 n = glm::normalize(nn);
+            glm::vec3 inside = p - n * 0.02f;
+            glm::ivec3 bpos(
+                static_cast<int>(std::floor(inside.x)),
+                static_cast<int>(std::floor(inside.y)),
+                static_cast<int>(std::floor(inside.z))
+            );
+            BloodDecalInstance d;
+            d.attached = false;
+            d.attachedToBlock = true;
+            d.blockPos = bpos;
+            d.blockLocalPos = glm::vec3(p) - glm::vec3(bpos);
+            d.worldPos = p + n * 0.002f;
+            d.worldNormal = n;
+            d.size = wrapSize;
+            d.rotation = rotation;
+            d.color = glm::vec3(0.45f, 0.0f, 0.0f);
+            d.intensity = wrapIntensity;
+            d.lifetime = lifetime;
+            d.seed = frand(0.0f, 1000.0f);  // New seed for variation
+            d.pattern = wrapPattern;         // Use consistent pattern for wrap
+            bloodDecals.push_back(d);
+        };
+
+        if (axis == 1) {
+            float lx = pos.x - static_cast<float>(bx);
+            float lz = pos.z - static_cast<float>(bz);
+            float edgeX = std::min(0.49f, size.x * 0.65f);
+            float edgeZ = std::min(0.49f, size.y * 0.65f);
+            float edgeX2 = std::min(0.49f, size.x * 0.85f);
+            float edgeZ2 = std::min(0.49f, size.y * 0.85f);
+
+            if (lx < edgeX) {
+                pushWorld(glm::vec3(static_cast<float>(bx), static_cast<float>(by) + 0.5f, pos.z), glm::vec3(-1.0f, 0.0f, 0.0f));
+            }
+            if (lx > 1.0f - edgeX) {
+                pushWorld(glm::vec3(static_cast<float>(bx) + 1.0f, static_cast<float>(by) + 0.5f, pos.z), glm::vec3(1.0f, 0.0f, 0.0f));
+            }
+            if (lz < edgeZ) {
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 0.5f, static_cast<float>(bz)), glm::vec3(0.0f, 0.0f, -1.0f));
+            }
+            if (lz > 1.0f - edgeZ) {
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 0.5f, static_cast<float>(bz) + 1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            }
+            if (lx < edgeX2 && lz < edgeZ2) {
+                pushWorld(glm::vec3(static_cast<float>(bx), static_cast<float>(by) + 0.5f, static_cast<float>(bz)), glm::vec3(-1.0f, 0.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 0.5f, static_cast<float>(bz)), glm::vec3(0.0f, 0.0f, -1.0f));
+            }
+            if (lx < edgeX2 && lz > 1.0f - edgeZ2) {
+                pushWorld(glm::vec3(static_cast<float>(bx), static_cast<float>(by) + 0.5f, static_cast<float>(bz) + 1.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 0.5f, static_cast<float>(bz) + 1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            }
+            if (lx > 1.0f - edgeX2 && lz < edgeZ2) {
+                pushWorld(glm::vec3(static_cast<float>(bx) + 1.0f, static_cast<float>(by) + 0.5f, static_cast<float>(bz)), glm::vec3(1.0f, 0.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 0.5f, static_cast<float>(bz)), glm::vec3(0.0f, 0.0f, -1.0f));
+            }
+            if (lx > 1.0f - edgeX2 && lz > 1.0f - edgeZ2) {
+                pushWorld(glm::vec3(static_cast<float>(bx) + 1.0f, static_cast<float>(by) + 0.5f, static_cast<float>(bz) + 1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 0.5f, static_cast<float>(bz) + 1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            }
+        } else if (axis == 0) {
+            float ly = pos.y - static_cast<float>(by);
+            float lz = pos.z - static_cast<float>(bz);
+            float edgeY = std::min(0.49f, size.y * 0.65f);
+            float edgeZ = std::min(0.49f, size.x * 0.65f);
+            float edgeY2 = std::min(0.49f, size.y * 0.85f);
+            float edgeZ2 = std::min(0.49f, size.x * 0.85f);
+
+            if (ly < edgeY) {
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by), pos.z), glm::vec3(0.0f, -1.0f, 0.0f));
+            }
+            if (ly > 1.0f - edgeY) {
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 1.0f, pos.z), glm::vec3(0.0f, 1.0f, 0.0f));
+            }
+            if (lz < edgeZ) {
+                pushWorld(glm::vec3(pos.x, pos.y, static_cast<float>(bz)), glm::vec3(0.0f, 0.0f, -1.0f));
+            }
+            if (lz > 1.0f - edgeZ) {
+                pushWorld(glm::vec3(pos.x, pos.y, static_cast<float>(bz) + 1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            }
+            if (ly < edgeY2 && lz < edgeZ2) {
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by), static_cast<float>(bz)), glm::vec3(0.0f, -1.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, pos.y, static_cast<float>(bz)), glm::vec3(0.0f, 0.0f, -1.0f));
+            }
+            if (ly < edgeY2 && lz > 1.0f - edgeZ2) {
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by), static_cast<float>(bz) + 1.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, pos.y, static_cast<float>(bz) + 1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            }
+            if (ly > 1.0f - edgeY2 && lz < edgeZ2) {
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 1.0f, static_cast<float>(bz)), glm::vec3(0.0f, 1.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, pos.y, static_cast<float>(bz)), glm::vec3(0.0f, 0.0f, -1.0f));
+            }
+            if (ly > 1.0f - edgeY2 && lz > 1.0f - edgeZ2) {
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 1.0f, static_cast<float>(bz) + 1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, pos.y, static_cast<float>(bz) + 1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+            }
+        } else {
+            float lx = pos.x - static_cast<float>(bx);
+            float ly = pos.y - static_cast<float>(by);
+            float edgeX = std::min(0.49f, size.x * 0.65f);
+            float edgeY = std::min(0.49f, size.y * 0.65f);
+            float edgeX2 = std::min(0.49f, size.x * 0.85f);
+            float edgeY2 = std::min(0.49f, size.y * 0.85f);
+
+            if (lx < edgeX) {
+                pushWorld(glm::vec3(static_cast<float>(bx), pos.y, pos.z), glm::vec3(-1.0f, 0.0f, 0.0f));
+            }
+            if (lx > 1.0f - edgeX) {
+                pushWorld(glm::vec3(static_cast<float>(bx) + 1.0f, pos.y, pos.z), glm::vec3(1.0f, 0.0f, 0.0f));
+            }
+            if (ly < edgeY) {
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by), pos.z), glm::vec3(0.0f, -1.0f, 0.0f));
+            }
+            if (ly > 1.0f - edgeY) {
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 1.0f, pos.z), glm::vec3(0.0f, 1.0f, 0.0f));
+            }
+            if (lx < edgeX2 && ly < edgeY2) {
+                pushWorld(glm::vec3(static_cast<float>(bx), static_cast<float>(by), pos.z), glm::vec3(-1.0f, 0.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by), pos.z), glm::vec3(0.0f, -1.0f, 0.0f));
+            }
+            if (lx < edgeX2 && ly > 1.0f - edgeY2) {
+                pushWorld(glm::vec3(static_cast<float>(bx), static_cast<float>(by) + 1.0f, pos.z), glm::vec3(-1.0f, 0.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 1.0f, pos.z), glm::vec3(0.0f, 1.0f, 0.0f));
+            }
+            if (lx > 1.0f - edgeX2 && ly < edgeY2) {
+                pushWorld(glm::vec3(static_cast<float>(bx) + 1.0f, static_cast<float>(by), pos.z), glm::vec3(1.0f, 0.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by), pos.z), glm::vec3(0.0f, -1.0f, 0.0f));
+            }
+            if (lx > 1.0f - edgeX2 && ly > 1.0f - edgeY2) {
+                pushWorld(glm::vec3(static_cast<float>(bx) + 1.0f, static_cast<float>(by) + 1.0f, pos.z), glm::vec3(1.0f, 0.0f, 0.0f));
+                pushWorld(glm::vec3(pos.x, static_cast<float>(by) + 1.0f, pos.z), glm::vec3(0.0f, 1.0f, 0.0f));
+            }
+        }
+    }
+
+    void addBloodDecalWorld(const glm::vec3& pos, const glm::vec3& normal, const glm::vec2& size, float rotation, float lifetime, int patternType = -1) {
+        if (bloodDecals.size() >= maxBloodDecals) return;
+        glm::vec3 n = glm::normalize(normal);
+        glm::vec3 inside = pos - n * 0.02f;
+        glm::ivec3 bpos = glm::ivec3(
+            static_cast<int>(std::floor(inside.x)),
+            static_cast<int>(std::floor(inside.y)),
+            static_cast<int>(std::floor(inside.z))
+        );
+
+        BloodDecalInstance d;
+        d.attached = false;
+        d.attachedToBlock = true;
+        d.blockPos = bpos;
+        d.blockLocalPos = glm::vec3(pos) - glm::vec3(bpos);
+        d.worldPos = pos + n * 0.002f;
+        d.worldNormal = n;
+        d.size = size;
+        d.rotation = rotation;
+        d.color = glm::vec3(0.45f, 0.0f, 0.0f);
+        d.intensity = 1.0f;
+        d.lifetime = lifetime;
+        d.seed = frand(0.0f, 1000.0f);
+        d.pattern = (patternType >= 0) ? patternType : (rand() % 4);
+        bloodDecals.push_back(d);
+
+        addWrappedWorldDecals(pos, normal, size, rotation, lifetime);
+    }
+
+    void addBloodDecalAttached(Entity* entity, const glm::vec3& worldPos, const glm::vec3& normal, const glm::vec2& size, float rotation, float lifetime, int patternType = -1) {
+        if (!entity || bloodDecals.size() >= maxBloodDecals) return;
+        glm::mat4 world = buildEntityTransform(entity->getPosition(), entity->getRotation(), entity->getScale());
+        glm::mat4 invWorld = glm::inverse(world);
+        // Place decal directly on surface with minimal offset for z-fighting
+        glm::vec3 surfacePos = worldPos;
+        BloodDecalInstance d;
+        d.attached = true;
+        d.entity = entity;
+        d.attachedToNode = false;
+        d.localPos = glm::vec3(invWorld * glm::vec4(surfacePos, 1.0f));
+        d.localNormal = glm::normalize(glm::mat3(invWorld) * normal);
+        d.size = size;
+        d.rotation = rotation;
+        d.color = glm::vec3(0.5f, 0.0f, 0.0f);
+        d.intensity = 1.0f;
+        d.lifetime = lifetime;
+        d.seed = frand(0.0f, 1000.0f);
+        d.pattern = (patternType >= 0) ? patternType : (rand() % 4);
+        bloodDecals.push_back(d);
+
+        addWrappedAttachedDecals(invWorld, d, normal, size, rotation, lifetime);
+    }
+
+    void addBloodDecalAttachedToNode(Entity* entity, const std::shared_ptr<ModelSystem::Model>& model, int nodeIndex,
+                                     const glm::vec3& worldPos, const glm::vec3& normal, const glm::vec2& size, float rotation, float lifetime, int patternType = -1) {
+        if (!entity || !model || bloodDecals.size() >= maxBloodDecals) return;
+        glm::mat4 entityWorld = buildEntityTransform(entity->getPosition(), entity->getRotation(), entity->getScale());
+        glm::mat4 nodeWorld = entityWorld * model->getNodeGlobalTransformByIndex(nodeIndex);
+        glm::mat4 invNodeWorld = glm::inverse(nodeWorld);
+        // Place decal directly on surface with minimal offset for z-fighting
+        glm::vec3 surfacePos = worldPos;
+
+        BloodDecalInstance d;
+        d.attached = true;
+        d.entity = entity;
+        d.attachedToNode = true;
+        d.nodeIndex = nodeIndex;
+        d.model = model;
+        d.localPos = glm::vec3(invNodeWorld * glm::vec4(surfacePos, 1.0f));
+        d.localNormal = glm::normalize(glm::mat3(invNodeWorld) * normal);
+        d.size = size;
+        d.rotation = rotation;
+        d.color = glm::vec3(0.55f, 0.0f, 0.0f);
+        d.intensity = 1.0f;
+        d.lifetime = lifetime;
+        d.seed = frand(0.0f, 1000.0f);
+        d.pattern = (patternType >= 0) ? patternType : (rand() % 4);
+        bloodDecals.push_back(d);
+
+        addWrappedAttachedDecals(invNodeWorld, d, normal, size, rotation, lifetime);
+    }
+    
+    // Add a model blood decal - projected onto model surface in the shader
+    // boneIndex: the joint/bone to attach to (-1 for entity-local)
+    // boneLocalPos: position in bone's local space
+    void addModelBloodDecal(Entity* entity, int boneIndex, const glm::vec3& boneLocalPos, const glm::vec3& boneLocalNormal, float radius, float lifetime) {
+        if (!entity || modelBloodDecals.size() >= maxModelBloodDecals) return;
+        
+        ModelBloodDecalInstance d;
+        d.entity = entity;
+        d.boneIndex = boneIndex;
+        d.localPos = boneLocalPos;
+        d.localNormal = glm::normalize(boneLocalNormal);
+        d.radius = radius;
+        d.seed = frand(0.0f, 1000.0f);
+        d.alpha = 1.0f;
+        d.age = 0.0f;
+        d.lifetime = lifetime;
+        
+        modelBloodDecals.push_back(d);
+    }
+
+    bool findGroundY(float x, float startY, float z, float maxDepth, float& outY) {
+        if (!chunkManager) return false;
+        int ix = static_cast<int>(std::floor(x));
+        int iz = static_cast<int>(std::floor(z));
+        int start = static_cast<int>(std::floor(startY));
+        int end = static_cast<int>(std::floor(startY - maxDepth));
+        for (int y = start; y >= end; --y) {
+            Block b = chunkManager->getBlockAt(ix, y, iz);
+            if (b.isSolid()) {
+                outY = static_cast<float>(y + 1) + 0.01f;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void spawnExplosionBlood(const glm::vec3& center, float radius) {
+        int count = static_cast<int>(std::clamp(radius * 6.0f, 6.0f, 24.0f));
+        for (int i = 0; i < count; ++i) {
+            float a = frand(0.0f, 6.28318f);
+            float r = frand(0.2f, radius);
+            float x = center.x + std::cos(a) * r;
+            float z = center.z + std::sin(a) * r;
+            float groundY = 0.0f;
+            if (findGroundY(x, center.y + 4.0f, z, 16.0f, groundY)) {
+                glm::vec3 dir = glm::normalize(glm::vec3(x - center.x, 0.0f, z - center.z));
+                float rot = std::atan2(dir.z, dir.x);
+                float bigChance = frand(0.0f, 1.0f);
+                float major = (bigChance < 0.2f) ? frand(1.2f, 2.2f) : frand(0.4f, 1.1f);
+                float minor = major * frand(0.35f, 0.7f);
+                float life = frand(10.0f, 25.0f);
+                addBloodDecalWorld(glm::vec3(x, groundY, z), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec2(major, minor), rot, life);
+            }
+        }
+    }
+
+    void spawnExplosionBloodDirectionalBlocks(const glm::vec3& center, const glm::vec3& baseDir, float radius) {
+        glm::vec3 dirBase = baseDir;
+        if (glm::length(dirBase) < 0.001f) dirBase = glm::vec3(0.0f, 1.0f, 0.0f);
+        dirBase = glm::normalize(dirBase);
+
+        int count = static_cast<int>(std::clamp(radius * 2.2f, 6.0f, 18.0f));
+        float cone = glm::radians(30.0f);
+
+        for (int i = 0; i < count; ++i) {
+            glm::vec3 dir = randomDirectionInCone(dirBase, cone);
+            float dist = frand(radius * 0.5f, radius * 2.0f);
+            glm::vec3 sample = center + dir * dist;
+
+            float groundY = 0.0f;
+            if (!findGroundY(sample.x, sample.y + 6.0f, sample.z, 18.0f, groundY)) {
+                continue;
+            }
+
+            glm::vec3 normal = glm::vec3(0.0f, 1.0f, 0.0f);
+            glm::vec3 pos(sample.x, groundY, sample.z);
+            float rot = std::atan2(dir.z, dir.x);
+
+            float major = frand(0.45f, 1.2f);
+            float minor = major * frand(0.25f, 0.7f);
+            if (frand(0.0f, 1.0f) < 0.25f) {
+                minor = major * frand(0.15f, 0.35f);
+            }
+
+            addBloodDecalWorld(pos, normal, glm::vec2(major, minor), rot, frand(10.0f, 16.0f));
+        }
+    }
+
+    void updateBloodDecals(float deltaTime) {
+        for (auto& d : bloodDecals) {
+            d.age += deltaTime;
+        }
+        bloodDecals.erase(
+            std::remove_if(bloodDecals.begin(), bloodDecals.end(),
+                [this](const BloodDecalInstance& d) {
+                    if (d.age >= d.lifetime) return true;
+                    if (d.attached && (!d.entity || d.entity->isDead())) return true;
+                    if (d.attachedToBlock && chunkManager) {
+                        Block b = chunkManager->getBlockAt(d.blockPos.x, d.blockPos.y, d.blockPos.z);
+                        if (!b.isSolid()) return true;
+                    }
+                    return false;
+                }),
+            bloodDecals.end()
+        );
+    }
+
+    void updateModelBloodDecals(float deltaTime) {
+        for (auto& d : modelBloodDecals) {
+            d.age += deltaTime;
+            // Fade out during last 2 seconds
+            if (d.age > d.lifetime - 2.0f) {
+                d.alpha = std::max(0.0f, (d.lifetime - d.age) / 2.0f);
+            }
+        }
+        modelBloodDecals.erase(
+            std::remove_if(modelBloodDecals.begin(), modelBloodDecals.end(),
+                [](const ModelBloodDecalInstance& d) {
+                    if (d.age >= d.lifetime) return true;
+                    if (!d.entity || d.entity->isDead()) return true;
+                    return false;
+                }),
+            modelBloodDecals.end()
+        );
     }
 
     // Clear and destroy ragdoll
@@ -1069,9 +1641,16 @@ private:
                               const glm::vec3& dir, float damage) {
         if (!ragdoll.active) return;
         
+        // Sync joint positions from current animation BEFORE hit detection
+        // This ensures decals appear at the correct animated position
+        if (!ragdoll.entity->isDead()) {
+            updateJointPositionsFromEntity(ragdoll);
+        }
+        
         const float maxRange = 12.0f;
         int hitJointIndex = -1;
         float bestT = maxRange;
+        glm::vec3 hitPoint = origin + dir * maxRange;
 
         LOG_INFO("[RAGDOLL] damageRagdollFromRay: joints=" + std::to_string(ragdoll.joints.size()));
 
@@ -1081,9 +1660,9 @@ private:
             if (joint.detached) continue;  // Skip detached joints
             
             float t = 0.0f;
-            // Use very large radius for hit detection (5x base radius)
-            float hitRadius = joint.radius * 5.0f;
-            if (hitRadius < 0.5f) hitRadius = 0.5f;  // Minimum hit radius
+            // Use 1.5x joint radius for reasonable hit detection
+            float hitRadius = joint.radius * 1.5f;
+            if (hitRadius < 0.15f) hitRadius = 0.15f;  // Reasonable minimum
             
             if (raySphereHit(origin, dir, joint.position, hitRadius, t)) {
                 std::string jointName = (joint.nodeIndex >= 0 && 
@@ -1094,6 +1673,7 @@ private:
                 if (t < bestT) {
                     bestT = t;
                     hitJointIndex = static_cast<int>(i);
+                    hitPoint = origin + dir * t;
                 }
             }
         }
@@ -1147,6 +1727,24 @@ private:
         
         LOG_INFO("[RAGDOLL] HIT " + jointName + " dmg=" + std::to_string(dmgToLimb) + 
                  " health=" + std::to_string(hitJoint.health) + "/" + std::to_string(hitJoint.maxHealth));
+
+        // Spawn a model blood decal (projected onto model surface in shader)
+        if (ragdoll.entity && ragdoll.model) {
+            // Calculate surface point: from joint center toward attacker by joint radius
+            // This gives consistent placement on the sphere surface facing the player
+            glm::vec3 surfaceHitPoint = hitJoint.position + (-dir) * hitJoint.radius;
+            
+            // Convert to entity local space
+            glm::mat4 entityWorld = buildEntityTransform(ragdoll.entity->getPosition(), ragdoll.entity->getRotation(), ragdoll.entity->getScale());
+            glm::mat4 invEntityWorld = glm::inverse(entityWorld);
+            
+            glm::vec3 localHitPos = glm::vec3(invEntityWorld * glm::vec4(surfaceHitPoint, 1.0f));
+            // Decal normal points INTO the model (attack direction)
+            glm::vec3 localNormal = glm::normalize(glm::mat3(invEntityWorld) * dir);
+            
+            float decalRadius = frand(0.15f, 0.3f);
+            addModelBloodDecal(ragdoll.entity, -1, localHitPos, localNormal, decalRadius, 15.0f);
+        }
 
         // Check if limb should detach (never detach torso/core)
         if (hitJoint.health <= 0.0f && !isTorsoCore(jointName)) {
@@ -1211,6 +1809,9 @@ private:
 
         // Explosions fully disassemble: detach ALL joints if any joint was affected
         if (anyAffected) {
+            if (ragdoll.entity) {
+                explodedEntities.insert(ragdoll.entity);
+            }
             glm::vec3 entScale = ragdoll.entity ? ragdoll.entity->getScale() : glm::vec3(1.0f);
             float avgScale = (entScale.x + entScale.y + entScale.z) / 3.0f;
             for (size_t i = 0; i < ragdoll.joints.size(); ++i) {
@@ -1221,11 +1822,36 @@ private:
                                         ? ragdoll.nodeNames[joint.nodeIndex] : "";
                 if (isTorsoCore(jointName)) {
                     joint.health = std::max(joint.health, 1.0f);
+                    joint.detached = true;
+                    // Deactivate constraints
+                    for (auto& c : ragdoll.constraints) {
+                        if (c.jointA == static_cast<int>(i) || c.jointB == static_cast<int>(i)) {
+                            c.active = false;
+                        }
+                    }
+                    // Hide torso/core node without spawning debris
+                    if (ragdoll.model && joint.nodeIndex >= 0) {
+                        ragdoll.model->setNodeHidden(joint.nodeIndex, true);
+                    }
                     continue;
                 }
                 joint.health = 0.0f;
                 detachJoint(ragdoll, static_cast<int>(i), avgScale, false);
             }
+
+            // Hide the entire model so no full body remains after explosion disassembly
+            if (ragdoll.model) {
+                ragdoll.model->setAllNodesHidden(true);
+            }
+
+            // Directional blood splatter on blocks away from explosion (from model position)
+            if (ragdoll.entity) {
+                glm::vec3 away = ragdoll.entity->getPosition() - center;
+                spawnExplosionBloodDirectionalBlocks(center, away, radius);
+            }
+
+            // Spawn blood splatter on ground
+            spawnExplosionBlood(center, radius);
         }
     }
 

@@ -112,9 +112,13 @@ void RenderPipelineSystem::renderFrame(bool isBreakingBlock, float blockBreakPro
     }
 
     std::vector<Renderer::DebrisRenderData> debrisData;
+    std::vector<Renderer::BloodDecalRenderData> bloodDecals;
+    std::vector<Renderer::ModelBloodDecal> modelDecals;
 #if ENABLE_PHYSICS_TEST
     if (physicsTest.isEnabled()) {
         debrisData = physicsTest.getDebrisRenderData();
+        bloodDecals = physicsTest.getBloodDecalRenderData();
+        modelDecals = physicsTest.getModelBloodDecals();
     }
     
     // Log limb debris count for debugging
@@ -139,7 +143,7 @@ void RenderPipelineSystem::renderFrame(bool isBreakingBlock, float blockBreakPro
         };
     }
 #endif
-    renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight(), debrisData, &explosionVolumes, limbRenderPass);
+    renderer.render(chunkManager, camera, entities, window->getWidth(), window->getHeight(), debrisData, bloodDecals, &explosionVolumes, limbRenderPass, modelDecals);
 
     renderer.cleanUnusedMeshes(chunkManager);
     renderer.blitDepthToScreen(window->getWidth(), window->getHeight());
@@ -163,7 +167,7 @@ void RenderPipelineSystem::renderMenuWorld() {
     if (!window) return;
     std::vector<Entity*> emptyEntities;
     renderer.setFireLightPositions({});
-    renderer.render(chunkManager, menuWorldSystem.getCamera(), emptyEntities, window->getWidth(), window->getHeight(), {}, nullptr);
+    renderer.render(chunkManager, menuWorldSystem.getCamera(), emptyEntities, window->getWidth(), window->getHeight(), {}, {}, nullptr);
     renderer.cleanUnusedMeshes(chunkManager);
     uiManager.render();
     uiManager.renderConsole();

@@ -6,6 +6,7 @@
 #include "../Util/Config.h"
 #include "../Core/Settings.h"
 #include "../Entity/Entity.h"
+#include "../Model/Model.h"
 #include <GLFW/glfw3.h>
 #include <glm/gtc/quaternion.hpp>
 #include <random>
@@ -103,8 +104,10 @@ void Renderer::onResize(int width, int height) {
 
 void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vector<Entity*>& entities, 
                       int windowWidth, int windowHeight, const std::vector<DebrisRenderData>& debris,
+                      const std::vector<BloodDecalRenderData>& bloodDecals,
                       ExplosionVolumeSystem* explosionVolumes,
-                      const std::function<void(Shader&, const glm::vec3&, const glm::vec3&)>& extraModelPass) {
+                      const std::function<void(Shader&, const glm::vec3&, const glm::vec3&)>& extraModelPass,
+                      const std::vector<ModelBloodDecal>& modelDecals) {
     // === HANDLE PBR SETTINGS CHANGES ===
     // When PBR mode is toggled, we may need to recalculate lighting/shadows
     if (Settings::instance().pbrSettingsChanged) {
@@ -649,6 +652,7 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         // Debug flags
         modelShader.setInt("uDebugNoTexture", Settings::instance().debugNoTexture ? 1 : 0);
         modelShader.setInt("uDebugShowNormals", Settings::instance().debugShowNormals ? 1 : 0);
+        
         for (auto* entity : entities) {
             if (!entity) continue;
             
@@ -676,15 +680,48 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
 
             glm::mat4 currentModel = buildMatrix(relPos, entity->getRotation(), entity->getScale());
             glm::mat4 prevModel = buildMatrix(prevRelPos, entity->getPrevRotation(), entity->getPrevScale());
+            
+            // Collect blood decals for this entity and pass to shader
+            int decalCount = 0;
+            const int MAX_DECALS = 32;
+            for (const auto& decal : modelDecals) {
+                if (decal.entity == entity && decalCount < MAX_DECALS) {
+                    // Transform local decal position to world space (camera-relative)
+                    glm::vec3 worldDecalPos = glm::vec3(currentModel * glm::vec4(decal.localPos, 1.0f));
+                    glm::vec3 worldNormal = glm::normalize(glm::mat3(currentModel) * decal.localNormal);
+                    
+                    std::string posUniform = "uBloodDecalPos[" + std::to_string(decalCount) + "]";
+                    std::string normalUniform = "uBloodDecalNormal[" + std::to_string(decalCount) + "]";
+                    std::string radiusUniform = "uBloodDecalRadius[" + std::to_string(decalCount) + "]";
+                    std::string seedUniform = "uBloodDecalSeed[" + std::to_string(decalCount) + "]";
+                    std::string alphaUniform = "uBloodDecalAlpha[" + std::to_string(decalCount) + "]";
+                    
+                    modelShader.setVec3(posUniform.c_str(), glm::vec3(worldDecalPos));
+                    modelShader.setVec3(normalUniform.c_str(), worldNormal);
+                    modelShader.setFloat(radiusUniform.c_str(), decal.radius);
+                    modelShader.setFloat(seedUniform.c_str(), decal.seed);
+                    modelShader.setFloat(alphaUniform.c_str(), decal.alpha);
+                    
+                    decalCount++;
+                }
+            }
+            
+            modelShader.setInt("uBloodDecalCount", decalCount);
 
             entity->renderWithMatrices(modelShader, currentModel, prevModel);
         }
 
         if (extraModelPass) {
             modelShader.setFloat("uAlphaMultiplier", 1.0f);
+            modelShader.setInt("uBloodDecalCount", 0);  // No decals for extra pass
             extraModelPass(modelShader, glm::vec3(renderOrigin), glm::vec3(prevRenderOrigin));
         }
         modelShader.unuse();
+    }
+
+    // Render blood decals (after entities, before water) - these are for blocks only now
+    if (!bloodDecals.empty()) {
+        renderBloodDecals(bloodDecals, view, projection, glm::vec3(renderOrigin));
     }
 
     // Copy scene color and depth for water reflections BEFORE rendering water
@@ -1028,6 +1065,10 @@ bool Renderer::loadShaders() {
     }
     if (!debrisShader.loadFromFiles("shaders/debris.vert", "shaders/debris.frag")) {
         LOG_ERROR("Failed to load debris shader");
+        success = false;
+    }
+    if (!bloodDecalShader.loadFromFiles("shaders/blood_decal.vert", "shaders/blood_decal.frag")) {
+        LOG_ERROR("Failed to load blood decal shader");
         success = false;
     }
     if (!explosionVolumeShader.loadFromFiles("shaders/explosion_volume.vert", "shaders/explosion_volume.frag")) {
@@ -1919,6 +1960,101 @@ void Renderer::initDebrisMesh() {
     glBindVertexArray(0);
     
     debrisIndexCount = static_cast<int>(indices.size());
+}
+
+void Renderer::initBloodDecalMesh() {
+    struct DecalVertex {
+        float x, y, z;
+        float u, v;
+    };
+
+    // Flat quad at Y=0, positioned at decal center
+    std::vector<DecalVertex> vertices = {
+        {-0.5f, 0.0f, -0.5f, 0.0f, 0.0f},
+        { 0.5f, 0.0f, -0.5f, 1.0f, 0.0f},
+        { 0.5f, 0.0f,  0.5f, 1.0f, 1.0f},
+        {-0.5f, 0.0f,  0.5f, 0.0f, 1.0f}
+    };
+
+    std::vector<unsigned int> indices = {0, 1, 2, 0, 2, 3};
+
+    glGenVertexArrays(1, &bloodDecalVAO);
+    glGenBuffers(1, &bloodDecalVBO);
+    glGenBuffers(1, &bloodDecalEBO);
+
+    glBindVertexArray(bloodDecalVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, bloodDecalVBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(DecalVertex), vertices.data(), GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bloodDecalEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+
+    // Position (location 0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(DecalVertex), (void*)offsetof(DecalVertex, x));
+    glEnableVertexAttribArray(0);
+
+    // UV (location 1)
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(DecalVertex), (void*)offsetof(DecalVertex, u));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+    bloodDecalIndexCount = static_cast<int>(indices.size());
+}
+
+void Renderer::renderBloodDecals(const std::vector<BloodDecalRenderData>& decals, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& renderOrigin) {
+    if (decals.empty()) return;
+    if (bloodDecalVAO == 0) {
+        initBloodDecalMesh();
+    }
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(-2.0f, -2.0f);  // Strong offset to render decals on top of surfaces
+    glDisable(GL_CULL_FACE);
+
+    bloodDecalShader.use();
+    bloodDecalShader.setMat4("uView", view);
+    bloodDecalShader.setMat4("uProjection", projection);
+    bloodDecalShader.setVec3("uRenderOrigin", renderOrigin);
+
+    glBindVertexArray(bloodDecalVAO);
+    for (const auto& d : decals) {
+        glm::vec3 normal = glm::normalize(d.normal);
+        glm::vec3 up = (std::abs(normal.y) < 0.99f) ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
+        glm::vec3 tangent = glm::normalize(glm::cross(up, normal));
+        glm::vec3 bitangent = glm::normalize(glm::cross(normal, tangent));
+
+        glm::mat4 basis(1.0f);
+        basis[0] = glm::vec4(tangent, 0.0f);
+        basis[1] = glm::vec4(normal, 0.0f);
+        basis[2] = glm::vec4(bitangent, 0.0f);
+
+        glm::mat4 localRot = glm::rotate(glm::mat4(1.0f), d.rotation, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(d.size.x, 1.0f, d.size.y));
+        glm::vec3 relPos = d.position - renderOrigin;
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), relPos) * basis * localRot * scale;
+
+        bloodDecalShader.setMat4("uModel", model);
+        bloodDecalShader.setVec3("uColor", d.color);
+        bloodDecalShader.setFloat("uAlpha", d.alpha);
+        bloodDecalShader.setFloat("uSeed", d.seed);
+        bloodDecalShader.setInt("uPattern", d.pattern);
+        bloodDecalShader.setInt("uAttachedToBlock", d.attachedToBlock ? 1 : 0);
+        bloodDecalShader.setVec3("uBlockPos", glm::vec3(d.blockPos));
+        bloodDecalShader.setVec3("uDecalNormal", normal);
+
+        glDrawElements(GL_TRIANGLES, bloodDecalIndexCount, GL_UNSIGNED_INT, 0);
+    }
+    glBindVertexArray(0);
+    bloodDecalShader.unuse();
+
+    glDepthMask(GL_TRUE);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glDisable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
 }
 
 void Renderer::renderDebris(const Camera& camera, const std::vector<DebrisRenderData>& debris, int windowWidth, int windowHeight) {

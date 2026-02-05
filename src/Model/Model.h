@@ -101,6 +101,7 @@ public:
     // Hide/show nodes (for ragdoll limb detachment)
     void setNodeHidden(int nodeIndex, bool hidden);
     void clearAllHiddenNodes();
+    void setAllNodesHidden(bool hidden);
 
 private:
     // Private constructor for cloning

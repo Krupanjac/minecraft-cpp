@@ -2,6 +2,7 @@
 #include "../Core/Logger.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
+#include <algorithm>
 
 // Static configuration
 LimbDebrisEntity::Config LimbDebrisEntity::config;
@@ -149,29 +150,54 @@ void LimbDebrisEntity::physicsUpdate(float fixedDeltaTime) {
         orientationQuat = glm::normalize(orientationQuat);
     }
 
-    // Terrain collision
-    float radius = debrisScale * 0.5f;
-    bool hasGround = false;
-    float groundLevel = 0.0f;
+    // Terrain collision (sphere vs blocks)
+    float radius = std::max(0.05f, debrisScale * 0.5f);
     if (terrainQuery) {
-        int bx = static_cast<int>(std::floor(position.x));
-        int by = static_cast<int>(std::floor(position.y - radius - 0.05f));
-        int bz = static_cast<int>(std::floor(position.z));
-        Block below = terrainQuery(bx, by, bz);
-        if (below.isSolid()) {
-            groundLevel = static_cast<float>(by + 1);
-            hasGround = true;
+        glm::vec3 p = position;
+        int minX = static_cast<int>(std::floor(p.x - radius));
+        int maxX = static_cast<int>(std::floor(p.x + radius));
+        int minY = static_cast<int>(std::floor(p.y - radius));
+        int maxY = static_cast<int>(std::floor(p.y + radius));
+        int minZ = static_cast<int>(std::floor(p.z - radius));
+        int maxZ = static_cast<int>(std::floor(p.z + radius));
+
+        for (int x = minX; x <= maxX; ++x) {
+            for (int y = minY; y <= maxY; ++y) {
+                for (int z = minZ; z <= maxZ; ++z) {
+                    Block b = terrainQuery(x, y, z);
+                    if (!b.isSolid()) continue;
+
+                    glm::vec3 blockMin(x, y, z);
+                    glm::vec3 blockMax(x + 1.0f, y + 1.0f, z + 1.0f);
+
+                    glm::vec3 closest;
+                    closest.x = std::clamp(p.x, blockMin.x, blockMax.x);
+                    closest.y = std::clamp(p.y, blockMin.y, blockMax.y);
+                    closest.z = std::clamp(p.z, blockMin.z, blockMax.z);
+
+                    glm::vec3 delta = p - closest;
+                    float dist2 = glm::dot(delta, delta);
+                    if (dist2 < radius * radius) {
+                        float dist = std::sqrt(std::max(dist2, 0.00001f));
+                        glm::vec3 normal = (dist > 0.00001f) ? (delta / dist) : glm::vec3(0.0f, 1.0f, 0.0f);
+                        float penetration = radius - dist;
+
+                        // Push out of the block
+                        p += normal * (penetration + 0.001f);
+
+                        // Reflect velocity on collision normal (bounce + friction)
+                        float vn = glm::dot(linearVelocity, normal);
+                        if (vn < 0.0f) {
+                            glm::vec3 vt = linearVelocity - vn * normal;
+                            linearVelocity = vt * config.friction - normal * vn * config.bounceRestitution;
+                            angularVelocity *= 0.8f;
+                        }
+                    }
+                }
+            }
         }
-    }
-    if (hasGround && position.y < groundLevel + radius) {
-        position.y = groundLevel + radius;
-        // Bounce
-        if (linearVelocity.y < 0) {
-            linearVelocity.y = -linearVelocity.y * config.bounceRestitution;
-            linearVelocity.x *= config.friction;
-            linearVelocity.z *= config.friction;
-            angularVelocity *= 0.8f;
-        }
+
+        position = p;
     }
 }
 

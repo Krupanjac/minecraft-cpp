@@ -9,6 +9,7 @@ out vec3 FragPos;
 out vec3 Normal;
 out vec2 TexCoord;
 out vec4 vFragPosLightSpace;
+out vec3 WorldPos;  // Actual world position for decal projection
 
 uniform mat4 uModel;
 uniform mat4 uPrevModel;
@@ -54,6 +55,7 @@ void main() {
 
     vec4 worldPos = uModel * totalLocalPos;
     FragPos = worldPos.xyz;
+    WorldPos = worldPos.xyz;  // Pass world position for decal projection
     
     // Light space position for shadow mapping
     vFragPosLightSpace = uLightSpaceMatrix * worldPos;

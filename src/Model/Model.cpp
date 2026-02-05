@@ -841,6 +841,12 @@ void Model::clearAllHiddenNodes() {
     }
 }
 
+void Model::setAllNodesHidden(bool hidden) {
+    for (auto* node : nodeMap) {
+        if (node) node->hidden = hidden;
+    }
+}
+
 const std::vector<int>& Model::getActiveSkinJoints() const {
     static const std::vector<int> empty;
     if (skins.empty() || activeSkin < 0 || static_cast<size_t>(activeSkin) >= skins.size()) {
