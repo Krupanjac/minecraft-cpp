@@ -20,6 +20,7 @@
 #include "../World/ChunkManager.h"
 #include "../World/Item.h"
 #include "../Physics/PhysicsTest.h"
+#include "../Render/BloodSplatterSystem.h"
 
 #include <algorithm>
 #include <cmath>
@@ -31,6 +32,7 @@ InputSystem::InputSystem(UIManager& uiManagerRef,
                          EntityManager& entityManagerRef,
                          Network::NetworkManager& networkManagerRef,
                          Physics::PhysicsTestSystem& physicsTestRef,
+                         BloodSplatterSystem& bloodSplatterRef,
                          std::unique_ptr<PlayerEntity>& playerEntityRef,
                          std::vector<std::unique_ptr<ZombieEntity>>& zombiesRef,
                          std::vector<std::unique_ptr<SkeletonEntity>>& skeletonsRef,
@@ -51,6 +53,7 @@ InputSystem::InputSystem(UIManager& uiManagerRef,
       entityManager(entityManagerRef),
       networkManager(networkManagerRef),
     physicsTest(physicsTestRef),
+    bloodSplatter(bloodSplatterRef),
       playerEntity(playerEntityRef),
       zombies(zombiesRef),
       skeletons(skeletonsRef),
@@ -177,6 +180,12 @@ void InputSystem::handleMouseButton(int button, int action, int /*mods*/) {
                         physicsTest.handleAttackHit(targetEntity, eyePos, camera.getFront(), damage);
                         LOG_INFO("[INPUT] handleAttackHit returned");
                         targetEntity->takeDamage(damage, knockbackVec);
+                        
+                        // Spawn blood splatter at impact point
+                        glm::vec3 impactPos = targetEntity->getPosition() + glm::vec3(0.0f, 0.8f, 0.0f); // Roughly center of entity
+                        glm::vec3 splatterDir = -camera.getFront(); // Blood sprays away from player
+                        float intensity = std::min(damage / 5.0f, 2.0f); // More damage = more blood
+                        bloodSplatter.spawnSplatter(impactPos, splatterDir, intensity);
                     }
 
                     Audio::AudioManager::instance().playSoundAt(Audio::SoundType::PLAYER_HURT, targetEntity->getPosition());

@@ -20,6 +20,7 @@
 #include "../World/WorldGenerator.h"
 #include "../World/FireSystem.h"
 #include "../Render/ExplosionVolumeSystem.h"
+#include "../Render/BloodSplatterSystem.h"
 #include "../Game/MenuWorldSystem.h"
 #include "../UI/UIManager.h"
 #include "../Physics/PhysicsTest.h"
@@ -35,6 +36,7 @@ RenderPipelineSystem::RenderPipelineSystem(Renderer& rendererRef,
                                            HeldItemRenderer& heldItemRendererRef,
                                            FireSystem& fireSystemRef,
                                            ExplosionVolumeSystem& explosionVolumesRef,
+                                           BloodSplatterSystem& bloodSplatterRef,
                                            UIManager& uiManagerRef,
                                            Network::NetworkManager& networkManagerRef,
                                            Physics::PhysicsTestSystem& physicsTestRef,
@@ -54,6 +56,7 @@ RenderPipelineSystem::RenderPipelineSystem(Renderer& rendererRef,
       heldItemRenderer(heldItemRendererRef),
       fireSystem(fireSystemRef),
       explosionVolumes(explosionVolumesRef),
+      bloodSplatter(bloodSplatterRef),
       uiManager(uiManagerRef),
       networkManager(networkManagerRef),
       physicsTest(physicsTestRef),
@@ -147,6 +150,16 @@ void RenderPipelineSystem::renderFrame(bool isBreakingBlock, float blockBreakPro
 
     renderer.cleanUnusedMeshes(chunkManager);
     renderer.blitDepthToScreen(window->getWidth(), window->getHeight());
+
+    // Render blood splatter particles
+    {
+        float aspectRatio = static_cast<float>(window->getWidth()) / static_cast<float>(window->getHeight());
+        glm::mat4 projection = glm::perspective(glm::radians(camera.getFov()), aspectRatio, 0.1f, 1000.0f);
+        glm::mat4 view = camera.getViewMatrix();
+        glm::vec3 cameraRight = glm::normalize(glm::vec3(view[0][0], view[1][0], view[2][0]));
+        glm::vec3 cameraUp = glm::normalize(glm::vec3(view[0][1], view[1][1], view[2][1]));
+        bloodSplatter.render(view, projection, cameraRight, cameraUp);
+    }
 
     if (isBreakingBlock && !uiManager.isCreativeMode && blockBreakProgress > 0.0f) {
         renderer.renderBlockBreakOverlay(camera, breakingBlockPos, blockBreakProgress, window->getWidth(), window->getHeight());

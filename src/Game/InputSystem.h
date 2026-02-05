@@ -18,6 +18,7 @@ class SkeletonEntity;
 class PigEntity;
 class ChickenEntity;
 class SheepEntity;
+class BloodSplatterSystem;
 
 namespace Physics {
 class PhysicsTestSystem;
@@ -36,6 +37,7 @@ public:
                 EntityManager& entityManager,
                 Network::NetworkManager& networkManager,
                 Physics::PhysicsTestSystem& physicsTest,
+                BloodSplatterSystem& bloodSplatter,
                 std::unique_ptr<PlayerEntity>& playerEntity,
                 std::vector<std::unique_ptr<ZombieEntity>>& zombies,
                 std::vector<std::unique_ptr<SkeletonEntity>>& skeletons,
@@ -65,6 +67,7 @@ private:
     EntityManager& entityManager;
     Network::NetworkManager& networkManager;
     Physics::PhysicsTestSystem& physicsTest;
+    BloodSplatterSystem& bloodSplatter;
     std::unique_ptr<PlayerEntity>& playerEntity;
     std::vector<std::unique_ptr<ZombieEntity>>& zombies;
     std::vector<std::unique_ptr<SkeletonEntity>>& skeletons;

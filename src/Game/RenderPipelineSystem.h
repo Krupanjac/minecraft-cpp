@@ -15,6 +15,7 @@ class WorldGenerator;
 class HeldItemRenderer;
 class FireSystem;
 class ExplosionVolumeSystem;
+class BloodSplatterSystem;
 class PlayerEntity;
 class ZombieEntity;
 class SkeletonEntity;
@@ -43,6 +44,7 @@ public:
                          HeldItemRenderer& heldItemRenderer,
                          FireSystem& fireSystem,
                          ExplosionVolumeSystem& explosionVolumes,
+                         BloodSplatterSystem& bloodSplatter,
                          UIManager& uiManager,
                          Network::NetworkManager& networkManager,
                          Physics::PhysicsTestSystem& physicsTest,
@@ -73,6 +75,7 @@ private:
     HeldItemRenderer& heldItemRenderer;
     FireSystem& fireSystem;
     ExplosionVolumeSystem& explosionVolumes;
+    BloodSplatterSystem& bloodSplatter;
     UIManager& uiManager;
     Network::NetworkManager& networkManager;
     Physics::PhysicsTestSystem& physicsTest;

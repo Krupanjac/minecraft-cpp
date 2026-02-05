@@ -139,6 +139,7 @@ set(SOURCES
     src/Render/HeldItemRenderer.cpp
     src/Render/ResourcePackManager.cpp
     src/Render/ExplosionVolumeSystem.cpp
+    src/Render/BloodSplatterSystem.cpp
     src/Network/Socket.cpp
     src/Network/Protocol.cpp
     src/Network/GameServer.cpp

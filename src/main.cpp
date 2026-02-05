@@ -28,6 +28,7 @@
 #include "Audio/AudioManager.h"
 #include "Physics/PhysicsTest.h"
 #include "Render/ExplosionVolumeSystem.h"
+#include "Render/BloodSplatterSystem.h"
 #include "World/FireSystem.h"
 #include "Game/StatusEffectsSystem.h"
 #include "Game/PlayerHealthSystem.h"
@@ -66,7 +67,7 @@ public:
                                                              camera, playerEntity, mobSpawnManager, zombies, skeletons, pigs, chickens, sheep,
                                                              useNewEntityManager, physicsTest, currentWorldName, currentSeed),
                     inputSystem(uiManager, camera, chunkManager, heldItemRenderer, entityManager, networkManager,
-                                            physicsTest, playerEntity, zombies, skeletons, pigs, chickens, sheep, useNewEntityManager,
+                                            physicsTest, bloodSplatterSystem, playerEntity, zombies, skeletons, pigs, chickens, sheep, useNewEntityManager,
                                             attackCooldown, isBreakingBlock, blockBreakProgress, breakingBlockPos, breakingBlockType, isUnderwater),
                       chunkUpdateSystem(chunkManager, worldGenerator, meshBuilder, renderer, threadPool, meshMutex, pendingMeshes),
                       timeOfDaySystem(uiManager, renderer, networkManager, camera),
@@ -76,7 +77,7 @@ public:
                                                     mobSpawnManager, playerEntity, zombies, skeletons, pigs, chickens, sheep, useNewEntityManager),
                                         renderPipelineSystem(renderer, chunkManager, menuWorldSystem, camera, entityManager,
                                                                                  worldGenerator, heldItemRenderer, fireSystem, explosionVolumes,
-                                                                                 uiManager, networkManager, physicsTest, playerEntity,
+                                                                                 bloodSplatterSystem, uiManager, networkManager, physicsTest, playerEntity,
                                                                                  zombies, skeletons, pigs, chickens, sheep, useNewEntityManager),
                     lastSpaceTime(0.0),
                     running(true),
@@ -324,6 +325,11 @@ public:
         // Initialize held item renderer
         if (!heldItemRenderer.initialize()) {
             LOG_WARNING("Failed to initialize held item renderer");
+        }
+        
+        // Initialize blood splatter system
+        if (!bloodSplatterSystem.initialize()) {
+            LOG_WARNING("Failed to initialize blood splatter system");
         }
         
         // Apply initial settings
@@ -764,6 +770,7 @@ private:
     MenuWorldSystem menuWorldSystem;
     ExplosionVolumeSystem explosionVolumes;
     FireSystem fireSystem;
+    BloodSplatterSystem bloodSplatterSystem;
     StatusEffectsSystem statusEffectsSystem;
     InputSystem inputSystem;
     ChunkUpdateSystem chunkUpdateSystem;
@@ -965,6 +972,7 @@ private:
         if (uiManager.isWorldLoaded()) {
             explosionVolumes.update(deltaTime);
             fireSystem.update(deltaTime, chunkManager, &explosionVolumes);
+            bloodSplatterSystem.update(deltaTime);
         }
         
         // renderer.setShowShadows(uiManager.showShadows); // Removed, Renderer uses Settings directly
