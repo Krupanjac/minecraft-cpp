@@ -284,6 +284,52 @@ add_custom_command(TARGET minecraft_server POST_BUILD
     ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:minecraft_server>/assets
 )
 
+# ============================================================================
+# VxStruct Editor - Vortex Engine Structure Editor Tool
+# ============================================================================
+
+set(EDITOR_SOURCES
+    src/Tools/VxStructEditor/EditorMain.cpp
+    src/World/Structure.cpp
+    src/Core/Logger.cpp
+    ${GLAD_DIR}/src/glad.c
+    ${IMGUI_SOURCES}
+)
+
+add_executable(vxstruct_editor ${EDITOR_SOURCES})
+
+target_include_directories(vxstruct_editor PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${GLAD_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+)
+
+target_link_libraries(vxstruct_editor PRIVATE
+    OpenGL::GL
+    glfw
+    glm::glm
+    nlohmann_json::nlohmann_json
+)
+
+if(WIN32)
+    target_compile_definitions(vxstruct_editor PRIVATE _CRT_SECURE_NO_WARNINGS EDITOR_BUILD SERVER_BUILD)
+    target_link_libraries(vxstruct_editor PRIVATE comdlg32 shell32)
+    # Keep console window for editor (useful for debug output)
+endif()
+
+# Copy shaders and assets for editor
+add_custom_command(TARGET vxstruct_editor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:vxstruct_editor>/shaders
+)
+
+add_custom_command(TARGET vxstruct_editor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:vxstruct_editor>/assets
+)
+
 # Platform-specific settings
 if(WIN32)
     target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)

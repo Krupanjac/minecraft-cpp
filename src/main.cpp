@@ -342,7 +342,7 @@ public:
         uiManager.initialize(fbW, fbH);
         uiManager.setWorldGenerator(&worldGenerator);
         
-        // Initialize structures from .mcstruct files
+        // Initialize structures from .vxstruct files
         worldGenerator.initializeStructures("assets/structures");
         
         // Pick a main menu tip for this session

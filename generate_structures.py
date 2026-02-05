@@ -1,4 +1,4 @@
-"""Generate .mcstruct files for village and city structures."""
+"""Generate .vxstruct files for village and city structures."""
 import json
 import os
 
@@ -843,37 +843,37 @@ village_dir = os.path.join(base_dir, "assets", "structures", "village")
 city_dir = os.path.join(base_dir, "assets", "structures", "city")
 
 print("=== Generating Village Structures ===")
-save(os.path.join(village_dir, "large_house.mcstruct"), village_large_house())
-save(os.path.join(village_dir, "library.mcstruct"), village_library())
-save(os.path.join(village_dir, "church.mcstruct"), village_church())
-save(os.path.join(village_dir, "market_stall.mcstruct"), village_market_stall())
-save(os.path.join(village_dir, "barn.mcstruct"), village_barn())
-save(os.path.join(village_dir, "watchtower.mcstruct"), village_watchtower())
-save(os.path.join(village_dir, "stable.mcstruct"), village_stable())
-save(os.path.join(village_dir, "garden.mcstruct"), village_garden())
-save(os.path.join(village_dir, "large_well.mcstruct"), village_well_large())
-save(os.path.join(village_dir, "inn.mcstruct"), village_inn())
-save(os.path.join(village_dir, "large_farm.mcstruct"), village_farm_large())
+save(os.path.join(village_dir, "large_house.vxstruct"), village_large_house())
+save(os.path.join(village_dir, "library.vxstruct"), village_library())
+save(os.path.join(village_dir, "church.vxstruct"), village_church())
+save(os.path.join(village_dir, "market_stall.vxstruct"), village_market_stall())
+save(os.path.join(village_dir, "barn.vxstruct"), village_barn())
+save(os.path.join(village_dir, "watchtower.vxstruct"), village_watchtower())
+save(os.path.join(village_dir, "stable.vxstruct"), village_stable())
+save(os.path.join(village_dir, "garden.vxstruct"), village_garden())
+save(os.path.join(village_dir, "large_well.vxstruct"), village_well_large())
+save(os.path.join(village_dir, "inn.vxstruct"), village_inn())
+save(os.path.join(village_dir, "large_farm.vxstruct"), village_farm_large())
 
 print("\n=== Generating City Structures ===")
-save(os.path.join(city_dir, "office_tower.mcstruct"), city_office_tower())
-save(os.path.join(city_dir, "apartment.mcstruct"), city_apartment())
-save(os.path.join(city_dir, "skyscraper.mcstruct"), city_skyscraper())
-save(os.path.join(city_dir, "warehouse.mcstruct"), city_warehouse())
-save(os.path.join(city_dir, "city_hall.mcstruct"), city_hall())
-save(os.path.join(city_dir, "shop.mcstruct"), city_shop())
-save(os.path.join(city_dir, "park.mcstruct"), city_park())
-save(os.path.join(city_dir, "tall_apartment.mcstruct"), city_tall_apartment())
-save(os.path.join(city_dir, "tower_block.mcstruct"), city_tower_block())
-save(os.path.join(city_dir, "road_section.mcstruct"), city_road_section())
-save(os.path.join(city_dir, "lamppost.mcstruct"), city_lamppost())
-save(os.path.join(city_dir, "monument.mcstruct"), city_monument())
+save(os.path.join(city_dir, "office_tower.vxstruct"), city_office_tower())
+save(os.path.join(city_dir, "apartment.vxstruct"), city_apartment())
+save(os.path.join(city_dir, "skyscraper.vxstruct"), city_skyscraper())
+save(os.path.join(city_dir, "warehouse.vxstruct"), city_warehouse())
+save(os.path.join(city_dir, "city_hall.vxstruct"), city_hall())
+save(os.path.join(city_dir, "shop.vxstruct"), city_shop())
+save(os.path.join(city_dir, "park.vxstruct"), city_park())
+save(os.path.join(city_dir, "tall_apartment.vxstruct"), city_tall_apartment())
+save(os.path.join(city_dir, "tower_block.vxstruct"), city_tower_block())
+save(os.path.join(city_dir, "road_section.vxstruct"), city_road_section())
+save(os.path.join(city_dir, "lamppost.vxstruct"), city_lamppost())
+save(os.path.join(city_dir, "monument.vxstruct"), city_monument())
 
 print(f"\nDone! Generated {11 + 12} structure files.")
 
 # Also clean up None entries in blocks from bad code
 import glob
-for path in glob.glob(os.path.join(base_dir, "assets", "structures", "**", "*.mcstruct"), recursive=True):
+for path in glob.glob(os.path.join(base_dir, "assets", "structures", "**", "*.vxstruct"), recursive=True):
     with open(path, 'r') as f:
         data = json.load(f)
     original_count = len(data['blocks'])

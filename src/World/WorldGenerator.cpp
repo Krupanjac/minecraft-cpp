@@ -1170,7 +1170,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         }
     }
     
-    // 4. STRUCTURE PASS - Place .mcstruct structures in settlement biomes
+    // 4. STRUCTURE PASS - Place .vxstruct structures in settlement biomes
     // Uses a sub-grid system: cities place structures every 8 blocks (up to 4 per chunk),
     // villages every 16 blocks (1 per chunk). Roads in cities form a grid pattern.
     [&]() {

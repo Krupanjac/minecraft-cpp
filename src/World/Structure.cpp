@@ -483,7 +483,7 @@ void StructureRegistry::loadStructuresFromDirectory(const std::string& directory
     for (const auto& entry : fs::recursive_directory_iterator(directory)) {
         if (entry.is_regular_file()) {
             std::string ext = entry.path().extension().string();
-            if (ext == ".mcstruct" || ext == ".json") {
+            if (ext == ".vxstruct" || ext == ".json") {
                 auto structure = std::make_shared<Structure>();
                 if (structure->loadFromFile(entry.path().string())) {
                     std::string id = entry.path().stem().string();
