@@ -34,12 +34,12 @@ bool Renderer::initialize(int windowWidth, int windowHeight) {
     blockAtlas = std::make_unique<Texture>("assets/block_atlas.png");
 
     // Initialize PBR Resource Pack Manager
-    if (ResourcePackManager::instance().initialize("assets/PBRANDPOM")) {
-        LOG_INFO("PBRANDPOM resource pack loaded successfully");
+    if (ResourcePackManager::instance().initialize("assets/pbr")) {
+        LOG_INFO("pbr resource pack loaded successfully");
         // Sync with settings
         ResourcePackManager::instance().setEnabled(Settings::instance().usePBRResourcePack);
     } else {
-        LOG_WARNING("Failed to load PBRANDPOM resource pack - will use default textures");
+        LOG_WARNING("Failed to load pbr resource pack - will use default textures");
         Settings::instance().usePBRResourcePack = false;
     }
 

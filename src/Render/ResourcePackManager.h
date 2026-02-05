@@ -36,7 +36,7 @@ public:
     }
 
     // Initialize and load resource pack textures
-    bool initialize(const std::string& resourcePackPath = "assets/PBRANDPOM");
+    bool initialize(const std::string& resourcePackPath = "assets/pbr");
     void cleanup();
 
     // Check if resource pack is loaded and available

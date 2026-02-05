@@ -1,0 +1,297 @@
+#include "BloodSplatterSystem.h"
+#include "../Core/Logger.h"
+#include <glad/glad.h>
+#include <stb_image.h>
+#include <algorithm>
+
+BloodSplatterSystem::BloodSplatterSystem() 
+    : m_rng(std::random_device{}()) {
+    m_particles.resize(m_maxParticles);
+    for (auto& p : m_particles) {
+        p.active = false;
+    }
+}
+
+BloodSplatterSystem::~BloodSplatterSystem() {
+    if (m_quadVAO) glDeleteVertexArrays(1, &m_quadVAO);
+    if (m_quadVBO) glDeleteBuffers(1, &m_quadVBO);
+    if (m_instanceVBO) glDeleteBuffers(1, &m_instanceVBO);
+    if (m_atlasTexture) glDeleteTextures(1, &m_atlasTexture);
+}
+
+bool BloodSplatterSystem::initialize() {
+    if (m_initialized) return true;
+    
+    // Load shader
+    if (!m_shader.loadFromFiles("shaders/sprite_particle.vert", "shaders/sprite_particle.frag")) {
+        LOG_ERROR("Failed to load sprite particle shader");
+        return false;
+    }
+    
+    // Load blood atlas
+    if (!loadAtlas()) {
+        LOG_ERROR("Failed to load blood splatter atlas");
+        return false;
+    }
+    
+    // Initialize quad mesh
+    initQuadMesh();
+    
+    m_instanceData.reserve(m_maxParticles);
+    m_initialized = true;
+    
+    LOG_INFO("BloodSplatterSystem initialized");
+    return true;
+}
+
+bool BloodSplatterSystem::loadAtlas() {
+    const char* atlasPath = "assets/particles/predrawn_atlas/blood_impact_6x5.png";
+    
+    stbi_set_flip_vertically_on_load(true);
+    int width, height, channels;
+    unsigned char* data = stbi_load(atlasPath, &width, &height, &channels, 4);
+    
+    if (!data) {
+        LOG_ERROR("Failed to load blood atlas: " + std::string(atlasPath));
+        return false;
+    }
+    
+    glGenTextures(1, &m_atlasTexture);
+    glBindTexture(GL_TEXTURE_2D, m_atlasTexture);
+    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    
+    stbi_image_free(data);
+    stbi_set_flip_vertically_on_load(false);
+    
+    LOG_INFO("Loaded blood splatter atlas: " + std::to_string(width) + "x" + std::to_string(height));
+    return true;
+}
+
+void BloodSplatterSystem::initQuadMesh() {
+    // Simple quad vertices: position (x,y,z) + texcoord (u,v)
+    float quadVertices[] = {
+        // Position           // TexCoord
+        -0.5f, -0.5f, 0.0f,   0.0f, 0.0f,
+         0.5f, -0.5f, 0.0f,   1.0f, 0.0f,
+         0.5f,  0.5f, 0.0f,   1.0f, 1.0f,
+        -0.5f, -0.5f, 0.0f,   0.0f, 0.0f,
+         0.5f,  0.5f, 0.0f,   1.0f, 1.0f,
+        -0.5f,  0.5f, 0.0f,   0.0f, 1.0f
+    };
+    
+    glGenVertexArrays(1, &m_quadVAO);
+    glGenBuffers(1, &m_quadVBO);
+    glGenBuffers(1, &m_instanceVBO);
+    
+    glBindVertexArray(m_quadVAO);
+    
+    // Quad vertex data
+    glBindBuffer(GL_ARRAY_BUFFER, m_quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+    
+    // Position attribute (location 0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    
+    // TexCoord attribute (location 1)
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    
+    // Instance data buffer
+    glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
+    glBufferData(GL_ARRAY_BUFFER, m_maxParticles * sizeof(InstanceData), nullptr, GL_DYNAMIC_DRAW);
+    
+    // Instance attributes
+    // aWorldPos (location 2)
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(InstanceData), (void*)offsetof(InstanceData, worldPos));
+    glEnableVertexAttribArray(2);
+    glVertexAttribDivisor(2, 1);
+    
+    // aSize (location 3)
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(InstanceData), (void*)offsetof(InstanceData, size));
+    glEnableVertexAttribArray(3);
+    glVertexAttribDivisor(3, 1);
+    
+    // aAtlasInfo (location 4)
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData), (void*)offsetof(InstanceData, atlasInfo));
+    glEnableVertexAttribArray(4);
+    glVertexAttribDivisor(4, 1);
+    
+    // aColor (location 5)
+    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData), (void*)offsetof(InstanceData, color));
+    glEnableVertexAttribArray(5);
+    glVertexAttribDivisor(5, 1);
+    
+    // aRotation (location 6)
+    glVertexAttribPointer(6, 1, GL_FLOAT, GL_FALSE, sizeof(InstanceData), (void*)offsetof(InstanceData, rotation));
+    glEnableVertexAttribArray(6);
+    glVertexAttribDivisor(6, 1);
+    
+    glBindVertexArray(0);
+}
+
+void BloodSplatterSystem::update(float deltaTime) {
+    for (auto& p : m_particles) {
+        if (!p.active) continue;
+        
+        p.age += deltaTime;
+        if (p.age >= p.lifetime) {
+            p.active = false;
+            continue;
+        }
+        
+        // Update position with gravity
+        p.velocity.y -= 9.8f * deltaTime * 0.5f;  // Half gravity for floaty blood
+        p.position += p.velocity * deltaTime;
+        
+        // Update rotation
+        p.rotation += p.rotationSpeed * deltaTime;
+        
+        // Update animation frame
+        p.frame += p.frameRate * deltaTime;
+        if (p.frame >= static_cast<float>(m_totalFrames)) {
+            p.frame = static_cast<float>(m_totalFrames - 1);  // Stay on last frame
+        }
+        
+        // Fade out near end of life
+        float lifeRatio = p.age / p.lifetime;
+        if (lifeRatio > 0.7f) {
+            float fadeRatio = (lifeRatio - 0.7f) / 0.3f;
+            p.color.a = 1.0f - fadeRatio;
+        }
+    }
+}
+
+void BloodSplatterSystem::render(const glm::mat4& view, const glm::mat4& projection,
+                                  const glm::vec3& cameraRight, const glm::vec3& cameraUp) {
+    if (!m_initialized) return;
+    
+    // Build instance data
+    m_instanceData.clear();
+    for (const auto& p : m_particles) {
+        if (!p.active) continue;
+        
+        InstanceData inst;
+        inst.worldPos = p.position;
+        inst.size = p.size;
+        inst.atlasInfo = glm::vec4(p.frame, static_cast<float>(m_totalFrames), 
+                                   static_cast<float>(m_atlasColumns), static_cast<float>(m_atlasRows));
+        inst.color = p.color;
+        inst.rotation = p.rotation;
+        m_instanceData.push_back(inst);
+    }
+    
+    if (m_instanceData.empty()) return;
+    
+    // Upload instance data
+    glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, m_instanceData.size() * sizeof(InstanceData), m_instanceData.data());
+    
+    // Render
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+    
+    m_shader.use();
+    m_shader.setMat4("uView", view);
+    m_shader.setMat4("uProjection", projection);
+    m_shader.setVec3("uCameraRight", cameraRight);
+    m_shader.setVec3("uCameraUp", cameraUp);
+    m_shader.setInt("uAtlasTexture", 0);
+    m_shader.setInt("uAdditiveBlend", 0);
+    
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_atlasTexture);
+    
+    glBindVertexArray(m_quadVAO);
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, static_cast<GLsizei>(m_instanceData.size()));
+    glBindVertexArray(0);
+    
+    // Restore state
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+    
+    m_shader.unuse();
+}
+
+void BloodSplatterSystem::spawnSplatter(const glm::vec3& position, const glm::vec3& direction, float intensity) {
+    std::uniform_real_distribution<float> angleDist(-0.5f, 0.5f);
+    std::uniform_real_distribution<float> speedDist(2.0f, 6.0f);
+    std::uniform_real_distribution<float> sizeDist(0.15f, 0.4f);
+    std::uniform_real_distribution<float> lifeDist(0.4f, 0.8f);
+    std::uniform_real_distribution<float> rotDist(0.0f, 6.28f);
+    std::uniform_real_distribution<float> rotSpeedDist(-3.0f, 3.0f);
+    std::uniform_real_distribution<float> frameRateDist(25.0f, 40.0f);
+    
+    // Spawn multiple particles based on intensity
+    int count = static_cast<int>(3 + intensity * 5);
+    
+    for (int i = 0; i < count; ++i) {
+        // Find inactive particle
+        Particle* p = nullptr;
+        for (auto& particle : m_particles) {
+            if (!particle.active) {
+                p = &particle;
+                break;
+            }
+        }
+        
+        if (!p) {
+            // Pool full, replace oldest
+            float maxAge = 0.0f;
+            for (auto& particle : m_particles) {
+                if (particle.age > maxAge) {
+                    maxAge = particle.age;
+                    p = &particle;
+                }
+            }
+        }
+        
+        if (!p) continue;
+        
+        // Initialize particle
+        p->position = position;
+        
+        // Spray in direction with random spread
+        glm::vec3 baseDir = glm::normalize(direction + glm::vec3(0.0f, 0.3f, 0.0f));
+        glm::vec3 spread(angleDist(m_rng), angleDist(m_rng), angleDist(m_rng));
+        p->velocity = glm::normalize(baseDir + spread) * speedDist(m_rng) * intensity;
+        
+        float size = sizeDist(m_rng) * intensity;
+        p->size = glm::vec2(size);
+        
+        // Blood red color with slight variation
+        float redVar = 0.8f + 0.2f * (static_cast<float>(m_rng() % 100) / 100.0f);
+        p->color = glm::vec4(redVar, 0.0f, 0.0f, 1.0f);
+        
+        p->rotation = rotDist(m_rng);
+        p->rotationSpeed = rotSpeedDist(m_rng);
+        p->frame = 0.0f;
+        p->frameRate = frameRateDist(m_rng);
+        p->lifetime = lifeDist(m_rng);
+        p->age = 0.0f;
+        p->active = true;
+    }
+}
+
+void BloodSplatterSystem::clear() {
+    for (auto& p : m_particles) {
+        p.active = false;
+    }
+}
+
+size_t BloodSplatterSystem::getActiveCount() const {
+    size_t count = 0;
+    for (const auto& p : m_particles) {
+        if (p.active) ++count;
+    }
+    return count;
+}

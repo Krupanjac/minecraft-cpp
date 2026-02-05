@@ -319,8 +319,8 @@ public:
     static constexpr int RT_QUALITY_LOW = 0;
     static constexpr int RT_QUALITY_MEDIUM = 1;
     
-    // Resource Pack settings (PBRANDPOM)
-    bool usePBRResourcePack = false; // Use PBRANDPOM resource pack textures
+    // Resource Pack settings (pbr)
+    bool usePBRResourcePack = false; // Use pbr resource pack textures
     bool pbrSettingsChanged = false; // Flag to trigger shadow/lighting recalculation when PBR mode changes
     bool enableParallaxMapping = true; // Enable 3D parallax occlusion mapping for PBR textures (ON by default)
     static constexpr int RT_QUALITY_HIGH = 2;
