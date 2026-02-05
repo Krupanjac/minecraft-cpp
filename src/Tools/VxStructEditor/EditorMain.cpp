@@ -30,6 +30,8 @@
 #include <cmath>
 #include <algorithm>
 #include <filesystem>
+#include <deque>
+#include <set>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -398,6 +400,26 @@ static std::string saveFileDialog(const char*, const char*, const char*) { retur
 #endif
 
 // ============================================================================
+// Undo/Redo System
+// ============================================================================
+
+struct EditorAction {
+    enum class Type { PLACE_BLOCK, REMOVE_BLOCK, PLACE_MULTIPLE, REMOVE_MULTIPLE, PASTE, FILL_SELECTION };
+    Type type;
+    
+    // Single block ops
+    glm::ivec3 position;
+    BlockType blockType = BlockType::AIR;
+    BlockType previousType = BlockType::AIR;
+    uint8_t metadata = 0;
+    uint8_t previousMetadata = 0;
+    
+    // Multi-block ops
+    std::vector<StructureBlock> blocks;          // The blocks that were placed/removed
+    std::vector<StructureBlock> previousBlocks;  // What was there before
+};
+
+// ============================================================================
 // VxStruct Editor Application  
 // ============================================================================
 
@@ -445,7 +467,7 @@ private:
     std::string m_selectedCategory = "All";
 
     // Tools
-    enum class EditorTool { PLACE, ERASE, PICK, MARKER };
+    enum class EditorTool { PLACE, ERASE, PICK, MARKER, SELECT };
     EditorTool m_currentTool = EditorTool::PLACE;
 
     // Grid/display
@@ -460,6 +482,22 @@ private:
     glm::ivec3 m_hoverPlacePos = {0, 0, 0};
     bool m_hasHover = false;
 
+    // Multi-block selection
+    std::set<int64_t> m_selectedBlocks; // Encoded positions
+    bool m_boxSelectActive = false;
+    glm::ivec3 m_boxSelectStart = {0, 0, 0};
+    glm::ivec3 m_boxSelectEnd = {0, 0, 0};
+    bool m_boxSelectHasStart = false;
+
+    // Clipboard
+    std::vector<StructureBlock> m_clipboard;
+    glm::ivec3 m_clipboardOrigin = {0, 0, 0};
+
+    // Undo/Redo
+    std::deque<EditorAction> m_undoStack;
+    std::deque<EditorAction> m_redoStack;
+    static const size_t MAX_UNDO = 200;
+
     // Marker editing
     std::string m_markerType = "door";
     std::string m_markerData;
@@ -473,6 +511,27 @@ private:
     char m_tagBuffer[64] = "";
     std::vector<std::string> m_tags;
 
+    // UI popups
+    bool m_showHelpWindow = false;
+    bool m_showAboutWindow = false;
+
+    // Rotation preview
+    int m_rotationAngle = 0; // 0, 1, 2, 3 (x90 degrees)
+
+    // Selection encoding helpers
+    static int64_t encodePos(const glm::ivec3& p) {
+        return ((int64_t)(p.x + 10000) << 32) | ((int64_t)(p.y + 10000) << 16) | (int64_t)(p.z + 10000);
+    }
+    static glm::ivec3 decodePos(int64_t e) {
+        int x = (int)((e >> 32) & 0xFFFF) - 10000;
+        int y = (int)((e >> 16) & 0xFFFF) - 10000;
+        int z = (int)(e & 0xFFFF) - 10000;
+        return {x, y, z};
+    }
+    bool isBlockSelected(const glm::ivec3& pos) const {
+        return m_selectedBlocks.count(encodePos(pos)) > 0;
+    }
+
     // Methods
     void processInput();
     void updateHover();
@@ -485,14 +544,36 @@ private:
     void renderBlockPalette();
     void renderProperties();
     void renderStructureInfo();
-    void renderViewport();
     void renderMarkerPanel();
+    void renderHelpWindow();
+    void renderAboutWindow();
+    void renderSelectionPanel();
+    void renderSelectionHighlights();
 
     void newStructure();
     void loadStructure();
     void saveStructure();
     void saveStructureAs();
     void exportStructure();
+
+    // Undo/Redo
+    void pushAction(const EditorAction& action);
+    void undo();
+    void redo();
+
+    // Edit operations
+    void placeBlockWithUndo(const glm::ivec3& pos, BlockType type, uint8_t metadata = 0);
+    void removeBlockWithUndo(const glm::ivec3& pos);
+    void deleteSelectedBlocks();
+    void copySelection();
+    void pasteClipboard();
+    void selectAll();
+    void deselectAll();
+    void invertSelection();
+    void rotateStructure();
+    void rotateSelection();
+    void fillSelection(BlockType type);
+    void duplicateSelection();
 
     // Callbacks
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
@@ -676,24 +757,39 @@ void VxStructEditor::processInput() {
     double mx, my;
     glfwGetCursorPos(m_window, &mx, &my);
 
-    // Middle mouse: orbit
+    double dx = mx - m_lastMouseX;
+    double dy = my - m_lastMouseY;
+
+    // Middle mouse: orbit camera (Blender-style)
     if (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS) {
+        bool shiftHeld = glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+                         glfwGetKey(m_window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+        bool ctrlHeld = glfwGetKey(m_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+                        glfwGetKey(m_window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
+
         if (!m_isDragging && !m_isPanning) {
-            if (glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+            if (shiftHeld) {
                 m_isPanning = true;
+            } else if (ctrlHeld) {
+                // Ctrl+MMB = zoom (Blender-style)
+                m_isDragging = false;
+                m_isPanning = false;
             } else {
                 m_isDragging = true;
             }
         }
 
-        double dx = mx - m_lastMouseX;
-        double dy = my - m_lastMouseY;
-
-        if (m_isDragging) {
+        if (ctrlHeld && !m_isDragging && !m_isPanning) {
+            // Ctrl+MMB drag: zoom
+            m_camera.distance -= (float)dy * m_camera.distance * 0.005f;
+            m_camera.distance = glm::clamp(m_camera.distance, 2.0f, 200.0f);
+        } else if (m_isDragging) {
+            // Orbit
             m_camera.yaw -= (float)dx * 0.3f;
             m_camera.pitch += (float)dy * 0.3f;
             m_camera.pitch = glm::clamp(m_camera.pitch, -89.0f, 89.0f);
         } else if (m_isPanning) {
+            // Pan (Shift+MMB)
             glm::mat4 view = m_camera.getViewMatrix();
             glm::vec3 right = glm::vec3(view[0][0], view[1][0], view[2][0]);
             glm::vec3 up = glm::vec3(view[0][1], view[1][1], view[2][1]);
@@ -942,9 +1038,21 @@ void VxStructEditor::render() {
             glBindVertexArray(m_wireVAO);
             glDrawArrays(GL_LINES, 0, 24);
             glBindVertexArray(0);
+        } else if (m_currentTool == EditorTool::SELECT && m_hoverHit.hit) {
+            // Select indicator (cyan wireframe)
+            glm::mat4 selModel = glm::translate(glm::mat4(1.0f), glm::vec3(m_hoverHit.blockPos));
+            glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uModel"), 1, GL_FALSE, glm::value_ptr(selModel));
+            glUniform4f(glGetUniformLocation(m_wireShader, "uColor"), 0.0f, 0.8f, 1.0f, 0.9f);
+            glLineWidth(2.5f);
+            glBindVertexArray(m_wireVAO);
+            glDrawArrays(GL_LINES, 0, 24);
+            glBindVertexArray(0);
         }
         glLineWidth(1.0f);
     }
+
+    // Draw selection highlights (bright cyan wireframe on selected blocks)
+    renderSelectionHighlights();
 
     // Draw marker positions
     const auto& markers = m_structure.getMarkers();
@@ -986,20 +1094,25 @@ void VxStructEditor::renderUI() {
     ImGui::SetNextWindowSize(ImVec2(280, (float)m_windowHeight - 20), ImGuiCond_FirstUseEver);
     renderToolbar();
 
-    ImGui::SetNextWindowPos(ImVec2(0, 320), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(280, (float)m_windowHeight - 320), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(0, 380), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(280, (float)m_windowHeight - 380), ImGuiCond_FirstUseEver);
     renderBlockPalette();
 
     // Right panel: Properties + Info
     ImGui::SetNextWindowPos(ImVec2((float)m_windowWidth - 300, 20), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(300, 350), ImGuiCond_FirstUseEver);
     renderProperties();
 
-    ImGui::SetNextWindowPos(ImVec2((float)m_windowWidth - 300, 420), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(300, (float)m_windowHeight - 420), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2((float)m_windowWidth - 300, 370), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(300, (float)m_windowHeight - 370), ImGuiCond_FirstUseEver);
     renderStructureInfo();
 
     renderMarkerPanel();
+    renderSelectionPanel();
+
+    // Popup windows
+    if (m_showHelpWindow) renderHelpWindow();
+    if (m_showAboutWindow) renderAboutWindow();
 }
 
 void VxStructEditor::renderMenuBar() {
@@ -1015,8 +1128,31 @@ void VxStructEditor::renderMenuBar() {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Edit")) {
+            if (ImGui::MenuItem("Undo", "Ctrl+Z", false, !m_undoStack.empty())) undo();
+            if (ImGui::MenuItem("Redo", "Ctrl+Y", false, !m_redoStack.empty())) redo();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Copy", "Ctrl+C", false, !m_selectedBlocks.empty())) copySelection();
+            if (ImGui::MenuItem("Paste", "Ctrl+V", false, !m_clipboard.empty())) pasteClipboard();
+            if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, !m_selectedBlocks.empty())) duplicateSelection();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Select All", "Ctrl+A")) selectAll();
+            if (ImGui::MenuItem("Deselect All", "Ctrl+Shift+A")) deselectAll();
+            if (ImGui::MenuItem("Invert Selection", "Ctrl+I")) invertSelection();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Delete Selected", "Delete", false, !m_selectedBlocks.empty())) deleteSelectedBlocks();
+            if (ImGui::MenuItem("Fill Selection", "Ctrl+F", false, !m_selectedBlocks.empty())) fillSelection(m_selectedBlock);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Rotate Structure 90", "Ctrl+R")) rotateStructure();
+            if (ImGui::MenuItem("Rotate Selection 90", "Ctrl+Shift+R", false, !m_selectedBlocks.empty())) rotateSelection();
+            ImGui::Separator();
             if (ImGui::MenuItem("Clear All Blocks")) {
+                // Push undo for all blocks
+                EditorAction action;
+                action.type = EditorAction::Type::REMOVE_MULTIPLE;
+                action.previousBlocks = m_structure.getBlocks();
+                pushAction(action);
                 m_structure.clear();
+                m_selectedBlocks.clear();
                 m_modified = true;
                 rebuildBlockMesh();
             }
@@ -1027,49 +1163,79 @@ void VxStructEditor::renderMenuBar() {
             ImGui::Checkbox("Show Wireframe", &m_showWireframe);
             ImGui::Checkbox("Show Axes", &m_showAxes);
             ImGui::Separator();
-            if (ImGui::MenuItem("Reset Camera")) {
+            if (ImGui::MenuItem("Reset Camera", "Home")) {
                 m_camera = OrbitCamera();
             }
+            if (ImGui::MenuItem("Focus Selection", "Numpad .")) {
+                // Focus on structure center
+                if (!m_structure.getBlocks().empty()) {
+                    glm::vec3 center = glm::vec3(m_structure.getMinBounds() + m_structure.getMaxBounds()) * 0.5f;
+                    m_camera.target = center;
+                }
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Front View", "Numpad 1")) { m_camera.yaw = 0; m_camera.pitch = 0; }
+            if (ImGui::MenuItem("Back View", "Ctrl+Numpad 1")) { m_camera.yaw = 180; m_camera.pitch = 0; }
+            if (ImGui::MenuItem("Right View", "Numpad 3")) { m_camera.yaw = 90; m_camera.pitch = 0; }
+            if (ImGui::MenuItem("Left View", "Ctrl+Numpad 3")) { m_camera.yaw = -90; m_camera.pitch = 0; }
+            if (ImGui::MenuItem("Top View", "Numpad 7")) { m_camera.yaw = 0; m_camera.pitch = 89; }
+            if (ImGui::MenuItem("Bottom View", "Ctrl+Numpad 7")) { m_camera.yaw = 0; m_camera.pitch = -89; }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Help")) {
-            if (ImGui::MenuItem("About")) {
-                // Will show in next frame
-            }
+            if (ImGui::MenuItem("Keyboard Shortcuts", "F1")) m_showHelpWindow = true;
+            ImGui::Separator();
+            if (ImGui::MenuItem("About VxStruct Editor")) m_showAboutWindow = true;
             ImGui::EndMenu();
         }
+
+        // Status bar on the right side of menu bar
+        float statusX = ImGui::GetWindowWidth() - 450;
+        ImGui::SameLine(statusX);
+        ImGui::TextDisabled("Blocks: %d | Selection: %d | Undo: %d",
+                           (int)m_structure.getBlocks().size(),
+                           (int)m_selectedBlocks.size(),
+                           (int)m_undoStack.size());
+
         ImGui::EndMainMenuBar();
     }
 }
 
 void VxStructEditor::renderToolbar() {
-    ImGui::Begin("Tools", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Tools");
 
     ImGui::Text("Current Tool:");
     ImGui::Separator();
 
-    bool isPlace = (m_currentTool == EditorTool::PLACE);
-    bool isErase = (m_currentTool == EditorTool::ERASE);
-    bool isPick  = (m_currentTool == EditorTool::PICK);
+    bool isPlace  = (m_currentTool == EditorTool::PLACE);
+    bool isErase  = (m_currentTool == EditorTool::ERASE);
+    bool isPick   = (m_currentTool == EditorTool::PICK);
     bool isMarker = (m_currentTool == EditorTool::MARKER);
+    bool isSelect = (m_currentTool == EditorTool::SELECT);
 
-    if (isPlace) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.3f, 1.0f));
-    if (ImGui::Button("Place [1]", ImVec2(120, 30))) m_currentTool = EditorTool::PLACE;
-    if (isPlace) ImGui::PopStyleColor();
+    auto toolButton = [](const char* label, bool active, ImVec4 activeColor) -> bool {
+        if (active) ImGui::PushStyleColor(ImGuiCol_Button, activeColor);
+        bool pressed = ImGui::Button(label, ImVec2(130, 28));
+        if (active) ImGui::PopStyleColor();
+        return pressed;
+    };
 
-    if (isErase) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
-    if (ImGui::Button("Erase [2]", ImVec2(120, 30))) m_currentTool = EditorTool::ERASE;
-    if (isErase) ImGui::PopStyleColor();
-
-    if (isPick) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.7f, 0.2f, 1.0f));
-    if (ImGui::Button("Pick [3]", ImVec2(120, 30))) m_currentTool = EditorTool::PICK;
-    if (isPick) ImGui::PopStyleColor();
-
-    if (isMarker) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.5f, 0.7f, 1.0f));
-    if (ImGui::Button("Marker [4]", ImVec2(120, 30))) m_currentTool = EditorTool::MARKER;
-    if (isMarker) ImGui::PopStyleColor();
+    if (toolButton("Select [Q]", isSelect, ImVec4(0.1f, 0.5f, 0.8f, 1.0f))) m_currentTool = EditorTool::SELECT;
+    if (toolButton("Place  [1]", isPlace,  ImVec4(0.2f, 0.6f, 0.3f, 1.0f))) m_currentTool = EditorTool::PLACE;
+    if (toolButton("Erase  [2]", isErase,  ImVec4(0.7f, 0.2f, 0.2f, 1.0f))) m_currentTool = EditorTool::ERASE;
+    if (toolButton("Pick   [3]", isPick,   ImVec4(0.7f, 0.7f, 0.2f, 1.0f))) m_currentTool = EditorTool::PICK;
+    if (toolButton("Marker [4]", isMarker, ImVec4(0.2f, 0.5f, 0.7f, 1.0f))) m_currentTool = EditorTool::MARKER;
 
     ImGui::Separator();
+
+    // Selection info
+    if (!m_selectedBlocks.empty()) {
+        ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f), "Selected: %d blocks", (int)m_selectedBlocks.size());
+        if (ImGui::Button("Deselect All", ImVec2(130, 22))) deselectAll();
+        if (ImGui::Button("Delete Selected", ImVec2(130, 22))) deleteSelectedBlocks();
+        if (ImGui::Button("Fill Selected", ImVec2(130, 22))) fillSelection(m_selectedBlock);
+        ImGui::Separator();
+    }
 
     // Layer filter
     ImGui::Text("Layer Filter:");
@@ -1085,10 +1251,18 @@ void VxStructEditor::renderToolbar() {
     }
 
     ImGui::Separator();
+
+    // Undo/Redo info
+    ImGui::Text("History:");
+    ImGui::Text("  Undo: %d  Redo: %d", (int)m_undoStack.size(), (int)m_redoStack.size());
+    if (ImGui::Button("Undo##btn", ImVec2(62, 22)) && !m_undoStack.empty()) undo();
+    ImGui::SameLine();
+    if (ImGui::Button("Redo##btn", ImVec2(62, 22)) && !m_redoStack.empty()) redo();
+
+    ImGui::Separator();
     ImGui::Text("Camera:");
     ImGui::Text("  Distance: %.1f", m_camera.distance);
-    ImGui::Text("  Yaw: %.1f", m_camera.yaw);
-    ImGui::Text("  Pitch: %.1f", m_camera.pitch);
+    ImGui::Text("  Yaw: %.1f  Pitch: %.1f", m_camera.yaw, m_camera.pitch);
 
     ImGui::End();
 }
@@ -1343,6 +1517,596 @@ void VxStructEditor::renderMarkerPanel() {
     ImGui::End();
 }
 
+// ============================================================================
+// Selection Highlights Rendering
+// ============================================================================
+
+void VxStructEditor::renderSelectionHighlights() {
+    if (m_selectedBlocks.empty()) return;
+
+    int fbW, fbH;
+    glfwGetFramebufferSize(m_window, &fbW, &fbH);
+    if (fbW == 0 || fbH == 0) return;
+
+    float aspect = (float)fbW / (float)fbH;
+    glm::mat4 proj = m_camera.getProjectionMatrix(aspect);
+    glm::mat4 view = m_camera.getViewMatrix();
+
+    glUseProgram(m_wireShader);
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uProjection"), 1, GL_FALSE, glm::value_ptr(proj));
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uView"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniform4f(glGetUniformLocation(m_wireShader, "uColor"), 0.0f, 0.9f, 1.0f, 0.95f);
+    glLineWidth(2.5f);
+
+    glBindVertexArray(m_wireVAO);
+    for (int64_t enc : m_selectedBlocks) {
+        glm::ivec3 pos = decodePos(enc);
+        glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(pos));
+        m = glm::scale(m, glm::vec3(1.02f));
+        m = glm::translate(m, glm::vec3(-0.01f));
+        glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uModel"), 1, GL_FALSE, glm::value_ptr(m));
+        glDrawArrays(GL_LINES, 0, 24);
+    }
+    glBindVertexArray(0);
+    glLineWidth(1.0f);
+}
+
+// ============================================================================
+// Selection Panel
+// ============================================================================
+
+void VxStructEditor::renderSelectionPanel() {
+    if (m_currentTool != EditorTool::SELECT && m_selectedBlocks.empty()) return;
+
+    ImGui::Begin("Selection", nullptr);
+
+    ImGui::TextColored(ImVec4(0.3f, 0.85f, 1.0f, 1.0f), "%d blocks selected", (int)m_selectedBlocks.size());
+    ImGui::Separator();
+
+    if (ImGui::Button("Select All (Ctrl+A)", ImVec2(-1, 0))) selectAll();
+    if (ImGui::Button("Deselect (Ctrl+Shift+A)", ImVec2(-1, 0))) deselectAll();
+    if (ImGui::Button("Invert (Ctrl+I)", ImVec2(-1, 0))) invertSelection();
+
+    ImGui::Separator();
+    ImGui::Text("Operations:");
+
+    bool hasSelection = !m_selectedBlocks.empty();
+    if (!hasSelection) ImGui::BeginDisabled();
+    if (ImGui::Button("Copy (Ctrl+C)", ImVec2(-1, 0))) copySelection();
+    if (ImGui::Button("Duplicate (Ctrl+D)", ImVec2(-1, 0))) duplicateSelection();
+    if (ImGui::Button("Delete (Del)", ImVec2(-1, 0))) deleteSelectedBlocks();
+    if (ImGui::Button("Rotate Selection (Ctrl+Shift+R)", ImVec2(-1, 0))) rotateSelection();
+
+    ImGui::Separator();
+    ImGui::Text("Fill with current block:");
+    if (ImGui::Button("Fill Selection (Ctrl+F)", ImVec2(-1, 0))) fillSelection(m_selectedBlock);
+    if (!hasSelection) ImGui::EndDisabled();
+
+    bool hasClipboard = !m_clipboard.empty();
+    ImGui::Separator();
+    if (!hasClipboard) ImGui::BeginDisabled();
+    ImGui::Text("Clipboard: %d blocks", (int)m_clipboard.size());
+    if (ImGui::Button("Paste (Ctrl+V)", ImVec2(-1, 0))) pasteClipboard();
+    if (!hasClipboard) ImGui::EndDisabled();
+
+    ImGui::End();
+}
+
+// ============================================================================
+// Help Window
+// ============================================================================
+
+void VxStructEditor::renderHelpWindow() {
+    if (!m_showHelpWindow) return;
+
+    ImGui::SetNextWindowSize(ImVec2(520, 620), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Keyboard Shortcuts & Help", &m_showHelpWindow);
+
+    ImGui::TextColored(ImVec4(0.4f, 0.9f, 1.0f, 1.0f), "VxStruct Editor - Keyboard Reference");
+    ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Navigation (Blender-style)", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::BulletText("Middle Mouse Drag    - Orbit camera");
+        ImGui::BulletText("Shift + Middle Mouse - Pan camera");
+        ImGui::BulletText("Ctrl + Middle Mouse  - Zoom camera");
+        ImGui::BulletText("Scroll Wheel         - Zoom in/out");
+        ImGui::BulletText("Numpad 1             - Front view");
+        ImGui::BulletText("Numpad 3             - Right view");
+        ImGui::BulletText("Numpad 7             - Top view");
+        ImGui::BulletText("Ctrl+Numpad 1        - Back view");
+        ImGui::BulletText("Ctrl+Numpad 3        - Left view");
+        ImGui::BulletText("Ctrl+Numpad 7        - Bottom view");
+        ImGui::BulletText("Numpad .             - Focus on selection");
+        ImGui::BulletText("Home                 - Reset camera");
+    }
+
+    if (ImGui::CollapsingHeader("Tools", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::BulletText("Q - Select tool");
+        ImGui::BulletText("1 - Place block");
+        ImGui::BulletText("2 - Erase block");
+        ImGui::BulletText("3 - Pick block (eyedropper)");
+        ImGui::BulletText("4 - Place marker");
+        ImGui::BulletText("G - Toggle grid");
+        ImGui::BulletText("W - Toggle wireframe");
+        ImGui::BulletText("X - Toggle axes");
+    }
+
+    if (ImGui::CollapsingHeader("Selection", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::BulletText("Left Click (Select tool)   - Toggle block selection");
+        ImGui::BulletText("Shift + Left Click         - Add to selection");
+        ImGui::BulletText("Ctrl + A                   - Select all");
+        ImGui::BulletText("Ctrl + Shift + A           - Deselect all");
+        ImGui::BulletText("Ctrl + I                   - Invert selection");
+    }
+
+    if (ImGui::CollapsingHeader("Edit Operations", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::BulletText("Ctrl + Z     - Undo");
+        ImGui::BulletText("Ctrl + Y     - Redo");
+        ImGui::BulletText("Ctrl + C     - Copy selection");
+        ImGui::BulletText("Ctrl + V     - Paste clipboard");
+        ImGui::BulletText("Ctrl + D     - Duplicate selection");
+        ImGui::BulletText("Ctrl + R     - Rotate entire structure 90 deg");
+        ImGui::BulletText("Ctrl+Shift+R - Rotate selection 90 deg");
+        ImGui::BulletText("Ctrl + F     - Fill selection with current block");
+        ImGui::BulletText("Delete       - Delete selected blocks");
+    }
+
+    if (ImGui::CollapsingHeader("File", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::BulletText("Ctrl + N         - New structure");
+        ImGui::BulletText("Ctrl + O         - Open file");
+        ImGui::BulletText("Ctrl + S         - Save");
+        ImGui::BulletText("Ctrl + Shift + S - Save As");
+    }
+
+    if (ImGui::CollapsingHeader("Mouse")) {
+        ImGui::BulletText("Left Click       - Use current tool");
+        ImGui::BulletText("Right Click      - Quick erase block");
+        ImGui::BulletText("Middle Click     - Orbit (hold & drag)");
+    }
+
+    ImGui::Separator();
+    ImGui::TextWrapped("Tip: Use the Select tool (Q) to select blocks, then use copy/paste/fill/delete to edit them in bulk.");
+
+    ImGui::End();
+}
+
+// ============================================================================
+// About Window
+// ============================================================================
+
+void VxStructEditor::renderAboutWindow() {
+    if (!m_showAboutWindow) return;
+
+    ImGui::SetNextWindowSize(ImVec2(380, 260), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("About VxStruct Editor", &m_showAboutWindow)) {
+        ImGui::TextColored(ImVec4(0.4f, 0.9f, 1.0f, 1.0f), "VxStruct Editor");
+        ImGui::Text("Version 1.0.0");
+        ImGui::Separator();
+        ImGui::TextWrapped(
+            "A standalone 3D voxel structure editor for creating and editing "
+            ".vxstruct files used by the Vortex Engine Minecraft-like game."
+        );
+        ImGui::Separator();
+        ImGui::Text("Features:");
+        ImGui::BulletText("Blender-style 3D navigation");
+        ImGui::BulletText("Multi-block selection & editing");
+        ImGui::BulletText("Undo/Redo with 200 history steps");
+        ImGui::BulletText("Copy/Paste/Duplicate blocks");
+        ImGui::BulletText("Structure rotation (90 deg increments)");
+        ImGui::BulletText("Block palette with 100+ block types");
+        ImGui::BulletText("Marker placement for doors & spawns");
+        ImGui::Separator();
+        ImGui::Text("Built with: OpenGL 4.5, GLFW, ImGui, GLM");
+        ImGui::Text("Format: VxStruct (Vortex Structs) JSON");
+    }
+    ImGui::End();
+}
+
+// ============================================================================
+// Undo / Redo System
+// ============================================================================
+
+void VxStructEditor::pushAction(const EditorAction& action) {
+    m_undoStack.push_back(action);
+    if (m_undoStack.size() > MAX_UNDO) {
+        m_undoStack.pop_front();
+    }
+    m_redoStack.clear();
+}
+
+void VxStructEditor::undo() {
+    if (m_undoStack.empty()) return;
+
+    EditorAction action = m_undoStack.back();
+    m_undoStack.pop_back();
+
+    switch (action.type) {
+        case EditorAction::Type::PLACE_BLOCK:
+            // Was a place, so undo = remove (or restore previous)
+            if (action.previousType == BlockType::AIR)
+                m_structure.removeBlock(action.position);
+            else
+                m_structure.setBlock(action.position, action.previousType, action.previousMetadata);
+            break;
+
+        case EditorAction::Type::REMOVE_BLOCK:
+            // Was a remove, so undo = place back
+            m_structure.setBlock(action.position, action.blockType, action.metadata);
+            break;
+
+        case EditorAction::Type::PLACE_MULTIPLE:
+        case EditorAction::Type::PASTE:
+        case EditorAction::Type::FILL_SELECTION:
+            // Remove all placed blocks, restore previous state
+            for (const auto& b : action.blocks) {
+                m_structure.removeBlock(b.position);
+            }
+            for (const auto& b : action.previousBlocks) {
+                if (b.type != BlockType::AIR)
+                    m_structure.setBlock(b.position, b.type, b.metadata);
+            }
+            break;
+
+        case EditorAction::Type::REMOVE_MULTIPLE:
+            // Was a multi-remove, so undo = place all back
+            for (const auto& b : action.blocks) {
+                m_structure.setBlock(b.position, b.type, b.metadata);
+            }
+            break;
+    }
+
+    m_redoStack.push_back(action);
+    m_modified = true;
+    rebuildBlockMesh();
+}
+
+void VxStructEditor::redo() {
+    if (m_redoStack.empty()) return;
+
+    EditorAction action = m_redoStack.back();
+    m_redoStack.pop_back();
+
+    switch (action.type) {
+        case EditorAction::Type::PLACE_BLOCK:
+            m_structure.setBlock(action.position, action.blockType, action.metadata);
+            break;
+
+        case EditorAction::Type::REMOVE_BLOCK:
+            m_structure.removeBlock(action.position);
+            break;
+
+        case EditorAction::Type::PLACE_MULTIPLE:
+        case EditorAction::Type::PASTE:
+        case EditorAction::Type::FILL_SELECTION:
+            // Re-place all blocks
+            for (const auto& b : action.blocks) {
+                m_structure.setBlock(b.position, b.type, b.metadata);
+            }
+            break;
+
+        case EditorAction::Type::REMOVE_MULTIPLE:
+            // Re-remove all
+            for (const auto& b : action.blocks) {
+                m_structure.removeBlock(b.position);
+            }
+            break;
+    }
+
+    m_undoStack.push_back(action);
+    m_modified = true;
+    rebuildBlockMesh();
+}
+
+// ============================================================================
+// Edit Operations with Undo
+// ============================================================================
+
+void VxStructEditor::placeBlockWithUndo(const glm::ivec3& pos, BlockType type, uint8_t metadata) {
+    EditorAction action;
+    action.type = EditorAction::Type::PLACE_BLOCK;
+    action.position = pos;
+    action.blockType = type;
+    action.metadata = metadata;
+    action.previousType = m_structure.getBlock(pos);
+    action.previousMetadata = 0; // Metadata tracking simplified
+    pushAction(action);
+
+    m_structure.setBlock(pos, type, metadata);
+    m_modified = true;
+    rebuildBlockMesh();
+}
+
+void VxStructEditor::removeBlockWithUndo(const glm::ivec3& pos) {
+    BlockType existing = m_structure.getBlock(pos);
+    if (existing == BlockType::AIR) return;
+
+    EditorAction action;
+    action.type = EditorAction::Type::REMOVE_BLOCK;
+    action.position = pos;
+    action.blockType = existing;
+    action.metadata = 0;
+    pushAction(action);
+
+    m_structure.removeBlock(pos);
+    m_modified = true;
+    rebuildBlockMesh();
+}
+
+void VxStructEditor::deleteSelectedBlocks() {
+    if (m_selectedBlocks.empty()) return;
+
+    EditorAction action;
+    action.type = EditorAction::Type::REMOVE_MULTIPLE;
+
+    for (int64_t enc : m_selectedBlocks) {
+        glm::ivec3 pos = decodePos(enc);
+        BlockType type = m_structure.getBlock(pos);
+        if (type != BlockType::AIR) {
+            StructureBlock sb;
+            sb.position = pos;
+            sb.type = type;
+            sb.metadata = 0;
+            action.blocks.push_back(sb);
+        }
+    }
+
+    if (action.blocks.empty()) return;
+
+    pushAction(action);
+
+    for (const auto& b : action.blocks) {
+        m_structure.removeBlock(b.position);
+    }
+
+    m_selectedBlocks.clear();
+    m_modified = true;
+    rebuildBlockMesh();
+}
+
+void VxStructEditor::copySelection() {
+    if (m_selectedBlocks.empty()) return;
+
+    m_clipboard.clear();
+    glm::ivec3 minPos(INT_MAX);
+    glm::ivec3 maxPos(INT_MIN);
+
+    for (int64_t enc : m_selectedBlocks) {
+        glm::ivec3 pos = decodePos(enc);
+        BlockType type = m_structure.getBlock(pos);
+        if (type != BlockType::AIR) {
+            StructureBlock sb;
+            sb.position = pos;
+            sb.type = type;
+            sb.metadata = 0;
+            m_clipboard.push_back(sb);
+            minPos = glm::min(minPos, pos);
+            maxPos = glm::max(maxPos, pos);
+        }
+    }
+
+    m_clipboardOrigin = minPos;
+}
+
+void VxStructEditor::pasteClipboard() {
+    if (m_clipboard.empty()) return;
+
+    glm::ivec3 offset = m_hoverPlacePos - m_clipboardOrigin;
+
+    EditorAction action;
+    action.type = EditorAction::Type::PASTE;
+
+    for (const auto& cb : m_clipboard) {
+        glm::ivec3 newPos = cb.position + offset;
+        
+        // Save previous state
+        BlockType prevType = m_structure.getBlock(newPos);
+        StructureBlock prev;
+        prev.position = newPos;
+        prev.type = prevType;
+        prev.metadata = 0;
+        action.previousBlocks.push_back(prev);
+
+        // New block
+        StructureBlock nb;
+        nb.position = newPos;
+        nb.type = cb.type;
+        nb.metadata = cb.metadata;
+        action.blocks.push_back(nb);
+    }
+
+    pushAction(action);
+
+    for (const auto& b : action.blocks) {
+        m_structure.setBlock(b.position, b.type, b.metadata);
+    }
+
+    m_modified = true;
+    rebuildBlockMesh();
+}
+
+void VxStructEditor::selectAll() {
+    m_selectedBlocks.clear();
+    for (const auto& block : m_structure.getBlocks()) {
+        m_selectedBlocks.insert(encodePos(block.position));
+    }
+}
+
+void VxStructEditor::deselectAll() {
+    m_selectedBlocks.clear();
+}
+
+void VxStructEditor::invertSelection() {
+    std::set<int64_t> newSel;
+    for (const auto& block : m_structure.getBlocks()) {
+        int64_t enc = encodePos(block.position);
+        if (m_selectedBlocks.count(enc) == 0) {
+            newSel.insert(enc);
+        }
+    }
+    m_selectedBlocks = newSel;
+}
+
+void VxStructEditor::rotateStructure() {
+    const auto& blocks = m_structure.getBlocks();
+    if (blocks.empty()) return;
+
+    // Compute center
+    glm::ivec3 minP(INT_MAX), maxP(INT_MIN);
+    for (const auto& b : blocks) {
+        minP = glm::min(minP, b.position);
+        maxP = glm::max(maxP, b.position);
+    }
+    glm::vec3 center = glm::vec3(minP + maxP) * 0.5f;
+
+    // Save current as undo (remove all old, place all new)
+    EditorAction action;
+    action.type = EditorAction::Type::REMOVE_MULTIPLE;
+    
+    EditorAction placeAction;
+    placeAction.type = EditorAction::Type::PLACE_MULTIPLE;
+
+    // Store old blocks for undo
+    std::vector<StructureBlock> oldBlocks = blocks; // copy
+    action.blocks = oldBlocks;
+
+    // Remove all
+    m_structure.clear();
+    // Keep metadata
+    
+    // Rotate each block 90 degrees around Y axis: (x, y, z) -> (z, y, -x)
+    // Adjusted for center
+    std::vector<StructureBlock> newBlocks;
+    for (const auto& b : oldBlocks) {
+        glm::vec3 rel = glm::vec3(b.position) - center;
+        glm::vec3 rot(rel.z, rel.y, -rel.x);
+        glm::ivec3 newPos = glm::ivec3(glm::round(rot + center));
+
+        StructureBlock nb;
+        nb.position = newPos;
+        nb.type = b.type;
+        nb.metadata = b.metadata;
+        newBlocks.push_back(nb);
+    }
+
+    placeAction.blocks = newBlocks;
+
+    // Combined action: we'll use REMOVE_MULTIPLE for the old blocks
+    // Actually, let's combine: previousBlocks = old state, blocks = new state
+    EditorAction combined;
+    combined.type = EditorAction::Type::PLACE_MULTIPLE;
+    combined.blocks = newBlocks;
+    combined.previousBlocks = oldBlocks;
+    pushAction(combined);
+
+    for (const auto& b : newBlocks) {
+        m_structure.setBlock(b.position, b.type, b.metadata);
+    }
+
+    m_selectedBlocks.clear();
+    m_modified = true;
+    rebuildBlockMesh();
+}
+
+void VxStructEditor::rotateSelection() {
+    if (m_selectedBlocks.empty()) return;
+
+    // Gather selected blocks
+    std::vector<StructureBlock> selBlocks;
+    glm::ivec3 minP(INT_MAX), maxP(INT_MIN);
+    for (int64_t enc : m_selectedBlocks) {
+        glm::ivec3 pos = decodePos(enc);
+        BlockType type = m_structure.getBlock(pos);
+        if (type != BlockType::AIR) {
+            StructureBlock sb;
+            sb.position = pos;
+            sb.type = type;
+            sb.metadata = 0;
+            selBlocks.push_back(sb);
+            minP = glm::min(minP, pos);
+            maxP = glm::max(maxP, pos);
+        }
+    }
+    if (selBlocks.empty()) return;
+
+    glm::vec3 center = glm::vec3(minP + maxP) * 0.5f;
+
+    // Build undo: remove old selected, place rotated
+    EditorAction action;
+    action.type = EditorAction::Type::PLACE_MULTIPLE;
+    action.previousBlocks = selBlocks;
+
+    // Remove old
+    for (const auto& b : selBlocks) {
+        m_structure.removeBlock(b.position);
+    }
+
+    // Place rotated
+    std::set<int64_t> newSelection;
+    for (const auto& b : selBlocks) {
+        glm::vec3 rel = glm::vec3(b.position) - center;
+        glm::vec3 rot(rel.z, rel.y, -rel.x);
+        glm::ivec3 newPos = glm::ivec3(glm::round(rot + center));
+
+        StructureBlock nb;
+        nb.position = newPos;
+        nb.type = b.type;
+        nb.metadata = b.metadata;
+        action.blocks.push_back(nb);
+
+        m_structure.setBlock(newPos, nb.type, nb.metadata);
+        newSelection.insert(encodePos(newPos));
+    }
+
+    pushAction(action);
+    m_selectedBlocks = newSelection;
+    m_modified = true;
+    rebuildBlockMesh();
+}
+
+void VxStructEditor::fillSelection(BlockType type) {
+    if (m_selectedBlocks.empty()) return;
+
+    EditorAction action;
+    action.type = EditorAction::Type::FILL_SELECTION;
+
+    for (int64_t enc : m_selectedBlocks) {
+        glm::ivec3 pos = decodePos(enc);
+
+        // Previous state
+        BlockType prevType = m_structure.getBlock(pos);
+        StructureBlock prev;
+        prev.position = pos;
+        prev.type = prevType;
+        prev.metadata = 0;
+        action.previousBlocks.push_back(prev);
+
+        // New state
+        StructureBlock nb;
+        nb.position = pos;
+        nb.type = type;
+        nb.metadata = 0;
+        action.blocks.push_back(nb);
+    }
+
+    pushAction(action);
+
+    for (const auto& b : action.blocks) {
+        m_structure.setBlock(b.position, b.type, b.metadata);
+    }
+
+    m_modified = true;
+    rebuildBlockMesh();
+}
+
+void VxStructEditor::duplicateSelection() {
+    copySelection();
+    pasteClipboard();
+}
+
+// ============================================================================
+// File Operations
+// ============================================================================
+
 void VxStructEditor::newStructure() {
     m_structure.clear();
     m_structure.setName("New Structure");
@@ -1350,6 +2114,14 @@ void VxStructEditor::newStructure() {
     m_structure.setCategory(StructureCategory::MISC);
     m_currentFilePath.clear();
     m_modified = false;
+
+    // Clear editor state
+    m_undoStack.clear();
+    m_redoStack.clear();
+    m_selectedBlocks.clear();
+    m_clipboard.clear();
+    m_boxSelectActive = false;
+    m_boxSelectHasStart = false;
 
     strncpy_s(m_nameBuffer, "New Structure", sizeof(m_nameBuffer));
     strncpy_s(m_authorBuffer, "VxStruct Editor", sizeof(m_authorBuffer));
@@ -1422,6 +2194,11 @@ void VxStructEditor::saveStructureAs() {
     saveStructure();
 }
 
+void VxStructEditor::exportStructure() {
+    // Future: export to other formats
+    saveStructureAs();
+}
+
 // ============================================================================
 // GLFW Callbacks
 // ============================================================================
@@ -1441,7 +2218,7 @@ void VxStructEditor::scrollCallback(GLFWwindow* window, double /*xoffset*/, doub
     editor->m_camera.distance = glm::clamp(editor->m_camera.distance, 2.0f, 200.0f);
 }
 
-void VxStructEditor::mouseButtonCallback(GLFWwindow* window, int button, int action, int /*mods*/) {
+void VxStructEditor::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     auto* editor = static_cast<VxStructEditor*>(glfwGetWindowUserPointer(window));
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantCaptureMouse) return;
@@ -1451,16 +2228,12 @@ void VxStructEditor::mouseButtonCallback(GLFWwindow* window, int button, int act
 
         switch (editor->m_currentTool) {
             case EditorTool::PLACE: {
-                editor->m_structure.setBlock(editor->m_hoverPlacePos, editor->m_selectedBlock);
-                editor->m_modified = true;
-                editor->rebuildBlockMesh();
+                editor->placeBlockWithUndo(editor->m_hoverPlacePos, editor->m_selectedBlock);
                 break;
             }
             case EditorTool::ERASE: {
                 if (editor->m_hoverHit.hit) {
-                    editor->m_structure.removeBlock(editor->m_hoverHit.blockPos);
-                    editor->m_modified = true;
-                    editor->rebuildBlockMesh();
+                    editor->removeBlockWithUndo(editor->m_hoverHit.blockPos);
                 }
                 break;
             }
@@ -1478,15 +2251,38 @@ void VxStructEditor::mouseButtonCallback(GLFWwindow* window, int button, int act
                 editor->m_modified = true;
                 break;
             }
+            case EditorTool::SELECT: {
+                if (editor->m_hoverHit.hit) {
+                    int64_t enc = encodePos(editor->m_hoverHit.blockPos);
+                    bool shiftHeld = (mods & GLFW_MOD_SHIFT) != 0;
+
+                    if (shiftHeld) {
+                        // Shift+click: add to / remove from selection
+                        if (editor->m_selectedBlocks.count(enc))
+                            editor->m_selectedBlocks.erase(enc);
+                        else
+                            editor->m_selectedBlocks.insert(enc);
+                    } else {
+                        // Plain click: toggle this block, clear others
+                        bool wasSelected = editor->m_selectedBlocks.count(enc) > 0;
+                        editor->m_selectedBlocks.clear();
+                        if (!wasSelected)
+                            editor->m_selectedBlocks.insert(enc);
+                    }
+                } else {
+                    // Clicked empty space: deselect all
+                    if (!(mods & GLFW_MOD_SHIFT))
+                        editor->m_selectedBlocks.clear();
+                }
+                break;
+            }
         }
     }
 
-    // Right click: quick erase
+    // Right click: quick erase with undo
     if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
         if (editor->m_hoverHit.hit) {
-            editor->m_structure.removeBlock(editor->m_hoverHit.blockPos);
-            editor->m_modified = true;
-            editor->rebuildBlockMesh();
+            editor->removeBlockWithUndo(editor->m_hoverHit.blockPos);
         }
     }
 }
@@ -1498,27 +2294,97 @@ void VxStructEditor::keyCallback(GLFWwindow* window, int key, int /*scancode*/, 
 
     if (action != GLFW_PRESS) return;
 
-    // Tool selection
-    switch (key) {
-        case GLFW_KEY_1: editor->m_currentTool = EditorTool::PLACE; break;
-        case GLFW_KEY_2: editor->m_currentTool = EditorTool::ERASE; break;
-        case GLFW_KEY_3: editor->m_currentTool = EditorTool::PICK; break;
-        case GLFW_KEY_4: editor->m_currentTool = EditorTool::MARKER; break;
-        case GLFW_KEY_G: editor->m_showGrid = !editor->m_showGrid; break;
-        case GLFW_KEY_W: editor->m_showWireframe = !editor->m_showWireframe; break;
+    bool ctrl = (mods & GLFW_MOD_CONTROL) != 0;
+    bool shift = (mods & GLFW_MOD_SHIFT) != 0;
+
+    // Tool selection (no modifiers)
+    if (!ctrl && !shift) {
+        switch (key) {
+            case GLFW_KEY_Q: editor->m_currentTool = EditorTool::SELECT; break;
+            case GLFW_KEY_1: editor->m_currentTool = EditorTool::PLACE; break;
+            case GLFW_KEY_2: editor->m_currentTool = EditorTool::ERASE; break;
+            case GLFW_KEY_3: editor->m_currentTool = EditorTool::PICK; break;
+            case GLFW_KEY_4: editor->m_currentTool = EditorTool::MARKER; break;
+            case GLFW_KEY_G: editor->m_showGrid = !editor->m_showGrid; break;
+            case GLFW_KEY_W: editor->m_showWireframe = !editor->m_showWireframe; break;
+            case GLFW_KEY_X: editor->m_showAxes = !editor->m_showAxes; break;
+            case GLFW_KEY_DELETE: editor->deleteSelectedBlocks(); break;
+            case GLFW_KEY_F1: editor->m_showHelpWindow = !editor->m_showHelpWindow; break;
+            case GLFW_KEY_HOME: {
+                // Reset camera
+                editor->m_camera.distance = 20.0f;
+                editor->m_camera.yaw = -45.0f;
+                editor->m_camera.pitch = 35.0f;
+                editor->m_camera.target = glm::vec3(0.0f);
+                break;
+            }
+            // Numpad views
+            case GLFW_KEY_KP_1: // Front
+                editor->m_camera.yaw = 0.0f;
+                editor->m_camera.pitch = 0.0f;
+                break;
+            case GLFW_KEY_KP_3: // Right
+                editor->m_camera.yaw = -90.0f;
+                editor->m_camera.pitch = 0.0f;
+                break;
+            case GLFW_KEY_KP_7: // Top
+                editor->m_camera.yaw = 0.0f;
+                editor->m_camera.pitch = 89.9f;
+                break;
+            case GLFW_KEY_KP_DECIMAL: { // Focus on selection
+                if (!editor->m_selectedBlocks.empty()) {
+                    glm::vec3 center(0.0f);
+                    for (int64_t enc : editor->m_selectedBlocks) {
+                        center += glm::vec3(decodePos(enc));
+                    }
+                    center /= (float)editor->m_selectedBlocks.size();
+                    editor->m_camera.target = center;
+                }
+                break;
+            }
+            default: break;
+        }
     }
 
-    // Keyboard shortcuts
-    if (mods & GLFW_MOD_CONTROL) {
+    // Ctrl + key shortcuts
+    if (ctrl && !shift) {
         switch (key) {
             case GLFW_KEY_N: editor->newStructure(); break;
             case GLFW_KEY_O: editor->loadStructure(); break;
-            case GLFW_KEY_S:
-                if (mods & GLFW_MOD_SHIFT)
-                    editor->saveStructureAs();
-                else
-                    editor->saveStructure();
+            case GLFW_KEY_S: editor->saveStructure(); break;
+            case GLFW_KEY_Z: editor->undo(); break;
+            case GLFW_KEY_Y: editor->redo(); break;
+            case GLFW_KEY_C: editor->copySelection(); break;
+            case GLFW_KEY_V: editor->pasteClipboard(); break;
+            case GLFW_KEY_D: editor->duplicateSelection(); break;
+            case GLFW_KEY_A: editor->selectAll(); break;
+            case GLFW_KEY_I: editor->invertSelection(); break;
+            case GLFW_KEY_R: editor->rotateStructure(); break;
+            case GLFW_KEY_F: editor->fillSelection(editor->m_selectedBlock); break;
+            // Ctrl + Numpad views (opposite directions)
+            case GLFW_KEY_KP_1: // Back
+                editor->m_camera.yaw = 180.0f;
+                editor->m_camera.pitch = 0.0f;
                 break;
+            case GLFW_KEY_KP_3: // Left
+                editor->m_camera.yaw = 90.0f;
+                editor->m_camera.pitch = 0.0f;
+                break;
+            case GLFW_KEY_KP_7: // Bottom
+                editor->m_camera.yaw = 0.0f;
+                editor->m_camera.pitch = -89.9f;
+                break;
+            default: break;
+        }
+    }
+
+    // Ctrl + Shift shortcuts
+    if (ctrl && shift) {
+        switch (key) {
+            case GLFW_KEY_S: editor->saveStructureAs(); break;
+            case GLFW_KEY_A: editor->deselectAll(); break;
+            case GLFW_KEY_R: editor->rotateSelection(); break;
+            default: break;
         }
     }
 }
