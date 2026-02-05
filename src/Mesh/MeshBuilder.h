@@ -49,6 +49,7 @@ private:
         u8 material;
         u8 data; // Metadata
         u8 ao[4]; // AO for each vertex
+        u8 skyLight; // Sky light level (0-15)
     };
     
     void greedyMesh(std::shared_ptr<Chunk> chunk,
@@ -67,7 +68,11 @@ private:
                                    const int* u, const int* v, const int* n,
                                    std::shared_ptr<Chunk> neighbors[6]);
     
+    // Calculate sky light for a block position (0-15, 15 = full sky access)
+    u8 calculateSkyLight(std::shared_ptr<Chunk> chunk, int x, int y, int z,
+                        std::shared_ptr<Chunk> neighbors[6]);
+    
     void addQuad(const Quad& quad, MeshData& meshData);
     
-    void addCross(int x, int y, int z, u8 material, u8 ao, MeshData& meshData);
+    void addCross(int x, int y, int z, u8 material, u8 ao, u8 skyLight, MeshData& meshData);
 };

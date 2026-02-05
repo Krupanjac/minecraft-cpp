@@ -5,6 +5,7 @@ layout(location = 1) in uint aNormal;
 layout(location = 2) in uint aMaterial;
 layout(location = 3) in uint aUV;
 layout(location = 4) in uint aAO;
+layout(location = 5) in uint aData;  // Sky light for solid blocks, water flags for water
 
 uniform mat4 uModel;
 uniform mat4 uView;
@@ -22,6 +23,7 @@ out vec2 vTexCoord;
 flat out vec2 vCellOrigin;
 flat out uint vMaterial;
 out float vAO;
+out float vSkyLight;  // Sky light level (0.0 = underground, 1.0 = full sky access)
 out vec4 vFragPosLightSpace;
 out vec4 vCurrentClip;
 out vec4 vPrevClip;
@@ -103,4 +105,9 @@ void main() {
     
     vMaterial = aMaterial;
     vAO = float(aAO) / 3.0;
+    
+    // Extract sky light from data field (lower 4 bits for non-water blocks)
+    // For water blocks, this will be 0 (water uses data for level/flags) but water 
+    // is rendered separately and always gets daylight
+    vSkyLight = float(aData & 0xFu) / 15.0;
 }

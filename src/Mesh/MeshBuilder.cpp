@@ -34,7 +34,10 @@ MeshData MeshBuilder::buildChunkMesh(std::shared_ptr<Chunk> chunk,
                         u8 ao = 3; // Default bright
                         // If block below is solid, maybe darken slightly at bottom? 
                         // For now, just flat lighting
-                        addCross(x, y, z, block.getMaterialID(), ao, meshData);
+                        
+                        // Calculate sky light for vegetation
+                        u8 skyLight = calculateSkyLight(chunk, x, y, z, neighbors);
+                        addCross(x, y, z, block.getMaterialID(), ao, skyLight, meshData);
                     }
                 }
             }
@@ -44,7 +47,7 @@ MeshData MeshBuilder::buildChunkMesh(std::shared_ptr<Chunk> chunk,
     return meshData;
 }
 
-void MeshBuilder::addCross(int x, int y, int z, u8 material, u8 ao, MeshData& meshData) {
+void MeshBuilder::addCross(int x, int y, int z, u8 material, u8 ao, u8 skyLight, MeshData& meshData) {
     // Two intersecting quads forming an X shape
     // Quad 1: diagonal from (0,0,0) to (1,1,1)
     // Quad 2: diagonal from (0,0,1) to (1,1,0)
@@ -59,11 +62,11 @@ void MeshBuilder::addCross(int x, int y, int z, u8 material, u8 ao, MeshData& me
     
     u8 normalUp = Vertex::packNormal(0, 1, 0); // Fake normal up for lighting
     
-    // Quad 1
-    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z), normalUp, material, uv00, ao, (u8)0);
-    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y), static_cast<i16>(z + 1), normalUp, material, uv10, ao, (u8)0);
-    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y + 1), static_cast<i16>(z + 1), normalUp, material, uv11, ao, (u8)0);
-    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y + 1), static_cast<i16>(z), normalUp, material, uv01, ao, (u8)0);
+    // Quad 1 - Store sky light in data field
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z), normalUp, material, uv00, ao, skyLight);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y), static_cast<i16>(z + 1), normalUp, material, uv10, ao, skyLight);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y + 1), static_cast<i16>(z + 1), normalUp, material, uv11, ao, skyLight);
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y + 1), static_cast<i16>(z), normalUp, material, uv01, ao, skyLight);
     
     u32 baseIdx = static_cast<u32>(meshData.vertices.size()) - 4;
     // Double sided
@@ -72,11 +75,11 @@ void MeshBuilder::addCross(int x, int y, int z, u8 material, u8 ao, MeshData& me
     meshData.indices.push_back(baseIdx + 2); meshData.indices.push_back(baseIdx + 1); meshData.indices.push_back(baseIdx + 0);
     meshData.indices.push_back(baseIdx + 3); meshData.indices.push_back(baseIdx + 2); meshData.indices.push_back(baseIdx + 0);
 
-    // Quad 2
-    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z + 1), normalUp, material, uv00, ao, (u8)0);
-    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y), static_cast<i16>(z), normalUp, material, uv10, ao, (u8)0);
-    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y + 1), static_cast<i16>(z), normalUp, material, uv11, ao, (u8)0);
-    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y + 1), static_cast<i16>(z + 1), normalUp, material, uv01, ao, (u8)0);
+    // Quad 2 - Store sky light in data field
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y), static_cast<i16>(z + 1), normalUp, material, uv00, ao, skyLight);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y), static_cast<i16>(z), normalUp, material, uv10, ao, skyLight);
+    meshData.vertices.emplace_back(static_cast<i16>(x + 1), static_cast<i16>(y + 1), static_cast<i16>(z), normalUp, material, uv11, ao, skyLight);
+    meshData.vertices.emplace_back(static_cast<i16>(x), static_cast<i16>(y + 1), static_cast<i16>(z + 1), normalUp, material, uv01, ao, skyLight);
     
     baseIdx = static_cast<u32>(meshData.vertices.size()) - 4;
     // Double sided
@@ -339,6 +342,19 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                                                                   neg_u, v_vec, n_vec, neighbors);
                     }
                     
+                    // Calculate sky light for this quad
+                    // Use the block position (block behind the face) for the check
+                    int blockX = quad.x - (nx > 0 ? step : 0);
+                    int blockY = quad.y - (ny > 0 ? step : 0);
+                    int blockZ = quad.z - (nz > 0 ? step : 0);
+                    
+                    // For water, don't override sky light (it's stored in data for water level)
+                    if (material == static_cast<u8>(BlockType::WATER)) {
+                        quad.skyLight = 15; // Water always gets full sky light (handled differently)
+                    } else {
+                        quad.skyLight = calculateSkyLight(chunk, blockX, blockY, blockZ, neighbors);
+                    }
+                    
                     addQuad(quad, meshData);
                     
                     u += w;
@@ -426,6 +442,13 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
             if (isTop(y2)) data2 |= 0x10;
             if (isTop(y3)) data3 |= 0x10;
         }
+    } else {
+        // For non-water blocks, store sky light in the data field (lower 4 bits)
+        // Sky light is 0-15, where 15 = full sky access, 0 = underground
+        data0 = quad.skyLight;
+        data1 = quad.skyLight;
+        data2 = quad.skyLight;
+        data3 = quad.skyLight;
     }
     
     // Pass dimensions (w, h) as UVs for tiling
@@ -542,4 +565,86 @@ u8 MeshBuilder::calculateVertexAOWithNormal(std::shared_ptr<Chunk> chunk, int x,
     // - Otherwise, count solid neighbors and subtract from 3
     if (s1 && s2) return 0;
     return 3 - (s1 + s2 + c);
+}
+
+u8 MeshBuilder::calculateSkyLight(std::shared_ptr<Chunk> chunk, int x, int y, int z,
+                                  std::shared_ptr<Chunk> neighbors[6]) {
+    // Calculate sky light by checking if there's any opaque block above this position.
+    // Sky light is 15 if the block can see the sky, 0 if it's completely underground.
+    // This provides a Minecraft-style light propagation that blocks sunlight in caves.
+    
+    ChunkPos chunkPos = chunk->getPosition();
+    int worldY = static_cast<int>(chunkPos.y) * CHUNK_HEIGHT + y;
+    
+    // If we're deep underground (below sea level by a margin), default to no sky light
+    // This catches cases where we can't check high enough due to limited neighbor access
+    if (worldY < SEA_LEVEL - 10) {
+        // Check the blocks above in the current chunk and immediate neighbor
+        // If we find any opaque block, we're underground
+        // Also, being this deep strongly suggests underground
+    }
+    
+    // Maximum height to check within available neighbors
+    // We can check current chunk + one chunk up (neighbor[2])
+    int maxReachableY = static_cast<int>(chunkPos.y + 2) * CHUNK_HEIGHT;
+    if (neighbors[2] == nullptr) {
+        maxReachableY = static_cast<int>(chunkPos.y + 1) * CHUNK_HEIGHT;
+    }
+    
+    // Lambda to check if a block at world coordinates is opaque
+    auto isBlockOpaqueAt = [&](int lx, int checkWorldY, int lz) -> bool {
+        // Calculate which chunk this Y falls into
+        int targetChunkY = checkWorldY / CHUNK_HEIGHT;
+        int localY = checkWorldY % CHUNK_HEIGHT;
+        
+        // Handle negative world Y (below Y=0)
+        if (checkWorldY < 0) {
+            targetChunkY = (checkWorldY - CHUNK_HEIGHT + 1) / CHUNK_HEIGHT;
+            localY = checkWorldY - targetChunkY * CHUNK_HEIGHT;
+        }
+        
+        int currentChunkY = static_cast<int>(chunkPos.y);
+        
+        if (targetChunkY == currentChunkY) {
+            // Same chunk
+            if (localY >= 0 && localY < CHUNK_HEIGHT) {
+                return chunk->getBlock(lx, localY, lz).isOpaque();
+            }
+        } else if (targetChunkY == currentChunkY + 1 && neighbors[2]) {
+            // One chunk above
+            if (localY >= 0 && localY < CHUNK_HEIGHT) {
+                return neighbors[2]->getBlock(lx, localY, lz).isOpaque();
+            }
+        }
+        // Beyond available neighbor chunks
+        return false;
+    };
+    
+    // Check upward from current position
+    for (int checkY = worldY + 1; checkY < maxReachableY; ++checkY) {
+        if (isBlockOpaqueAt(x, checkY, z)) {
+            // Found an opaque block above - this position is underground
+            return 0;
+        }
+    }
+    
+    // If we've checked all available blocks and found no obstruction:
+    // - If we reached a reasonable surface height, assume sky access
+    // - If we're deep underground but couldn't check high enough, be conservative
+    
+    // Typical terrain surface is around Y=64 (TERRAIN_HEIGHT)
+    // If we've checked up to at least terrain height + some margin, assume sky access
+    if (maxReachableY >= TERRAIN_HEIGHT + 10) {
+        return 15; // Full sky access
+    }
+    
+    // We're in a situation where we couldn't check high enough
+    // If the block is below sea level, it's likely underground
+    if (worldY < SEA_LEVEL) {
+        return 0; // Probably underground
+    }
+    
+    // Block is at or above sea level, but we couldn't verify sky access
+    // Be optimistic and assume partial sky access
+    return 15;
 }

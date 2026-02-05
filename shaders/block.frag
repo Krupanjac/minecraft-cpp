@@ -6,6 +6,7 @@ in vec2 vTexCoord;
 flat in vec2 vCellOrigin;
 flat in uint vMaterial;
 in float vAO;
+in float vSkyLight;  // Sky light level (0.0 = underground, 1.0 = full sky access)
 
 uniform vec3 uCameraPos;
 uniform vec3 uLightDir;
@@ -177,15 +178,26 @@ void main() {
         diffuse = max(dot(normal, lightDir), 0.0);
     }
     
+    // SKY LIGHT: Scale direct sunlight by sky light factor
+    // vSkyLight is 0.0 when underground (can't see sky), 1.0 when above ground
+    // This prevents sunlight from reaching caves/underground areas
+    diffuse *= vSkyLight;
+    
     // Ambient light
     // Use sky color brightness as ambient intensity
     float skyBrightness = dot(uSkyColor, vec3(0.299, 0.587, 0.114)); // Luminance
-    float ambient = clamp(skyBrightness * 0.6, 0.05, 0.4);
+    float baseAmbient = clamp(skyBrightness * 0.6, 0.05, 0.4);
+    
+    // Underground areas get significantly reduced ambient light
+    // But not zero - there's always some minimal ambient from bounce light
+    float minCaveAmbient = 0.08;  // Minimum ambient in caves
+    float ambient = mix(minCaveAmbient, baseAmbient, vSkyLight);
     
     // Calculate Shadow
     float shadow = 0.0;
     
-    if (uUseShadows != 0) {
+    // Skip shadow calculation for underground blocks (they're already dark)
+    if (uUseShadows != 0 && vSkyLight > 0.0) {
         if (uShadowMethod == 1 && uUseRTShadows != 0) {
             // Pure ray traced shadows
             vec2 screenUV = (vCurrentClip.xy / vCurrentClip.w) * 0.5 + 0.5;
@@ -195,6 +207,11 @@ void main() {
             // Shadow map only
             shadow = ShadowCalculation(vFragPosLightSpace, normal, lightDir);
         }
+        // Scale shadow effect by sky light (partially lit areas get partial shadow)
+        shadow *= vSkyLight;
+    } else if (vSkyLight == 0.0) {
+        // Underground blocks are always in complete shadow from the sun
+        shadow = 1.0;
     }
     
     // Apply AO with improved blending
