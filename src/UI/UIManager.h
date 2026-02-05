@@ -297,6 +297,23 @@ private:
     float mapScale = 8.0f;    // Blocks per pixel
     std::function<void(float, float)> onTeleport;
     
+    // Map caching and interaction
+    bool mapCacheValid = false;           // True if texture matches current center/scale
+    float mapCachedCenterX = 0.0f;        // Cached position for invalidation check
+    float mapCachedCenterZ = 0.0f;
+    float mapCachedScale = 0.0f;
+    bool mapDragging = false;             // Right-click drag state
+    float mapDragStartX = 0.0f;           // Screen position at drag start
+    float mapDragStartZ = 0.0f;
+    float mapDragCenterX = 0.0f;          // Map center at drag start
+    float mapDragCenterZ = 0.0f;
+    float mapTargetCenterX = 0.0f;        // Smooth pan targets
+    float mapTargetCenterZ = 0.0f;
+    float mapTargetScale = 8.0f;
+    float mapPanVelocityX = 0.0f;         // Momentum after drag release
+    float mapPanVelocityZ = 0.0f;
+    void updateMapInteraction(float deltaTime);  // Handle drag/zoom/pan
+    
     // World preview textures cache
     std::unordered_map<std::string, GLuint> worldPreviewTextures;
     GLuint loadWorldPreviewTexture(const std::string& worldName);

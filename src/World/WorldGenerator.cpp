@@ -1,13 +1,16 @@
 #include "WorldGenerator.h"
 #include "../Util/Config.h"
+#include "../Core/Logger.h"
 #include "ChunkManager.h"
+#include "StructurePlacer.h"
+#include "Structure.h"
 #include <cmath>
 #include <random>
 #include <algorithm>
 #include <map>
 
 // Static BiomeInfo cache - initialized once for fast lookups
-BiomeInfo WorldGenerator::biomeInfoCache[12];
+BiomeInfo WorldGenerator::biomeInfoCache[14];
 bool WorldGenerator::biomeInfoCacheInitialized = false;
 
 static void initBiomeInfoCache(BiomeInfo* cache) {
@@ -106,9 +109,25 @@ static void initBiomeInfoCache(BiomeInfo* cache) {
     cache[11].grassColorR = 0.72f; cache[11].grassColorG = 0.72f; cache[11].grassColorB = 0.35f;
     cache[11].foliageColorR = 0.68f; cache[11].foliageColorG = 0.68f; cache[11].foliageColorB = 0.32f;
     cache[11].mapColorR = 0.70f; cache[11].mapColorG = 0.70f; cache[11].mapColorB = 0.40f;
+    
+    // VILLAGE - flat plains with village structures
+    cache[12].type = BiomeType::VILLAGE;
+    cache[12].temperature = 0.6f; cache[12].humidity = 0.5f; cache[12].heightVariation = 0.15f;
+    cache[12].surfaceBlock = BlockType::GRASS; cache[12].subsurfaceBlock = BlockType::DIRT; cache[12].surfaceDepth = 4;
+    cache[12].grassColorR = 0.55f; cache[12].grassColorG = 0.72f; cache[12].grassColorB = 0.38f;
+    cache[12].foliageColorR = 0.50f; cache[12].foliageColorG = 0.68f; cache[12].foliageColorB = 0.35f;
+    cache[12].mapColorR = 1.0f; cache[12].mapColorG = 0.4f; cache[12].mapColorB = 0.8f;  // PINK
+    
+    // CITY - flat area with city buildings
+    cache[13].type = BiomeType::CITY;
+    cache[13].temperature = 0.5f; cache[13].humidity = 0.4f; cache[13].heightVariation = 0.1f;
+    cache[13].surfaceBlock = BlockType::COBBLESTONE; cache[13].subsurfaceBlock = BlockType::STONE; cache[13].surfaceDepth = 3;
+    cache[13].grassColorR = 0.45f; cache[13].grassColorG = 0.50f; cache[13].grassColorB = 0.40f;
+    cache[13].foliageColorR = 0.40f; cache[13].foliageColorG = 0.45f; cache[13].foliageColorB = 0.38f;
+    cache[13].mapColorR = 1.0f; cache[13].mapColorG = 0.4f; cache[13].mapColorB = 0.8f;  // PINK
 }
 
-WorldGenerator::WorldGenerator(unsigned int seed) : seed(seed) {
+WorldGenerator::WorldGenerator(unsigned int seed) : seed(seed), structurePlacer(std::make_unique<StructurePlacer>(seed)) {
     if (!biomeInfoCacheInitialized) {
         initBiomeInfoCache(biomeInfoCache);
         biomeInfoCacheInitialized = true;
@@ -116,8 +135,16 @@ WorldGenerator::WorldGenerator(unsigned int seed) : seed(seed) {
     setSeed(seed);
 }
 
+WorldGenerator::~WorldGenerator() = default;
+
+void WorldGenerator::initializeStructures(const std::string& structuresPath) {
+    structurePlacer->initialize(structuresPath);
+    LOG_INFO("WorldGenerator: Structures initialized from " + structuresPath);
+}
+
 void WorldGenerator::setSeed(unsigned int s) {
     seed = s;
+    structurePlacer->setSeed(s);
     std::mt19937 gen(seed);
     std::uniform_real_distribution<float> disOffset(-100000.0f, 100000.0f);
     std::uniform_real_distribution<float> disBias(-0.15f, 0.15f);
@@ -277,6 +304,38 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
     float riverBase = fbm(rX, rZ, 3);
     float riverVal = 1.0f - std::abs(riverBase);
     float riverMask = std::pow(std::clamp((riverVal - 0.85f) / 0.15f, 0.0f, 1.0f), 3.0f);  // Higher threshold = rarer rivers
+    
+    // ========== SETTLEMENT GENERATION ==========
+    // Villages and cities ALWAYS spawn on a grid - no terrain restrictions
+    
+    const float VILLAGE_GRID = 150.0f;  // Village every 150 blocks
+    const float CITY_GRID = 400.0f;     // City every 400 blocks  
+    const float VILLAGE_RADIUS = 35.0f; // Village biome radius
+    const float CITY_RADIUS = 70.0f;    // City biome radius
+    
+    // City check first (takes priority)
+    float cityGridX = std::floor(x / CITY_GRID) * CITY_GRID + CITY_GRID / 2;
+    float cityGridZ = std::floor(z / CITY_GRID) * CITY_GRID + CITY_GRID / 2;
+    float cityCenterX = cityGridX;
+    float cityCenterZ = cityGridZ;
+    float cityDist = std::sqrt((x - cityCenterX) * (x - cityCenterX) + (z - cityCenterZ) * (z - cityCenterZ));
+    
+    // ALWAYS spawn cities at grid points - no conditions!
+    if (cityDist < CITY_RADIUS) {
+        return BiomeType::CITY;
+    }
+    
+    // Village check (more common, smaller)
+    float villageGridX = std::floor(x / VILLAGE_GRID) * VILLAGE_GRID + VILLAGE_GRID / 2;
+    float villageGridZ = std::floor(z / VILLAGE_GRID) * VILLAGE_GRID + VILLAGE_GRID / 2;
+    float villageCenterX = villageGridX;
+    float villageCenterZ = villageGridZ;
+    float villageDist = std::sqrt((x - villageCenterX) * (x - villageCenterX) + (z - villageCenterZ) * (z - villageCenterZ));
+    
+    // ALWAYS spawn villages - only skip if overlapping a city
+    if (villageDist < VILLAGE_RADIUS && cityDist > CITY_RADIUS + 10) {
+        return BiomeType::VILLAGE;
+    }
     
     // ========== BIOME SELECTION ==========
     
@@ -1094,6 +1153,126 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             }
         }
     }
+    
+    // 4. STRUCTURE PASS - Place .mcstruct structures in settlement biomes
+    // Chunks are 16x16x16 and stacked vertically, so structures span multiple Y chunks.
+    // We use a grid in XZ based on world coordinates to place structures deterministically.
+    // Each chunk column (same X,Z different Y) places ONE structure at a fixed XZ anchor.
+    [&]() {
+        int chunkBaseX = static_cast<int>(worldPos.x);
+        int chunkBaseZ = static_cast<int>(worldPos.z);
+        int chunkBaseY = chunkPos.y * CHUNK_HEIGHT;
+        
+        // Check if this XZ area is a settlement biome
+        BiomeType centerBiome = getBiome(static_cast<float>(chunkBaseX + CHUNK_SIZE/2), 
+                                          static_cast<float>(chunkBaseZ + CHUNK_SIZE/2));
+        
+        if (centerBiome != BiomeType::VILLAGE && centerBiome != BiomeType::CITY) return;
+        
+        auto& registry = StructureRegistry::instance();
+        auto allStructures = registry.getAllStructureIds();
+        
+        // Structure anchor at fixed XZ within chunk
+        int anchorX = chunkBaseX + 4;
+        int anchorZ = chunkBaseZ + 4;
+        
+        // Deterministic hash for this chunk column (same for all Y levels)
+        unsigned int h = seed;
+        h ^= static_cast<unsigned int>(chunkPos.x) * 374761393u;
+        h ^= static_cast<unsigned int>(chunkPos.z) * 668265263u;
+        h = ((h << 17) | (h >> 15)) * 2654435761u;
+        
+        // 70% chance of structure in each settlement chunk column
+        if ((h % 100) >= 70) return;
+        
+        // Find ground level at anchor point
+        int groundY = getSurfaceHeight(anchorX, anchorZ);
+        
+        // Check if this vertical chunk slice overlaps the structure vertically
+        // Structure goes from groundY to groundY + maxHeight
+        int maxStructHeight = 12;
+        if (chunkBaseY > groundY + maxStructHeight) return;
+        if (chunkBaseY + CHUNK_HEIGHT <= groundY - 1) return;
+        
+        if (!allStructures.empty()) {
+            // Pick a structure category based on biome
+            StructureCategory category;
+            if (centerBiome == BiomeType::CITY) {
+                int roll = h % 100;
+                if (roll < 60) category = StructureCategory::CITY_BUILDING;
+                else if (roll < 85) category = StructureCategory::CITY_ROAD;
+                else category = StructureCategory::CITY_DECORATION;
+            } else {
+                int roll = (h >> 8) % 100;
+                if (roll < 35) category = StructureCategory::VILLAGE_HOUSE;
+                else if (roll < 55) category = StructureCategory::VILLAGE_BUILDING;
+                else if (roll < 70) category = StructureCategory::VILLAGE_FARM;
+                else if (roll < 85) category = StructureCategory::VILLAGE_WELL;
+                else category = StructureCategory::VILLAGE_PATH;
+            }
+            
+            auto structureIds = registry.getStructuresByCategory(category);
+            if (structureIds.empty()) structureIds = registry.getAllStructureIds();
+            if (structureIds.empty()) return;
+            
+            size_t idx = (h >> 16) % structureIds.size();
+            auto structure = registry.getStructure(structureIds[idx]);
+            if (!structure) return;
+            
+            // Place structure blocks that fall within THIS chunk
+            int rotation = ((h >> 24) % 4) * 90;
+            auto blocks = structure->getRotatedBlocks(rotation);
+            
+            for (const auto& block : blocks) {
+                int worldBX = anchorX + block.position.x;
+                int worldBY = groundY + block.position.y;
+                int worldBZ = anchorZ + block.position.z;
+                
+                int localBX = worldBX - chunkBaseX;
+                int localBY = worldBY - chunkBaseY;
+                int localBZ = worldBZ - chunkBaseZ;
+                
+                if (localBX < 0 || localBX >= CHUNK_SIZE) continue;
+                if (localBZ < 0 || localBZ >= CHUNK_SIZE) continue;
+                if (localBY < 0 || localBY >= CHUNK_HEIGHT) continue;
+                if (block.type == BlockType::AIR) continue;
+                
+                Block existing = chunk->getBlock(localBX, localBY, localBZ);
+                BlockType existingType = existing.getType();
+                if (existingType != BlockType::BEDROCK && existingType != BlockType::WATER) {
+                    chunk->setBlock(localBX, localBY, localBZ, block.type);
+                }
+            }
+        } else {
+            // Fallback: simple pink wool house when no .mcstruct files loaded
+            int houseSize = 5;
+            int houseHeight = 5;
+            
+            for (int hx = 0; hx < houseSize; hx++) {
+                for (int hz = 0; hz < houseSize; hz++) {
+                    for (int hy = 0; hy <= houseHeight; hy++) {
+                        int worldBY = groundY + hy;
+                        int localBX = 4 + hx;
+                        int localBY = worldBY - chunkBaseY;
+                        int localBZ = 4 + hz;
+                        
+                        if (localBX >= CHUNK_SIZE || localBZ >= CHUNK_SIZE) continue;
+                        if (localBY < 0 || localBY >= CHUNK_HEIGHT) continue;
+                        
+                        bool isWall = (hx == 0 || hx == houseSize-1 || hz == 0 || hz == houseSize-1);
+                        bool isDoor = (hx == houseSize/2 && hz == 0 && hy >= 1 && hy <= 2);
+                        
+                        if (hy == 0)
+                            chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::COBBLESTONE));
+                        else if (hy == houseHeight)
+                            chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::RED_WOOL));
+                        else if (isWall && !isDoor)
+                            chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::PINK_WOOL));
+                    }
+                }
+            }
+        }
+    }();
     
     chunk->setState(ChunkState::MESH_BUILD);
 }

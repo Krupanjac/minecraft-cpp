@@ -3,6 +3,10 @@
 #include "../Util/Types.h"
 #include "Chunk.h"
 #include <memory>
+#include <string>
+
+// Forward declaration
+class StructurePlacer;
 
 enum class BiomeType {
     OCEAN,
@@ -16,7 +20,9 @@ enum class BiomeType {
     SWAMP,            // Swamp
     MOUNTAINS,
     SNOWY_TUNDRA,
-    SAVANNA           // Hot plains with acacia-like trees
+    SAVANNA,          // Hot plains with acacia-like trees
+    VILLAGE,          // Flat plains with village structures
+    CITY              // Flat area with city buildings
 };
 
 enum class TreeType {
@@ -46,9 +52,10 @@ struct BiomeInfo {
 class WorldGenerator {
 public:
     WorldGenerator(unsigned int seed = 12345);
-    ~WorldGenerator() = default;
+    ~WorldGenerator();  // Defined in .cpp since StructurePlacer is incomplete here
 
     void setSeed(unsigned int s);
+    void initializeStructures(const std::string& structuresPath);
     void generate(std::shared_ptr<Chunk> chunk);
     
     float getNoise(float x, float y, float z) const;
@@ -56,9 +63,14 @@ public:
     int getSurfaceHeight(int x, int z) const;
     BiomeType getBiome(float x, float z) const;
     BiomeInfo getBiomeInfo(BiomeType biome) const;
+    
+    // Structure placement
+    StructurePlacer* getStructurePlacer() { return structurePlacer.get(); }
+    const StructurePlacer* getStructurePlacer() const { return structurePlacer.get(); }
 
 private:
     unsigned int seed;
+    std::unique_ptr<StructurePlacer> structurePlacer;
     
     // Randomized World Parameters
     float offsetContinentX = 0.0f;
@@ -99,7 +111,7 @@ private:
     }
     
     // Cached biome info for fast lookups
-    static BiomeInfo biomeInfoCache[12];
+    static BiomeInfo biomeInfoCache[14];
     static bool biomeInfoCacheInitialized;
     
     // Spline helper

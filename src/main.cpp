@@ -341,6 +341,10 @@ public:
         glfwGetFramebufferSize(window->getNative(), &fbW, &fbH);
         uiManager.initialize(fbW, fbH);
         uiManager.setWorldGenerator(&worldGenerator);
+        
+        // Initialize structures from .mcstruct files
+        worldGenerator.initializeStructures("assets/structures");
+        
         // Pick a main menu tip for this session
         mainMenuTip = pickRandomTip();
         uiManager.setMainMenuTip(mainMenuTip);

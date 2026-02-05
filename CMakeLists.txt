@@ -77,6 +77,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(imgui)
 
+# nlohmann/json for structure file parsing
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # ImGui source files
 set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/imgui.cpp
@@ -109,6 +117,8 @@ set(SOURCES
     src/World/WorldSerializer.cpp
     src/World/Item.cpp
     src/World/FireSystem.cpp
+    src/World/Structure.cpp
+    src/World/StructurePlacer.cpp
     src/Game/StatusEffectsSystem.cpp
     src/Game/PlayerHealthSystem.cpp
     src/Game/MenuWorldSystem.cpp
@@ -216,6 +226,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     OpenGL::GL
     glfw
     glm::glm
+    nlohmann_json::nlohmann_json
 )
 
 # Create dedicated server executable

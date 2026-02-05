@@ -1,0 +1,17 @@
+{
+  "name": "Street Lamp",
+  "author": "system",
+  "category": "city_decoration",
+  "requires_flat": true,
+  "min_ground_coverage": 1.0,
+  "tags": ["lamp", "light", "decoration"],
+  "size": {"x": 1, "y": 5, "z": 1},
+  "blocks": [
+    {"x": 0, "y": 0, "z": 0, "type": "stone_bricks"},
+    {"x": 0, "y": 1, "z": 0, "type": "iron_block"},
+    {"x": 0, "y": 2, "z": 0, "type": "iron_block"},
+    {"x": 0, "y": 3, "z": 0, "type": "iron_block"},
+    {"x": 0, "y": 4, "z": 0, "type": "glowstone"}
+  ],
+  "markers": []
+}

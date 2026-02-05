@@ -1,0 +1,30 @@
+{
+  "name": "Village Path Straight",
+  "author": "system",
+  "category": "village_path",
+  "requires_flat": false,
+  "min_ground_coverage": 0.5,
+  "tags": ["path", "road", "connector"],
+  "size": {"x": 3, "y": 1, "z": 5},
+  "blocks": [
+    {"x": 0, "y": 0, "z": 0, "type": "gravel"},
+    {"x": 1, "y": 0, "z": 0, "type": "gravel"},
+    {"x": 2, "y": 0, "z": 0, "type": "gravel"},
+    {"x": 0, "y": 0, "z": 1, "type": "gravel"},
+    {"x": 1, "y": 0, "z": 1, "type": "gravel"},
+    {"x": 2, "y": 0, "z": 1, "type": "gravel"},
+    {"x": 0, "y": 0, "z": 2, "type": "gravel"},
+    {"x": 1, "y": 0, "z": 2, "type": "gravel"},
+    {"x": 2, "y": 0, "z": 2, "type": "gravel"},
+    {"x": 0, "y": 0, "z": 3, "type": "gravel"},
+    {"x": 1, "y": 0, "z": 3, "type": "gravel"},
+    {"x": 2, "y": 0, "z": 3, "type": "gravel"},
+    {"x": 0, "y": 0, "z": 4, "type": "gravel"},
+    {"x": 1, "y": 0, "z": 4, "type": "gravel"},
+    {"x": 2, "y": 0, "z": 4, "type": "gravel"}
+  ],
+  "markers": [
+    {"x": 1, "y": 0, "z": 0, "type": "path_connection", "data": "north"},
+    {"x": 1, "y": 0, "z": 4, "type": "path_connection", "data": "south"}
+  ]
+}
