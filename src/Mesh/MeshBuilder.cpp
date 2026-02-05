@@ -343,16 +343,24 @@ void MeshBuilder::greedyMesh(std::shared_ptr<Chunk> chunk,
                     }
                     
                     // Calculate sky light for this quad
-                    // Use the block position (block behind the face) for the check
+                    // IMPORTANT: Check sky light from the ADJACENT air position, not the block itself.
+                    // This ensures a face exposed to air above gets proper sky light, even if the
+                    // block itself is underground. We check from where the face is visible (the air space).
                     int blockX = quad.x - (nx > 0 ? step : 0);
                     int blockY = quad.y - (ny > 0 ? step : 0);
                     int blockZ = quad.z - (nz > 0 ? step : 0);
+                    
+                    // Adjacent position (the air space in front of this face)
+                    int adjX = blockX + nx * step;
+                    int adjY = blockY + ny * step;
+                    int adjZ = blockZ + nz * step;
                     
                     // For water, don't override sky light (it's stored in data for water level)
                     if (material == static_cast<u8>(BlockType::WATER)) {
                         quad.skyLight = 15; // Water always gets full sky light (handled differently)
                     } else {
-                        quad.skyLight = calculateSkyLight(chunk, blockX, blockY, blockZ, neighbors);
+                        // Check sky light from the adjacent air position
+                        quad.skyLight = calculateSkyLight(chunk, adjX, adjY, adjZ, neighbors);
                     }
                     
                     addQuad(quad, meshData);
@@ -573,78 +581,46 @@ u8 MeshBuilder::calculateSkyLight(std::shared_ptr<Chunk> chunk, int x, int y, in
     // Sky light is 15 if the block can see the sky, 0 if it's completely underground.
     // This provides a Minecraft-style light propagation that blocks sunlight in caves.
     
+    // Handle out-of-bounds X/Z by checking neighbor chunks
+    if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE) {
+        // Position is outside current chunk - assume sky light for simplicity
+        // (edge cases at chunk boundaries)
+        return 15;
+    }
+    
     ChunkPos chunkPos = chunk->getPosition();
-    int worldY = static_cast<int>(chunkPos.y) * CHUNK_HEIGHT + y;
     
-    // If we're deep underground (below sea level by a margin), default to no sky light
-    // This catches cases where we can't check high enough due to limited neighbor access
-    if (worldY < SEA_LEVEL - 10) {
-        // Check the blocks above in the current chunk and immediate neighbor
-        // If we find any opaque block, we're underground
-        // Also, being this deep strongly suggests underground
-    }
-    
-    // Maximum height to check within available neighbors
-    // We can check current chunk + one chunk up (neighbor[2])
-    int maxReachableY = static_cast<int>(chunkPos.y + 2) * CHUNK_HEIGHT;
-    if (neighbors[2] == nullptr) {
-        maxReachableY = static_cast<int>(chunkPos.y + 1) * CHUNK_HEIGHT;
-    }
-    
-    // Lambda to check if a block at world coordinates is opaque
-    auto isBlockOpaqueAt = [&](int lx, int checkWorldY, int lz) -> bool {
-        // Calculate which chunk this Y falls into
-        int targetChunkY = checkWorldY / CHUNK_HEIGHT;
-        int localY = checkWorldY % CHUNK_HEIGHT;
-        
-        // Handle negative world Y (below Y=0)
-        if (checkWorldY < 0) {
-            targetChunkY = (checkWorldY - CHUNK_HEIGHT + 1) / CHUNK_HEIGHT;
-            localY = checkWorldY - targetChunkY * CHUNK_HEIGHT;
-        }
-        
-        int currentChunkY = static_cast<int>(chunkPos.y);
-        
-        if (targetChunkY == currentChunkY) {
-            // Same chunk
-            if (localY >= 0 && localY < CHUNK_HEIGHT) {
-                return chunk->getBlock(lx, localY, lz).isOpaque();
-            }
-        } else if (targetChunkY == currentChunkY + 1 && neighbors[2]) {
-            // One chunk above
-            if (localY >= 0 && localY < CHUNK_HEIGHT) {
-                return neighbors[2]->getBlock(lx, localY, lz).isOpaque();
-            }
-        }
-        // Beyond available neighbor chunks
-        return false;
-    };
-    
-    // Check upward from current position
-    for (int checkY = worldY + 1; checkY < maxReachableY; ++checkY) {
-        if (isBlockOpaqueAt(x, checkY, z)) {
-            // Found an opaque block above - this position is underground
+    // Check all blocks above within this chunk first
+    for (int checkY = y + 1; checkY < CHUNK_HEIGHT; ++checkY) {
+        if (chunk->getBlock(x, checkY, z).isOpaque()) {
+            // Found an opaque block above in same chunk - underground
             return 0;
         }
     }
     
-    // If we've checked all available blocks and found no obstruction:
-    // - If we reached a reasonable surface height, assume sky access
-    // - If we're deep underground but couldn't check high enough, be conservative
-    
-    // Typical terrain surface is around Y=64 (TERRAIN_HEIGHT)
-    // If we've checked up to at least terrain height + some margin, assume sky access
-    if (maxReachableY >= TERRAIN_HEIGHT + 10) {
-        return 15; // Full sky access
+    // Now check the chunk above if available
+    if (neighbors[2]) {
+        for (int checkY = 0; checkY < CHUNK_HEIGHT; ++checkY) {
+            if (neighbors[2]->getBlock(x, checkY, z).isOpaque()) {
+                // Found an opaque block in chunk above - underground  
+                return 0;
+            }
+        }
     }
     
-    // We're in a situation where we couldn't check high enough
-    // If the block is below sea level, it's likely underground
-    if (worldY < SEA_LEVEL) {
-        return 0; // Probably underground
+    // We've checked current chunk and one above - no obstructions found
+    // If we can reach above typical terrain height, we have sky access
+    int maxCheckedWorldY = static_cast<int>(chunkPos.y + (neighbors[2] ? 2 : 1)) * CHUNK_HEIGHT;
+    
+    // If we've checked up to or past typical terrain surface, we have clear sky
+    // TERRAIN_HEIGHT is 64, so if we've checked past ~70-80 we're good
+    if (maxCheckedWorldY >= TERRAIN_HEIGHT + 16) {
+        return 15; // Full sky access - no blocks found above
     }
     
-    // Block is at or above sea level, but we couldn't verify sky access
-    // Be optimistic and assume partial sky access
+    // We couldn't check high enough to be certain, but found no obstructions
+    // in everything we could check. Be optimistic - if there were blocks above,
+    // they would likely have been within our check range for normal terrain.
+    // This handles open pits, ravines, and low terrain correctly.
     return 15;
 }

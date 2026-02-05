@@ -196,44 +196,50 @@ void HeldItemRenderer::renderFirstPerson(Shader& shader, const Camera& camera, i
     glm::vec3 rotation = m_baseRotation + offset.rotation;
     rotation.x += swingAngle; // Add swing rotation
     
-    // Create view-space model matrix
-    glm::mat4 modelMatrix = glm::mat4(1.0f);
+    // Create view-space model matrix (position/rotation relative to camera)
+    glm::mat4 viewSpaceModel = glm::mat4(1.0f);
     
     // Position in view space (relative to camera)
-    modelMatrix = glm::translate(modelMatrix, position);
+    viewSpaceModel = glm::translate(viewSpaceModel, position);
     
     // Apply rotations
-    modelMatrix = glm::rotate(modelMatrix, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-    modelMatrix = glm::rotate(modelMatrix, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-    modelMatrix = glm::rotate(modelMatrix, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+    viewSpaceModel = glm::rotate(viewSpaceModel, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    viewSpaceModel = glm::rotate(viewSpaceModel, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    viewSpaceModel = glm::rotate(viewSpaceModel, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
     
     // Scale
     float scale = m_baseScale * offset.scale;
-    modelMatrix = glm::scale(modelMatrix, glm::vec3(scale));
+    viewSpaceModel = glm::scale(viewSpaceModel, glm::vec3(scale));
     
     // For first-person rendering, we need a special projection that doesn't clip close objects
     float aspect = static_cast<float>(screenWidth) / static_cast<float>(screenHeight);
     glm::mat4 fpProjection = glm::perspective(glm::radians(70.0f), aspect, 0.01f, 10.0f);
     
-    // View matrix is identity since we're rendering in view space
-    glm::mat4 fpView = glm::mat4(1.0f);
+    // Convert view-space model to world-space model for proper shadow lookup
+    // The shader computes vFragPosLightSpace = uLightSpaceMatrix * uModel * localPos
+    // so uModel must be in world space (camera-relative rendering origin space)
+    glm::mat4 cameraView = camera.getViewMatrix();
+    glm::mat4 invCameraView = glm::inverse(cameraView);
+    glm::mat4 worldModel = invCameraView * viewSpaceModel;
     
     // Set shader uniforms
     shader.use();
-    shader.setMat4("uView", fpView);
+    shader.setMat4("uView", cameraView);  // Use regular camera view
     shader.setMat4("uProjection", fpProjection);
-    shader.setMat4("uModel", modelMatrix);
-    shader.setMat4("uPrevModel", modelMatrix); // No motion blur for held item
+    shader.setMat4("uModel", worldModel);  // World-space model for shadow lookup
+    shader.setMat4("uPrevModel", worldModel); // No motion blur for held item
     
-    // Disable depth testing for held item so it always renders on top
-    // Or use a near clip plane trick
-    glDisable(GL_DEPTH_TEST);
+    // Use world-space light direction (the renderer already set this for entities)
+    // The uniform uLightDir should already be set from entity rendering pass
+    // Just ensure shadows are enabled
+    shader.setInt("uUseShadows", 1);
+    
+    // Clear depth buffer to ensure held item renders on top of everything
+    // but can still receive shadows based on world position
+    glClear(GL_DEPTH_BUFFER_BIT);
     
     // Draw the model
-    model->draw(shader, modelMatrix, modelMatrix);
-    
-    // Re-enable depth testing
-    glEnable(GL_DEPTH_TEST);
+    model->draw(shader, worldModel, worldModel);
 }
 
 void HeldItemRenderer::renderThirdPerson(Shader& shader, const glm::mat4& handMatrix) {

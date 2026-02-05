@@ -244,8 +244,9 @@ void Renderer::render(ChunkManager& chunkManager, Camera& camera, const std::vec
         glDisable(GL_CULL_FACE);
         
         // Use polygon offset to prevent shadow acne (z-fighting)
+        // Keep offset moderate to allow shadows from objects on surfaces to be visible
         glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(4.0f, 4.0f);  // Increased offset for better acne prevention
+        glPolygonOffset(1.5f, 1.5f);  // Reduced to allow close object shadows
 
         shadowShader.use();
         shadowShader.setMat4("uLightSpaceMatrix", lightSpaceMatrix);

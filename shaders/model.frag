@@ -217,7 +217,7 @@ vec4 calculateBloodDecals(vec3 worldPos, vec3 surfaceNormal) {
     return vec4(totalBlood, totalAlpha);
 }
 
-// Shadow calculation with PCF
+// Shadow calculation with PCF - improved for models
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir2) {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
@@ -229,8 +229,16 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir2) {
     }
     
     float currentDepth = projCoords.z;
-    float bias = max(0.005 * (1.0 - dot(normal, lightDir2)), 0.001);
     
+    // Improved bias calculation for models:
+    // - Larger base bias to prevent shadow acne on smooth surfaces
+    // - Scale based on surface angle to light
+    // Minimal bias - rely on polygon offset during shadow map rendering
+    float NdotL = max(dot(normal, lightDir2), 0.0);
+    float slopeFactor = sqrt(1.0 - NdotL * NdotL); // sin(angle)
+    float bias = 0.0002 + 0.001 * slopeFactor;
+    
+    // PCF with slightly larger kernel for smoother shadows on models
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(uShadowMap, 0);
     
@@ -242,7 +250,13 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir2) {
     }
     shadow /= 9.0;
     
-    return shadow;
+    // Fade shadow at map edges to prevent hard cutoffs
+    float edgeFade = 1.0;
+    float edgeDist = min(min(projCoords.x, 1.0 - projCoords.x), 
+                         min(projCoords.y, 1.0 - projCoords.y));
+    edgeFade = smoothstep(0.0, 0.05, edgeDist);
+    
+    return shadow * edgeFade;
 }
 
 void main() {

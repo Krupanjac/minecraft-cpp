@@ -81,9 +81,9 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
         return 0.0;
     }
     
+    // Minimal bias - rely on polygon offset during shadow map rendering
     float slopeFactor = sqrt(1.0 - NdotL * NdotL);
-    float depthBias = projCoords.z * 0.0005;
-    float bias = 0.0005 + 0.002 * slopeFactor + depthBias;
+    float bias = 0.0001 + 0.0005 * slopeFactor;
     
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(uShadowMap, 0);
@@ -373,17 +373,16 @@ void main() {
         diffuse = max(dot(normal, lightDir), 0.0);
     }
     
-    // SKY LIGHT: Scale direct sunlight by sky light factor
-    // vSkyLight is 0.0 when underground (can't see sky), 1.0 when above ground
-    // This prevents sunlight from reaching caves/underground areas
-    diffuse *= vSkyLight;
+    // NOTE: vSkyLight is NOT used for diffuse lighting!
+    // The shadow map handles directional shadows based on actual sun/moon position.
+    // vSkyLight only controls AMBIENT light (indirect sky illumination).
     
-    // Specular (Blinn-Phong with roughness) - also affected by sky light
+    // Specular (Blinn-Phong with roughness)
     float specular = 0.0;
     if (diffuse > 0.0 && uUsePBRResourcePack == 1) {
         vec3 halfDir = normalize(lightDir + viewDir);
         float shininess = mix(256.0, 8.0, roughness);
-        specular = pow(max(dot(normal, halfDir), 0.0), shininess) * (1.0 - roughness) * 0.5 * vSkyLight;
+        specular = pow(max(dot(normal, halfDir), 0.0), shininess) * (1.0 - roughness) * 0.5;
     }
     
     // Ambient
@@ -395,23 +394,18 @@ void main() {
     float minCaveAmbient = 0.08;  // Minimum ambient in caves
     float ambient = mix(minCaveAmbient, baseAmbient, vSkyLight);
     
-    // Shadow
+    // Shadow - shadow map handles directional light occlusion
     float shadow = 0.0;
     
-    // Skip shadow calculation for underground blocks (they're already dark)
-    if (uUseShadows != 0 && vSkyLight > 0.0) {
+    if (uUseShadows != 0) {
         if (uShadowMethod == 1 && uUseRTShadows != 0) {
             vec2 screenUV = (vCurrentClip.xy / vCurrentClip.w) * 0.5 + 0.5;
             vec4 rtData = texture(uRayTracingMap, screenUV);
             shadow = 1.0 - rtData.r;
         } else {
+            // Shadow map - this properly checks occlusion in sun direction
             shadow = ShadowCalculation(vFragPosLightSpace, normal, lightDir);
         }
-        // Scale shadow effect by sky light (partially lit areas get partial shadow)
-        shadow *= vSkyLight;
-    } else if (vSkyLight == 0.0) {
-        // Underground blocks are always in complete shadow from the sun
-        shadow = 1.0;
     }
     
     // Apply AO with improved blending
