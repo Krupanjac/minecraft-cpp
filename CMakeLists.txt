@@ -290,6 +290,11 @@ add_custom_command(TARGET minecraft_server POST_BUILD
 
 set(EDITOR_SOURCES
     src/Tools/VxStructEditor/EditorMain.cpp
+    src/Tools/VxStructEditor/EditorCommon.cpp
+    src/Tools/VxStructEditor/EditorRenderer.cpp
+    src/Tools/VxStructEditor/EditorUI.cpp
+    src/Tools/VxStructEditor/EditorActions.cpp
+    src/Tools/VxStructEditor/EditorIO.cpp
     src/World/Structure.cpp
     src/Core/Logger.cpp
     ${GLAD_DIR}/src/glad.c
