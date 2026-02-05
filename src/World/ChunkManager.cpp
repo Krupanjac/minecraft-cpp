@@ -78,27 +78,91 @@ void ChunkManager::requestChunkGeneration(const ChunkPos& pos) {
     }
 }
 
-std::vector<ChunkPos> ChunkManager::getChunksToGenerate(const glm::vec3& cameraPos, int range, int maxChunks) {
+std::vector<ChunkPos> ChunkManager::getChunksToGenerate(const glm::vec3& cameraPos, int range, int maxChunks, const glm::vec3& viewDir) {
     std::vector<ChunkPos> result;
+    result.reserve(maxChunks);
+    
     ChunkPos centerChunk = worldToChunk(cameraPos);
     
-    // Generate in a spiral pattern around the player
-    for (int dist = 0; dist <= range && result.size() < static_cast<size_t>(maxChunks); ++dist) {
-        for (int x = -dist; x <= dist && result.size() < static_cast<size_t>(maxChunks); ++x) {
-            for (int z = -dist; z <= dist && result.size() < static_cast<size_t>(maxChunks); ++z) {
-                // Generate vertical column from bedrock (-4) to height limit (12)
-                for (int y = -4; y <= 12 && result.size() < static_cast<size_t>(maxChunks); ++y) {
-                    if (std::abs(x) != dist && std::abs(z) != dist) continue;
-                    
-                    ChunkPos pos(centerChunk.x + x, y, centerChunk.z + z);
-                    auto chunk = getChunk(pos);
-                    
-                    if (!chunk || chunk->getState() == ChunkState::UNLOADED) {
-                        result.push_back(pos);
+    // Determine if we have a valid view direction for biasing
+    float viewDirLength = glm::length(viewDir);
+    glm::vec3 normalizedViewDir = (viewDirLength > 0.01f) ? viewDir / viewDirLength : glm::vec3(0.0f);
+    bool useViewBias = viewDirLength > 0.01f;
+    
+    // Pre-compute camera chunk center in world space for more accurate distance
+    glm::vec3 cameraPosXZ(cameraPos.x, 0.0f, cameraPos.z);
+    
+    // Collect candidate chunks with priority scores
+    struct ChunkCandidate {
+        ChunkPos pos;
+        float priority;  // Lower = higher priority
+    };
+    std::vector<ChunkCandidate> candidates;
+    
+    // Estimate capacity: roughly the volume of chunks to check
+    int estimatedCount = (2 * range + 1) * (2 * range + 1) * 17; // 17 vertical chunks
+    candidates.reserve(std::min(estimatedCount, 10000));
+    
+    // Y range for chunks (from bedrock to height limit)
+    constexpr int Y_MIN = -4;
+    constexpr int Y_MAX = 12;
+    
+    // Scan all potential chunk positions
+    for (int dx = -range; dx <= range; ++dx) {
+        for (int dz = -range; dz <= range; ++dz) {
+            // Quick distance check in XZ plane
+            int distSq = dx * dx + dz * dz;
+            if (distSq > range * range) continue;
+            
+            for (int y = Y_MIN; y <= Y_MAX; ++y) {
+                ChunkPos pos(centerChunk.x + dx, y, centerChunk.z + dz);
+                auto chunk = getChunk(pos);
+                
+                // Skip if chunk already exists and isn't unloaded
+                if (chunk && chunk->getState() != ChunkState::UNLOADED) continue;
+                
+                // Calculate priority score (lower = higher priority)
+                float baseDist = std::sqrt(static_cast<float>(distSq));
+                
+                // Add small Y penalty to prioritize horizontal neighbors first
+                // But don't penalize too much - we need vertical columns
+                float yPenalty = std::abs(y - static_cast<int>(cameraPos.y / CHUNK_HEIGHT)) * 0.1f;
+                
+                float priority = baseDist + yPenalty;
+                
+                // View direction biasing: reduce priority (make more urgent) for chunks
+                // in the view direction
+                if (useViewBias) {
+                    glm::vec3 chunkWorldPos = chunkToWorld(pos);
+                    glm::vec3 toChunk = glm::vec3(chunkWorldPos.x + CHUNK_SIZE * 0.5f, 0.0f, 
+                                                   chunkWorldPos.z + CHUNK_SIZE * 0.5f) - cameraPosXZ;
+                    float toChunkLen = glm::length(toChunk);
+                    if (toChunkLen > 0.01f) {
+                        glm::vec3 toChunkNorm = toChunk / toChunkLen;
+                        // Dot product with view dir: 1 = directly in front, -1 = behind
+                        float viewDot = glm::dot(glm::vec3(normalizedViewDir.x, 0.0f, normalizedViewDir.z), toChunkNorm);
+                        // Convert to bias: chunks in view get priority reduction
+                        // Front chunks (-0.5 to priority), back chunks (+0.5 to priority)
+                        float viewBias = (1.0f - viewDot) * 0.25f * baseDist;  // Scale with distance
+                        priority += viewBias;
                     }
                 }
+                
+                candidates.push_back({pos, priority});
             }
         }
+    }
+    
+    // Sort by priority (ascending - lower priority value = higher urgency)
+    std::sort(candidates.begin(), candidates.end(), 
+              [](const ChunkCandidate& a, const ChunkCandidate& b) {
+                  return a.priority < b.priority;
+              });
+    
+    // Take top maxChunks
+    size_t count = std::min(candidates.size(), static_cast<size_t>(maxChunks));
+    for (size_t i = 0; i < count; ++i) {
+        result.push_back(candidates[i].pos);
     }
     
     return result;

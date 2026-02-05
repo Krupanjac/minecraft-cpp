@@ -35,7 +35,9 @@ public:
     void unloadDistantChunks(const glm::vec3& cameraPos);
     void requestChunkGeneration(const ChunkPos& pos);
     
-    std::vector<ChunkPos> getChunksToGenerate(const glm::vec3& cameraPos, int range, int maxChunks);
+    // Optimized chunk generation with view direction biasing
+    // viewDir is optional - if zero vector, uses distance-only prioritization
+    std::vector<ChunkPos> getChunksToGenerate(const glm::vec3& cameraPos, int range, int maxChunks, const glm::vec3& viewDir = glm::vec3(0.0f));
     std::vector<std::shared_ptr<Chunk>> getChunksToMesh(const glm::vec3& cameraPos, int maxChunks);
 
     static ChunkPos worldToChunk(const glm::vec3& worldPos);
