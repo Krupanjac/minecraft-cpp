@@ -334,6 +334,7 @@ public:
         int fbW, fbH;
         glfwGetFramebufferSize(window->getNative(), &fbW, &fbH);
         uiManager.initialize(fbW, fbH);
+        uiManager.setWorldGenerator(&worldGenerator);
         // Pick a main menu tip for this session
         mainMenuTip = pickRandomTip();
         uiManager.setMainMenuTip(mainMenuTip);
