@@ -1,11 +1,14 @@
 #pragma once
 
 #include "Shader.h"
+#include "Renderer.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 #include <random>
 #include <string>
+
+class ChunkManager;
 
 // Animated sprite particle system for blood splatters
 class BloodSplatterSystem {
@@ -28,6 +31,7 @@ public:
     ~BloodSplatterSystem();
 
     bool initialize();
+    void setChunkManager(ChunkManager* cm) { m_chunkManager = cm; }
     void update(float deltaTime);
     void render(const glm::mat4& view, const glm::mat4& projection, 
                 const glm::vec3& cameraRight, const glm::vec3& cameraUp);
@@ -36,7 +40,10 @@ public:
     void spawnSplatter(const glm::vec3& position, const glm::vec3& direction, 
                        const glm::vec3& backSplashDir, float intensity = 1.0f);
     
-    // Clear all particles
+    // Get blood decals for rendering
+    std::vector<Renderer::BloodDecalRenderData> getBloodDecalRenderData() const;
+    
+    // Clear all particles and decals
     void clear();
     
     // Get active particle count
@@ -45,10 +52,33 @@ public:
 private:
     void initQuadMesh();
     bool loadAtlas();
+    void updateDecals(float deltaTime);
+    void spawnDecalAtPosition(const glm::vec3& pos, const glm::vec3& normal);
     
     // Particle pool
     std::vector<Particle> m_particles;
     size_t m_maxParticles = 500;
+    
+    // Blood decals from particle impacts
+    struct BloodDecal {
+        glm::vec3 position;
+        glm::vec3 normal;
+        glm::vec2 size;
+        float rotation;
+        glm::vec3 color;
+        float alpha;
+        float seed;
+        int pattern;
+        float age;
+        float lifetime;
+        bool attachedToBlock;
+        glm::ivec3 blockPos;
+    };
+    std::vector<BloodDecal> m_decals;
+    size_t m_maxDecals = 128;
+    
+    // Chunk manager for raycasting
+    ChunkManager* m_chunkManager = nullptr;
     
     // OpenGL resources
     GLuint m_quadVAO = 0;

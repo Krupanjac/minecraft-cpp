@@ -132,6 +132,11 @@ void RenderPipelineSystem::renderFrame(bool isBreakingBlock, float blockBreakPro
     }
 #endif
 
+    // Add blood decals from the splatter system
+    bloodSplatter.setChunkManager(&chunkManager);
+    auto splatterDecals = bloodSplatter.getBloodDecalRenderData();
+    bloodDecals.insert(bloodDecals.end(), splatterDecals.begin(), splatterDecals.end());
+
     std::vector<glm::vec3> fireLights;
     fireSystem.getFireLightPositions(fireLights, 16);
     renderer.setFireLightPositions(fireLights);

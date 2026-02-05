@@ -1,5 +1,7 @@
 #include "BloodSplatterSystem.h"
 #include "../Core/Logger.h"
+#include "../World/ChunkManager.h"
+#include "../World/Block.h"
 #include <glad/glad.h>
 #include <stb_image.h>
 #include <algorithm>
@@ -137,6 +139,8 @@ void BloodSplatterSystem::initQuadMesh() {
 }
 
 void BloodSplatterSystem::update(float deltaTime) {
+    std::uniform_real_distribution<float> decalChance(0.0f, 1.0f);
+    
     for (auto& p : m_particles) {
         if (!p.active) continue;
         
@@ -146,9 +150,30 @@ void BloodSplatterSystem::update(float deltaTime) {
             continue;
         }
         
+        // Store old position for collision check
+        glm::vec3 oldPos = p.position;
+        
         // Update position with gravity
         p.velocity.y -= 9.8f * deltaTime * 0.5f;  // Half gravity for floaty blood
         p.position += p.velocity * deltaTime;
+        
+        // Check for collision with world (occasionally spawn decal)
+        if (m_chunkManager && decalChance(m_rng) < 0.3f) { // 30% of particles can spawn decals
+            glm::vec3 moveDir = p.position - oldPos;
+            float moveDist = glm::length(moveDir);
+            if (moveDist > 0.001f) {
+                auto result = m_chunkManager->rayCast(oldPos, glm::normalize(moveDir), moveDist + 0.1f);
+                if (result.hit) {
+                    // Spawn decal at hit point
+                    glm::vec3 hitPos = glm::vec3(ChunkManager::chunkToWorld(result.chunkPos)) + 
+                                       glm::vec3(result.blockPos) + glm::vec3(0.5f) + 
+                                       glm::vec3(result.normal) * 0.51f;
+                    spawnDecalAtPosition(hitPos, glm::vec3(result.normal));
+                    p.active = false; // Particle dies on impact
+                    continue;
+                }
+            }
+        }
         
         // Update rotation
         p.rotation += p.rotationSpeed * deltaTime;
@@ -166,6 +191,9 @@ void BloodSplatterSystem::update(float deltaTime) {
             p.color.a = 1.0f - fadeRatio;
         }
     }
+    
+    // Update decals
+    updateDecals(deltaTime);
 }
 
 void BloodSplatterSystem::render(const glm::mat4& view, const glm::mat4& projection,
@@ -296,6 +324,7 @@ void BloodSplatterSystem::clear() {
     for (auto& p : m_particles) {
         p.active = false;
     }
+    m_decals.clear();
 }
 
 size_t BloodSplatterSystem::getActiveCount() const {
@@ -304,4 +333,97 @@ size_t BloodSplatterSystem::getActiveCount() const {
         if (p.active) ++count;
     }
     return count;
+}
+
+void BloodSplatterSystem::updateDecals(float deltaTime) {
+    // Age and remove old decals
+    for (auto it = m_decals.begin(); it != m_decals.end(); ) {
+        it->age += deltaTime;
+        if (it->age >= it->lifetime) {
+            it = m_decals.erase(it);
+        } else {
+            // Fade out near end of life
+            float lifeRatio = it->age / it->lifetime;
+            if (lifeRatio > 0.8f) {
+                float fadeRatio = (lifeRatio - 0.8f) / 0.2f;
+                it->alpha = 1.0f - fadeRatio;
+            }
+            ++it;
+        }
+    }
+}
+
+void BloodSplatterSystem::spawnDecalAtPosition(const glm::vec3& pos, const glm::vec3& normal) {
+    if (!m_chunkManager) return;
+    
+    // Calculate block position
+    glm::vec3 inside = pos - normal * 0.02f;
+    glm::ivec3 blockPos(
+        static_cast<int>(std::floor(inside.x)),
+        static_cast<int>(std::floor(inside.y)),
+        static_cast<int>(std::floor(inside.z))
+    );
+    
+    // Check block type - don't place blood on vegetation
+    Block block = m_chunkManager->getBlockAt(blockPos.x, blockPos.y, blockPos.z);
+    if (block.isCrossModel() || block.isLeaves() || block.getType() == BlockType::AIR) {
+        return; // Don't place blood on flowers, grass, leaves, or air
+    }
+    
+    if (m_decals.size() >= m_maxDecals) {
+        // Remove oldest decal
+        float maxAge = 0.0f;
+        size_t oldestIdx = 0;
+        for (size_t i = 0; i < m_decals.size(); ++i) {
+            if (m_decals[i].age > maxAge) {
+                maxAge = m_decals[i].age;
+                oldestIdx = i;
+            }
+        }
+        m_decals.erase(m_decals.begin() + oldestIdx);
+    }
+    
+    std::uniform_real_distribution<float> sizeDist(0.15f, 0.35f);
+    std::uniform_real_distribution<float> rotDist(0.0f, 6.28f);
+    std::uniform_real_distribution<float> seedDist(0.0f, 1000.0f);
+    std::uniform_int_distribution<int> patternDist(0, 3);
+    
+    BloodDecal decal;
+    decal.position = pos;
+    decal.normal = normal;
+    float s = sizeDist(m_rng);
+    decal.size = glm::vec2(s, s);
+    decal.rotation = rotDist(m_rng);
+    decal.color = glm::vec3(0.5f, 0.0f, 0.0f); // Dark blood red
+    decal.alpha = 1.0f;
+    decal.seed = seedDist(m_rng);
+    decal.pattern = patternDist(m_rng);
+    decal.age = 0.0f;
+    decal.lifetime = 15.0f; // Decals last longer than particles
+    decal.attachedToBlock = true;
+    decal.blockPos = blockPos;
+    
+    m_decals.push_back(decal);
+}
+
+std::vector<Renderer::BloodDecalRenderData> BloodSplatterSystem::getBloodDecalRenderData() const {
+    std::vector<Renderer::BloodDecalRenderData> result;
+    result.reserve(m_decals.size());
+    
+    for (const auto& d : m_decals) {
+        Renderer::BloodDecalRenderData out;
+        out.position = d.position;
+        out.normal = d.normal;
+        out.size = d.size;
+        out.rotation = d.rotation;
+        out.color = d.color;
+        out.alpha = d.alpha;
+        out.seed = d.seed;
+        out.pattern = d.pattern;
+        out.attachedToBlock = d.attachedToBlock;
+        out.blockPos = d.blockPos;
+        result.push_back(out);
+    }
+    
+    return result;
 }
