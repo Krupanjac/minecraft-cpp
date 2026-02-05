@@ -1,0 +1,691 @@
+{
+  "name": "Village Garden",
+  "author": "generator",
+  "category": "village_decoration",
+  "requires_flat": true,
+  "min_ground_coverage": 0.8,
+  "tags": [
+    "garden",
+    "decoration",
+    "nature"
+  ],
+  "size": {
+    "x": 8,
+    "y": 2,
+    "z": 8
+  },
+  "blocks": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "type": "grass"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "type": "grass"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 2,
+      "type": "grass"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 3,
+      "type": "grass"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 4,
+      "type": "grass"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 5,
+      "type": "grass"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 6,
+      "type": "grass"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 7,
+      "type": "grass"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "type": "grass"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "type": "grass"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 2,
+      "type": "grass"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 3,
+      "type": "grass"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 4,
+      "type": "grass"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 5,
+      "type": "grass"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 6,
+      "type": "grass"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 7,
+      "type": "grass"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "type": "grass"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "type": "grass"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 2,
+      "type": "grass"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 3,
+      "type": "grass"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 4,
+      "type": "grass"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 5,
+      "type": "grass"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 6,
+      "type": "grass"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 7,
+      "type": "grass"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "type": "grass"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "type": "grass"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "type": "grass"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "type": "grass"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 4,
+      "type": "grass"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 5,
+      "type": "grass"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 6,
+      "type": "grass"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 7,
+      "type": "grass"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 0,
+      "type": "grass"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 1,
+      "type": "grass"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 2,
+      "type": "grass"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "type": "grass"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 4,
+      "type": "grass"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 5,
+      "type": "grass"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 6,
+      "type": "grass"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 7,
+      "type": "grass"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 0,
+      "type": "grass"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 1,
+      "type": "grass"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 2,
+      "type": "grass"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 3,
+      "type": "grass"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 4,
+      "type": "grass"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 5,
+      "type": "grass"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 6,
+      "type": "grass"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 7,
+      "type": "grass"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 0,
+      "type": "grass"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 1,
+      "type": "grass"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 2,
+      "type": "grass"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 3,
+      "type": "grass"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 4,
+      "type": "grass"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 5,
+      "type": "grass"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 6,
+      "type": "grass"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 7,
+      "type": "grass"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 0,
+      "type": "grass"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 1,
+      "type": "grass"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 2,
+      "type": "grass"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 3,
+      "type": "grass"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 4,
+      "type": "grass"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 5,
+      "type": "grass"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 6,
+      "type": "grass"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 7,
+      "type": "grass"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 4,
+      "type": "cobblestone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 4,
+      "type": "cobblestone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 4,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 4,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 4,
+      "type": "cobblestone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 4,
+      "type": "cobblestone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 4,
+      "type": "cobblestone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 4,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 0,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 1,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 4,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 4,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 5,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 5,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 1,
+      "type": "rose"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 2,
+      "type": "rose"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 5,
+      "type": "rose"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 6,
+      "type": "rose"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 1,
+      "type": "rose"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 2,
+      "type": "rose"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 5,
+      "type": "rose"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 6,
+      "type": "rose"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 1,
+      "type": "rose"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 2,
+      "type": "rose"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 5,
+      "type": "rose"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 6,
+      "type": "rose"
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 1,
+      "type": "rose"
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 2,
+      "type": "rose"
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 5,
+      "type": "rose"
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 6,
+      "type": "rose"
+    }
+  ]
+}

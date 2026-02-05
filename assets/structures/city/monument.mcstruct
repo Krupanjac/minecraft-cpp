@@ -1,0 +1,325 @@
+{
+  "name": "Monument",
+  "author": "generator",
+  "category": "city_decoration",
+  "requires_flat": true,
+  "min_ground_coverage": 0.8,
+  "tags": [
+    "monument",
+    "statue",
+    "decoration"
+  ],
+  "size": {
+    "x": 5,
+    "y": 7,
+    "z": 5
+  },
+  "blocks": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 2,
+      "type": "chiseled_stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 2,
+      "type": "chiseled_stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": 2,
+      "type": "chiseled_stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 2,
+      "type": "chiseled_stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 1,
+      "type": "glowstone"
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 1,
+      "type": "glowstone"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 3,
+      "type": "glowstone"
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 3,
+      "type": "glowstone"
+    }
+  ]
+}

@@ -58,6 +58,33 @@ static std::string blockTypeToString(BlockType type) {
         case BlockType::SANDSTONE: return "sandstone";
         case BlockType::SUGAR_CANE: return "sugar_cane";
         case BlockType::SPONGE: return "sponge";
+        case BlockType::WHITE_WOOL: return "white_wool";
+        case BlockType::ORANGE_WOOL: return "orange_wool";
+        case BlockType::MAGENTA_WOOL: return "magenta_wool";
+        case BlockType::LIGHT_BLUE_WOOL: return "light_blue_wool";
+        case BlockType::YELLOW_WOOL: return "yellow_wool";
+        case BlockType::LIME_WOOL: return "lime_wool";
+        case BlockType::PINK_WOOL: return "pink_wool";
+        case BlockType::GRAY_WOOL: return "gray_wool";
+        case BlockType::LIGHT_GRAY_WOOL: return "light_gray_wool";
+        case BlockType::CYAN_WOOL: return "cyan_wool";
+        case BlockType::PURPLE_WOOL: return "purple_wool";
+        case BlockType::BLUE_WOOL: return "blue_wool";
+        case BlockType::BROWN_WOOL: return "brown_wool";
+        case BlockType::GREEN_WOOL: return "green_wool";
+        case BlockType::RED_WOOL: return "red_wool";
+        case BlockType::BLACK_WOOL: return "black_wool";
+        case BlockType::IRON_BLOCK: return "iron_block";
+        case BlockType::GOLD_BLOCK: return "gold_block";
+        case BlockType::DIAMOND_BLOCK: return "diamond_block";
+        case BlockType::EMERALD_BLOCK: return "emerald_block";
+        case BlockType::REDSTONE_BLOCK: return "redstone_block";
+        case BlockType::MOSSY_STONE_BRICKS: return "mossy_stone_bricks";
+        case BlockType::CRACKED_STONE_BRICKS: return "cracked_stone_bricks";
+        case BlockType::CHISELED_STONE_BRICKS: return "chiseled_stone_bricks";
+        case BlockType::REDSTONE_LAMP: return "redstone_lamp";
+        case BlockType::FARMLAND: return "farmland";
+        case BlockType::CHISELED_SANDSTONE: return "chiseled_sandstone";
         default: return "unknown";
     }
 }
@@ -110,7 +137,38 @@ static BlockType stringToBlockType(const std::string& str) {
         {"glowstone", BlockType::GLOWSTONE},
         {"sandstone", BlockType::SANDSTONE},
         {"sugar_cane", BlockType::SUGAR_CANE},
-        {"sponge", BlockType::SPONGE}
+        {"sponge", BlockType::SPONGE},
+        {"white_wool", BlockType::WHITE_WOOL},
+        {"orange_wool", BlockType::ORANGE_WOOL},
+        {"magenta_wool", BlockType::MAGENTA_WOOL},
+        {"light_blue_wool", BlockType::LIGHT_BLUE_WOOL},
+        {"yellow_wool", BlockType::YELLOW_WOOL},
+        {"lime_wool", BlockType::LIME_WOOL},
+        {"pink_wool", BlockType::PINK_WOOL},
+        {"gray_wool", BlockType::GRAY_WOOL},
+        {"light_gray_wool", BlockType::LIGHT_GRAY_WOOL},
+        {"cyan_wool", BlockType::CYAN_WOOL},
+        {"purple_wool", BlockType::PURPLE_WOOL},
+        {"blue_wool", BlockType::BLUE_WOOL},
+        {"brown_wool", BlockType::BROWN_WOOL},
+        {"green_wool", BlockType::GREEN_WOOL},
+        {"red_wool", BlockType::RED_WOOL},
+        {"black_wool", BlockType::BLACK_WOOL},
+        {"iron_block", BlockType::IRON_BLOCK},
+        {"gold_block", BlockType::GOLD_BLOCK},
+        {"diamond_block", BlockType::DIAMOND_BLOCK},
+        {"emerald_block", BlockType::EMERALD_BLOCK},
+        {"redstone_block", BlockType::REDSTONE_BLOCK},
+        {"mossy_stone_bricks", BlockType::MOSSY_STONE_BRICKS},
+        {"cracked_stone_bricks", BlockType::CRACKED_STONE_BRICKS},
+        {"chiseled_stone_bricks", BlockType::CHISELED_STONE_BRICKS},
+        {"redstone_lamp", BlockType::REDSTONE_LAMP},
+        {"farmland", BlockType::FARMLAND},
+        {"note_block", BlockType::NOTE_BLOCK},
+        {"jukebox", BlockType::JUKEBOX},
+        {"chiseled_sandstone", BlockType::CHISELED_SANDSTONE},
+        {"wood", BlockType::WOOD},
+        {"log", BlockType::LOG}
     };
     
     auto it = lookup.find(str);

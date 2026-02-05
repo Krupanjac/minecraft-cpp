@@ -1,0 +1,523 @@
+{
+  "name": "Large Farm",
+  "author": "generator",
+  "category": "village_farm",
+  "requires_flat": true,
+  "min_ground_coverage": 0.8,
+  "tags": [
+    "farm",
+    "agriculture",
+    "large"
+  ],
+  "size": {
+    "x": 10,
+    "y": 2,
+    "z": 8
+  },
+  "blocks": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 0,
+      "type": "oak_log"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "type": "oak_log"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 1,
+      "type": "oak_log"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 2,
+      "type": "oak_log"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 2,
+      "type": "oak_log"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 3,
+      "type": "oak_log"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 3,
+      "type": "oak_log"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 4,
+      "type": "oak_log"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 4,
+      "type": "oak_log"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 5,
+      "type": "oak_log"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 5,
+      "type": "oak_log"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 6,
+      "type": "oak_log"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 6,
+      "type": "oak_log"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 7,
+      "type": "oak_log"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "type": "farmland"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 2,
+      "type": "farmland"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 3,
+      "type": "water"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 4,
+      "type": "water"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 5,
+      "type": "farmland"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 6,
+      "type": "farmland"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "type": "farmland"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 2,
+      "type": "farmland"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 3,
+      "type": "water"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 4,
+      "type": "water"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 5,
+      "type": "farmland"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 6,
+      "type": "farmland"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "type": "farmland"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "type": "farmland"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "type": "water"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 4,
+      "type": "water"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 5,
+      "type": "farmland"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 6,
+      "type": "farmland"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 1,
+      "type": "farmland"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 2,
+      "type": "farmland"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "type": "water"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 4,
+      "type": "water"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 5,
+      "type": "farmland"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 6,
+      "type": "farmland"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 1,
+      "type": "farmland"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 2,
+      "type": "farmland"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 3,
+      "type": "water"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 4,
+      "type": "water"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 5,
+      "type": "farmland"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 6,
+      "type": "farmland"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 1,
+      "type": "farmland"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 2,
+      "type": "farmland"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 3,
+      "type": "water"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 4,
+      "type": "water"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 5,
+      "type": "farmland"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 6,
+      "type": "farmland"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 1,
+      "type": "farmland"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 2,
+      "type": "farmland"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 3,
+      "type": "water"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 4,
+      "type": "water"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 5,
+      "type": "farmland"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 6,
+      "type": "farmland"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 1,
+      "type": "farmland"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 2,
+      "type": "farmland"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 3,
+      "type": "water"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 4,
+      "type": "water"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 5,
+      "type": "farmland"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 6,
+      "type": "farmland"
+    }
+  ]
+}

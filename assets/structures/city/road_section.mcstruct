@@ -1,0 +1,618 @@
+{
+  "name": "Road Section",
+  "author": "generator",
+  "category": "city_road",
+  "requires_flat": true,
+  "min_ground_coverage": 0.8,
+  "tags": [
+    "road",
+    "infrastructure"
+  ],
+  "size": {
+    "x": 10,
+    "y": 1,
+    "z": 10
+  },
+  "blocks": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 4,
+      "type": "gravel"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 4,
+      "type": "gravel"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 4,
+      "type": "gravel"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 4,
+      "type": "gravel"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 4,
+      "type": "gravel"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 4,
+      "type": "gravel"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 4,
+      "type": "gravel"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 4,
+      "type": "gravel"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 4,
+      "type": "gravel"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 2,
+      "type": "cobblestone"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 3,
+      "type": "cobblestone"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 4,
+      "type": "gravel"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 6,
+      "type": "cobblestone"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 7,
+      "type": "cobblestone"
+    }
+  ]
+}

@@ -1,0 +1,2563 @@
+{
+  "name": "Warehouse",
+  "author": "generator",
+  "category": "city_building",
+  "requires_flat": true,
+  "min_ground_coverage": 0.8,
+  "tags": [
+    "warehouse",
+    "storage",
+    "industrial"
+  ],
+  "size": {
+    "x": 12,
+    "y": 6,
+    "z": 10
+  },
+  "blocks": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 0,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 0,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 0,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 0,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 0,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 0,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 0,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 0,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 0,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 0,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 2,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 2,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 2,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 3,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 3,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 3,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "z": 0,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "z": 1,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "z": 2,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "z": 3,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "z": 4,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "z": 5,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "z": 6,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "z": 7,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "z": 8,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "z": 9,
+      "type": "stone_bricks"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 2,
+      "type": "oak_planks"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 2,
+      "type": "oak_planks"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 3,
+      "type": "oak_planks"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 3,
+      "type": "oak_planks"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 6,
+      "type": "oak_planks"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 6,
+      "type": "oak_planks"
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 7,
+      "type": "oak_planks"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 2,
+      "type": "oak_planks"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 2,
+      "type": "oak_planks"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 3,
+      "type": "oak_planks"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 6,
+      "type": "oak_planks"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 7,
+      "type": "oak_planks"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 7,
+      "type": "oak_planks"
+    },
+    {
+      "x": 8,
+      "y": 1,
+      "z": 2,
+      "type": "oak_planks"
+    },
+    {
+      "x": 8,
+      "y": 2,
+      "z": 2,
+      "type": "oak_planks"
+    },
+    {
+      "x": 8,
+      "y": 1,
+      "z": 3,
+      "type": "oak_planks"
+    },
+    {
+      "x": 8,
+      "y": 2,
+      "z": 3,
+      "type": "oak_planks"
+    },
+    {
+      "x": 8,
+      "y": 1,
+      "z": 6,
+      "type": "oak_planks"
+    },
+    {
+      "x": 8,
+      "y": 2,
+      "z": 6,
+      "type": "oak_planks"
+    },
+    {
+      "x": 8,
+      "y": 1,
+      "z": 7,
+      "type": "oak_planks"
+    },
+    {
+      "x": 9,
+      "y": 1,
+      "z": 2,
+      "type": "oak_planks"
+    },
+    {
+      "x": 9,
+      "y": 2,
+      "z": 2,
+      "type": "oak_planks"
+    },
+    {
+      "x": 9,
+      "y": 1,
+      "z": 3,
+      "type": "oak_planks"
+    },
+    {
+      "x": 9,
+      "y": 1,
+      "z": 6,
+      "type": "oak_planks"
+    },
+    {
+      "x": 9,
+      "y": 1,
+      "z": 7,
+      "type": "oak_planks"
+    },
+    {
+      "x": 9,
+      "y": 2,
+      "z": 7,
+      "type": "oak_planks"
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 3,
+      "type": "glowstone"
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "z": 6,
+      "type": "glowstone"
+    }
+  ]
+}
