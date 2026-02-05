@@ -222,7 +222,8 @@ void BloodSplatterSystem::render(const glm::mat4& view, const glm::mat4& project
     m_shader.unuse();
 }
 
-void BloodSplatterSystem::spawnSplatter(const glm::vec3& position, const glm::vec3& direction, float intensity) {
+void BloodSplatterSystem::spawnSplatter(const glm::vec3& position, const glm::vec3& direction, 
+                                         const glm::vec3& backSplashDir, float intensity) {
     std::uniform_real_distribution<float> angleDist(-0.5f, 0.5f);
     std::uniform_real_distribution<float> speedDist(2.0f, 6.0f);
     std::uniform_real_distribution<float> sizeDist(0.15f, 0.4f);
@@ -230,6 +231,7 @@ void BloodSplatterSystem::spawnSplatter(const glm::vec3& position, const glm::ve
     std::uniform_real_distribution<float> rotDist(0.0f, 6.28f);
     std::uniform_real_distribution<float> rotSpeedDist(-3.0f, 3.0f);
     std::uniform_real_distribution<float> frameRateDist(25.0f, 40.0f);
+    std::uniform_real_distribution<float> backSplashChance(0.0f, 1.0f);
     
     // Spawn multiple particles based on intensity
     int count = static_cast<int>(3 + intensity * 5);
@@ -260,8 +262,16 @@ void BloodSplatterSystem::spawnSplatter(const glm::vec3& position, const glm::ve
         // Initialize particle
         p->position = position;
         
-        // Spray in direction with random spread
-        glm::vec3 baseDir = glm::normalize(direction + glm::vec3(0.0f, 0.3f, 0.0f));
+        // ~15% chance for backsplash toward player (blood flying back)
+        bool isBackSplash = backSplashChance(m_rng) < 0.15f;
+        glm::vec3 baseDir;
+        if (isBackSplash) {
+            // Backsplash - blood flies back toward player, slightly upward
+            baseDir = glm::normalize(backSplashDir + glm::vec3(0.0f, 0.5f, 0.0f));
+        } else {
+            // Main spray - blood goes through entity in hit direction
+            baseDir = glm::normalize(direction + glm::vec3(0.0f, 0.3f, 0.0f));
+        }
         glm::vec3 spread(angleDist(m_rng), angleDist(m_rng), angleDist(m_rng));
         p->velocity = glm::normalize(baseDir + spread) * speedDist(m_rng) * intensity;
         

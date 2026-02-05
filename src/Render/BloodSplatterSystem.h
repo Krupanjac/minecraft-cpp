@@ -32,8 +32,9 @@ public:
     void render(const glm::mat4& view, const glm::mat4& projection, 
                 const glm::vec3& cameraRight, const glm::vec3& cameraUp);
 
-    // Spawn blood splatter at position with direction
-    void spawnSplatter(const glm::vec3& position, const glm::vec3& direction, float intensity = 1.0f);
+    // Spawn blood splatter at position with direction and backsplash
+    void spawnSplatter(const glm::vec3& position, const glm::vec3& direction, 
+                       const glm::vec3& backSplashDir, float intensity = 1.0f);
     
     // Clear all particles
     void clear();

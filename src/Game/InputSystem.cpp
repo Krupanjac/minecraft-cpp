@@ -183,9 +183,10 @@ void InputSystem::handleMouseButton(int button, int action, int /*mods*/) {
                         
                         // Spawn blood splatter at impact point
                         glm::vec3 impactPos = targetEntity->getPosition() + glm::vec3(0.0f, 0.8f, 0.0f); // Roughly center of entity
-                        glm::vec3 splatterDir = -camera.getFront(); // Blood sprays away from player
+                        glm::vec3 splatterDir = camera.getFront(); // Blood sprays in hit direction (through the entity)
+                        glm::vec3 backSplashDir = -camera.getFront(); // Occasional blood back toward player
                         float intensity = std::min(damage / 5.0f, 2.0f); // More damage = more blood
-                        bloodSplatter.spawnSplatter(impactPos, splatterDir, intensity);
+                        bloodSplatter.spawnSplatter(impactPos, splatterDir, backSplashDir, intensity);
                     }
 
                     Audio::AudioManager::instance().playSoundAt(Audio::SoundType::PLAYER_HURT, targetEntity->getPosition());
