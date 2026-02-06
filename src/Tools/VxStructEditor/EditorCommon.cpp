@@ -202,12 +202,81 @@ void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset
     };
 
     for (auto& face : faces) {
-        vertices.push_back({face.v[0] + offset, face.normal, color});
-        vertices.push_back({face.v[1] + offset, face.normal, color});
-        vertices.push_back({face.v[2] + offset, face.normal, color});
-        vertices.push_back({face.v[0] + offset, face.normal, color});
-        vertices.push_back({face.v[2] + offset, face.normal, color});
-        vertices.push_back({face.v[3] + offset, face.normal, color});
+        vertices.push_back({face.v[0] + offset, face.normal, color, {0,0}, -1.0f});
+        vertices.push_back({face.v[1] + offset, face.normal, color, {1,0}, -1.0f});
+        vertices.push_back({face.v[2] + offset, face.normal, color, {1,1}, -1.0f});
+        vertices.push_back({face.v[0] + offset, face.normal, color, {0,0}, -1.0f});
+        vertices.push_back({face.v[2] + offset, face.normal, color, {1,1}, -1.0f});
+        vertices.push_back({face.v[3] + offset, face.normal, color, {0,1}, -1.0f});
+    }
+}
+
+// Textured overload: computes atlas UVs or PBR layer per face
+void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset,
+                          const glm::vec3& color, BlockType type, int textureMode,
+                          const std::unordered_map<std::string, int>* pbrMap) {
+    struct Face {
+        glm::vec3 v[4];
+        glm::vec3 normal;
+        int faceCategory; // 0=top, 1=side, 2=bottom
+    };
+
+    Face faces[6] = {
+        // Front (+Z) → side
+        {{{0,0,1}, {1,0,1}, {1,1,1}, {0,1,1}}, {0,0,1}, 1},
+        // Back (-Z) → side
+        {{{1,0,0}, {0,0,0}, {0,1,0}, {1,1,0}}, {0,0,-1}, 1},
+        // Right (+X) → side
+        {{{1,0,1}, {1,0,0}, {1,1,0}, {1,1,1}}, {1,0,0}, 1},
+        // Left (-X) → side
+        {{{0,0,0}, {0,0,1}, {0,1,1}, {0,1,0}}, {-1,0,0}, 1},
+        // Top (+Y) → top
+        {{{0,1,1}, {1,1,1}, {1,1,0}, {0,1,0}}, {0,1,0}, 0},
+        // Bottom (-Y) → bottom
+        {{{0,0,0}, {1,0,0}, {1,0,1}, {0,0,1}}, {0,-1,0}, 2},
+    };
+
+    for (int i = 0; i < 6; i++) {
+        auto& face = faces[i];
+        glm::vec2 uv0, uv1, uv2, uv3;
+        float layer = -1.0f;
+
+        if (textureMode == 1) {
+            // Atlas mode: compute UV from atlas cell
+            int atlasIdx = getBlockTextureIndex(type, face.faceCategory);
+            float cs = 1.0f / 16.0f;
+            int col = atlasIdx % 16;
+            int row = atlasIdx / 16;
+            float u0 = col * cs;
+            float v0 = row * cs;
+            float u1 = (col + 1) * cs;
+            float v1 = (row + 1) * cs;
+            // Half-texel inset to prevent bleeding
+            float texel = 0.5f / (16.0f * 16.0f); // assuming 256px atlas (16 cells * 16px)
+            u0 += texel; v0 += texel;
+            u1 -= texel; v1 -= texel;
+            uv0 = {u0, v0};
+            uv1 = {u1, v0};
+            uv2 = {u1, v1};
+            uv3 = {u0, v1};
+        } else if (textureMode == 2 && pbrMap) {
+            // PBR mode: face UV is 0-1, layer from PBR map
+            uv0 = {0, 0};
+            uv1 = {1, 0};
+            uv2 = {1, 1};
+            uv3 = {0, 1};
+            layer = (float)getPBRTextureLayer(type, face.faceCategory, *pbrMap);
+        } else {
+            // Color-only fallback
+            uv0 = uv1 = uv2 = uv3 = {0, 0};
+        }
+
+        vertices.push_back({face.v[0] + offset, face.normal, color, uv0, layer});
+        vertices.push_back({face.v[1] + offset, face.normal, color, uv1, layer});
+        vertices.push_back({face.v[2] + offset, face.normal, color, uv2, layer});
+        vertices.push_back({face.v[0] + offset, face.normal, color, uv0, layer});
+        vertices.push_back({face.v[2] + offset, face.normal, color, uv2, layer});
+        vertices.push_back({face.v[3] + offset, face.normal, color, uv3, layer});
     }
 }
 
@@ -490,4 +559,229 @@ void EditorSettings::load(const std::string& filepath) {
         else if (key == "autoSaveIntervalSec") autoSaveIntervalSec = std::stof(val);
         else if (key.substr(0, 6) == "recent") recentFiles.push_back(val);
     }
+}
+
+// ============================================================================
+// PBR Texture Loading (simplified - albedo only for editor)
+// ============================================================================
+
+GLuint loadPBRAlbedoArray(const std::string& pbrPath, std::unordered_map<std::string, int>& nameToLayer, int& texSize) {
+    namespace fs = std::filesystem;
+    std::string texturePath = pbrPath + "/textures/block";
+
+    if (!fs::exists(texturePath)) {
+        std::cerr << "PBR texture path not found: " << texturePath << std::endl;
+        return 0;
+    }
+
+    // Collect albedo filenames (exclude _n, _s, _e suffixes)
+    std::vector<std::string> albedoFiles;
+    std::vector<std::string> albedoNames;
+
+    for (const auto& entry : fs::directory_iterator(texturePath)) {
+        if (!entry.is_regular_file()) continue;
+        std::string ext = entry.path().extension().string();
+        if (ext != ".png" && ext != ".PNG") continue;
+
+        std::string stem = entry.path().stem().string();
+        // Skip normal, specular, emissive maps
+        if (stem.size() >= 2) {
+            std::string suffix2 = stem.substr(stem.size() - 2);
+            if (suffix2 == "_n" || suffix2 == "_s" || suffix2 == "_e") continue;
+        }
+        // Also skip destroy_stage textures
+        if (stem.find("destroy_stage") != std::string::npos) continue;
+
+        albedoFiles.push_back(entry.path().string());
+        albedoNames.push_back(stem);
+    }
+
+    if (albedoFiles.empty()) {
+        std::cerr << "No PBR albedo textures found in: " << texturePath << std::endl;
+        return 0;
+    }
+
+    // Sort for deterministic ordering
+    std::vector<size_t> indices(albedoFiles.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(), [&](size_t a, size_t b) {
+        return albedoNames[a] < albedoNames[b];
+    });
+
+    // Detect texture size from first file
+    int w, h, ch;
+    stbi_set_flip_vertically_on_load(false);
+    unsigned char* probe = stbi_load(albedoFiles[indices[0]].c_str(), &w, &h, &ch, 4);
+    if (!probe) {
+        std::cerr << "Failed to load first PBR texture for size detection" << std::endl;
+        return 0;
+    }
+    texSize = std::min(w, h); // Use the smaller dimension as the target size
+    // Clamp to reasonable editor size (max 128 to save VRAM)
+    if (texSize > 128) texSize = 128;
+    stbi_image_free(probe);
+
+    int layerCount = (int)albedoFiles.size();
+
+    // Create texture array
+    GLuint texArray;
+    glGenTextures(1, &texArray);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, texArray);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, texSize, texSize, layerCount, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+    // Load each texture into a layer
+    nameToLayer.clear();
+    int layer = 0;
+    for (size_t idx : indices) {
+        int tw, th, tc;
+        unsigned char* data = stbi_load(albedoFiles[idx].c_str(), &tw, &th, &tc, 4);
+        if (!data) {
+            // Fill with magenta for missing textures
+            std::vector<unsigned char> fallback(texSize * texSize * 4, 255);
+            for (int p = 0; p < texSize * texSize; p++) {
+                fallback[p * 4 + 1] = 0; // magenta = (255,0,255,255)
+                fallback[p * 4 + 3] = 255;
+            }
+            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, texSize, texSize, 1,
+                           GL_RGBA, GL_UNSIGNED_BYTE, fallback.data());
+        } else {
+            if (tw == texSize && th == texSize) {
+                glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, texSize, texSize, 1,
+                               GL_RGBA, GL_UNSIGNED_BYTE, data);
+            } else {
+                // Simple nearest-neighbor resize
+                std::vector<unsigned char> resized(texSize * texSize * 4);
+                for (int y = 0; y < texSize; y++) {
+                    for (int x = 0; x < texSize; x++) {
+                        int sx = x * tw / texSize;
+                        int sy = y * th / texSize;
+                        int srcIdx = (sy * tw + sx) * 4;
+                        int dstIdx = (y * texSize + x) * 4;
+                        resized[dstIdx + 0] = data[srcIdx + 0];
+                        resized[dstIdx + 1] = data[srcIdx + 1];
+                        resized[dstIdx + 2] = data[srcIdx + 2];
+                        resized[dstIdx + 3] = data[srcIdx + 3];
+                    }
+                }
+                glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, texSize, texSize, 1,
+                               GL_RGBA, GL_UNSIGNED_BYTE, resized.data());
+            }
+            stbi_image_free(data);
+        }
+        nameToLayer[albedoNames[idx]] = layer;
+        layer++;
+    }
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+
+    std::cout << "Loaded " << layerCount << " PBR albedo textures (" << texSize << "x" << texSize << ")" << std::endl;
+    return texArray;
+}
+
+// Map BlockType + face → PBR texture name
+static std::string getPBRTextureName(BlockType type, int face) {
+    // face: 0=top, 1=side, 2=bottom
+    switch (type) {
+        case BlockType::GRASS:
+            return (face == 0) ? "grass_block_top" : (face == 2) ? "dirt" : "dirt";
+        case BlockType::DIRT:          return "dirt";
+        case BlockType::STONE:         return "stone";
+        case BlockType::SAND:          return "sand";
+        case BlockType::GRAVEL:        return "gravel";
+        case BlockType::SNOW:          return "snow";
+        case BlockType::ICE:           return "ice";
+        case BlockType::BEDROCK:       return "bedrock";
+        case BlockType::SANDSTONE:
+            return (face == 1) ? "sandstone" : "sandstone_top";
+        case BlockType::COBBLESTONE:   return "cobblestone";
+        case BlockType::CLAY:          return "clay";
+        case BlockType::COAL_ORE:      return "coal_ore";
+        case BlockType::IRON_ORE:      return "iron_ore";
+        case BlockType::GOLD_ORE:      return "gold_ore";
+        case BlockType::DIAMOND_ORE:   return "diamond_ore";
+        case BlockType::EMERALD_ORE:   return "emerald_ore";
+        case BlockType::REDSTONE_ORE:  return "redstone_ore";
+        case BlockType::LAPIS_ORE:     return "lapis_ore";
+        case BlockType::IRON_BLOCK:    return "iron_block";
+        case BlockType::GOLD_BLOCK:    return "gold_block";
+        case BlockType::DIAMOND_BLOCK: return "diamond_block";
+        case BlockType::EMERALD_BLOCK: return "emerald_block";
+        case BlockType::REDSTONE_BLOCK:return "redstone_block";
+        case BlockType::BRICKS:        return "bricks";
+        case BlockType::STONE_BRICKS:  return "stone_bricks";
+        case BlockType::MOSSY_STONE_BRICKS:    return "mossy_stone_bricks";
+        case BlockType::CRACKED_STONE_BRICKS:  return "cracked_stone_bricks";
+        case BlockType::CHISELED_STONE_BRICKS: return "chiseled_stone_bricks";
+        case BlockType::MOSSY_COBBLESTONE:     return "mossy_cobblestone";
+        case BlockType::GLASS:         return "glass";
+        case BlockType::OBSIDIAN:      return "obsidian";
+        case BlockType::BOOKSHELF:
+            return (face == 1) ? "bookshelf" : "oak_planks";
+        case BlockType::TNT:
+            return (face == 0) ? "tnt_top" : (face == 2) ? "tnt_bottom" : "tnt_side";
+        case BlockType::GLOWSTONE:     return "glowstone";
+        case BlockType::REDSTONE_LAMP: return "redstone_lamp_on";
+        case BlockType::OAK_PLANKS:    return "oak_planks";
+        case BlockType::SPRUCE_PLANKS: return "spruce_planks";
+        case BlockType::BIRCH_PLANKS:  return "birch_planks";
+        case BlockType::JUNGLE_PLANKS: return "jungle_planks";
+        case BlockType::OAK_LOG:
+            return (face == 1) ? "oak_log" : "oak_log_top";
+        case BlockType::SPRUCE_LOG:
+            return (face == 1) ? "spruce_log" : "spruce_log_top";
+        case BlockType::BIRCH_LOG:
+            return (face == 1) ? "birch_log" : "birch_log_top";
+        case BlockType::JUNGLE_LOG:
+            return (face == 1) ? "jungle_log" : "jungle_log_top";
+        case BlockType::OAK_LEAVES:    return "oak_leaves";
+        case BlockType::SPRUCE_LEAVES: return "spruce_leaves";
+        case BlockType::BIRCH_LEAVES:  return "birch_leaves";
+        case BlockType::JUNGLE_LEAVES: return "jungle_leaves";
+        case BlockType::TALL_GRASS:    return "grass";
+        case BlockType::ROSE:          return "dandelion";
+        case BlockType::SUGAR_CANE:    return "sugar_cane";
+        case BlockType::WHITE_WOOL:    return "white_wool";
+        case BlockType::ORANGE_WOOL:   return "orange_wool";
+        case BlockType::MAGENTA_WOOL:  return "magenta_wool";
+        case BlockType::LIGHT_BLUE_WOOL: return "light_blue_wool";
+        case BlockType::YELLOW_WOOL:   return "white_wool"; // fallback
+        case BlockType::LIME_WOOL:     return "lime_wool";
+        case BlockType::PINK_WOOL:     return "pink_wool";
+        case BlockType::GRAY_WOOL:     return "gray_wool";
+        case BlockType::LIGHT_GRAY_WOOL: return "light_gray_wool";
+        case BlockType::CYAN_WOOL:     return "cyan_wool";
+        case BlockType::PURPLE_WOOL:   return "purple_wool";
+        case BlockType::BLUE_WOOL:     return "blue_wool";
+        case BlockType::BROWN_WOOL:    return "brown_wool";
+        case BlockType::GREEN_WOOL:    return "green_wool";
+        case BlockType::RED_WOOL:      return "red_wool";
+        case BlockType::BLACK_WOOL:    return "black_wool";
+        case BlockType::CRAFTING_TABLE:
+            return (face == 0) ? "crafting_table_top" : (face == 1) ? "crafting_table_side" : "oak_planks";
+        case BlockType::NOTE_BLOCK:    return "note_block";
+        case BlockType::JUKEBOX:
+            return (face == 0) ? "jukebox_top" : "note_block";
+        case BlockType::SPONGE:        return "sponge";
+        case BlockType::COBWEB:        return "cobweb";
+        case BlockType::FARMLAND:
+            return (face == 0) ? "farmland" : "dirt";
+        case BlockType::WATER:         return "ice"; // placeholder
+        default: return "stone";
+    }
+}
+
+int getPBRTextureLayer(BlockType type, int face, const std::unordered_map<std::string, int>& nameToLayer) {
+    std::string name = getPBRTextureName(type, face);
+    auto it = nameToLayer.find(name);
+    if (it != nameToLayer.end()) return it->second;
+    // Fallback: try stone
+    it = nameToLayer.find("stone");
+    if (it != nameToLayer.end()) return it->second;
+    return 0;
 }

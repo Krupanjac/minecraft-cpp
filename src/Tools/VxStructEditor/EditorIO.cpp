@@ -169,6 +169,18 @@ void VxStructEditor::autoSave() {
     }
 }
 
+void VxStructEditor::updateTextureMode() {
+    if (m_settings.usePBRTextures && m_pbrAlbedoArray) {
+        m_textureMode = 2; // PBR
+    } else if (m_atlasTexture) {
+        m_textureMode = 1; // Atlas
+    } else {
+        m_textureMode = 0; // Color only
+    }
+    // Rebuild mesh with new texture mode UVs
+    rebuildBlockMesh();
+}
+
 // ============================================================================
 // GLFW Callbacks
 // ============================================================================

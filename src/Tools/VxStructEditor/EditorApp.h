@@ -134,6 +134,12 @@ private:
     // --- Block atlas texture ---
     GLuint m_atlasTexture = 0;
 
+    // --- PBR textures (albedo array) ---
+    GLuint m_pbrAlbedoArray = 0;
+    std::unordered_map<std::string, int> m_pbrTextureMap;
+    int m_pbrTexSize = 0;
+    int m_textureMode = 0; // 0=color, 1=atlas, 2=PBR
+
     // --- Settings & auto-save ---
     EditorSettings m_settings;
     std::string m_settingsFilePath = "editor_settings.ini";
@@ -184,6 +190,7 @@ private:
     void exportStructure();
     void openRecentFile(const std::string& path);
     void autoSave();
+    void updateTextureMode();
 
     // ---- Undo/Redo ----
     void pushAction(const EditorAction& action);

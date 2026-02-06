@@ -135,6 +135,12 @@ bool VxStructEditor::initialize() {
     // Load block atlas texture for palette
     m_atlasTexture = loadBlockAtlasTexture("assets/block_atlas.png");
 
+    // Load PBR albedo textures
+    m_pbrAlbedoArray = loadPBRAlbedoArray("assets/pbr", m_pbrTextureMap, m_pbrTexSize);
+
+    // Set texture mode from settings
+    updateTextureMode();
+
     // Initialize auto-save timer
     m_lastAutoSaveTime = glfwGetTime();
 
@@ -177,6 +183,7 @@ void VxStructEditor::cleanup() {
     m_settings.save(m_settingsFilePath);
 
     if (m_atlasTexture) glDeleteTextures(1, &m_atlasTexture);
+    if (m_pbrAlbedoArray) glDeleteTextures(1, &m_pbrAlbedoArray);
     if (m_blockVAO) glDeleteVertexArrays(1, &m_blockVAO);
     if (m_blockVBO) glDeleteBuffers(1, &m_blockVBO);
     if (m_gridVAO) glDeleteVertexArrays(1, &m_gridVAO);
@@ -337,7 +344,13 @@ void VxStructEditor::rebuildBlockMesh() {
         if (m_currentLayer >= 0 && block.position.y != m_currentLayer) continue;
 
         glm::vec3 color = getBlockColor(block.type);
-        generateCubeVertices(vertices, glm::vec3(block.position), color);
+        if (m_textureMode > 0) {
+            generateCubeVertices(vertices, glm::vec3(block.position), color,
+                                block.type, m_textureMode,
+                                m_textureMode == 2 ? &m_pbrTextureMap : nullptr);
+        } else {
+            generateCubeVertices(vertices, glm::vec3(block.position), color);
+        }
     }
 
     m_blockVertexCount = (int)vertices.size();
@@ -346,15 +359,21 @@ void VxStructEditor::rebuildBlockMesh() {
     glBindBuffer(GL_ARRAY_BUFFER, m_blockVBO);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_DYNAMIC_DRAW);
 
-    // Position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+    // Position (location 0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
     glEnableVertexAttribArray(0);
-    // Normal
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(glm::vec3)));
+    // Normal (location 1)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
     glEnableVertexAttribArray(1);
-    // Color
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(2 * sizeof(glm::vec3)));
+    // Color (location 2)
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
     glEnableVertexAttribArray(2);
+    // UV (location 3)
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, uv));
+    glEnableVertexAttribArray(3);
+    // TexLayer (location 4)
+    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texLayer));
+    glEnableVertexAttribArray(4);
 
     glBindVertexArray(0);
 }

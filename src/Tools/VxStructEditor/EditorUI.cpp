@@ -264,6 +264,7 @@ void VxStructEditor::renderBlockPalette() {
         ImGui::PushID(static_cast<int>(info.type));
 
         bool useTexture = (m_atlasTexture != 0 && m_settings.showTexturesInPalette);
+        // Note: Palette always uses atlas thumbnails; 3D blocks use atlas or PBR per settings
 
         if (isSelected) {
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 3.0f);
@@ -698,12 +699,20 @@ void VxStructEditor::renderSettingsWindow() {
             bool pbr = m_settings.usePBRTextures;
             if (ImGui::RadioButton("Block Atlas (16x16 grid)", !pbr)) {
                 m_settings.usePBRTextures = false;
+                updateTextureMode();
             }
             if (ImGui::RadioButton("PBR Textures (individual files)", pbr)) {
                 m_settings.usePBRTextures = true;
+                updateTextureMode();
             }
             if (m_settings.usePBRTextures) {
-                ImGui::TextDisabled("  PBR textures loaded from assets/pbr/textures/block/");
+                if (m_pbrAlbedoArray) {
+                    ImGui::TextDisabled("  PBR textures loaded (%d textures, %dx%d)",
+                        (int)m_pbrTextureMap.size(), m_pbrTexSize, m_pbrTexSize);
+                } else {
+                    ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "  PBR textures not found!");
+                    ImGui::TextDisabled("  Expected at assets/pbr/textures/block/");
+                }
             } else {
                 ImGui::TextDisabled("  Atlas loaded from assets/block_atlas.png");
             }

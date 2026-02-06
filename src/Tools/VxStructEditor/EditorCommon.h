@@ -37,6 +37,8 @@
 #include <deque>
 #include <set>
 #include <chrono>
+#include <unordered_map>
+#include <numeric>
 #include <stb_image.h>
 
 // ============================================================================
@@ -75,6 +77,13 @@ int getBlockTextureIndex(BlockType type, int face = 1); // face: 0=top,1=side,2=
 GLuint loadBlockAtlasTexture(const std::string& path);  // returns GL texture ID
 
 // ============================================================================
+// PBR Texture Loading (simplified - albedo only for editor)
+// ============================================================================
+
+GLuint loadPBRAlbedoArray(const std::string& pbrPath, std::unordered_map<std::string, int>& nameToLayer, int& texSize);
+int getPBRTextureLayer(BlockType type, int face, const std::unordered_map<std::string, int>& nameToLayer);
+
+// ============================================================================
 // Block Color Database
 // ============================================================================
 
@@ -104,9 +113,17 @@ struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec3 color;
+    glm::vec2 uv;        // Atlas UV coords (atlas mode) or 0-1 face UV (PBR mode)
+    float texLayer;      // PBR texture array layer index; -1 if unused
 };
 
+// Generate cube vertices with flat color only (textureMode=0)
 void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset, const glm::vec3& color);
+
+// Generate cube vertices with texture UVs (textureMode: 0=color, 1=atlas, 2=PBR)
+void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset,
+                          const glm::vec3& color, BlockType type, int textureMode,
+                          const std::unordered_map<std::string, int>* pbrMap = nullptr);
 
 // ============================================================================
 // Orbit Camera

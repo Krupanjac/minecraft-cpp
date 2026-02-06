@@ -37,9 +37,28 @@ void VxStructEditor::render() {
         glm::vec3 camPos = m_camera.getPosition();
         glUniform3f(glGetUniformLocation(m_blockShader, "uViewPos"), camPos.x, camPos.y, camPos.z);
         glUniform1f(glGetUniformLocation(m_blockShader, "uHighlight"), 0.0f);
+        glUniform1i(glGetUniformLocation(m_blockShader, "uTextureMode"), m_textureMode);
+
+        // Bind textures based on mode
+        if (m_textureMode == 1 && m_atlasTexture) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, m_atlasTexture);
+            glUniform1i(glGetUniformLocation(m_blockShader, "uTexture"), 0);
+        } else if (m_textureMode == 2 && m_pbrAlbedoArray) {
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D_ARRAY, m_pbrAlbedoArray);
+            glUniform1i(glGetUniformLocation(m_blockShader, "uAlbedoArray"), 1);
+        }
+
         glBindVertexArray(m_blockVAO);
         glDrawArrays(GL_TRIANGLES, 0, m_blockVertexCount);
         glBindVertexArray(0);
+
+        // Unbind textures
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
     // Draw wireframe overlay on blocks
