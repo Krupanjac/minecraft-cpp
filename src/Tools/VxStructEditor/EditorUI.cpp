@@ -232,7 +232,7 @@ void VxStructEditor::renderBlockPalette() {
     ImGui::InputTextWithHint("##filter", "Search blocks...", filterBuf, sizeof(filterBuf));
     std::string filter = filterBuf;
 
-    static const char* categories[] = {"All", "Natural", "Wood", "Nature", "Building", "Ore", "Mineral", "Wool", "Functional", "Liquid"};
+    static const char* categories[] = {"All", "Natural", "Wood", "Nature", "Building", "Ore", "Mineral", "Wool", "Functional", "Road", "Liquid"};
 
     if (ImGui::BeginTabBar("Categories")) {
         for (const char* cat : categories) {

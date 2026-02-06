@@ -157,6 +157,7 @@ inline void BlockPhysicsDatabase::initializeData() {
             1.25f, 4.5f, 2.2f, 0.8f, 0.1f, false, 0.0f, true, false, false, true, 8.0f
         };
         BlockType roadTypes[] = {
+            BlockType::GLAZED_TERRACOTTA,
             BlockType::ROAD_STRAIGHT, BlockType::ROAD_LEFT, BlockType::ROAD_RIGHT,
             BlockType::ROAD_LEFT_RIGHT, BlockType::ROAD_T_JUNCTION, BlockType::ROAD_INTERSECTION_YELLOW,
             BlockType::ROAD_MIDDLE_LINES, BlockType::ROAD_MIDDLE_LINES_YELLOW,

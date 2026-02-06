@@ -370,6 +370,7 @@ int UIManager::getBlockTextureIndex(BlockType type, int face) {
         case BlockType::ROAD_LEFT_DIAG_60_YELLOW:
         case BlockType::ROAD_RIGHT_DIAG_60:
         case BlockType::ROAD_RIGHT_DIAG_YELLOW:
+        case BlockType::GLAZED_TERRACOTTA:
             return 1;                      // Stone placeholder for atlas
             
         default:
@@ -642,6 +643,7 @@ std::string UIManager::getBlockName(BlockType type) {
         case BlockType::SUGAR_CANE: return "Sugar Cane";
         
         // Road blocks
+        case BlockType::GLAZED_TERRACOTTA: return "Glazed Terracotta";
         case BlockType::ROAD_STRAIGHT: return "Road Straight";
         case BlockType::ROAD_LEFT: return "Road Left";
         case BlockType::ROAD_RIGHT: return "Road Right";

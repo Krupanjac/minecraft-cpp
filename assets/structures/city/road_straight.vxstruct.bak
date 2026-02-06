@@ -1,0 +1,329 @@
+{
+  "author": "system",
+  "blocks": [
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "unknown",
+      "x": 1,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "unknown",
+      "x": 2,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "unknown",
+      "x": 3,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "unknown",
+      "x": 4,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "unknown",
+      "x": 1,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "unknown",
+      "x": 2,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "unknown",
+      "x": 3,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "unknown",
+      "x": 4,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "unknown",
+      "x": 1,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "unknown",
+      "x": 2,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "unknown",
+      "x": 4,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "unknown",
+      "x": 1,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "unknown",
+      "x": 2,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "unknown",
+      "x": 4,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "unknown",
+      "x": 1,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "unknown",
+      "x": 2,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "unknown",
+      "x": 3,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "unknown",
+      "x": 4,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "unknown",
+      "x": 1,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "unknown",
+      "x": 2,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "unknown",
+      "x": 3,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "unknown",
+      "x": 4,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "unknown",
+      "x": 1,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "unknown",
+      "x": 2,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "unknown",
+      "x": 3,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "unknown",
+      "x": 4,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "unknown",
+      "x": 3,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "unknown",
+      "x": 3,
+      "y": 0,
+      "z": 2
+    }
+  ],
+  "category": "city_road",
+  "markers": [
+    {
+      "data": "north",
+      "type": "road_connection",
+      "x": 3,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "data": "south",
+      "type": "road_connection",
+      "x": 3,
+      "y": 0,
+      "z": 6
+    }
+  ],
+  "min_ground_coverage": 0.5,
+  "name": "City Road Straight",
+  "requires_flat": false,
+  "size": {
+    "x": 7,
+    "y": 1,
+    "z": 7
+  },
+  "tags": [
+    "road",
+    "path",
+    "connector"
+  ]
+}

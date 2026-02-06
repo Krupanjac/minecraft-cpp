@@ -1,64 +1,314 @@
 {
-  "name": "City Road Turn",
   "author": "system",
-  "category": "city_road",
-  "requires_flat": false,
-  "min_ground_coverage": 0.5,
-  "tags": [ "road", "turn", "connector" ],
-  "size": { "x": 7, "y": 1, "z": 7 },
   "blocks": [
-    { "x": 0, "y": 0, "z": 0, "type": "stone_bricks" },
-    { "x": 1, "y": 0, "z": 0, "type": "stone_bricks" },
-    { "x": 2, "y": 0, "z": 0, "type": "stone_bricks" },
-    { "x": 3, "y": 0, "z": 0, "type": "stone_bricks" },
-    { "x": 4, "y": 0, "z": 0, "type": "stone_bricks" },
-    { "x": 5, "y": 0, "z": 0, "type": "stone_bricks" },
-    { "x": 6, "y": 0, "z": 0, "type": "stone_bricks" },
-    { "x": 0, "y": 0, "z": 1, "type": "stone_bricks" },
-    { "x": 0, "y": 0, "z": 2, "type": "stone_bricks" },
-    { "x": 0, "y": 0, "z": 3, "type": "stone_bricks" },
-    { "x": 0, "y": 0, "z": 4, "type": "stone_bricks" },
-    { "x": 0, "y": 0, "z": 5, "type": "stone_bricks" },
-    { "x": 0, "y": 0, "z": 6, "type": "stone_bricks" },
-    { "x": 6, "y": 0, "z": 6, "type": "stone_bricks" },
-    { "x": 1, "y": 0, "z": 1, "type": "cobblestone" },
-    { "x": 2, "y": 0, "z": 1, "type": "cobblestone" },
-    { "x": 3, "y": 0, "z": 1, "type": "cobblestone" },
-    { "x": 4, "y": 0, "z": 1, "type": "cobblestone" },
-    { "x": 5, "y": 0, "z": 1, "type": "cobblestone" },
-    { "x": 6, "y": 0, "z": 1, "type": "cobblestone" },
-    { "x": 1, "y": 0, "z": 2, "type": "cobblestone" },
-    { "x": 2, "y": 0, "z": 2, "type": "cobblestone" },
-    { "x": 3, "y": 0, "z": 2, "type": "cobblestone" },
-    { "x": 4, "y": 0, "z": 2, "type": "cobblestone" },
-    { "x": 5, "y": 0, "z": 2, "type": "cobblestone" },
-    { "x": 6, "y": 0, "z": 2, "type": "cobblestone" },
-    { "x": 1, "y": 0, "z": 3, "type": "cobblestone" },
-    { "x": 2, "y": 0, "z": 3, "type": "cobblestone" },
-    { "x": 3, "y": 0, "z": 3, "type": "gravel" },
-    { "x": 4, "y": 0, "z": 3, "type": "cobblestone" },
-    { "x": 5, "y": 0, "z": 3, "type": "cobblestone" },
-    { "x": 6, "y": 0, "z": 3, "type": "cobblestone" },
-    { "x": 1, "y": 0, "z": 4, "type": "cobblestone" },
-    { "x": 2, "y": 0, "z": 4, "type": "cobblestone" },
-    { "x": 3, "y": 0, "z": 4, "type": "cobblestone" },
-    { "x": 4, "y": 0, "z": 4, "type": "cobblestone" },
-    { "x": 5, "y": 0, "z": 4, "type": "cobblestone" },
-    { "x": 6, "y": 0, "z": 4, "type": "cobblestone" },
-    { "x": 1, "y": 0, "z": 5, "type": "cobblestone" },
-    { "x": 2, "y": 0, "z": 5, "type": "cobblestone" },
-    { "x": 3, "y": 0, "z": 5, "type": "cobblestone" },
-    { "x": 4, "y": 0, "z": 5, "type": "cobblestone" },
-    { "x": 5, "y": 0, "z": 5, "type": "cobblestone" },
-    { "x": 6, "y": 0, "z": 5, "type": "cobblestone" },
-    { "x": 1, "y": 0, "z": 6, "type": "cobblestone" },
-    { "x": 2, "y": 0, "z": 6, "type": "cobblestone" },
-    { "x": 3, "y": 0, "z": 6, "type": "cobblestone" },
-    { "x": 4, "y": 0, "z": 6, "type": "cobblestone" },
-    { "x": 5, "y": 0, "z": 6, "type": "cobblestone" }
+    {
+      "type": "glazed_terracotta",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "road_middle_lines",
+      "x": 1,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "road_straight",
+      "x": 2,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "road_straight",
+      "x": 4,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "road_middle_lines",
+      "x": 5,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 6,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "road_middle_lines",
+      "x": 0,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "road_left",
+      "x": 1,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "road_straight",
+      "x": 2,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "road_straight",
+      "x": 4,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "road_right",
+      "x": 5,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "road_middle_lines",
+      "x": 6,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 1,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 2,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 3,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 4,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 5,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "road_straight",
+      "x": 6,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 1,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 2,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "road_intersection_yellow",
+      "x": 3,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 4,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 5,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 1,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 2,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 3,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 4,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 5,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "road_straight",
+      "x": 6,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "road_middle_lines",
+      "x": 0,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "road_left",
+      "x": 1,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "road_straight",
+      "x": 2,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "road_straight",
+      "x": 4,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "road_right",
+      "x": 5,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "road_middle_lines",
+      "x": 6,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 0,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "road_middle_lines",
+      "x": 1,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "road_straight",
+      "x": 2,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "road_straight",
+      "x": 4,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "road_middle_lines",
+      "x": 5,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 6,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "road_middle_lines_yellow",
+      "x": 3,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "road_middle_lines_yellow",
+      "x": 3,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "road_straight",
+      "x": 0,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "road_straight",
+      "x": 0,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "road_middle_lines_yellow",
+      "x": 0,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "road_middle_lines_yellow",
+      "x": 6,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "road_straight",
+      "x": 3,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "road_straight",
+      "x": 3,
+      "y": 0,
+      "z": 5
+    }
   ],
-  "markers": [
-    { "type": "road_connection", "data": "north", "x": 3, "y": 0, "z": 0 },
-    { "type": "road_connection", "data": "east", "x": 6, "y": 0, "z": 3 }
+  "category": "city_road",
+  "markers": [],
+  "min_ground_coverage": 0.5,
+  "name": "City Road Turn",
+  "requires_flat": false,
+  "size": {
+    "x": 7,
+    "y": 1,
+    "z": 7
+  },
+  "tags": [
+    "road",
+    "turn",
+    "connector"
   ]
 }

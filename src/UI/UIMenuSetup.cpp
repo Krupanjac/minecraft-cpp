@@ -1167,6 +1167,7 @@ void UIManager::setupInventoryMenu() {
         BlockType::FARMLAND,
         
         // Road blocks
+        BlockType::GLAZED_TERRACOTTA,
         BlockType::ROAD_STRAIGHT, BlockType::ROAD_LEFT, BlockType::ROAD_RIGHT,
         BlockType::ROAD_LEFT_RIGHT, BlockType::ROAD_T_JUNCTION, BlockType::ROAD_INTERSECTION_YELLOW,
         BlockType::ROAD_MIDDLE_LINES, BlockType::ROAD_MIDDLE_LINES_YELLOW,

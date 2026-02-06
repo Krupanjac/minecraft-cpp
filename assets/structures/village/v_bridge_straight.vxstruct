@@ -1,0 +1,329 @@
+{
+  "author": "system",
+  "blocks": [
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "oak_log",
+      "x": 1,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "oak_log",
+      "x": 1,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "oak_log",
+      "x": 1,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 1,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "oak_log",
+      "x": 1,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 1,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "oak_log",
+      "x": 1,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "oak_log",
+      "x": 3,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "oak_log",
+      "x": 3,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "oak_log",
+      "x": 3,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 3,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "oak_log",
+      "x": 3,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 3,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "oak_log",
+      "x": 3,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "oak_log",
+      "x": 5,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "oak_log",
+      "x": 5,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "oak_log",
+      "x": 5,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 5,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "oak_log",
+      "x": 5,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 5,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "oak_log",
+      "x": 5,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 6
+    }
+  ],
+  "category": "village_path",
+  "markers": [
+    {
+      "data": "north",
+      "type": "road_connection",
+      "x": 3,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "data": "south",
+      "type": "road_connection",
+      "x": 3,
+      "y": 0,
+      "z": 6
+    }
+  ],
+  "min_ground_coverage": 0.0,
+  "name": "Village Bridge Straight",
+  "requires_flat": false,
+  "size": {
+    "x": 7,
+    "y": 1,
+    "z": 7
+  },
+  "tags": [
+    "road",
+    "bridge",
+    "connector"
+  ]
+}

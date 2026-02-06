@@ -31,6 +31,7 @@ glm::vec4 UIManager::getBlockColor(BlockType type) {
         case BlockType::TALL_GRASS: return glm::vec4(0.2f, 0.6f, 0.2f, 1.0f);
         case BlockType::ROSE: return glm::vec4(0.9f, 0.1f, 0.1f, 1.0f);
         case BlockType::BEDROCK: return glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
+        case BlockType::GLAZED_TERRACOTTA: return glm::vec4(0.55f, 0.42f, 0.35f, 1.0f);
         default: return glm::vec4(1.0f, 0.0f, 1.0f, 1.0f); 
     }
 }

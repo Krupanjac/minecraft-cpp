@@ -1,5 +1,5 @@
 {
-  "author": "system",
+  "author": "generator",
   "blocks": [
     {
       "type": "stone_bricks",
@@ -62,541 +62,505 @@
       "z": 9
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 1,
       "y": 0,
       "z": 0
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 1,
       "y": 0,
       "z": 1
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 1,
       "y": 0,
       "z": 2
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 1,
       "y": 0,
       "z": 3
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 1,
       "y": 0,
       "z": 4
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 1,
       "y": 0,
       "z": 5
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 1,
       "y": 0,
       "z": 6
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 1,
       "y": 0,
       "z": 7
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 1,
       "y": 0,
       "z": 8
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 1,
       "y": 0,
       "z": 9
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 2,
       "y": 0,
       "z": 0
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 2,
       "y": 0,
       "z": 1
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 2,
       "y": 0,
       "z": 2
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 2,
       "y": 0,
       "z": 3
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 2,
       "y": 0,
       "z": 4
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 2,
       "y": 0,
       "z": 5
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 2,
       "y": 0,
       "z": 6
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 2,
       "y": 0,
       "z": 7
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 2,
       "y": 0,
       "z": 8
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 2,
       "y": 0,
       "z": 9
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 3,
       "y": 0,
       "z": 0
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 3,
       "y": 0,
       "z": 1
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 3,
       "y": 0,
       "z": 2
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 3,
       "y": 0,
       "z": 3
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 3,
       "y": 0,
       "z": 4
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 3,
       "y": 0,
       "z": 5
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 3,
       "y": 0,
       "z": 6
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 3,
       "y": 0,
       "z": 7
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 3,
       "y": 0,
       "z": 8
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 3,
       "y": 0,
       "z": 9
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 4,
       "y": 0,
       "z": 0
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 4,
       "y": 0,
       "z": 1
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 4,
       "y": 0,
       "z": 2
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 4,
       "y": 0,
       "z": 3
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 4,
       "y": 0,
       "z": 4
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 4,
       "y": 0,
       "z": 5
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 4,
       "y": 0,
       "z": 6
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 4,
       "y": 0,
       "z": 7
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 4,
       "y": 0,
       "z": 8
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 4,
       "y": 0,
       "z": 9
     },
     {
-      "type": "road_middle_lines_yellow",
+      "type": "unknown",
       "x": 5,
       "y": 0,
       "z": 0
     },
     {
-      "type": "road_middle_lines_yellow",
+      "type": "unknown",
       "x": 5,
       "y": 0,
       "z": 1
     },
     {
-      "type": "road_middle_lines_yellow",
-      "x": 5,
-      "y": 0,
-      "z": 2
-    },
-    {
-      "type": "road_middle_lines_yellow",
-      "x": 5,
-      "y": 0,
-      "z": 3
-    },
-    {
-      "type": "road_middle_lines_yellow",
-      "x": 5,
-      "y": 0,
-      "z": 4
-    },
-    {
-      "type": "road_middle_lines_yellow",
-      "x": 5,
-      "y": 0,
-      "z": 5
-    },
-    {
-      "type": "road_middle_lines_yellow",
-      "x": 5,
-      "y": 0,
-      "z": 6
-    },
-    {
-      "type": "road_middle_lines_yellow",
-      "x": 5,
-      "y": 0,
-      "z": 7
-    },
-    {
-      "type": "road_middle_lines_yellow",
+      "type": "unknown",
       "x": 5,
       "y": 0,
       "z": 8
     },
     {
-      "type": "road_middle_lines_yellow",
+      "type": "unknown",
       "x": 5,
       "y": 0,
       "z": 9
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 6,
       "y": 0,
       "z": 0
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 6,
       "y": 0,
       "z": 1
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 6,
       "y": 0,
       "z": 2
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 6,
       "y": 0,
       "z": 3
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 6,
       "y": 0,
       "z": 4
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 6,
       "y": 0,
       "z": 5
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 6,
       "y": 0,
       "z": 6
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 6,
       "y": 0,
       "z": 7
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 6,
       "y": 0,
       "z": 8
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 6,
       "y": 0,
       "z": 9
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 7,
       "y": 0,
       "z": 0
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 7,
       "y": 0,
       "z": 1
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 7,
       "y": 0,
       "z": 2
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 7,
       "y": 0,
       "z": 3
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 7,
       "y": 0,
       "z": 4
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 7,
       "y": 0,
       "z": 5
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 7,
       "y": 0,
       "z": 6
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 7,
       "y": 0,
       "z": 7
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 7,
       "y": 0,
       "z": 8
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 7,
       "y": 0,
       "z": 9
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 8,
       "y": 0,
       "z": 0
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 8,
       "y": 0,
       "z": 1
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 8,
       "y": 0,
       "z": 2
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 8,
       "y": 0,
       "z": 3
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 8,
       "y": 0,
       "z": 4
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 8,
       "y": 0,
       "z": 5
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 8,
       "y": 0,
       "z": 6
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 8,
       "y": 0,
       "z": 7
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 8,
       "y": 0,
       "z": 8
     },
     {
-      "type": "glazed_terracotta",
+      "type": "unknown",
       "x": 8,
       "y": 0,
       "z": 9
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 9,
       "y": 0,
       "z": 0
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 9,
       "y": 0,
       "z": 1
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 9,
       "y": 0,
       "z": 2
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 9,
       "y": 0,
       "z": 3
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 9,
       "y": 0,
       "z": 4
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 9,
       "y": 0,
       "z": 5
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 9,
       "y": 0,
       "z": 6
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 9,
       "y": 0,
       "z": 7
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 9,
       "y": 0,
       "z": 8
     },
     {
-      "type": "road_middle_lines",
+      "type": "stone_bricks",
       "x": 9,
       "y": 0,
       "z": 9
@@ -660,6 +624,42 @@
       "x": 10,
       "y": 0,
       "z": 9
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 7
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "unknown",
+      "x": 5,
+      "y": 0,
+      "z": 2
     }
   ],
   "category": "city_road",

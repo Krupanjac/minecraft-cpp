@@ -104,6 +104,7 @@ const std::vector<BlockColorInfo>& getBlockPalette() {
         {BlockType::WATER,           "Water",             {0.15f, 0.35f, 0.75f}, "Liquid"},
 
         // Road blocks
+        {BlockType::GLAZED_TERRACOTTA,       "Glazed Terracotta",  {0.55f, 0.42f, 0.35f}, "Road"},
         {BlockType::ROAD_STRAIGHT,           "Road Straight",      {0.35f, 0.35f, 0.38f}, "Road"},
         {BlockType::ROAD_LEFT,               "Road Left",          {0.35f, 0.35f, 0.38f}, "Road"},
         {BlockType::ROAD_RIGHT,              "Road Right",         {0.35f, 0.35f, 0.38f}, "Road"},
@@ -517,6 +518,26 @@ int getBlockTextureIndex(BlockType type, int face) {
         case BlockType::COBWEB:        return 11;
         case BlockType::FARMLAND:      { int r[] = {86, 2, 2}; return r[face]; }
         case BlockType::WATER:         return 205;
+        // Road blocks - use gray concrete-ish tile as atlas fallback
+        case BlockType::ROAD_STRAIGHT:
+        case BlockType::ROAD_LEFT:
+        case BlockType::ROAD_RIGHT:
+        case BlockType::ROAD_LEFT_RIGHT:
+        case BlockType::ROAD_T_JUNCTION:
+        case BlockType::ROAD_INTERSECTION_YELLOW:
+        case BlockType::ROAD_MIDDLE_LINES:
+        case BlockType::ROAD_MIDDLE_LINES_YELLOW:
+        case BlockType::ROAD_MIDDLE_RIGHT:
+        case BlockType::ROAD_MIDDLE_RIGHT_YELLOW:
+        case BlockType::ROAD_LEFT_DIAG_45:
+        case BlockType::ROAD_LEFT_DIAG_45_YELLOW:
+        case BlockType::ROAD_LEFT_DIAG_60:
+        case BlockType::ROAD_LEFT_DIAG_60_YELLOW:
+        case BlockType::ROAD_RIGHT_DIAG_60:
+        case BlockType::ROAD_RIGHT_DIAG_YELLOW:
+            return 1; // Stone placeholder
+        case BlockType::GLAZED_TERRACOTTA:
+            return 1; // Stone placeholder
         default: return 1;
     }
 }
@@ -640,6 +661,30 @@ GLuint loadPBRAlbedoArray(const std::string& pbrPath, std::unordered_map<std::st
     if (albedoFiles.empty()) {
         std::cerr << "No PBR albedo textures found in: " << texturePath << std::endl;
         return 0;
+    }
+
+    // Also load road textures from assets/roads/
+    {
+        std::string roadPath = "assets/roads";
+        if (fs::exists(roadPath)) {
+            auto isRoadPBR = [](const std::string& name) -> bool {
+                const std::string suffixes[] = {"_ao", "_normal", "_metallic", "_metalic", "_roughness"};
+                for (const auto& s : suffixes) {
+                    if (name.length() > s.length() && name.substr(name.length() - s.length()) == s)
+                        return true;
+                }
+                return false;
+            };
+            for (const auto& entry : fs::directory_iterator(roadPath)) {
+                if (!entry.is_regular_file()) continue;
+                std::string ext = entry.path().extension().string();
+                if (ext != ".png" && ext != ".PNG") continue;
+                std::string stem = entry.path().stem().string();
+                if (isRoadPBR(stem)) continue;
+                albedoFiles.push_back(entry.path().string());
+                albedoNames.push_back(stem);
+            }
+        }
     }
 
     // Sort for deterministic ordering
@@ -879,6 +924,24 @@ static std::string getPBRTextureName(BlockType type, int face) {
         case BlockType::FARMLAND:
             return (face == 0) ? "farmland" : "dirt";
         case BlockType::WATER:         return "ice"; // placeholder
+        // Road blocks: top = specific road texture, sides/bottom = glazed_terracotta_base
+        case BlockType::GLAZED_TERRACOTTA:       return "glazed_terracotta_base";
+        case BlockType::ROAD_STRAIGHT:           return (face == 0) ? "glazed_terracotta_up" : "glazed_terracotta_base";
+        case BlockType::ROAD_LEFT:               return (face == 0) ? "glazed_terracotta_left" : "glazed_terracotta_base";
+        case BlockType::ROAD_RIGHT:              return (face == 0) ? "glazed_terracotta_right" : "glazed_terracotta_base";
+        case BlockType::ROAD_LEFT_RIGHT:         return (face == 0) ? "glazed_terracotta_left_right" : "glazed_terracotta_base";
+        case BlockType::ROAD_T_JUNCTION:         return (face == 0) ? "glazed_terracotta_left_right_no_forward" : "glazed_terracotta_base";
+        case BlockType::ROAD_INTERSECTION_YELLOW:return (face == 0) ? "glazed_terracotta_intersection_yellow_lines" : "glazed_terracotta_base";
+        case BlockType::ROAD_MIDDLE_LINES:       return (face == 0) ? "glazed_terracotta_m_lines" : "glazed_terracotta_base";
+        case BlockType::ROAD_MIDDLE_LINES_YELLOW:return (face == 0) ? "glazed_terracotta_m_lines_yellow" : "glazed_terracotta_base";
+        case BlockType::ROAD_MIDDLE_RIGHT:       return (face == 0) ? "glazed_terracotta_m_right" : "glazed_terracotta_base";
+        case BlockType::ROAD_MIDDLE_RIGHT_YELLOW:return (face == 0) ? "glazed_terracotta_m_right_yellow_lines" : "glazed_terracotta_base";
+        case BlockType::ROAD_LEFT_DIAG_45:       return (face == 0) ? "glazed_terracotta_left_diag_45_lines" : "glazed_terracotta_base";
+        case BlockType::ROAD_LEFT_DIAG_45_YELLOW:return (face == 0) ? "glazed_terracotta_left_diag_45_lines_yellow" : "glazed_terracotta_base";
+        case BlockType::ROAD_LEFT_DIAG_60:       return (face == 0) ? "glazed_terracotta_left_diag_60" : "glazed_terracotta_base";
+        case BlockType::ROAD_LEFT_DIAG_60_YELLOW:return (face == 0) ? "glazed_terracotta_left_diag_60_yellow_lines" : "glazed_terracotta_base";
+        case BlockType::ROAD_RIGHT_DIAG_60:      return (face == 0) ? "glazed_terracotta_right_diag_60_lines" : "glazed_terracotta_base";
+        case BlockType::ROAD_RIGHT_DIAG_YELLOW:  return (face == 0) ? "glazed_terracotta_right_diag_yellow" : "glazed_terracotta_base";
         default: return "stone";
     }
 }

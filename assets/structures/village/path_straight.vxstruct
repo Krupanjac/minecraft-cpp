@@ -1,125 +1,30 @@
 {
-  "author": "system",
-  "blocks": [
-    {
-      "type": "dirt",
-      "x": 0,
-      "y": 0,
-      "z": 0
-    },
-    {
-      "type": "dirt",
-      "x": 1,
-      "y": 0,
-      "z": 0
-    },
-    {
-      "type": "dirt",
-      "x": 2,
-      "y": 0,
-      "z": 0
-    },
-    {
-      "type": "dirt",
-      "x": 0,
-      "y": 0,
-      "z": 1
-    },
-    {
-      "type": "dirt",
-      "x": 1,
-      "y": 0,
-      "z": 1
-    },
-    {
-      "type": "dirt",
-      "x": 2,
-      "y": 0,
-      "z": 1
-    },
-    {
-      "type": "dirt",
-      "x": 0,
-      "y": 0,
-      "z": 2
-    },
-    {
-      "type": "dirt",
-      "x": 1,
-      "y": 0,
-      "z": 2
-    },
-    {
-      "type": "dirt",
-      "x": 2,
-      "y": 0,
-      "z": 2
-    },
-    {
-      "type": "dirt",
-      "x": 0,
-      "y": 0,
-      "z": 3
-    },
-    {
-      "type": "dirt",
-      "x": 1,
-      "y": 0,
-      "z": 3
-    },
-    {
-      "type": "dirt",
-      "x": 2,
-      "y": 0,
-      "z": 3
-    },
-    {
-      "type": "dirt",
-      "x": 0,
-      "y": 0,
-      "z": 4
-    },
-    {
-      "type": "dirt",
-      "x": 1,
-      "y": 0,
-      "z": 4
-    },
-    {
-      "type": "dirt",
-      "x": 2,
-      "y": 0,
-      "z": 4
-    }
-  ],
-  "category": "village_path",
-  "markers": [
-    {
-      "data": "north",
-      "type": "path_connection",
-      "x": 1,
-      "y": 0,
-      "z": 0
-    },
-    {
-      "data": "south",
-      "type": "path_connection",
-      "x": 1,
-      "y": 0,
-      "z": 4
-    }
-  ],
-  "min_ground_coverage": 0.5,
   "name": "Village Path Straight",
+  "author": "system",
+  "category": "village_path",
   "requires_flat": false,
-  "size": {
-    "x": 3,
-    "y": 1,
-    "z": 5
-  },
-  "tags": [
-    "path",
-    "road",
-    "connector"
+  "min_ground_coverage": 0.5,
+  "tags": [ "path", "connector" ],
+  "size": { "x": 3, "y": 1, "z": 5 },
+  "blocks": [
+    { "x": 0, "y": 0, "z": 0, "type": "glazed_terracotta" },
+    { "x": 1, "y": 0, "z": 0, "type": "road_straight" },
+    { "x": 2, "y": 0, "z": 0, "type": "glazed_terracotta" },
+    { "x": 0, "y": 0, "z": 1, "type": "glazed_terracotta" },
+    { "x": 1, "y": 0, "z": 1, "type": "road_straight" },
+    { "x": 2, "y": 0, "z": 1, "type": "glazed_terracotta" },
+    { "x": 0, "y": 0, "z": 2, "type": "glazed_terracotta" },
+    { "x": 1, "y": 0, "z": 2, "type": "road_straight" },
+    { "x": 2, "y": 0, "z": 2, "type": "glazed_terracotta" },
+    { "x": 0, "y": 0, "z": 3, "type": "glazed_terracotta" },
+    { "x": 1, "y": 0, "z": 3, "type": "road_straight" },
+    { "x": 2, "y": 0, "z": 3, "type": "glazed_terracotta" },
+    { "x": 0, "y": 0, "z": 4, "type": "glazed_terracotta" },
+    { "x": 1, "y": 0, "z": 4, "type": "road_straight" },
+    { "x": 2, "y": 0, "z": 4, "type": "glazed_terracotta" }
+  ],
+  "markers": [
+    { "type": "path_connection", "data": "north", "x": 1, "y": 0, "z": 0 },
+    { "type": "path_connection", "data": "south", "x": 1, "y": 0, "z": 4 }
   ]
 }

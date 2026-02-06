@@ -1557,8 +1557,19 @@ void ResourcePackManager::setupBlockMappings() {
         blockMappings[BlockType::SUGAR_CANE] = mapping;
     }
     
-    // Road blocks (glazed terracotta road surfaces) - all faces use same texture
+    // Glazed terracotta base block (plain, all sides same)
     {
+        BlockTextureMapping mapping;
+        int baseIdx = findTex("glazed_terracotta_base");
+        mapping.top.albedoIndex = baseIdx;
+        mapping.bottom.albedoIndex = baseIdx;
+        mapping.side.albedoIndex = baseIdx;
+        blockMappings[BlockType::GLAZED_TERRACOTTA] = mapping;
+    }
+    
+    // Road blocks - top face = specific road texture, sides/bottom = glazed_terracotta_base
+    {
+        int baseIdx = findTex("glazed_terracotta_base");
         struct RoadBlockDef { BlockType type; std::string texName; };
         RoadBlockDef roadBlocks[] = {
             { BlockType::ROAD_STRAIGHT,              "glazed_terracotta_up" },
@@ -1580,14 +1591,14 @@ void ResourcePackManager::setupBlockMappings() {
         };
         for (const auto& rb : roadBlocks) {
             BlockTextureMapping mapping;
-            int idx = findTex(rb.texName);
-            if (idx < 0) {
+            int topIdx = findTex(rb.texName);
+            if (topIdx < 0) {
                 LOG_WARNING("Road texture not found: " + rb.texName);
                 continue;
             }
-            mapping.top.albedoIndex = idx;
-            mapping.bottom.albedoIndex = idx;
-            mapping.side.albedoIndex = idx;
+            mapping.top.albedoIndex = topIdx;
+            mapping.bottom.albedoIndex = baseIdx;
+            mapping.side.albedoIndex = baseIdx;
             blockMappings[rb.type] = mapping;
         }
     }

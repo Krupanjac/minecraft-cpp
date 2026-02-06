@@ -85,6 +85,23 @@ static std::string blockTypeToString(BlockType type) {
         case BlockType::REDSTONE_LAMP: return "redstone_lamp";
         case BlockType::FARMLAND: return "farmland";
         case BlockType::CHISELED_SANDSTONE: return "chiseled_sandstone";
+        case BlockType::ROAD_STRAIGHT: return "road_straight";
+        case BlockType::ROAD_LEFT: return "road_left";
+        case BlockType::ROAD_RIGHT: return "road_right";
+        case BlockType::ROAD_LEFT_RIGHT: return "road_left_right";
+        case BlockType::ROAD_T_JUNCTION: return "road_t_junction";
+        case BlockType::ROAD_INTERSECTION_YELLOW: return "road_intersection_yellow";
+        case BlockType::ROAD_MIDDLE_LINES: return "road_middle_lines";
+        case BlockType::ROAD_MIDDLE_LINES_YELLOW: return "road_middle_lines_yellow";
+        case BlockType::ROAD_MIDDLE_RIGHT: return "road_middle_right";
+        case BlockType::ROAD_MIDDLE_RIGHT_YELLOW: return "road_middle_right_yellow";
+        case BlockType::ROAD_LEFT_DIAG_45: return "road_left_diag_45";
+        case BlockType::ROAD_LEFT_DIAG_45_YELLOW: return "road_left_diag_45_yellow";
+        case BlockType::ROAD_LEFT_DIAG_60: return "road_left_diag_60";
+        case BlockType::ROAD_LEFT_DIAG_60_YELLOW: return "road_left_diag_60_yellow";
+        case BlockType::ROAD_RIGHT_DIAG_60: return "road_right_diag_60";
+        case BlockType::ROAD_RIGHT_DIAG_YELLOW: return "road_right_diag_yellow";
+        case BlockType::GLAZED_TERRACOTTA: return "glazed_terracotta";
         default: return "unknown";
     }
 }
@@ -168,7 +185,24 @@ static BlockType stringToBlockType(const std::string& str) {
         {"jukebox", BlockType::JUKEBOX},
         {"chiseled_sandstone", BlockType::CHISELED_SANDSTONE},
         {"wood", BlockType::WOOD},
-        {"log", BlockType::LOG}
+        {"log", BlockType::LOG},
+        {"road_straight", BlockType::ROAD_STRAIGHT},
+        {"road_left", BlockType::ROAD_LEFT},
+        {"road_right", BlockType::ROAD_RIGHT},
+        {"road_left_right", BlockType::ROAD_LEFT_RIGHT},
+        {"road_t_junction", BlockType::ROAD_T_JUNCTION},
+        {"road_intersection_yellow", BlockType::ROAD_INTERSECTION_YELLOW},
+        {"road_middle_lines", BlockType::ROAD_MIDDLE_LINES},
+        {"road_middle_lines_yellow", BlockType::ROAD_MIDDLE_LINES_YELLOW},
+        {"road_middle_right", BlockType::ROAD_MIDDLE_RIGHT},
+        {"road_middle_right_yellow", BlockType::ROAD_MIDDLE_RIGHT_YELLOW},
+        {"road_left_diag_45", BlockType::ROAD_LEFT_DIAG_45},
+        {"road_left_diag_45_yellow", BlockType::ROAD_LEFT_DIAG_45_YELLOW},
+        {"road_left_diag_60", BlockType::ROAD_LEFT_DIAG_60},
+        {"road_left_diag_60_yellow", BlockType::ROAD_LEFT_DIAG_60_YELLOW},
+        {"road_right_diag_60", BlockType::ROAD_RIGHT_DIAG_60},
+        {"road_right_diag_yellow", BlockType::ROAD_RIGHT_DIAG_YELLOW},
+        {"glazed_terracotta", BlockType::GLAZED_TERRACOTTA}
     };
     
     auto it = lookup.find(str);

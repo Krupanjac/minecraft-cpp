@@ -109,6 +109,7 @@ enum class BlockType : u8 {
     ROAD_LEFT_DIAG_60_YELLOW = 96,
     ROAD_RIGHT_DIAG_60 = 97,
     ROAD_RIGHT_DIAG_YELLOW = 98,
+    GLAZED_TERRACOTTA = 99,       // Plain glazed terracotta base (road base block)
     
     // Misc blocks
     CLAY = 104,
