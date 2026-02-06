@@ -36,12 +36,43 @@
 #include <filesystem>
 #include <deque>
 #include <set>
+#include <chrono>
+#include <stb_image.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#include <commdlg.h>
-#include <shlobj.h>
-#endif
+// ============================================================================
+// Move Axis Constraint
+// ============================================================================
+
+enum class MoveAxis { FREE, X, Y, Z };
+
+// ============================================================================
+// Editor Settings (persisted to editor_settings.ini)
+// ============================================================================
+
+struct EditorSettings {
+    // Texture mode
+    bool usePBRTextures = false;   // false = atlas, true = PBR
+    bool showTexturesInPalette = true;
+
+    // Auto-save
+    bool autoSaveEnabled = true;
+    float autoSaveIntervalSec = 60.0f; // seconds
+
+    // Recent files
+    std::vector<std::string> recentFiles; // most recent first
+    static const size_t MAX_RECENT = 10;
+
+    void addRecentFile(const std::string& path);
+    void save(const std::string& filepath) const;
+    void load(const std::string& filepath);
+};
+
+// ============================================================================
+// Block Texture Atlas Helper
+// ============================================================================
+
+int getBlockTextureIndex(BlockType type, int face = 1); // face: 0=top,1=side,2=bottom
+GLuint loadBlockAtlasTexture(const std::string& path);  // returns GL texture ID
 
 // ============================================================================
 // Block Color Database

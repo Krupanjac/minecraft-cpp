@@ -64,6 +64,10 @@ void VxStructEditor::loadStructure() {
         
         std::cout << "Loaded structure: " << m_structure.getName() 
                   << " (" << m_structure.getBlocks().size() << " blocks)" << std::endl;
+
+        // Track in recent files
+        m_settings.addRecentFile(path);
+        m_settings.save(m_settingsFilePath);
     } else {
         std::cerr << "Failed to load structure: " << path << std::endl;
     }
@@ -80,6 +84,10 @@ void VxStructEditor::saveStructure() {
         std::string title = "VxStruct Editor - " + m_structure.getName();
         glfwSetWindowTitle(m_window, title.c_str());
         std::cout << "Saved: " << m_currentFilePath << std::endl;
+
+        // Track in recent files
+        m_settings.addRecentFile(m_currentFilePath);
+        m_settings.save(m_settingsFilePath);
     }
 }
 
@@ -99,6 +107,66 @@ void VxStructEditor::saveStructureAs() {
 void VxStructEditor::exportStructure() {
     // Future: export to other formats
     saveStructureAs();
+}
+
+void VxStructEditor::openRecentFile(const std::string& path) {
+    Structure newStruct;
+    if (newStruct.loadFromFile(path)) {
+        m_structure = newStruct;
+        m_currentFilePath = path;
+        m_modified = false;
+
+        strncpy_s(m_nameBuffer, m_structure.getName().c_str(), sizeof(m_nameBuffer));
+        strncpy_s(m_authorBuffer, m_structure.getAuthor().c_str(), sizeof(m_authorBuffer));
+        m_categoryIndex = static_cast<int>(m_structure.getCategory());
+        m_requiresFlat = m_structure.requiresFlat();
+        m_minGroundCoverage = m_structure.getMinGroundCoverage();
+
+        // Clear editor state
+        m_undoStack.clear();
+        m_redoStack.clear();
+        m_selectedBlocks.clear();
+        m_clipboard.clear();
+        m_boxSelectActive = false;
+        m_boxSelectHasStart = false;
+        m_hasSelectionAnchor = false;
+
+        rebuildBlockMesh();
+
+        std::string title = "VxStruct Editor - " + m_structure.getName();
+        glfwSetWindowTitle(m_window, title.c_str());
+
+        // Update recent files
+        m_settings.addRecentFile(path);
+        m_settings.save(m_settingsFilePath);
+
+        std::cout << "Opened recent: " << path << std::endl;
+    } else {
+        std::cerr << "Failed to open recent file: " << path << std::endl;
+        // Remove invalid entry from recent files
+        m_settings.recentFiles.erase(
+            std::remove(m_settings.recentFiles.begin(), m_settings.recentFiles.end(), path),
+            m_settings.recentFiles.end()
+        );
+        m_settings.save(m_settingsFilePath);
+    }
+}
+
+void VxStructEditor::autoSave() {
+    if (!m_settings.autoSaveEnabled) return;
+    if (!m_modified) return;
+    if (m_currentFilePath.empty()) return;
+
+    double now = glfwGetTime();
+    if (now - m_lastAutoSaveTime < m_settings.autoSaveIntervalSec) return;
+
+    if (m_structure.saveToFile(m_currentFilePath)) {
+        m_modified = false;
+        m_lastAutoSaveTime = now;
+        std::string title = "VxStruct Editor - " + m_structure.getName();
+        glfwSetWindowTitle(m_window, title.c_str());
+        std::cout << "Auto-saved: " << m_currentFilePath << std::endl;
+    }
 }
 
 // ============================================================================
@@ -278,6 +346,7 @@ void VxStructEditor::keyCallback(GLFWwindow* window, int key, int /*scancode*/, 
             case GLFW_KEY_I: editor->invertSelection(); break;
             case GLFW_KEY_R: editor->rotateStructure(); break;
             case GLFW_KEY_F: editor->fillSelection(editor->m_selectedBlock); break;
+            case GLFW_KEY_COMMA: editor->m_showSettingsWindow = !editor->m_showSettingsWindow; break;
             // Ctrl + Numpad views (opposite directions)
             case GLFW_KEY_KP_1: // Back
                 editor->m_camera.yaw = 180.0f;

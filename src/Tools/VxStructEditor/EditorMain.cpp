@@ -129,6 +129,15 @@ bool VxStructEditor::initialize() {
     newStructure();
     rebuildGridMesh();
 
+    // Load editor settings
+    m_settings.load(m_settingsFilePath);
+
+    // Load block atlas texture for palette
+    m_atlasTexture = loadBlockAtlasTexture("assets/block_atlas.png");
+
+    // Initialize auto-save timer
+    m_lastAutoSaveTime = glfwGetTime();
+
     std::cout << "VxStruct Editor initialized successfully" << std::endl;
     return true;
 }
@@ -142,6 +151,9 @@ void VxStructEditor::run() {
         glfwPollEvents();
         processInput();
         updateHover();
+
+        // Auto-save check
+        autoSave();
 
         // Start ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -161,6 +173,10 @@ void VxStructEditor::run() {
 }
 
 void VxStructEditor::cleanup() {
+    // Save settings on exit
+    m_settings.save(m_settingsFilePath);
+
+    if (m_atlasTexture) glDeleteTextures(1, &m_atlasTexture);
     if (m_blockVAO) glDeleteVertexArrays(1, &m_blockVAO);
     if (m_blockVBO) glDeleteBuffers(1, &m_blockVBO);
     if (m_gridVAO) glDeleteVertexArrays(1, &m_gridVAO);

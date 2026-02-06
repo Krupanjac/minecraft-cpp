@@ -200,6 +200,12 @@ void VxStructEditor::moveSelection() {
 
     // Compute offset from clipboard origin to current hover position
     glm::ivec3 offset = m_hoverPlacePos - m_clipboardOrigin;
+
+    // Apply axis constraint
+    if (m_moveAxis == MoveAxis::X) { offset.y = 0; offset.z = 0; }
+    else if (m_moveAxis == MoveAxis::Y) { offset.x = 0; offset.z = 0; }
+    else if (m_moveAxis == MoveAxis::Z) { offset.x = 0; offset.y = 0; }
+
     if (offset == glm::ivec3(0)) return; // No movement
 
     // Build undo action that captures both the removal and placement

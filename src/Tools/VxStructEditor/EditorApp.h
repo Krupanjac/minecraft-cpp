@@ -123,9 +123,21 @@ private:
     // --- UI popups ---
     bool m_showHelpWindow = false;
     bool m_showAboutWindow = false;
+    bool m_showSettingsWindow = false;
 
     // --- Rotation ---
     int m_rotationAngle = 0;
+
+    // --- Move axis constraint ---
+    MoveAxis m_moveAxis = MoveAxis::FREE;
+
+    // --- Block atlas texture ---
+    GLuint m_atlasTexture = 0;
+
+    // --- Settings & auto-save ---
+    EditorSettings m_settings;
+    std::string m_settingsFilePath = "editor_settings.ini";
+    double m_lastAutoSaveTime = 0.0;
 
     // ---- Selection encoding helpers ----
     static int64_t encodePos(const glm::ivec3& p) {
@@ -162,6 +174,7 @@ private:
     void renderHelpWindow();
     void renderAboutWindow();
     void renderSelectionPanel();
+    void renderSettingsWindow();
 
     // ---- File I/O ----
     void newStructure();
@@ -169,6 +182,8 @@ private:
     void saveStructure();
     void saveStructureAs();
     void exportStructure();
+    void openRecentFile(const std::string& path);
+    void autoSave();
 
     // ---- Undo/Redo ----
     void pushAction(const EditorAction& action);

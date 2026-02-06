@@ -32,6 +32,7 @@ void VxStructEditor::renderUI() {
 
     if (m_showHelpWindow) renderHelpWindow();
     if (m_showAboutWindow) renderAboutWindow();
+    if (m_showSettingsWindow) renderSettingsWindow();
 }
 
 // ============================================================================
@@ -43,9 +44,38 @@ void VxStructEditor::renderMenuBar() {
         if (ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("New", "Ctrl+N")) newStructure();
             if (ImGui::MenuItem("Open...", "Ctrl+O")) loadStructure();
+            if (ImGui::BeginMenu("Open Recent")) {
+                if (m_settings.recentFiles.empty()) {
+                    ImGui::MenuItem("(No recent files)", nullptr, false, false);
+                } else {
+                    for (size_t i = 0; i < m_settings.recentFiles.size(); i++) {
+                        const auto& path = m_settings.recentFiles[i];
+                        // Show just the filename for display
+                        std::string display = path;
+                        auto slash = display.find_last_of("/\\");
+                        if (slash != std::string::npos) display = display.substr(slash + 1);
+                        ImGui::PushID((int)i);
+                        if (ImGui::MenuItem(display.c_str())) {
+                            openRecentFile(path);
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::SetTooltip("%s", path.c_str());
+                        }
+                        ImGui::PopID();
+                    }
+                    ImGui::Separator();
+                    if (ImGui::MenuItem("Clear Recent Files")) {
+                        m_settings.recentFiles.clear();
+                        m_settings.save(m_settingsFilePath);
+                    }
+                }
+                ImGui::EndMenu();
+            }
             ImGui::Separator();
             if (ImGui::MenuItem("Save", "Ctrl+S")) saveStructure();
             if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) saveStructureAs();
+            ImGui::Separator();
+            if (ImGui::MenuItem("Settings...", "Ctrl+,")) m_showSettingsWindow = true;
             ImGui::Separator();
             if (ImGui::MenuItem("Exit", "Alt+F4")) glfwSetWindowShouldClose(m_window, true);
             ImGui::EndMenu();
@@ -233,24 +263,61 @@ void VxStructEditor::renderBlockPalette() {
 
         ImGui::PushID(static_cast<int>(info.type));
 
-        ImVec4 buttonColor(info.color.r, info.color.g, info.color.b, 1.0f);
-        ImVec4 hoverColor(
-            std::min(1.0f, info.color.r + 0.2f),
-            std::min(1.0f, info.color.g + 0.2f),
-            std::min(1.0f, info.color.b + 0.2f),
-            1.0f
-        );
-
-        ImGui::PushStyleColor(ImGuiCol_Button, buttonColor);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoverColor);
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, buttonColor);
+        bool useTexture = (m_atlasTexture != 0 && m_settings.showTexturesInPalette);
 
         if (isSelected) {
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 3.0f);
             ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
         }
 
-        if (ImGui::Button("##block", ImVec2(32, 32))) {
+        bool clicked = false;
+        if (useTexture) {
+            int atlasIdx = getBlockTextureIndex(info.type, 1); // side face
+            float cs = 1.0f / 16.0f;
+            int atlasCol = atlasIdx % 16;
+            int atlasRow = atlasIdx / 16;
+            ImVec2 uv0(atlasCol * cs, atlasRow * cs);
+            ImVec2 uv1((atlasCol + 1) * cs, (atlasRow + 1) * cs);
+
+            // Use tinted background to show selection state
+            ImGui::PushStyleColor(ImGuiCol_Button, isSelected ? ImVec4(0.3f, 0.5f, 0.8f, 1.0f) : ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.4f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.2f, 0.3f, 1.0f));
+
+            // Draw button with texture
+            ImVec2 btnSize(32, 32);
+            clicked = ImGui::Button("##block", btnSize);
+
+            // Draw the texture overlay on the button
+            ImVec2 rectMin = ImGui::GetItemRectMin();
+            ImVec2 rectMax = ImGui::GetItemRectMax();
+            // Inset by 2 pixels for a small border
+            ImVec2 imgMin(rectMin.x + 2, rectMin.y + 2);
+            ImVec2 imgMax(rectMax.x - 2, rectMax.y - 2);
+            ImGui::GetWindowDrawList()->AddImage(
+                (ImTextureID)(intptr_t)m_atlasTexture,
+                imgMin, imgMax, uv0, uv1
+            );
+
+            ImGui::PopStyleColor(3);
+        } else {
+            ImVec4 buttonColor(info.color.r, info.color.g, info.color.b, 1.0f);
+            ImVec4 hoverColor(
+                std::min(1.0f, info.color.r + 0.2f),
+                std::min(1.0f, info.color.g + 0.2f),
+                std::min(1.0f, info.color.b + 0.2f),
+                1.0f
+            );
+            ImGui::PushStyleColor(ImGuiCol_Button, buttonColor);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoverColor);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, buttonColor);
+
+            clicked = ImGui::Button("##block", ImVec2(32, 32));
+
+            ImGui::PopStyleColor(3);
+        }
+
+        if (clicked) {
             m_selectedBlock = info.type;
             m_currentTool = EditorTool::PLACE;
         }
@@ -259,8 +326,6 @@ void VxStructEditor::renderBlockPalette() {
             ImGui::PopStyleColor();
             ImGui::PopStyleVar();
         }
-
-        ImGui::PopStyleColor(3);
 
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", info.name);
@@ -481,6 +546,16 @@ void VxStructEditor::renderSelectionPanel() {
     ImGui::Text("Clipboard: %d blocks", (int)m_clipboard.size());
     if (ImGui::Button("Paste (Ctrl+V)", ImVec2(-1, 0))) pasteClipboard();
     if (ImGui::Button("Move to Cursor (Ctrl+M)", ImVec2(-1, 0))) moveSelection();
+
+    ImGui::Separator();
+    ImGui::Text("Move Axis Constraint:");
+    int axisInt = static_cast<int>(m_moveAxis);
+    ImGui::RadioButton("Free##axis", &axisInt, 0); ImGui::SameLine();
+    ImGui::RadioButton("X##axis", &axisInt, 1); ImGui::SameLine();
+    ImGui::RadioButton("Y##axis", &axisInt, 2); ImGui::SameLine();
+    ImGui::RadioButton("Z##axis", &axisInt, 3);
+    m_moveAxis = static_cast<MoveAxis>(axisInt);
+
     if (!hasClipboard) ImGui::EndDisabled();
 
     ImGui::End();
@@ -540,6 +615,7 @@ void VxStructEditor::renderHelpWindow() {
         ImGui::BulletText("Ctrl + X     - Cut selection");
         ImGui::BulletText("Ctrl + V     - Paste clipboard");
         ImGui::BulletText("Ctrl + M     - Move clipboard to cursor");
+        ImGui::BulletText("  (Set axis: Free/X/Y/Z in Selection panel)");
         ImGui::BulletText("Ctrl + D     - Duplicate selection");
         ImGui::BulletText("Ctrl + R     - Rotate entire structure 90 deg");
         ImGui::BulletText("Ctrl+Shift+R - Rotate selection 90 deg");
@@ -552,6 +628,7 @@ void VxStructEditor::renderHelpWindow() {
         ImGui::BulletText("Ctrl + O         - Open file");
         ImGui::BulletText("Ctrl + S         - Save");
         ImGui::BulletText("Ctrl + Shift + S - Save As");
+        ImGui::BulletText("Ctrl + ,         - Settings");
     }
 
     if (ImGui::CollapsingHeader("Mouse")) {
@@ -597,6 +674,75 @@ void VxStructEditor::renderAboutWindow() {
         ImGui::Separator();
         ImGui::Text("Built with: OpenGL 4.5, GLFW, ImGui, GLM");
         ImGui::Text("Format: VxStruct (Vortex Structs) JSON");
+    }
+    ImGui::End();
+}
+
+// ============================================================================
+// Settings Window
+// ============================================================================
+
+void VxStructEditor::renderSettingsWindow() {
+    if (!m_showSettingsWindow) return;
+
+    ImGui::SetNextWindowSize(ImVec2(420, 380), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Settings", &m_showSettingsWindow)) {
+        ImGui::TextColored(ImVec4(0.4f, 0.9f, 1.0f, 1.0f), "Editor Settings");
+        ImGui::Separator();
+
+        // --- Texture Mode ---
+        if (ImGui::CollapsingHeader("Textures", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Checkbox("Show Textures in Block Palette", &m_settings.showTexturesInPalette);
+            ImGui::Separator();
+            ImGui::Text("Texture Source:");
+            bool pbr = m_settings.usePBRTextures;
+            if (ImGui::RadioButton("Block Atlas (16x16 grid)", !pbr)) {
+                m_settings.usePBRTextures = false;
+            }
+            if (ImGui::RadioButton("PBR Textures (individual files)", pbr)) {
+                m_settings.usePBRTextures = true;
+            }
+            if (m_settings.usePBRTextures) {
+                ImGui::TextDisabled("  PBR textures loaded from assets/pbr/textures/block/");
+            } else {
+                ImGui::TextDisabled("  Atlas loaded from assets/block_atlas.png");
+            }
+        }
+
+        // --- Auto-save ---
+        if (ImGui::CollapsingHeader("Auto-Save", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Checkbox("Enable Auto-Save", &m_settings.autoSaveEnabled);
+
+            if (!m_settings.autoSaveEnabled) ImGui::BeginDisabled();
+
+            ImGui::Text("Auto-save interval:");
+            ImGui::SetNextItemWidth(200);
+            ImGui::SliderFloat("##autosave_sec", &m_settings.autoSaveIntervalSec, 10.0f, 600.0f, "%.0f seconds");
+
+            // Quick preset buttons
+            if (ImGui::Button("30s")) m_settings.autoSaveIntervalSec = 30.0f;
+            ImGui::SameLine();
+            if (ImGui::Button("1 min")) m_settings.autoSaveIntervalSec = 60.0f;
+            ImGui::SameLine();
+            if (ImGui::Button("2 min")) m_settings.autoSaveIntervalSec = 120.0f;
+            ImGui::SameLine();
+            if (ImGui::Button("5 min")) m_settings.autoSaveIntervalSec = 300.0f;
+
+            if (!m_settings.autoSaveEnabled) ImGui::EndDisabled();
+        }
+
+        // --- Display ---
+        if (ImGui::CollapsingHeader("Display")) {
+            ImGui::Checkbox("Show Grid on Start", &m_showGrid);
+            ImGui::Checkbox("Show Wireframe on Start", &m_showWireframe);
+            ImGui::Checkbox("Show Axes on Start", &m_showAxes);
+            ImGui::SliderInt("Grid Size", &m_gridSize, 8, 128);
+        }
+
+        ImGui::Separator();
+        if (ImGui::Button("Save Settings", ImVec2(-1, 0))) {
+            m_settings.save(m_settingsFilePath);
+        }
     }
     ImGui::End();
 }

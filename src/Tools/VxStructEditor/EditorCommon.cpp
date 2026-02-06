@@ -1,6 +1,7 @@
 // ============================================================================
 // VxStruct Editor - Common Types & Utilities (Implementation)
 // ============================================================================
+#define STB_IMAGE_IMPLEMENTATION
 #include "EditorCommon.h"
 
 // ============================================================================
@@ -324,3 +325,169 @@ std::string saveFileDialog(const char* filter, const char* title, const char* de
 std::string openFileDialog(const char*, const char*) { return ""; }
 std::string saveFileDialog(const char*, const char*, const char*) { return ""; }
 #endif
+
+// ============================================================================
+// Block Texture Atlas Index Mapping
+// ============================================================================
+
+int getBlockTextureIndex(BlockType type, int face) {
+    // face: 0=top, 1=side, 2=bottom
+    // Returns index 0-255 for 16x16 atlas
+    switch (type) {
+        case BlockType::GRASS:         { int r[] = {0, 3, 2}; return r[face]; }
+        case BlockType::DIRT:          return 2;
+        case BlockType::STONE:         return 1;
+        case BlockType::SAND:          return 18;
+        case BlockType::GRAVEL:        return 19;
+        case BlockType::SNOW:          return 66;
+        case BlockType::ICE:           return 67;
+        case BlockType::BEDROCK:       return 17;
+        case BlockType::SANDSTONE:     { int r[] = {176, 192, 176}; return r[face]; }
+        case BlockType::COBBLESTONE:   return 16;
+        case BlockType::CLAY:          return 53;
+        case BlockType::COAL_ORE:      return 34;
+        case BlockType::IRON_ORE:      return 33;
+        case BlockType::GOLD_ORE:      return 32;
+        case BlockType::DIAMOND_ORE:   return 50;
+        case BlockType::EMERALD_ORE:   return 171;
+        case BlockType::REDSTONE_ORE:  return 51;
+        case BlockType::LAPIS_ORE:     return 160;
+        case BlockType::IRON_BLOCK:    return 22;
+        case BlockType::GOLD_BLOCK:    return 23;
+        case BlockType::DIAMOND_BLOCK: return 24;
+        case BlockType::EMERALD_BLOCK: return 25;
+        case BlockType::REDSTONE_BLOCK:return 215;
+        case BlockType::BRICKS:        return 7;
+        case BlockType::STONE_BRICKS:  return 54;
+        case BlockType::MOSSY_STONE_BRICKS:    return 100;
+        case BlockType::CRACKED_STONE_BRICKS:  return 118;
+        case BlockType::CHISELED_STONE_BRICKS: return 98;
+        case BlockType::MOSSY_COBBLESTONE:     return 36;
+        case BlockType::GLASS:         return 49;
+        case BlockType::OBSIDIAN:      return 37;
+        case BlockType::BOOKSHELF:     { int r[] = {4, 35, 4}; return r[face]; }
+        case BlockType::TNT:           { int r[] = {9, 8, 10}; return r[face]; }
+        case BlockType::GLOWSTONE:     return 105;
+        case BlockType::REDSTONE_LAMP: return 123;
+        case BlockType::OAK_PLANKS:    return 4;
+        case BlockType::SPRUCE_PLANKS: return 198;
+        case BlockType::BIRCH_PLANKS:  return 214;
+        case BlockType::JUNGLE_PLANKS: return 199;
+        case BlockType::OAK_LOG:       { int r[] = {21, 20, 21}; return r[face]; }
+        case BlockType::SPRUCE_LOG:    { int r[] = {117, 116, 117}; return r[face]; }
+        case BlockType::BIRCH_LOG:     return 117;
+        case BlockType::JUNGLE_LOG:    return 153;
+        case BlockType::OAK_LEAVES:    return 52;
+        case BlockType::SPRUCE_LEAVES: return 132;
+        case BlockType::BIRCH_LEAVES:  return 52;
+        case BlockType::JUNGLE_LEAVES: return 52;
+        case BlockType::TALL_GRASS:    return 39;
+        case BlockType::ROSE:          return 12;
+        case BlockType::SUGAR_CANE:    return 73;
+        case BlockType::WHITE_WOOL:    return 64;
+        case BlockType::ORANGE_WOOL:   return 210;
+        case BlockType::MAGENTA_WOOL:  return 194;
+        case BlockType::LIGHT_BLUE_WOOL: return 178;
+        case BlockType::YELLOW_WOOL:   return 162;
+        case BlockType::LIME_WOOL:     return 146;
+        case BlockType::PINK_WOOL:     return 130;
+        case BlockType::GRAY_WOOL:     return 114;
+        case BlockType::LIGHT_GRAY_WOOL: return 225;
+        case BlockType::CYAN_WOOL:     return 209;
+        case BlockType::PURPLE_WOOL:   return 193;
+        case BlockType::BLUE_WOOL:     return 177;
+        case BlockType::BROWN_WOOL:    return 161;
+        case BlockType::GREEN_WOOL:    return 145;
+        case BlockType::RED_WOOL:      return 129;
+        case BlockType::BLACK_WOOL:    return 113;
+        case BlockType::CRAFTING_TABLE:{ int r[] = {43, 59, 4}; return r[face]; }
+        case BlockType::NOTE_BLOCK:    return 74;
+        case BlockType::JUKEBOX:       { int r[] = {75, 74, 74}; return r[face]; }
+        case BlockType::SPONGE:        return 48;
+        case BlockType::COBWEB:        return 11;
+        case BlockType::FARMLAND:      { int r[] = {86, 2, 2}; return r[face]; }
+        case BlockType::WATER:         return 205;
+        default: return 1;
+    }
+}
+
+GLuint loadBlockAtlasTexture(const std::string& path) {
+    int w, h, channels;
+    stbi_set_flip_vertically_on_load(false);
+    unsigned char* data = stbi_load(path.c_str(), &w, &h, &channels, 4);
+    if (!data) {
+        std::cerr << "Failed to load atlas: " << path << std::endl;
+        return 0;
+    }
+
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    stbi_image_free(data);
+    std::cout << "Loaded block atlas: " << w << "x" << h << std::endl;
+    return tex;
+}
+
+// ============================================================================
+// Editor Settings
+// ============================================================================
+
+void EditorSettings::addRecentFile(const std::string& path) {
+    // Remove if already in list
+    recentFiles.erase(
+        std::remove(recentFiles.begin(), recentFiles.end(), path),
+        recentFiles.end()
+    );
+    // Insert at front
+    recentFiles.insert(recentFiles.begin(), path);
+    // Trim to max
+    if (recentFiles.size() > MAX_RECENT)
+        recentFiles.resize(MAX_RECENT);
+}
+
+void EditorSettings::save(const std::string& filepath) const {
+    std::ofstream f(filepath);
+    if (!f.is_open()) return;
+
+    f << "[EditorSettings]\n";
+    f << "usePBRTextures=" << (usePBRTextures ? 1 : 0) << "\n";
+    f << "showTexturesInPalette=" << (showTexturesInPalette ? 1 : 0) << "\n";
+    f << "autoSaveEnabled=" << (autoSaveEnabled ? 1 : 0) << "\n";
+    f << "autoSaveIntervalSec=" << autoSaveIntervalSec << "\n";
+
+    f << "[RecentFiles]\n";
+    for (size_t i = 0; i < recentFiles.size(); i++) {
+        f << "recent" << i << "=" << recentFiles[i] << "\n";
+    }
+}
+
+void EditorSettings::load(const std::string& filepath) {
+    std::ifstream f(filepath);
+    if (!f.is_open()) return;
+
+    std::string line;
+    recentFiles.clear();
+
+    while (std::getline(f, line)) {
+        if (line.empty() || line[0] == '[') continue;
+
+        auto eq = line.find('=');
+        if (eq == std::string::npos) continue;
+
+        std::string key = line.substr(0, eq);
+        std::string val = line.substr(eq + 1);
+
+        if (key == "usePBRTextures")        usePBRTextures = (val == "1");
+        else if (key == "showTexturesInPalette") showTexturesInPalette = (val == "1");
+        else if (key == "autoSaveEnabled")  autoSaveEnabled = (val == "1");
+        else if (key == "autoSaveIntervalSec") autoSaveIntervalSec = std::stof(val);
+        else if (key.substr(0, 6) == "recent") recentFiles.push_back(val);
+    }
+}
