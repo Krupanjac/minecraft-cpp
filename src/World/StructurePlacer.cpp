@@ -6,6 +6,7 @@
 #include <random>
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 
 StructurePlacer::StructurePlacer(unsigned int seed) : seed(seed) {}
 
@@ -141,10 +142,15 @@ void StructurePlacer::planStructuresForChunk(int chunkX, int chunkZ, BiomeType b
             std::shared_ptr<Structure> structure = pickStructure(category, localSeed >> 16);
             if (!structure) continue;
             
-            // Get surface height at placement point
+            // Get surface height across the structure footprint (use max to avoid burial)
             glm::ivec3 size = structure->getSize();
-            int surfaceY = worldGen.getSurfaceHeight(worldX + size.x / 2,
-                                                      worldZ + size.z / 2);
+            int centerY = worldGen.getSurfaceHeight(worldX + size.x / 2,
+                                                     worldZ + size.z / 2);
+            int cornerY0 = worldGen.getSurfaceHeight(worldX, worldZ);
+            int cornerY1 = worldGen.getSurfaceHeight(worldX + size.x - 1, worldZ);
+            int cornerY2 = worldGen.getSurfaceHeight(worldX, worldZ + size.z - 1);
+            int cornerY3 = worldGen.getSurfaceHeight(worldX + size.x - 1, worldZ + size.z - 1);
+            int surfaceY = std::max({centerY, cornerY0, cornerY1, cornerY2, cornerY3});
             
             // Check terrain suitability
             if (!isTerrainSuitable(worldX, worldZ, *structure, worldGen)) continue;
@@ -199,6 +205,51 @@ void StructurePlacer::placeStructuresInChunk(std::shared_ptr<Chunk> chunk,
         // Get rotated blocks
         auto blocks = structure->getRotatedBlocks(placed.rotation);
         
+        // --- PHASE 1: Clear the structure's bounding box (remove terrain that would clip through) ---
+        // Also fill foundation below the structure base where terrain is lower
+        for (int bx = 0; bx < structSize.x; ++bx) {
+            for (int bz = 0; bz < structSize.z; ++bz) {
+                int worldX = placed.worldX + bx;
+                int worldZ = placed.worldZ + bz;
+                
+                // Skip columns outside this chunk
+                if (worldX < chunkMinX || worldX > chunkMaxX ||
+                    worldZ < chunkMinZ || worldZ > chunkMaxZ) {
+                    continue;
+                }
+                
+                int localX = worldX - chunkMinX;
+                int localZ = worldZ - chunkMinZ;
+                
+                // Clear air from placement Y up through the structure height
+                for (int by = 0; by < structSize.y; ++by) {
+                    int worldY = placed.worldY + by;
+                    if (worldY < 0 || worldY >= CHUNK_HEIGHT) continue;
+                    
+                    BlockType existing = chunk->getBlock(localX, worldY, localZ).type;
+                    // Only clear solid terrain blocks, not air or water
+                    if (existing != BlockType::AIR && existing != BlockType::WATER) {
+                        chunk->setBlock(localX, worldY, localZ, BlockType::AIR);
+                    }
+                }
+                
+                // Fill foundation below structure base where terrain is lower
+                // Use dirt for top layer, stone below
+                for (int fy = placed.worldY - 1; fy >= placed.worldY - 5; --fy) {
+                    if (fy < 0 || fy >= CHUNK_HEIGHT) continue;
+                    
+                    BlockType existing = chunk->getBlock(localX, fy, localZ).type;
+                    if (existing != BlockType::AIR && existing != BlockType::WATER) {
+                        break;  // Hit solid ground, stop filling
+                    }
+                    // Top layer dirt, deeper layers stone
+                    BlockType fillType = (fy >= placed.worldY - 2) ? BlockType::DIRT : BlockType::STONE;
+                    chunk->setBlock(localX, fy, localZ, fillType);
+                }
+            }
+        }
+        
+        // --- PHASE 2: Place structure blocks ---
         // Place blocks that fall within this chunk
         for (const auto& block : blocks) {
             int worldX = placed.worldX + block.position.x;
