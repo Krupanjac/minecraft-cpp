@@ -2439,19 +2439,7 @@
     },
     {
       "type": "stone_bricks",
-      "x": 2,
-      "y": 6,
-      "z": 0
-    },
-    {
-      "type": "stone_bricks",
       "x": 3,
-      "y": 6,
-      "z": 0
-    },
-    {
-      "type": "stone_bricks",
-      "x": 4,
       "y": 6,
       "z": 0
     },
@@ -2469,19 +2457,7 @@
     },
     {
       "type": "stone_bricks",
-      "x": 7,
-      "y": 6,
-      "z": 0
-    },
-    {
-      "type": "stone_bricks",
       "x": 8,
-      "y": 6,
-      "z": 0
-    },
-    {
-      "type": "stone_bricks",
-      "x": 9,
       "y": 6,
       "z": 0
     },
@@ -2784,18 +2760,6 @@
       "x": 6,
       "y": 4,
       "z": 8
-    },
-    {
-      "type": "stone_bricks",
-      "x": 7,
-      "y": 4,
-      "z": 1
-    },
-    {
-      "type": "stone_bricks",
-      "x": 7,
-      "y": 4,
-      "z": 2
     },
     {
       "type": "stone_bricks",
@@ -4444,12 +4408,6 @@
     {
       "type": "glass",
       "x": 2,
-      "y": 4,
-      "z": 0
-    },
-    {
-      "type": "glass",
-      "x": 2,
       "y": 5,
       "z": 0
     },
@@ -4463,12 +4421,6 @@
       "type": "stone_bricks",
       "x": 3,
       "y": 5,
-      "z": 0
-    },
-    {
-      "type": "glass",
-      "x": 4,
-      "y": 4,
       "z": 0
     },
     {
@@ -4504,12 +4456,6 @@
     {
       "type": "glass",
       "x": 7,
-      "y": 4,
-      "z": 0
-    },
-    {
-      "type": "glass",
-      "x": 7,
       "y": 5,
       "z": 0
     },
@@ -4523,12 +4469,6 @@
       "type": "stone_bricks",
       "x": 8,
       "y": 5,
-      "z": 0
-    },
-    {
-      "type": "glass",
-      "x": 9,
-      "y": 4,
       "z": 0
     },
     {
@@ -4668,6 +4608,66 @@
       "x": 0,
       "y": 5,
       "z": 7
+    },
+    {
+      "type": "glass",
+      "x": 2,
+      "y": 6,
+      "z": 0
+    },
+    {
+      "type": "glass",
+      "x": 4,
+      "y": 6,
+      "z": 0
+    },
+    {
+      "type": "glass",
+      "x": 7,
+      "y": 6,
+      "z": 0
+    },
+    {
+      "type": "glass",
+      "x": 9,
+      "y": 6,
+      "z": 0
+    },
+    {
+      "type": "stone_bricks",
+      "x": 7,
+      "y": 4,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 7,
+      "y": 4,
+      "z": 1
+    },
+    {
+      "type": "stone_bricks",
+      "x": 9,
+      "y": 4,
+      "z": 0
+    },
+    {
+      "type": "stone_bricks",
+      "x": 7,
+      "y": 4,
+      "z": 0
+    },
+    {
+      "type": "stone_bricks",
+      "x": 4,
+      "y": 4,
+      "z": 0
+    },
+    {
+      "type": "stone_bricks",
+      "x": 2,
+      "y": 4,
+      "z": 0
     }
   ],
   "category": "city_building",
