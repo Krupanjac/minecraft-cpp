@@ -90,8 +90,10 @@ vec3 applySharpen(vec2 uv, float amount) {
     vec3 south = sampleScene(uv - vec2(0.0, texel.y));
     vec3 east = sampleScene(uv + vec2(texel.x, 0.0));
     vec3 west = sampleScene(uv - vec2(texel.x, 0.0));
-    vec3 laplacian = (north + south + east + west) - (center * 4.0);
-    return center - laplacian * amount;
+    // Unsharp mask: amplify difference from neighbors, clamped to prevent negatives
+    vec3 avg = (north + south + east + west) * 0.25;
+    vec3 diff = center - avg;
+    return max(center + diff * amount, vec3(0.0));
 }
 
 vec3 computeBloom(vec2 uv) {

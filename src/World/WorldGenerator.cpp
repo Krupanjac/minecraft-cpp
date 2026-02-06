@@ -1612,37 +1612,6 @@ float WorldGenerator::getHeight(float x, float z) const {
     // Combine all layers - this is the base terrain height BEFORE river carving
     float finalHeight = baseHeight + finalHillHeight + mountainHeight + detailHeight;
 
-    // ========== SETTLEMENT FLATTENING ==========
-    // Partially flatten terrain in city/village biome areas so structures sit better.
-    // Uses the same grid logic as getBiome() for consistency.
-    {
-        const float CITY_GRID_F  = 400.0f;
-        const float CITY_RADIUS_F = 100.0f;
-        const float VILLAGE_GRID_F  = 150.0f;
-        const float VILLAGE_RADIUS_F = 45.0f;
-
-        float cityGridCX = std::floor(x / CITY_GRID_F) * CITY_GRID_F + CITY_GRID_F / 2.0f;
-        float cityGridCZ = std::floor(z / CITY_GRID_F) * CITY_GRID_F + CITY_GRID_F / 2.0f;
-        float cityDist = std::sqrt((x - cityGridCX) * (x - cityGridCX) +
-                                   (z - cityGridCZ) * (z - cityGridCZ));
-
-        float villageGridCX = std::floor(x / VILLAGE_GRID_F) * VILLAGE_GRID_F + VILLAGE_GRID_F / 2.0f;
-        float villageGridCZ = std::floor(z / VILLAGE_GRID_F) * VILLAGE_GRID_F + VILLAGE_GRID_F / 2.0f;
-        float villageDist = std::sqrt((x - villageGridCX) * (x - villageGridCX) +
-                                      (z - villageGridCZ) * (z - villageGridCZ));
-
-        if (cityDist < CITY_RADIUS_F) {
-            // Smooth falloff: strongest flattening at center, none at edge
-            float t = 1.0f - (cityDist / CITY_RADIUS_F);          // 1 at center, 0 at edge
-            float flattenStrength = t * t * 0.75f;                 // Quadratic falloff, up to 75%
-            finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
-        } else if (villageDist < VILLAGE_RADIUS_F && cityDist > CITY_RADIUS_F + 10.0f) {
-            float t = 1.0f - (villageDist / VILLAGE_RADIUS_F);
-            float flattenStrength = t * t * 0.50f;                 // Softer for villages
-            finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
-        }
-    }
-
     // River carving: create river-like water channels instead of random inland water.
     float rX = x * 0.0035f + offsetPVX * 0.25f + 31000.0f;
     float rZ = z * 0.0035f + offsetPVZ * 0.25f + 42000.0f;
@@ -1704,6 +1673,47 @@ float WorldGenerator::getHeight(float x, float z) const {
     if (finalHeight > 75.0f) {
         float excess = finalHeight - 75.0f;
         finalHeight = 75.0f + std::pow(excess / 120.0f, 0.85f) * 120.0f;
+    }
+
+    // ========== SETTLEMENT FLATTENING (applied last so nothing overrides it) ==========
+    // Flatten terrain in city/village biome areas so structures sit on level ground.
+    // Uses the same grid logic as getBiome() for consistency.
+    {
+        const float CITY_GRID_F    = 400.0f;
+        const float CITY_RADIUS_F  = 100.0f;
+        const float VILLAGE_GRID_F    = 150.0f;
+        const float VILLAGE_RADIUS_F  = 45.0f;
+        // Transition band outside the biome radius for smooth edges
+        const float CITY_TRANSITION    = 30.0f;
+        const float VILLAGE_TRANSITION = 15.0f;
+
+        float cityGridCX = std::floor(x / CITY_GRID_F) * CITY_GRID_F + CITY_GRID_F / 2.0f;
+        float cityGridCZ = std::floor(z / CITY_GRID_F) * CITY_GRID_F + CITY_GRID_F / 2.0f;
+        float cityDist = std::sqrt((x - cityGridCX) * (x - cityGridCX) +
+                                   (z - cityGridCZ) * (z - cityGridCZ));
+
+        float villageGridCX = std::floor(x / VILLAGE_GRID_F) * VILLAGE_GRID_F + VILLAGE_GRID_F / 2.0f;
+        float villageGridCZ = std::floor(z / VILLAGE_GRID_F) * VILLAGE_GRID_F + VILLAGE_GRID_F / 2.0f;
+        float villageDist = std::sqrt((x - villageGridCX) * (x - villageGridCX) +
+                                      (z - villageGridCZ) * (z - villageGridCZ));
+
+        if (cityDist < CITY_RADIUS_F + CITY_TRANSITION) {
+            // Use baseHeight as target — the flat continental base without hills/mountains
+            float outerR = CITY_RADIUS_F + CITY_TRANSITION;
+            // Full strength inside the radius, fade to 0 in transition band
+            float edgeFade = std::clamp((outerR - cityDist) / CITY_TRANSITION, 0.0f, 1.0f);
+            // Smooth-step for natural blending at boundary
+            edgeFade = edgeFade * edgeFade * (3.0f - 2.0f * edgeFade);
+            float flattenStrength = edgeFade * 0.92f;  // 92% flattened at center
+            finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
+        } else if (villageDist < VILLAGE_RADIUS_F + VILLAGE_TRANSITION &&
+                   cityDist > CITY_RADIUS_F + CITY_TRANSITION) {
+            float outerR = VILLAGE_RADIUS_F + VILLAGE_TRANSITION;
+            float edgeFade = std::clamp((outerR - villageDist) / VILLAGE_TRANSITION, 0.0f, 1.0f);
+            edgeFade = edgeFade * edgeFade * (3.0f - 2.0f * edgeFade);
+            float flattenStrength = edgeFade * 0.70f;  // 70% flattened
+            finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
+        }
     }
     
     return finalHeight;
