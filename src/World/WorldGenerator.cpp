@@ -118,10 +118,10 @@ static void initBiomeInfoCache(BiomeInfo* cache) {
     cache[12].foliageColorR = 0.50f; cache[12].foliageColorG = 0.68f; cache[12].foliageColorB = 0.35f;
     cache[12].mapColorR = 0.70f; cache[12].mapColorG = 0.55f; cache[12].mapColorB = 0.35f;  // Warm brown
     
-    // CITY - flat area with city buildings
+    // CITY - flat area with city buildings (grass/dirt base - roads/structures placed in generate())
     cache[13].type = BiomeType::CITY;
     cache[13].temperature = 0.5f; cache[13].humidity = 0.4f; cache[13].heightVariation = 0.1f;
-    cache[13].surfaceBlock = BlockType::COBBLESTONE; cache[13].subsurfaceBlock = BlockType::STONE; cache[13].surfaceDepth = 3;
+    cache[13].surfaceBlock = BlockType::GRASS; cache[13].subsurfaceBlock = BlockType::DIRT; cache[13].surfaceDepth = 4;
     cache[13].grassColorR = 0.45f; cache[13].grassColorG = 0.50f; cache[13].grassColorB = 0.40f;
     cache[13].foliageColorR = 0.40f; cache[13].foliageColorG = 0.45f; cache[13].foliageColorB = 0.38f;
     cache[13].mapColorR = 0.60f; cache[13].mapColorG = 0.60f; cache[13].mapColorB = 0.65f;  // Gray stone
@@ -1318,12 +1318,15 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     if (localTY >= 0 && localTY < CHUNK_HEIGHT) {
                         chunk->setBlock(lx, localTY, lz, Block(BlockType::GRASS));
                     }
-                    // Ensure dirt layer right below the grass
-                    int localDY = targetY - 1 - chunkBaseY;
-                    if (localDY >= 0 && localDY < CHUNK_HEIGHT) {
-                        Block below = chunk->getBlock(lx, localDY, lz);
-                        if (below.getType() != BlockType::STONE && below.getType() != BlockType::BEDROCK) {
-                            chunk->setBlock(lx, localDY, lz, Block(BlockType::DIRT));
+                    // Ensure dirt layers below the grass (replace stone too - no exposed stone in settlements)
+                    for (int d = 1; d <= 4; d++) {
+                        int localDY = targetY - d - chunkBaseY;
+                        if (localDY >= 0 && localDY < CHUNK_HEIGHT) {
+                            Block below = chunk->getBlock(lx, localDY, lz);
+                            BlockType bt = below.getType();
+                            if (bt == BlockType::STONE || bt == BlockType::COBBLESTONE || bt == BlockType::AIR) {
+                                chunk->setBlock(lx, localDY, lz, Block(BlockType::DIRT));
+                            }
                         }
                     }
                     
@@ -1428,12 +1431,10 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         }
         
         // ---- VILLAGE PATH NETWORK ----
-        // Villages get paths radiating from center, baked into terrain (replace surface block)
+        // Villages get paths radiating from center, baked INTO the terrain surface
         if (!isCity) {
             int centerIX = static_cast<int>(settlementCenterX);
             int centerIZ = static_cast<int>(settlementCenterZ);
-            // Use the village center height as the unified path Y level
-            int villageY = getSurfaceHeight(centerIX, centerIZ);
             
             for (int lx = 0; lx < CHUNK_SIZE; lx++) {
                 for (int lz = 0; lz < CHUNK_SIZE; lz++) {
@@ -1458,32 +1459,27 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     float pathRiver = getRiverMask(static_cast<float>(worldPX), static_cast<float>(worldPZ));
                     if (pathRiver > 0.25f) continue;
                     
+                    // Use the actual surface height at this position for the path
+                    // This embeds the path INTO the terrain rather than floating above/below
                     int naturalY = getSurfaceHeight(worldPX, worldPZ);
-                    // Blend path height: mostly villageY, slight blend with natural for gentle slope
-                    int pathY = static_cast<int>(std::round(0.7f * static_cast<float>(villageY) + 0.3f * static_cast<float>(naturalY)));
+                    int pathY = naturalY; // Path sits at the natural surface
                     int localPY = pathY - chunkBaseY;
                     if (localPY < 0 || localPY >= CHUNK_HEIGHT) continue;
                     
-                    // Fill up or carve down to path level
-                    if (naturalY < pathY) {
-                        for (int fy = naturalY + 1; fy < pathY; fy++) {
-                            int localFY = fy - chunkBaseY;
-                            if (localFY >= 0 && localFY < CHUNK_HEIGHT)
-                                chunk->setBlock(lx, localFY, lz, Block(BlockType::DIRT));
-                        }
-                    } else if (naturalY > pathY) {
-                        for (int fy = pathY + 1; fy <= naturalY; fy++) {
-                            int localFY = fy - chunkBaseY;
-                            if (localFY >= 0 && localFY < CHUNK_HEIGHT)
-                                chunk->setBlock(lx, localFY, lz, Block(BlockType::AIR));
-                        }
-                    }
-                    
-                    // Place path block at surface level (baked into terrain)
+                    // Replace the surface block with path material (baked into terrain)
                     if (std::abs(relX) == 0 || std::abs(relZ) == 0)
                         chunk->setBlock(lx, localPY, lz, Block(BlockType::COBBLESTONE));
                     else
                         chunk->setBlock(lx, localPY, lz, Block(BlockType::GRAVEL));
+                    
+                    // Ensure dirt below the path
+                    int localBelowPY = localPY - 1;
+                    if (localBelowPY >= 0 && localBelowPY < CHUNK_HEIGHT) {
+                        Block belowBlock = chunk->getBlock(lx, localBelowPY, lz);
+                        if (belowBlock.getType() == BlockType::AIR || belowBlock.getType() == BlockType::GRASS) {
+                            chunk->setBlock(lx, localBelowPY, lz, Block(BlockType::DIRT));
+                        }
+                    }
                     
                     // Clear above path for headroom
                     for (int clearY = 1; clearY <= 4; clearY++) {
@@ -1608,6 +1604,34 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                                         chunk->setBlock(localBX, localBY, localBZ, block.type);
                                     }
                                 }
+                                
+                                // Fill foundation below structure to prevent floating buildings
+                                auto structSize = structure->getSize();
+                                int footprintMaxX = std::min(structSize.x, structFootprint);
+                                int footprintMaxZ = std::min(structSize.z, structFootprint);
+                                for (int fx = 0; fx < footprintMaxX; fx++) {
+                                    for (int fz = 0; fz < footprintMaxZ; fz++) {
+                                        int worldFX = anchorX + fx;
+                                        int worldFZ = anchorZ + fz;
+                                        int localFX = worldFX - chunkBaseX;
+                                        int localFZ = worldFZ - chunkBaseZ;
+                                        if (localFX < 0 || localFX >= CHUNK_SIZE) continue;
+                                        if (localFZ < 0 || localFZ >= CHUNK_SIZE) continue;
+                                        
+                                        // Fill downward from groundY until we hit solid ground
+                                        for (int fy = groundY - 1; fy >= groundY - 12; fy--) {
+                                            int localFY = fy - chunkBaseY;
+                                            if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
+                                            Block below = chunk->getBlock(localFX, localFY, localFZ);
+                                            BlockType bt = below.getType();
+                                            if (bt == BlockType::AIR || bt == BlockType::WATER) {
+                                                chunk->setBlock(localFX, localFY, localFZ, Block(BlockType::DIRT));
+                                            } else {
+                                                break; // Hit solid ground, stop filling
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1671,19 +1695,33 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                                 
                                 int naturalY = getSurfaceHeight(worldFX, worldFZ);
                                 
+                                // Fill up terrain to groundY
                                 for (int fy = naturalY + 1; fy <= groundY; fy++) {
                                     int localFY = fy - chunkBaseY;
                                     if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
                                     chunk->setBlock(localFX, localFY, localFZ, Block(fy == groundY ? BlockType::GRASS : BlockType::DIRT));
                                 }
+                                // Carve down terrain to groundY
                                 for (int fy = groundY + 1; fy <= naturalY; fy++) {
                                     int localFY = fy - chunkBaseY;
                                     if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
                                     chunk->setBlock(localFX, localFY, localFZ, Block(BlockType::AIR));
                                 }
+                                // Ensure grass on top
                                 int localGY = groundY - chunkBaseY;
                                 if (localGY >= 0 && localGY < CHUNK_HEIGHT) {
                                     chunk->setBlock(localFX, localGY, localFZ, Block(BlockType::GRASS));
+                                }
+                                // Replace exposed stone/cobble below grass with dirt
+                                for (int d = 1; d <= 3; d++) {
+                                    int localDY = groundY - d - chunkBaseY;
+                                    if (localDY >= 0 && localDY < CHUNK_HEIGHT) {
+                                        Block below = chunk->getBlock(localFX, localDY, localFZ);
+                                        BlockType bt = below.getType();
+                                        if (bt == BlockType::STONE || bt == BlockType::COBBLESTONE || bt == BlockType::AIR) {
+                                            chunk->setBlock(localFX, localDY, localFZ, Block(BlockType::DIRT));
+                                        }
+                                    }
                                 }
                             }
                         }

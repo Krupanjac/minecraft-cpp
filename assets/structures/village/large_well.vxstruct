@@ -1,661 +1,668 @@
 {
-  "name": "Large Well",
   "author": "generator",
-  "category": "village_well",
-  "requires_flat": true,
-  "min_ground_coverage": 0.8,
-  "tags": [
-    "well",
-    "water",
-    "plaza"
+  "blocks": [
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "cobblestone",
+      "x": 0,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "cobblestone",
+      "x": 1,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "cobblestone",
+      "x": 1,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "cobblestone",
+      "x": 1,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "cobblestone",
+      "x": 1,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "cobblestone",
+      "x": 1,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "cobblestone",
+      "x": 1,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "cobblestone",
+      "x": 1,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "cobblestone",
+      "x": 2,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "cobblestone",
+      "x": 2,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "cobblestone",
+      "x": 2,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "cobblestone",
+      "x": 2,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "cobblestone",
+      "x": 2,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "cobblestone",
+      "x": 2,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "cobblestone",
+      "x": 2,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "cobblestone",
+      "x": 3,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "cobblestone",
+      "x": 3,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "cobblestone",
+      "x": 3,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "cobblestone",
+      "x": 3,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "cobblestone",
+      "x": 3,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "cobblestone",
+      "x": 3,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "cobblestone",
+      "x": 3,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "cobblestone",
+      "x": 4,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "cobblestone",
+      "x": 4,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "cobblestone",
+      "x": 4,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "cobblestone",
+      "x": 4,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "cobblestone",
+      "x": 4,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "cobblestone",
+      "x": 4,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "cobblestone",
+      "x": 4,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "cobblestone",
+      "x": 5,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "cobblestone",
+      "x": 5,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "cobblestone",
+      "x": 5,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "cobblestone",
+      "x": 5,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "cobblestone",
+      "x": 5,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "cobblestone",
+      "x": 5,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "cobblestone",
+      "x": 5,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "cobblestone",
+      "x": 6,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "stone_bricks",
+      "x": 2,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 4,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 2,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "stone_bricks",
+      "x": 4,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "stone_bricks",
+      "x": 3,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 3,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "stone_bricks",
+      "x": 2,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "stone_bricks",
+      "x": 4,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "stone_bricks",
+      "x": 2,
+      "y": 1,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 2,
+      "y": 1,
+      "z": 4
+    },
+    {
+      "type": "stone_bricks",
+      "x": 3,
+      "y": 1,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 3,
+      "y": 1,
+      "z": 4
+    },
+    {
+      "type": "stone_bricks",
+      "x": 2,
+      "y": 1,
+      "z": 3
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 2,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 2,
+      "z": 4
+    },
+    {
+      "type": "water",
+      "x": 3,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 3,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 4,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 3,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 4,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 3,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 4,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 3,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 4,
+      "z": 4
+    },
+    {
+      "type": "spruce_planks",
+      "x": 1,
+      "y": 4,
+      "z": 1
+    },
+    {
+      "type": "spruce_planks",
+      "x": 1,
+      "y": 4,
+      "z": 2
+    },
+    {
+      "type": "spruce_planks",
+      "x": 1,
+      "y": 4,
+      "z": 3
+    },
+    {
+      "type": "spruce_planks",
+      "x": 1,
+      "y": 4,
+      "z": 4
+    },
+    {
+      "type": "spruce_planks",
+      "x": 1,
+      "y": 4,
+      "z": 5
+    },
+    {
+      "type": "spruce_planks",
+      "x": 2,
+      "y": 4,
+      "z": 1
+    },
+    {
+      "type": "spruce_planks",
+      "x": 2,
+      "y": 4,
+      "z": 2
+    },
+    {
+      "type": "spruce_planks",
+      "x": 2,
+      "y": 4,
+      "z": 3
+    },
+    {
+      "type": "spruce_planks",
+      "x": 2,
+      "y": 4,
+      "z": 4
+    },
+    {
+      "type": "spruce_planks",
+      "x": 2,
+      "y": 4,
+      "z": 5
+    },
+    {
+      "type": "spruce_planks",
+      "x": 3,
+      "y": 4,
+      "z": 1
+    },
+    {
+      "type": "spruce_planks",
+      "x": 3,
+      "y": 4,
+      "z": 2
+    },
+    {
+      "type": "spruce_planks",
+      "x": 3,
+      "y": 4,
+      "z": 4
+    },
+    {
+      "type": "spruce_planks",
+      "x": 3,
+      "y": 4,
+      "z": 5
+    },
+    {
+      "type": "spruce_planks",
+      "x": 4,
+      "y": 4,
+      "z": 1
+    },
+    {
+      "type": "spruce_planks",
+      "x": 4,
+      "y": 4,
+      "z": 2
+    },
+    {
+      "type": "spruce_planks",
+      "x": 4,
+      "y": 4,
+      "z": 3
+    },
+    {
+      "type": "spruce_planks",
+      "x": 4,
+      "y": 4,
+      "z": 4
+    },
+    {
+      "type": "spruce_planks",
+      "x": 4,
+      "y": 4,
+      "z": 5
+    },
+    {
+      "type": "spruce_planks",
+      "x": 5,
+      "y": 4,
+      "z": 1
+    },
+    {
+      "type": "spruce_planks",
+      "x": 5,
+      "y": 4,
+      "z": 2
+    },
+    {
+      "type": "spruce_planks",
+      "x": 5,
+      "y": 4,
+      "z": 3
+    },
+    {
+      "type": "spruce_planks",
+      "x": 5,
+      "y": 4,
+      "z": 4
+    },
+    {
+      "type": "spruce_planks",
+      "x": 5,
+      "y": 4,
+      "z": 5
+    },
+    {
+      "type": "water",
+      "x": 3,
+      "y": 1,
+      "z": 3
+    },
+    {
+      "type": "spruce_planks",
+      "x": 3,
+      "y": 4,
+      "z": 3
+    },
+    {
+      "type": "stone_bricks",
+      "x": 4,
+      "y": 1,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 4,
+      "y": 1,
+      "z": 3
+    },
+    {
+      "type": "stone_bricks",
+      "x": 4,
+      "y": 1,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 2,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 2,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 3,
+      "y": 2,
+      "z": 2
+    },
+    {
+      "type": "oak_log",
+      "x": 2,
+      "y": 2,
+      "z": 3
+    },
+    {
+      "type": "oak_log",
+      "x": 3,
+      "y": 2,
+      "z": 4
+    },
+    {
+      "type": "oak_log",
+      "x": 4,
+      "y": 2,
+      "z": 3
+    }
   ],
+  "category": "village_well",
+  "markers": [],
+  "min_ground_coverage": 0.800000011920929,
+  "name": "Large Well",
+  "requires_flat": true,
   "size": {
     "x": 7,
     "y": 5,
     "z": 7
   },
-  "blocks": [
-    {
-      "x": 0,
-      "y": 0,
-      "z": 0,
-      "type": "cobblestone"
-    },
-    {
-      "x": 0,
-      "y": 0,
-      "z": 1,
-      "type": "cobblestone"
-    },
-    {
-      "x": 0,
-      "y": 0,
-      "z": 2,
-      "type": "cobblestone"
-    },
-    {
-      "x": 0,
-      "y": 0,
-      "z": 3,
-      "type": "cobblestone"
-    },
-    {
-      "x": 0,
-      "y": 0,
-      "z": 4,
-      "type": "cobblestone"
-    },
-    {
-      "x": 0,
-      "y": 0,
-      "z": 5,
-      "type": "cobblestone"
-    },
-    {
-      "x": 0,
-      "y": 0,
-      "z": 6,
-      "type": "cobblestone"
-    },
-    {
-      "x": 1,
-      "y": 0,
-      "z": 0,
-      "type": "cobblestone"
-    },
-    {
-      "x": 1,
-      "y": 0,
-      "z": 1,
-      "type": "cobblestone"
-    },
-    {
-      "x": 1,
-      "y": 0,
-      "z": 2,
-      "type": "cobblestone"
-    },
-    {
-      "x": 1,
-      "y": 0,
-      "z": 3,
-      "type": "cobblestone"
-    },
-    {
-      "x": 1,
-      "y": 0,
-      "z": 4,
-      "type": "cobblestone"
-    },
-    {
-      "x": 1,
-      "y": 0,
-      "z": 5,
-      "type": "cobblestone"
-    },
-    {
-      "x": 1,
-      "y": 0,
-      "z": 6,
-      "type": "cobblestone"
-    },
-    {
-      "x": 2,
-      "y": 0,
-      "z": 0,
-      "type": "cobblestone"
-    },
-    {
-      "x": 2,
-      "y": 0,
-      "z": 1,
-      "type": "cobblestone"
-    },
-    {
-      "x": 2,
-      "y": 0,
-      "z": 2,
-      "type": "cobblestone"
-    },
-    {
-      "x": 2,
-      "y": 0,
-      "z": 3,
-      "type": "cobblestone"
-    },
-    {
-      "x": 2,
-      "y": 0,
-      "z": 4,
-      "type": "cobblestone"
-    },
-    {
-      "x": 2,
-      "y": 0,
-      "z": 5,
-      "type": "cobblestone"
-    },
-    {
-      "x": 2,
-      "y": 0,
-      "z": 6,
-      "type": "cobblestone"
-    },
-    {
-      "x": 3,
-      "y": 0,
-      "z": 0,
-      "type": "cobblestone"
-    },
-    {
-      "x": 3,
-      "y": 0,
-      "z": 1,
-      "type": "cobblestone"
-    },
-    {
-      "x": 3,
-      "y": 0,
-      "z": 2,
-      "type": "cobblestone"
-    },
-    {
-      "x": 3,
-      "y": 0,
-      "z": 3,
-      "type": "cobblestone"
-    },
-    {
-      "x": 3,
-      "y": 0,
-      "z": 4,
-      "type": "cobblestone"
-    },
-    {
-      "x": 3,
-      "y": 0,
-      "z": 5,
-      "type": "cobblestone"
-    },
-    {
-      "x": 3,
-      "y": 0,
-      "z": 6,
-      "type": "cobblestone"
-    },
-    {
-      "x": 4,
-      "y": 0,
-      "z": 0,
-      "type": "cobblestone"
-    },
-    {
-      "x": 4,
-      "y": 0,
-      "z": 1,
-      "type": "cobblestone"
-    },
-    {
-      "x": 4,
-      "y": 0,
-      "z": 2,
-      "type": "cobblestone"
-    },
-    {
-      "x": 4,
-      "y": 0,
-      "z": 3,
-      "type": "cobblestone"
-    },
-    {
-      "x": 4,
-      "y": 0,
-      "z": 4,
-      "type": "cobblestone"
-    },
-    {
-      "x": 4,
-      "y": 0,
-      "z": 5,
-      "type": "cobblestone"
-    },
-    {
-      "x": 4,
-      "y": 0,
-      "z": 6,
-      "type": "cobblestone"
-    },
-    {
-      "x": 5,
-      "y": 0,
-      "z": 0,
-      "type": "cobblestone"
-    },
-    {
-      "x": 5,
-      "y": 0,
-      "z": 1,
-      "type": "cobblestone"
-    },
-    {
-      "x": 5,
-      "y": 0,
-      "z": 2,
-      "type": "cobblestone"
-    },
-    {
-      "x": 5,
-      "y": 0,
-      "z": 3,
-      "type": "cobblestone"
-    },
-    {
-      "x": 5,
-      "y": 0,
-      "z": 4,
-      "type": "cobblestone"
-    },
-    {
-      "x": 5,
-      "y": 0,
-      "z": 5,
-      "type": "cobblestone"
-    },
-    {
-      "x": 5,
-      "y": 0,
-      "z": 6,
-      "type": "cobblestone"
-    },
-    {
-      "x": 6,
-      "y": 0,
-      "z": 0,
-      "type": "cobblestone"
-    },
-    {
-      "x": 6,
-      "y": 0,
-      "z": 1,
-      "type": "cobblestone"
-    },
-    {
-      "x": 6,
-      "y": 0,
-      "z": 2,
-      "type": "cobblestone"
-    },
-    {
-      "x": 6,
-      "y": 0,
-      "z": 3,
-      "type": "cobblestone"
-    },
-    {
-      "x": 6,
-      "y": 0,
-      "z": 4,
-      "type": "cobblestone"
-    },
-    {
-      "x": 6,
-      "y": 0,
-      "z": 5,
-      "type": "cobblestone"
-    },
-    {
-      "x": 6,
-      "y": 0,
-      "z": 6,
-      "type": "cobblestone"
-    },
-    {
-      "x": 2,
-      "y": 0,
-      "z": 2,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 4,
-      "y": 0,
-      "z": 2,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 2,
-      "y": 0,
-      "z": 4,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 4,
-      "y": 0,
-      "z": 4,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 3,
-      "y": 0,
-      "z": 2,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 3,
-      "y": 0,
-      "z": 4,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 2,
-      "y": 0,
-      "z": 3,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 4,
-      "y": 0,
-      "z": 3,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 2,
-      "y": 1,
-      "z": 2,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 4,
-      "y": 1,
-      "z": 2,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 2,
-      "y": 1,
-      "z": 4,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 4,
-      "y": 1,
-      "z": 4,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 3,
-      "y": 1,
-      "z": 2,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 3,
-      "y": 1,
-      "z": 4,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 2,
-      "y": 1,
-      "z": 3,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 4,
-      "y": 1,
-      "z": 3,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 2,
-      "y": 2,
-      "z": 2,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 4,
-      "y": 2,
-      "z": 2,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 2,
-      "y": 2,
-      "z": 4,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 4,
-      "y": 2,
-      "z": 4,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 3,
-      "y": 2,
-      "z": 2,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 3,
-      "y": 2,
-      "z": 4,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 2,
-      "y": 2,
-      "z": 3,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 4,
-      "y": 2,
-      "z": 3,
-      "type": "stone_bricks"
-    },
-    {
-      "x": 3,
-      "y": 0,
-      "z": 3,
-      "type": "water"
-    },
-    {
-      "x": 2,
-      "y": 3,
-      "z": 2,
-      "type": "oak_log"
-    },
-    {
-      "x": 2,
-      "y": 4,
-      "z": 2,
-      "type": "oak_log"
-    },
-    {
-      "x": 4,
-      "y": 3,
-      "z": 2,
-      "type": "oak_log"
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": 2,
-      "type": "oak_log"
-    },
-    {
-      "x": 2,
-      "y": 3,
-      "z": 4,
-      "type": "oak_log"
-    },
-    {
-      "x": 2,
-      "y": 4,
-      "z": 4,
-      "type": "oak_log"
-    },
-    {
-      "x": 4,
-      "y": 3,
-      "z": 4,
-      "type": "oak_log"
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": 4,
-      "type": "oak_log"
-    },
-    {
-      "x": 1,
-      "y": 4,
-      "z": 1,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 1,
-      "y": 4,
-      "z": 2,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 1,
-      "y": 4,
-      "z": 3,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 1,
-      "y": 4,
-      "z": 4,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 1,
-      "y": 4,
-      "z": 5,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 2,
-      "y": 4,
-      "z": 1,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 2,
-      "y": 4,
-      "z": 2,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 2,
-      "y": 4,
-      "z": 3,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 2,
-      "y": 4,
-      "z": 4,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 2,
-      "y": 4,
-      "z": 5,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 3,
-      "y": 4,
-      "z": 1,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 3,
-      "y": 4,
-      "z": 2,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 3,
-      "y": 4,
-      "z": 3,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 3,
-      "y": 4,
-      "z": 4,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 3,
-      "y": 4,
-      "z": 5,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": 1,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": 2,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": 3,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": 4,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": 5,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 5,
-      "y": 4,
-      "z": 1,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 5,
-      "y": 4,
-      "z": 2,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 5,
-      "y": 4,
-      "z": 3,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 5,
-      "y": 4,
-      "z": 4,
-      "type": "spruce_planks"
-    },
-    {
-      "x": 5,
-      "y": 4,
-      "z": 5,
-      "type": "spruce_planks"
-    }
+  "tags": [
+    "well",
+    "water",
+    "plaza"
   ]
 }

@@ -467,12 +467,6 @@
       "type": "cobblestone",
       "x": 3,
       "y": 4,
-      "z": 0
-    },
-    {
-      "type": "cobblestone",
-      "x": 3,
-      "y": 4,
       "z": 4
     },
     {
@@ -539,12 +533,6 @@
       "type": "cobblestone",
       "x": 1,
       "y": 5,
-      "z": 0
-    },
-    {
-      "type": "cobblestone",
-      "x": 1,
-      "y": 5,
       "z": 4
     },
     {
@@ -586,12 +574,6 @@
     {
       "type": "cobblestone",
       "x": 0,
-      "y": 5,
-      "z": 1
-    },
-    {
-      "type": "cobblestone",
-      "x": 4,
       "y": 5,
       "z": 1
     },
@@ -706,12 +688,6 @@
     {
       "type": "cobblestone",
       "x": 0,
-      "y": 6,
-      "z": 3
-    },
-    {
-      "type": "cobblestone",
-      "x": 4,
       "y": 6,
       "z": 3
     },
@@ -852,12 +828,6 @@
       "x": 3,
       "y": 8,
       "z": 0
-    },
-    {
-      "type": "cobblestone",
-      "x": 3,
-      "y": 8,
-      "z": 4
     },
     {
       "type": "cobblestone",
@@ -1284,6 +1254,108 @@
       "x": 2,
       "y": 10,
       "z": 2
+    },
+    {
+      "type": "cobblestone",
+      "x": 1,
+      "y": 5,
+      "z": 0
+    },
+    {
+      "type": "glass",
+      "x": 3,
+      "y": 4,
+      "z": 0
+    },
+    {
+      "type": "glass",
+      "x": 4,
+      "y": 5,
+      "z": 1
+    },
+    {
+      "type": "glass",
+      "x": 4,
+      "y": 6,
+      "z": 3
+    },
+    {
+      "type": "glass",
+      "x": 3,
+      "y": 8,
+      "z": 4
+    },
+    {
+      "type": "glass",
+      "x": 3,
+      "y": 10,
+      "z": 4
+    },
+    {
+      "type": "glass",
+      "x": 2,
+      "y": 10,
+      "z": 4
+    },
+    {
+      "type": "glass",
+      "x": 1,
+      "y": 10,
+      "z": 4
+    },
+    {
+      "type": "glass",
+      "x": 4,
+      "y": 10,
+      "z": 1
+    },
+    {
+      "type": "glass",
+      "x": 4,
+      "y": 10,
+      "z": 2
+    },
+    {
+      "type": "glass",
+      "x": 4,
+      "y": 10,
+      "z": 3
+    },
+    {
+      "type": "glass",
+      "x": 1,
+      "y": 10,
+      "z": 0
+    },
+    {
+      "type": "glass",
+      "x": 2,
+      "y": 10,
+      "z": 0
+    },
+    {
+      "type": "glass",
+      "x": 3,
+      "y": 10,
+      "z": 0
+    },
+    {
+      "type": "glass",
+      "x": 0,
+      "y": 10,
+      "z": 3
+    },
+    {
+      "type": "glass",
+      "x": 0,
+      "y": 10,
+      "z": 2
+    },
+    {
+      "type": "glass",
+      "x": 0,
+      "y": 10,
+      "z": 1
     }
   ],
   "category": "village_building",
