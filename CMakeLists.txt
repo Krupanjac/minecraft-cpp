@@ -12,9 +12,29 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 # Compiler flags
 if(MSVC)
-    add_compile_options(/W4 /permissive-)
+    # /MP  - Multi-processor compilation (uses all available cores)
+    # /W4  - Warning level 4
+    # /permissive- - Strict conformance mode
+    add_compile_options(/W4 /permissive- /MP)
+
+    # Release optimizations
+    # /O2    - Maximum speed optimization
+    # /Oi    - Enable intrinsic functions
+    # /GL    - Whole program optimization (enables LTCG at link time)
+    # /Gy    - Function-level linking
+    # /fp:fast - Fast floating-point model (better SIMD/math perf)
+    # /arch:AVX2 - Use AVX2 instructions (Ryzen 5800X supports this)
+    set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_RELEASE} /O2 /Oi /GL /Gy /fp:fast /arch:AVX2 /DNDEBUG")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /Oi /GL /Gy /fp:fast /arch:AVX2 /DNDEBUG")
+
+    # Link-Time Code Generation for Release (pairs with /GL)
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE    "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG /OPT:REF /OPT:ICF")
+    set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS_RELEASE} /LTCG")
 else()
     add_compile_options(-Wall -Wextra -pedantic)
+    # GCC/Clang Release optimizations
+    set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_RELEASE} -O3 -march=znver3 -flto -DNDEBUG")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=znver3 -flto -DNDEBUG")
 endif()
 
 # Find OpenGL
@@ -29,6 +49,7 @@ if(NOT glfw3_FOUND)
         glfw
         GIT_REPOSITORY https://github.com/glfw/glfw.git
         GIT_TAG 3.3.8
+        GIT_SHALLOW TRUE
     )
     set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
     set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -44,6 +65,7 @@ if(NOT glm_FOUND)
         glm
         GIT_REPOSITORY https://github.com/g-truc/glm.git
         GIT_TAG 1.0.2
+        GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(glm)
 endif()
@@ -53,6 +75,7 @@ FetchContent_Declare(
     stb
     GIT_REPOSITORY https://github.com/nothings/stb.git
     GIT_TAG master
+    GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(stb)
 include_directories(${stb_SOURCE_DIR})
@@ -65,6 +88,7 @@ FetchContent_Declare(
     tinygltf
     GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
     GIT_TAG release
+    GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(tinygltf)
 include_directories(${tinygltf_SOURCE_DIR})
@@ -74,6 +98,7 @@ FetchContent_Declare(
     imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
     GIT_TAG v1.90.1
+    GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(imgui)
 
@@ -82,6 +107,7 @@ FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.11.3
+    GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
