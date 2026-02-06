@@ -181,13 +181,18 @@ GLuint createShaderProgram(const std::string& vertPath, const std::string& fragP
 // ============================================================================
 
 void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset, const glm::vec3& color) {
-    struct Face {
+    // Standard OpenGL UV: V=0 at bottom, V=1 at top (textures loaded with stbi flip=true)
+    // All faces use same UV pattern: (0,0)=BL, (1,0)=BR, (1,1)=TR, (0,1)=TL
+    struct FaceData {
         glm::vec3 v[4];
         glm::vec3 normal;
     };
 
-    Face faces[6] = {
-        // Front (+Z)
+    // UV is the same for all faces
+    const glm::vec2 uv[4] = {{0,0},{1,0},{1,1},{0,1}};
+
+    FaceData faces[6] = {
+        // Front (+Z)  BL       BR       TR       TL
         {{{0,0,1}, {1,0,1}, {1,1,1}, {0,1,1}}, {0,0,1}},
         // Back (-Z)
         {{{1,0,0}, {0,0,0}, {0,1,0}, {1,1,0}}, {0,0,-1}},
@@ -202,12 +207,12 @@ void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset
     };
 
     for (auto& face : faces) {
-        vertices.push_back({face.v[0] + offset, face.normal, color, {0,0}, -1.0f});
-        vertices.push_back({face.v[1] + offset, face.normal, color, {1,0}, -1.0f});
-        vertices.push_back({face.v[2] + offset, face.normal, color, {1,1}, -1.0f});
-        vertices.push_back({face.v[0] + offset, face.normal, color, {0,0}, -1.0f});
-        vertices.push_back({face.v[2] + offset, face.normal, color, {1,1}, -1.0f});
-        vertices.push_back({face.v[3] + offset, face.normal, color, {0,1}, -1.0f});
+        vertices.push_back({face.v[0] + offset, face.normal, color, uv[0], -1.0f});
+        vertices.push_back({face.v[1] + offset, face.normal, color, uv[1], -1.0f});
+        vertices.push_back({face.v[2] + offset, face.normal, color, uv[2], -1.0f});
+        vertices.push_back({face.v[0] + offset, face.normal, color, uv[0], -1.0f});
+        vertices.push_back({face.v[2] + offset, face.normal, color, uv[2], -1.0f});
+        vertices.push_back({face.v[3] + offset, face.normal, color, uv[3], -1.0f});
     }
 }
 
@@ -215,68 +220,86 @@ void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset
 void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset,
                           const glm::vec3& color, BlockType type, int textureMode,
                           const std::unordered_map<std::string, int>* pbrMap) {
+    // Standard OpenGL UV: V=0 at bottom, V=1 at top (stbi flip=true)
+    // All faces use (0,0)=BL, (1,0)=BR, (1,1)=TR, (0,1)=TL
     struct Face {
         glm::vec3 v[4];
         glm::vec3 normal;
         int faceCategory; // 0=top, 1=side, 2=bottom
     };
 
+    const glm::vec2 baseUV[4] = {{0,0},{1,0},{1,1},{0,1}};
+
     Face faces[6] = {
-        // Front (+Z) → side
-        {{{0,0,1}, {1,0,1}, {1,1,1}, {0,1,1}}, {0,0,1}, 1},
-        // Back (-Z) → side
+        // Front (+Z)   BL       BR       TR       TL
+        {{{0,0,1}, {1,0,1}, {1,1,1}, {0,1,1}}, {0,0,1},  1},
+        // Back (-Z)
         {{{1,0,0}, {0,0,0}, {0,1,0}, {1,1,0}}, {0,0,-1}, 1},
-        // Right (+X) → side
-        {{{1,0,1}, {1,0,0}, {1,1,0}, {1,1,1}}, {1,0,0}, 1},
-        // Left (-X) → side
+        // Right (+X)
+        {{{1,0,1}, {1,0,0}, {1,1,0}, {1,1,1}}, {1,0,0},  1},
+        // Left (-X)
         {{{0,0,0}, {0,0,1}, {0,1,1}, {0,1,0}}, {-1,0,0}, 1},
-        // Top (+Y) → top
-        {{{0,1,1}, {1,1,1}, {1,1,0}, {0,1,0}}, {0,1,0}, 0},
-        // Bottom (-Y) → bottom
+        // Top (+Y)
+        {{{0,1,1}, {1,1,1}, {1,1,0}, {0,1,0}}, {0,1,0},  0},
+        // Bottom (-Y)
         {{{0,0,0}, {1,0,0}, {1,0,1}, {0,0,1}}, {0,-1,0}, 2},
     };
 
     for (int i = 0; i < 6; i++) {
         auto& face = faces[i];
-        glm::vec2 uv0, uv1, uv2, uv3;
+        glm::vec2 uv[4];
         float layer = -1.0f;
+        glm::vec3 tint = {1.0f, 1.0f, 1.0f}; // Default: no tint (white)
 
         if (textureMode == 1) {
-            // Atlas mode: compute UV from atlas cell
+            // Atlas mode: map base 0-1 UVs into the atlas cell
+            // Atlas loaded with stbi flip=true: V=0=bottom, V=1=top (OpenGL standard)
+            // Row 0 (image top) is at V near 1.0, row 15 (image bottom) at V near 0.0
             int atlasIdx = getBlockTextureIndex(type, face.faceCategory);
             float cs = 1.0f / 16.0f;
             int col = atlasIdx % 16;
             int row = atlasIdx / 16;
-            float u0 = col * cs;
-            float v0 = row * cs;
-            float u1 = (col + 1) * cs;
-            float v1 = (row + 1) * cs;
-            // Half-texel inset to prevent bleeding
-            float texel = 0.5f / (16.0f * 16.0f); // assuming 256px atlas (16 cells * 16px)
-            u0 += texel; v0 += texel;
-            u1 -= texel; v1 -= texel;
-            uv0 = {u0, v0};
-            uv1 = {u1, v0};
-            uv2 = {u1, v1};
-            uv3 = {u0, v1};
+            float cellU0 = col * cs;
+            float cellU1 = (col + 1) * cs;
+            float cellV0 = 1.0f - (row + 1) * cs; // Cell bottom (lower V)
+            float cellV1 = 1.0f - row * cs;        // Cell top (higher V)
+            // Half-texel inset to prevent atlas bleeding
+            float texel = 0.5f / 256.0f; // 256px atlas = 16 cells * 16px
+            cellU0 += texel; cellV0 += texel;
+            cellU1 -= texel; cellV1 -= texel;
+            // Map base UVs into the atlas cell
+            for (int j = 0; j < 4; j++) {
+                float u = cellU0 + baseUV[j].x * (cellU1 - cellU0);
+                float v = cellV0 + baseUV[j].y * (cellV1 - cellV0);
+                uv[j] = {u, v};
+            }
+            // Apply biome tint for grass/leaf top faces in atlas mode
+            // (Atlas grass_top may be grayscale, needs green tint)
+            if (type == BlockType::GRASS && face.faceCategory == 0) {
+                tint = {0.49f, 0.78f, 0.30f}; // Green biome tint
+            } else if (type == BlockType::OAK_LEAVES || type == BlockType::BIRCH_LEAVES ||
+                       type == BlockType::JUNGLE_LEAVES || type == BlockType::SPRUCE_LEAVES) {
+                tint = {0.40f, 0.65f, 0.20f}; // Leaf biome tint
+            }
         } else if (textureMode == 2 && pbrMap) {
-            // PBR mode: face UV is 0-1, layer from PBR map
-            uv0 = {0, 0};
-            uv1 = {1, 0};
-            uv2 = {1, 1};
-            uv3 = {0, 1};
+            // PBR mode: use base 0-1 UVs directly, set layer
+            // Tinting is already baked into composited textures
+            for (int j = 0; j < 4; j++) {
+                uv[j] = baseUV[j];
+            }
             layer = (float)getPBRTextureLayer(type, face.faceCategory, *pbrMap);
         } else {
             // Color-only fallback
-            uv0 = uv1 = uv2 = uv3 = {0, 0};
+            for (int j = 0; j < 4; j++) uv[j] = baseUV[j];
+            tint = color; // Use palette color for color-only
         }
 
-        vertices.push_back({face.v[0] + offset, face.normal, color, uv0, layer});
-        vertices.push_back({face.v[1] + offset, face.normal, color, uv1, layer});
-        vertices.push_back({face.v[2] + offset, face.normal, color, uv2, layer});
-        vertices.push_back({face.v[0] + offset, face.normal, color, uv0, layer});
-        vertices.push_back({face.v[2] + offset, face.normal, color, uv2, layer});
-        vertices.push_back({face.v[3] + offset, face.normal, color, uv3, layer});
+        vertices.push_back({face.v[0] + offset, face.normal, tint, uv[0], layer});
+        vertices.push_back({face.v[1] + offset, face.normal, tint, uv[1], layer});
+        vertices.push_back({face.v[2] + offset, face.normal, tint, uv[2], layer});
+        vertices.push_back({face.v[0] + offset, face.normal, tint, uv[0], layer});
+        vertices.push_back({face.v[2] + offset, face.normal, tint, uv[2], layer});
+        vertices.push_back({face.v[3] + offset, face.normal, tint, uv[3], layer});
     }
 }
 
@@ -482,7 +505,7 @@ int getBlockTextureIndex(BlockType type, int face) {
 
 GLuint loadBlockAtlasTexture(const std::string& path) {
     int w, h, channels;
-    stbi_set_flip_vertically_on_load(false);
+    stbi_set_flip_vertically_on_load(true); // Match game convention: V=0 at bottom
     unsigned char* data = stbi_load(path.c_str(), &w, &h, &channels, 4);
     if (!data) {
         std::cerr << "Failed to load atlas: " << path << std::endl;
@@ -610,67 +633,133 @@ GLuint loadPBRAlbedoArray(const std::string& pbrPath, std::unordered_map<std::st
 
     // Detect texture size from first file
     int w, h, ch;
-    stbi_set_flip_vertically_on_load(false);
+    stbi_set_flip_vertically_on_load(true); // Match game: V=0 at bottom (OpenGL standard)
     unsigned char* probe = stbi_load(albedoFiles[indices[0]].c_str(), &w, &h, &ch, 4);
     if (!probe) {
         std::cerr << "Failed to load first PBR texture for size detection" << std::endl;
         return 0;
     }
-    texSize = std::min(w, h); // Use the smaller dimension as the target size
-    // Clamp to reasonable editor size (max 128 to save VRAM)
+    texSize = std::min(w, h);
     if (texSize > 128) texSize = 128;
     stbi_image_free(probe);
 
-    int layerCount = (int)albedoFiles.size();
+    // ---- Phase 1: Load all textures into CPU memory ----
+    struct TexData {
+        std::string name;
+        std::vector<unsigned char> pixels; // texSize * texSize * 4
+    };
+    std::vector<TexData> allTextures;
 
-    // Create texture array
+    for (size_t idx : indices) {
+        TexData td;
+        td.name = albedoNames[idx];
+        td.pixels.resize(texSize * texSize * 4);
+
+        int tw, th, tc;
+        unsigned char* data = stbi_load(albedoFiles[idx].c_str(), &tw, &th, &tc, 4);
+        if (!data) {
+            // Magenta fallback
+            for (int p = 0; p < texSize * texSize; p++) {
+                td.pixels[p * 4 + 0] = 255;
+                td.pixels[p * 4 + 1] = 0;
+                td.pixels[p * 4 + 2] = 255;
+                td.pixels[p * 4 + 3] = 255;
+            }
+        } else {
+            if (tw == texSize && th == texSize) {
+                memcpy(td.pixels.data(), data, texSize * texSize * 4);
+            } else {
+                // Nearest-neighbor resize
+                for (int y = 0; y < texSize; y++) {
+                    for (int x = 0; x < texSize; x++) {
+                        int sx = x * tw / texSize;
+                        int sy = y * th / texSize;
+                        int srcI = (sy * tw + sx) * 4;
+                        int dstI = (y * texSize + x) * 4;
+                        td.pixels[dstI + 0] = data[srcI + 0];
+                        td.pixels[dstI + 1] = data[srcI + 1];
+                        td.pixels[dstI + 2] = data[srcI + 2];
+                        td.pixels[dstI + 3] = data[srcI + 3];
+                    }
+                }
+            }
+            stbi_image_free(data);
+        }
+        allTextures.push_back(std::move(td));
+    }
+
+    // Build name→index map for lookups
+    std::unordered_map<std::string, int> tempIndex;
+    for (int i = 0; i < (int)allTextures.size(); i++) {
+        tempIndex[allTextures[i].name] = i;
+    }
+
+    // ---- Phase 2: Create composited grass textures (like game does) ----
+    auto dirtIt = tempIndex.find("dirt");
+    auto overlayIt = tempIndex.find("grass_block_side_overlay");
+    auto grassTopIt = tempIndex.find("grass_block_top");
+
+    // Composite: dirt + grass_block_side_overlay → grass_block_side_composited
+    if (dirtIt != tempIndex.end() && overlayIt != tempIndex.end()) {
+        TexData composited;
+        composited.name = "grass_block_side_composited";
+        composited.pixels.resize(texSize * texSize * 4);
+        const auto& dirt = allTextures[dirtIt->second].pixels;
+        const auto& overlay = allTextures[overlayIt->second].pixels;
+
+        // Green biome tint for the overlay (matching game: 0.5, 0.85, 0.4)
+        float tintR = 0.49f, tintG = 0.78f, tintB = 0.30f;
+
+        for (int i = 0; i < texSize * texSize; i++) {
+            float overlayA = overlay[i * 4 + 3] / 255.0f;
+            // Tint the overlay by biome green
+            float oR = (overlay[i * 4 + 0] / 255.0f) * tintR;
+            float oG = (overlay[i * 4 + 1] / 255.0f) * tintG;
+            float oB = (overlay[i * 4 + 2] / 255.0f) * tintB;
+            // Blend: result = dirt * (1 - overlayA) + tinted_overlay * overlayA
+            float dR = dirt[i * 4 + 0] / 255.0f;
+            float dG = dirt[i * 4 + 1] / 255.0f;
+            float dB = dirt[i * 4 + 2] / 255.0f;
+            composited.pixels[i * 4 + 0] = (unsigned char)(std::min(1.0f, dR * (1.0f - overlayA) + oR * overlayA) * 255.0f);
+            composited.pixels[i * 4 + 1] = (unsigned char)(std::min(1.0f, dG * (1.0f - overlayA) + oG * overlayA) * 255.0f);
+            composited.pixels[i * 4 + 2] = (unsigned char)(std::min(1.0f, dB * (1.0f - overlayA) + oB * overlayA) * 255.0f);
+            composited.pixels[i * 4 + 3] = 255; // Fully opaque result
+        }
+        allTextures.push_back(std::move(composited));
+        std::cout << "Created composited grass_block_side texture" << std::endl;
+    }
+
+    // Tint grass_block_top → grass_block_top_tinted
+    if (grassTopIt != tempIndex.end()) {
+        TexData tinted;
+        tinted.name = "grass_block_top_tinted";
+        tinted.pixels.resize(texSize * texSize * 4);
+        const auto& src = allTextures[grassTopIt->second].pixels;
+
+        float tintR = 0.49f, tintG = 0.78f, tintB = 0.30f;
+        for (int i = 0; i < texSize * texSize; i++) {
+            tinted.pixels[i * 4 + 0] = (unsigned char)(std::min(255.0f, src[i * 4 + 0] * tintR));
+            tinted.pixels[i * 4 + 1] = (unsigned char)(std::min(255.0f, src[i * 4 + 1] * tintG));
+            tinted.pixels[i * 4 + 2] = (unsigned char)(std::min(255.0f, src[i * 4 + 2] * tintB));
+            tinted.pixels[i * 4 + 3] = src[i * 4 + 3];
+        }
+        allTextures.push_back(std::move(tinted));
+        std::cout << "Created tinted grass_block_top texture" << std::endl;
+    }
+
+    // ---- Phase 3: Upload everything to GL texture array ----
+    int layerCount = (int)allTextures.size();
     GLuint texArray;
     glGenTextures(1, &texArray);
     glBindTexture(GL_TEXTURE_2D_ARRAY, texArray);
     glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, texSize, texSize, layerCount, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
-    // Load each texture into a layer
     nameToLayer.clear();
-    int layer = 0;
-    for (size_t idx : indices) {
-        int tw, th, tc;
-        unsigned char* data = stbi_load(albedoFiles[idx].c_str(), &tw, &th, &tc, 4);
-        if (!data) {
-            // Fill with magenta for missing textures
-            std::vector<unsigned char> fallback(texSize * texSize * 4, 255);
-            for (int p = 0; p < texSize * texSize; p++) {
-                fallback[p * 4 + 1] = 0; // magenta = (255,0,255,255)
-                fallback[p * 4 + 3] = 255;
-            }
-            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, texSize, texSize, 1,
-                           GL_RGBA, GL_UNSIGNED_BYTE, fallback.data());
-        } else {
-            if (tw == texSize && th == texSize) {
-                glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, texSize, texSize, 1,
-                               GL_RGBA, GL_UNSIGNED_BYTE, data);
-            } else {
-                // Simple nearest-neighbor resize
-                std::vector<unsigned char> resized(texSize * texSize * 4);
-                for (int y = 0; y < texSize; y++) {
-                    for (int x = 0; x < texSize; x++) {
-                        int sx = x * tw / texSize;
-                        int sy = y * th / texSize;
-                        int srcIdx = (sy * tw + sx) * 4;
-                        int dstIdx = (y * texSize + x) * 4;
-                        resized[dstIdx + 0] = data[srcIdx + 0];
-                        resized[dstIdx + 1] = data[srcIdx + 1];
-                        resized[dstIdx + 2] = data[srcIdx + 2];
-                        resized[dstIdx + 3] = data[srcIdx + 3];
-                    }
-                }
-                glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, texSize, texSize, 1,
-                               GL_RGBA, GL_UNSIGNED_BYTE, resized.data());
-            }
-            stbi_image_free(data);
-        }
-        nameToLayer[albedoNames[idx]] = layer;
-        layer++;
+    for (int i = 0; i < layerCount; i++) {
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, texSize, texSize, 1,
+                       GL_RGBA, GL_UNSIGNED_BYTE, allTextures[i].pixels.data());
+        nameToLayer[allTextures[i].name] = i;
     }
 
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
@@ -689,7 +778,7 @@ static std::string getPBRTextureName(BlockType type, int face) {
     // face: 0=top, 1=side, 2=bottom
     switch (type) {
         case BlockType::GRASS:
-            return (face == 0) ? "grass_block_top" : (face == 2) ? "dirt" : "dirt";
+            return (face == 0) ? "grass_block_top_tinted" : (face == 2) ? "dirt" : "grass_block_side_composited";
         case BlockType::DIRT:          return "dirt";
         case BlockType::STONE:         return "stone";
         case BlockType::SAND:          return "sand";

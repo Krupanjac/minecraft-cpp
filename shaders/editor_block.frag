@@ -24,13 +24,13 @@ void main() {
     float alpha = 1.0;
     
     if (uTextureMode == 1) {
-        // Atlas texture
+        // Atlas texture - multiply by vertex color for biome tinting
         vec4 texSample = textureLod(uTexture, vUV, 0.0);
-        baseColor = texSample.rgb;
+        baseColor = texSample.rgb * vColor;
         alpha = texSample.a;
         if (alpha < 0.1) discard;
     } else if (uTextureMode == 2 && vTexLayer >= 0.0) {
-        // PBR albedo array texture
+        // PBR albedo array texture (tint is baked in composited textures)
         vec4 texSample = texture(uAlbedoArray, vec3(vUV, vTexLayer));
         baseColor = texSample.rgb;
         alpha = texSample.a;

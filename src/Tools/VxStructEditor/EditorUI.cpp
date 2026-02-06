@@ -277,8 +277,10 @@ void VxStructEditor::renderBlockPalette() {
             float cs = 1.0f / 16.0f;
             int atlasCol = atlasIdx % 16;
             int atlasRow = atlasIdx / 16;
-            ImVec2 uv0(atlasCol * cs, atlasRow * cs);
-            ImVec2 uv1((atlasCol + 1) * cs, (atlasRow + 1) * cs);
+            // Atlas loaded with stbi flip=true: V=0 is image bottom, V=1 is image top
+            // ImGui uv0=top-left on screen, uv1=bottom-right on screen
+            ImVec2 uv0(atlasCol * cs, 1.0f - atlasRow * cs);
+            ImVec2 uv1((atlasCol + 1) * cs, 1.0f - (atlasRow + 1) * cs);
 
             // Use tinted background to show selection state
             ImGui::PushStyleColor(ImGuiCol_Button, isSelected ? ImVec4(0.3f, 0.5f, 0.8f, 1.0f) : ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
