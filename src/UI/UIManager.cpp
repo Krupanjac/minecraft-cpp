@@ -2173,9 +2173,8 @@ void UIManager::update(float deltaTime, double mouseX, double mouseY, bool mouse
             if (std::abs(mapPanVelocityZ) < 1.0f) mapPanVelocityZ = 0.0f;
         }
         
-        // Smooth zoom interpolation
-        float zoomLerpSpeed = 6.0f * deltaTime;
-        mapScale += (mapTargetScale - mapScale) * zoomLerpSpeed;
+        // Snap zoom to target to prevent pixel shimmer from fractional scale
+        mapScale = mapTargetScale;
     }
 
     if (pendingClick) {
@@ -2320,22 +2319,48 @@ void UIManager::render() {
                     
                     glDisable(GL_SCISSOR_TEST);
                     
-                    // Second pass: find and label settlements with icons
-                    for (int py = 0; py < pixelRes; py += 4) {
-                        for (int px = 0; px < pixelRes; px += 4) {
-                            float worldX = snappedCenterX + (px - pixelRes / 2) * worldPerPixel;
-                            float worldZ = snappedCenterZ + (py - pixelRes / 2) * worldPerPixel;
-                            BiomeType biome = worldGenerator->getBiome(worldX, worldZ);
-                            
-                            float screenX = mapEl.x + px * pixelSize - subPixelX;
-                            float screenY = mapEl.y + py * pixelSize - subPixelZ;
-                            
-                            // Clip icons to map bounds
-                            if (screenX < mapEl.x - 10 || screenX > mapEl.x + mapEl.w + 10 ||
-                                screenY < mapEl.y - 10 || screenY > mapEl.y + mapEl.h + 10) continue;
-                            
-                            if (biome == BiomeType::CITY) {
-                                // City icon - gray
+                    // Second pass: draw settlement icons at actual world-space centers
+                    // Compute settlement centers from jittered grid to avoid icons moving during pan/zoom
+                    {
+                        const float CITY_GRID_M = 500.0f, CITY_JITTER_M = 120.0f;
+                        const float VILLAGE_GRID_M = 180.0f, VILLAGE_JITTER_M = 50.0f;
+                        unsigned int wSeed = worldGenerator->getSeed();
+                        
+                        auto jitterCenter = [&](float gridCX, float gridCZ, float jitterAmt, float gridSize) -> std::pair<float, float> {
+                            unsigned int hx = static_cast<unsigned int>(static_cast<int>(std::floor(gridCX / gridSize))) * 374761393u;
+                            unsigned int hz = static_cast<unsigned int>(static_cast<int>(std::floor(gridCZ / gridSize))) * 668265263u;
+                            unsigned int h1 = (wSeed ^ hx ^ hz) * 2654435761u;
+                            unsigned int h2 = (wSeed ^ hz ^ (hx * 2246822519u)) * 3266489917u;
+                            float offX = ((h1 & 0xFFFF) / 32768.0f - 1.0f) * jitterAmt;
+                            float offZ = ((h2 & 0xFFFF) / 32768.0f - 1.0f) * jitterAmt;
+                            return {gridCX + offX, gridCZ + offZ};
+                        };
+                        
+                        // Visible world bounds
+                        float visMinX = mapCenterX - halfMapWorld;
+                        float visMaxX = mapCenterX + halfMapWorld;
+                        float visMinZ = mapCenterZ - halfMapWorld;
+                        float visMaxZ = mapCenterZ + halfMapWorld;
+                        
+                        // City icons - iterate grid cells in visible area
+                        int cgMinX = (int)std::floor((visMinX - CITY_JITTER_M) / CITY_GRID_M);
+                        int cgMaxX = (int)std::floor((visMaxX + CITY_JITTER_M) / CITY_GRID_M);
+                        int cgMinZ = (int)std::floor((visMinZ - CITY_JITTER_M) / CITY_GRID_M);
+                        int cgMaxZ = (int)std::floor((visMaxZ + CITY_JITTER_M) / CITY_GRID_M);
+                        
+                        for (int gx = cgMinX; gx <= cgMaxX; gx++) {
+                            for (int gz = cgMinZ; gz <= cgMaxZ; gz++) {
+                                float gridCX = gx * CITY_GRID_M + CITY_GRID_M / 2.0f;
+                                float gridCZ = gz * CITY_GRID_M + CITY_GRID_M / 2.0f;
+                                auto [cx, cz] = jitterCenter(gridCX, gridCZ, CITY_JITTER_M, CITY_GRID_M);
+                                
+                                if (worldGenerator->getBiome(cx, cz) != BiomeType::CITY) continue;
+                                
+                                float screenX = mapEl.x + ((cx - mapCenterX) / halfMapWorld + 1.0f) * 0.5f * mapEl.w;
+                                float screenY = mapEl.y + ((cz - mapCenterZ) / halfMapWorld + 1.0f) * 0.5f * mapEl.h;
+                                if (screenX < mapEl.x - 20 || screenX > mapEl.x + mapEl.w + 20 ||
+                                    screenY < mapEl.y - 20 || screenY > mapEl.y + mapEl.h + 20) continue;
+                                
                                 float iconSize = std::max(12.0f, 30.0f / mapScale);
                                 float ix = screenX - iconSize/2;
                                 float iy = screenY - iconSize/2;
@@ -2343,8 +2368,28 @@ void UIManager::render() {
                                 drawRect(ix, iy, iconSize, iconSize, glm::vec4(0.6f, 0.6f, 0.65f, 1.0f));
                                 float textScale = std::max(0.6f, 1.2f / mapScale);
                                 drawText(ix + iconSize/2 - 3*textScale, iy + iconSize/2 - 4*textScale, textScale, "C", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-                            } else if (biome == BiomeType::VILLAGE) {
-                                // Village icon - brown
+                            }
+                        }
+                        
+                        // Village icons
+                        int vgMinX = (int)std::floor((visMinX - VILLAGE_JITTER_M) / VILLAGE_GRID_M);
+                        int vgMaxX = (int)std::floor((visMaxX + VILLAGE_JITTER_M) / VILLAGE_GRID_M);
+                        int vgMinZ = (int)std::floor((visMinZ - VILLAGE_JITTER_M) / VILLAGE_GRID_M);
+                        int vgMaxZ = (int)std::floor((visMaxZ + VILLAGE_JITTER_M) / VILLAGE_GRID_M);
+                        
+                        for (int gx = vgMinX; gx <= vgMaxX; gx++) {
+                            for (int gz = vgMinZ; gz <= vgMaxZ; gz++) {
+                                float gridCX = gx * VILLAGE_GRID_M + VILLAGE_GRID_M / 2.0f;
+                                float gridCZ = gz * VILLAGE_GRID_M + VILLAGE_GRID_M / 2.0f;
+                                auto [vx, vz] = jitterCenter(gridCX, gridCZ, VILLAGE_JITTER_M, VILLAGE_GRID_M);
+                                
+                                if (worldGenerator->getBiome(vx, vz) != BiomeType::VILLAGE) continue;
+                                
+                                float screenX = mapEl.x + ((vx - mapCenterX) / halfMapWorld + 1.0f) * 0.5f * mapEl.w;
+                                float screenY = mapEl.y + ((vz - mapCenterZ) / halfMapWorld + 1.0f) * 0.5f * mapEl.h;
+                                if (screenX < mapEl.x - 20 || screenX > mapEl.x + mapEl.w + 20 ||
+                                    screenY < mapEl.y - 20 || screenY > mapEl.y + mapEl.h + 20) continue;
+                                
                                 float iconSize = std::max(8.0f, 22.0f / mapScale);
                                 float ix = screenX - iconSize/2;
                                 float iy = screenY - iconSize/2;

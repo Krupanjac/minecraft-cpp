@@ -63,6 +63,7 @@ public:
     int getSurfaceHeight(int x, int z) const;
     BiomeType getBiome(float x, float z) const;
     BiomeInfo getBiomeInfo(BiomeType biome) const;
+    unsigned int getSeed() const { return seed; }
     
     // Structure placement
     StructurePlacer* getStructurePlacer() { return structurePlacer.get(); }

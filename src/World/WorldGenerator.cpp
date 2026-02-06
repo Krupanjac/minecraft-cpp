@@ -346,9 +346,16 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
     
     // Cities: ~70% of grid points spawn, avoid mountains
     if (cityDist < CITY_RADIUS && shouldSpawnSettlement(cityGridBaseX, cityGridBaseZ, CITY_GRID, 0.70f)) {
-        // Check mountain factor at city center - cities prefer flat terrain
-        float cityMtFactor = getMountainFactor(cityCenterX, cityCenterZ);
-        if (cityMtFactor < 0.25f) {
+        // Check mountain factor at center AND cardinal edge points - cities need flat terrain everywhere
+        float cityMtCenter = getMountainFactor(cityCenterX, cityCenterZ);
+        float edgeCheckR = CITY_RADIUS * 0.7f;
+        float cityMtEdge = std::max({
+            getMountainFactor(cityCenterX + edgeCheckR, cityCenterZ),
+            getMountainFactor(cityCenterX - edgeCheckR, cityCenterZ),
+            getMountainFactor(cityCenterX, cityCenterZ + edgeCheckR),
+            getMountainFactor(cityCenterX, cityCenterZ - edgeCheckR)
+        });
+        if (cityMtCenter < 0.15f && cityMtEdge < 0.30f) {
             return BiomeType::CITY;
         }
     }
@@ -1256,7 +1263,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         // Rivers are preserved and get bridges where roads cross them.
         int cityY = getSurfaceHeight(static_cast<int>(settlementCenterX), static_cast<int>(settlementCenterZ));
         float cityRadius = isCity ? 160.0f : 45.0f;
-        float edgeBlend = isCity ? 30.0f : 10.0f; // smooth transition at city edge
+        float edgeBlend = isCity ? 60.0f : 15.0f; // wide gradual transition at city edge
         
         // ---- PHASE 1: CITY-WIDE TERRAIN FLATTENING ----
         // Flatten the entire city area to cityY with grass/dirt, skip rivers
@@ -1973,8 +1980,8 @@ float WorldGenerator::getHeight(float x, float z) const {
         const float VILLAGE_GRID_F    = 180.0f;
         const float VILLAGE_RADIUS_F  = 45.0f;
         const float VILLAGE_JITTER_F  = 50.0f;
-        const float CITY_TRANSITION    = 40.0f;
-        const float VILLAGE_TRANSITION = 15.0f;
+        const float CITY_TRANSITION    = 100.0f;  // Wide gradual slope at city edges
+        const float VILLAGE_TRANSITION = 25.0f;
 
         // Same jitter function as getBiome
         auto settlementJitterH = [&](float gridCX, float gridCZ, float jitterAmount, float gridSize) -> std::pair<float, float> {
@@ -2005,8 +2012,13 @@ float WorldGenerator::getHeight(float x, float z) const {
         float villageDist = std::sqrt((x - villageJX) * (x - villageJX) + (z - villageJZ) * (z - villageJZ));
 
         // Only flatten if this grid cell actually spawns a settlement
+        float edgeCheckRH = CITY_RADIUS_F * 0.7f;
         bool citySpawns = shouldSpawnH(cityGridBaseX, cityGridBaseZ, CITY_GRID_F, 0.70f) &&
-                          getMountainFactor(cityJX, cityJZ) < 0.25f;
+                          getMountainFactor(cityJX, cityJZ) < 0.15f &&
+                          std::max({getMountainFactor(cityJX + edgeCheckRH, cityJZ),
+                                    getMountainFactor(cityJX - edgeCheckRH, cityJZ),
+                                    getMountainFactor(cityJX, cityJZ + edgeCheckRH),
+                                    getMountainFactor(cityJX, cityJZ - edgeCheckRH)}) < 0.30f;
         bool villageSpawns = shouldSpawnH(villageGridBaseX, villageGridBaseZ, VILLAGE_GRID_F, 0.75f) &&
                              getMountainFactor(villageJX, villageJZ) < 0.35f;
 
