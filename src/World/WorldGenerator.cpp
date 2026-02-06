@@ -1431,21 +1431,16 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         }
         
         // ---- VILLAGE PATH NETWORK ----
-        // Villages get paths radiating from center, baked INTO the terrain surface
-        // Main paths get bridges over rivers (max 2 bridges per village)
+        // Villages get proper road layout: central square, main cross roads, and side connecting lanes
+        // Main roads get bridges over rivers (max 2 bridges per village)
         if (!isCity) {
             int centerIX = static_cast<int>(settlementCenterX);
             int centerIZ = static_cast<int>(settlementCenterZ);
             
-            // Track bridge segments: we allow max 2 river crossings to get bridges
-            // A "crossing" is a contiguous stretch of river on a main path axis
-            // We detect crossings by tracking when we enter/exit river on each axis
-            // Pre-scan both main axes to find river crossing center points
-            struct RiverCrossing {
-                float centerCoord; // world coordinate of the crossing center along the axis
-            };
-            std::vector<RiverCrossing> crossingsNS; // N-S path (relX==0), varying Z
-            std::vector<RiverCrossing> crossingsEW; // E-W path (relZ==0), varying X
+            // --- Pre-scan for river crossings on main roads (for bridges) ---
+            struct RiverCrossing { float centerCoord; };
+            std::vector<RiverCrossing> crossingsNS;
+            std::vector<RiverCrossing> crossingsEW;
             
             // Scan N-S main path for river crossings
             {
@@ -1453,18 +1448,13 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                 int riverStart = 0;
                 for (int scanZ = centerIZ - 45; scanZ <= centerIZ + 45; scanZ++) {
                     float rm = getRiverMask(static_cast<float>(centerIX), static_cast<float>(scanZ));
-                    if (rm > 0.25f && !inRiver) {
-                        inRiver = true;
-                        riverStart = scanZ;
-                    } else if (rm <= 0.25f && inRiver) {
+                    if (rm > 0.25f && !inRiver) { inRiver = true; riverStart = scanZ; }
+                    else if (rm <= 0.25f && inRiver) {
                         inRiver = false;
-                        float crossCenter = static_cast<float>(riverStart + scanZ) * 0.5f;
-                        crossingsNS.push_back({crossCenter});
+                        crossingsNS.push_back({static_cast<float>(riverStart + scanZ) * 0.5f});
                     }
                 }
-                if (inRiver) { // River extends to edge
-                    crossingsNS.push_back({static_cast<float>(riverStart + centerIZ + 45) * 0.5f});
-                }
+                if (inRiver) crossingsNS.push_back({static_cast<float>(riverStart + centerIZ + 45) * 0.5f});
             }
             // Scan E-W main path for river crossings
             {
@@ -1472,73 +1462,46 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                 int riverStart = 0;
                 for (int scanX = centerIX - 45; scanX <= centerIX + 45; scanX++) {
                     float rm = getRiverMask(static_cast<float>(scanX), static_cast<float>(centerIZ));
-                    if (rm > 0.25f && !inRiver) {
-                        inRiver = true;
-                        riverStart = scanX;
-                    } else if (rm <= 0.25f && inRiver) {
+                    if (rm > 0.25f && !inRiver) { inRiver = true; riverStart = scanX; }
+                    else if (rm <= 0.25f && inRiver) {
                         inRiver = false;
-                        float crossCenter = static_cast<float>(riverStart + scanX) * 0.5f;
-                        crossingsEW.push_back({crossCenter});
+                        crossingsEW.push_back({static_cast<float>(riverStart + scanX) * 0.5f});
                     }
                 }
-                if (inRiver) {
-                    crossingsEW.push_back({static_cast<float>(riverStart + centerIX + 45) * 0.5f});
-                }
+                if (inRiver) crossingsEW.push_back({static_cast<float>(riverStart + centerIX + 45) * 0.5f});
             }
             
-            // Limit to 2 total bridges: prefer the ones closest to village center
-            int totalBridges = static_cast<int>(crossingsNS.size() + crossingsEW.size());
-            if (totalBridges > 2) {
-                // Sort all crossings by distance to center
-                struct CrossingInfo {
-                    float dist;
-                    bool isNS; // true=N-S axis, false=E-W axis
-                    int index;
-                };
+            // Limit to 2 total bridges closest to village center
+            if (static_cast<int>(crossingsNS.size() + crossingsEW.size()) > 2) {
+                struct CrossingInfo { float dist; bool isNS; int index; };
                 std::vector<CrossingInfo> allCrossings;
-                for (int i = 0; i < static_cast<int>(crossingsNS.size()); i++) {
-                    float d = std::abs(crossingsNS[i].centerCoord - static_cast<float>(centerIZ));
-                    allCrossings.push_back({d, true, i});
-                }
-                for (int i = 0; i < static_cast<int>(crossingsEW.size()); i++) {
-                    float d = std::abs(crossingsEW[i].centerCoord - static_cast<float>(centerIX));
-                    allCrossings.push_back({d, false, i});
-                }
+                for (int i = 0; i < static_cast<int>(crossingsNS.size()); i++)
+                    allCrossings.push_back({std::abs(crossingsNS[i].centerCoord - static_cast<float>(centerIZ)), true, i});
+                for (int i = 0; i < static_cast<int>(crossingsEW.size()); i++)
+                    allCrossings.push_back({std::abs(crossingsEW[i].centerCoord - static_cast<float>(centerIX)), false, i});
                 std::sort(allCrossings.begin(), allCrossings.end(),
                     [](const CrossingInfo& a, const CrossingInfo& b) { return a.dist < b.dist; });
-                
-                // Mark which crossings to keep
-                std::vector<bool> keepNS(crossingsNS.size(), false);
-                std::vector<bool> keepEW(crossingsEW.size(), false);
+                std::vector<bool> keepNS(crossingsNS.size(), false), keepEW(crossingsEW.size(), false);
                 int kept = 0;
                 for (auto& ci : allCrossings) {
                     if (kept >= 2) break;
-                    if (ci.isNS) keepNS[ci.index] = true;
-                    else keepEW[ci.index] = true;
+                    if (ci.isNS) keepNS[ci.index] = true; else keepEW[ci.index] = true;
                     kept++;
                 }
-                // Remove un-kept crossings
                 std::vector<RiverCrossing> filteredNS, filteredEW;
-                for (int i = 0; i < static_cast<int>(crossingsNS.size()); i++)
-                    if (keepNS[i]) filteredNS.push_back(crossingsNS[i]);
-                for (int i = 0; i < static_cast<int>(crossingsEW.size()); i++)
-                    if (keepEW[i]) filteredEW.push_back(crossingsEW[i]);
+                for (int i = 0; i < static_cast<int>(crossingsNS.size()); i++) if (keepNS[i]) filteredNS.push_back(crossingsNS[i]);
+                for (int i = 0; i < static_cast<int>(crossingsEW.size()); i++) if (keepEW[i]) filteredEW.push_back(crossingsEW[i]);
                 crossingsNS = filteredNS;
                 crossingsEW = filteredEW;
             }
             
+            // --- Place paths ---
             for (int lx = 0; lx < CHUNK_SIZE; lx++) {
                 for (int lz = 0; lz < CHUNK_SIZE; lz++) {
                     int worldPX = chunkBaseX + lx;
                     int worldPZ = chunkBaseZ + lz;
-                    
                     int relX = worldPX - centerIX;
                     int relZ = worldPZ - centerIZ;
-                    
-                    // Main cross paths (N-S and E-W through center)
-                    bool isMainPath = (std::abs(relX) <= 1) || (std::abs(relZ) <= 1);
-                    
-                    if (!isMainPath) continue;
                     
                     // Distance check - only within village radius
                     float pdx = static_cast<float>(worldPX) - settlementCenterX;
@@ -1546,69 +1509,75 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     float pathDist = std::sqrt(pdx * pdx + pdz * pdz);
                     if (pathDist > 45.0f) continue;
                     
-                    // Check for water - don't path over rivers unless it's a bridge
+                    // === Path type detection ===
+                    // 1. Village square (7x7 cobblestone center)
+                    bool isVillageSquare = (std::abs(relX) <= 3 && std::abs(relZ) <= 3);
+                    
+                    // 2. Main roads (3 blocks wide through center)
+                    bool isMainRoadNS = (std::abs(relX) <= 1); // N-S
+                    bool isMainRoadEW = (std::abs(relZ) <= 1); // E-W
+                    bool isMainRoad = isMainRoadNS || isMainRoadEW;
+                    
+                    // 3. Side connecting lanes (1 block wide, every ~16 blocks)
+                    //    These branch off main roads to reach building areas
+                    int lanePeriod = 16;
+                    int laneModZ = ((relZ % lanePeriod) + lanePeriod) % lanePeriod;
+                    int laneModX = ((relX % lanePeriod) + lanePeriod) % lanePeriod;
+                    // E-W side lanes at regular Z intervals, extending out from N-S main road
+                    bool isSideLaneEW = (laneModZ == 0) && (std::abs(relX) > 1) && (std::abs(relX) <= 14) && (relZ != 0);
+                    // N-S side lanes at regular X intervals, extending out from E-W main road
+                    bool isSideLaneNS = (laneModX == 0) && (std::abs(relZ) > 1) && (std::abs(relZ) <= 14) && (relX != 0);
+                    bool isSideLane = isSideLaneEW || isSideLaneNS;
+                    
+                    bool isAnyPath = isVillageSquare || isMainRoad || isSideLane;
+                    if (!isAnyPath) continue;
+                    
+                    // === River / bridge handling ===
                     float pathRiver = getRiverMask(static_cast<float>(worldPX), static_cast<float>(worldPZ));
                     bool isOnRiver = pathRiver > 0.25f;
                     
-                    // Check if this river block is part of an allowed bridge crossing
+                    // Only main roads get bridges - side lanes just stop at rivers
                     bool isBridge = false;
-                    if (isOnRiver) {
-                        // N-S path blocks: relX near 0
-                        if (std::abs(relX) <= 1) {
-                            for (auto& c : crossingsNS) {
-                                (void)c; // all remaining crossings are allowed
-                                isBridge = true;
-                                break;
-                            }
-                        }
-                        // E-W path blocks: relZ near 0
-                        if (!isBridge && std::abs(relZ) <= 1) {
-                            for (auto& c : crossingsEW) {
-                                (void)c;
-                                isBridge = true;
-                                break;
-                            }
-                        }
+                    if (isOnRiver && isMainRoad) {
+                        if (isMainRoadNS && !crossingsNS.empty()) isBridge = true;
+                        if (!isBridge && isMainRoadEW && !crossingsEW.empty()) isBridge = true;
                     }
                     
                     if (isOnRiver && !isBridge) continue;
                     
                     if (isBridge) {
-                        // Bridge: place stone brick platform at village flattened height
-                        // Find a reasonable bridge Y: use the village groundY from nearby non-river terrain
-                        int bridgeY = getSurfaceHeight(centerIX, centerIZ); // village center height
+                        // Bridge: stone brick platform at village center height
+                        int bridgeY = getSurfaceHeight(centerIX, centerIZ);
                         int localBridgeY = bridgeY - chunkBaseY;
                         if (localBridgeY < 0 || localBridgeY >= CHUNK_HEIGHT) continue;
                         
                         // Bridge deck
                         chunk->setBlock(lx, localBridgeY, lz, Block(BlockType::STONE_BRICKS));
                         
-                        // Support below bridge (fill with stone bricks down to water surface)
+                        // Support pillars on edges only
+                        bool isEdge = false;
+                        if (isMainRoadNS && (std::abs(relX) == 1)) isEdge = true;
+                        if (isMainRoadEW && (std::abs(relZ) == 1)) isEdge = true;
+                        
                         for (int sy = bridgeY - 1; sy >= SEA_LEVEL - 2; sy--) {
                             int localSY = sy - chunkBaseY;
                             if (localSY < 0 || localSY >= CHUNK_HEIGHT) continue;
                             Block below = chunk->getBlock(lx, localSY, lz);
                             BlockType bt = below.getType();
                             if (bt == BlockType::AIR || bt == BlockType::WATER) {
-                                // Only place supports at the edges of the bridge (railings/pillars)
-                                if (std::abs(relX) == 1 || std::abs(relZ) == 1) {
-                                    chunk->setBlock(lx, localSY, lz, Block(BlockType::STONE_BRICKS));
-                                }
-                            } else {
-                                break;
-                            }
+                                if (isEdge) chunk->setBlock(lx, localSY, lz, Block(BlockType::STONE_BRICKS));
+                            } else break;
                         }
                         
-                        // Railings: 1-block walls on the edges of the bridge
-                        if (std::abs(relX) == 1 || std::abs(relZ) == 1) {
+                        // Railings on edges
+                        if (isEdge) {
                             int localRailY = localBridgeY + 1;
-                            if (localRailY >= 0 && localRailY < CHUNK_HEIGHT) {
+                            if (localRailY >= 0 && localRailY < CHUNK_HEIGHT)
                                 chunk->setBlock(lx, localRailY, lz, Block(BlockType::STONE_BRICKS));
-                            }
                         }
                         
-                        // Clear headroom above bridge
-                        int clearStart = (std::abs(relX) == 1 || std::abs(relZ) == 1) ? 2 : 1;
+                        // Clear headroom
+                        int clearStart = isEdge ? 2 : 1;
                         for (int clearY = clearStart; clearY <= 5; clearY++) {
                             int localCY = localBridgeY + clearY;
                             if (localCY >= 0 && localCY < CHUNK_HEIGHT) {
@@ -1618,23 +1587,39 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                             }
                         }
                     } else {
-                        // Normal path (not on river) - bake into terrain surface
+                        // Normal path - baked into terrain surface
                         int naturalY = getSurfaceHeight(worldPX, worldPZ);
-                        int pathY = naturalY;
-                        int localPY = pathY - chunkBaseY;
+                        int localPY = naturalY - chunkBaseY;
                         if (localPY < 0 || localPY >= CHUNK_HEIGHT) continue;
                         
-                        // Replace the surface block with path material
-                        if (std::abs(relX) == 0 || std::abs(relZ) == 0)
-                            chunk->setBlock(lx, localPY, lz, Block(BlockType::COBBLESTONE));
-                        else
-                            chunk->setBlock(lx, localPY, lz, Block(BlockType::GRAVEL));
+                        // Material selection based on path type
+                        BlockType pathMaterial;
+                        if (isVillageSquare) {
+                            // Village square: cobblestone with gravel trim
+                            if (std::abs(relX) == 3 || std::abs(relZ) == 3)
+                                pathMaterial = BlockType::GRAVEL;
+                            else
+                                pathMaterial = BlockType::COBBLESTONE;
+                        } else if (isMainRoad) {
+                            // Main road: cobblestone center, gravel curb at edges
+                            bool isCenter = (isMainRoadNS && relX == 0) || (isMainRoadEW && relZ == 0);
+                            if (isCenter)
+                                pathMaterial = BlockType::COBBLESTONE;
+                            else
+                                pathMaterial = BlockType::GRAVEL;
+                        } else {
+                            // Side lanes: gravel
+                            pathMaterial = BlockType::GRAVEL;
+                        }
                         
-                        // Ensure dirt below the path
+                        chunk->setBlock(lx, localPY, lz, Block(pathMaterial));
+                        
+                        // Ensure dirt below the path (no floating)
                         int localBelowPY = localPY - 1;
                         if (localBelowPY >= 0 && localBelowPY < CHUNK_HEIGHT) {
                             Block belowBlock = chunk->getBlock(lx, localBelowPY, lz);
-                            if (belowBlock.getType() == BlockType::AIR || belowBlock.getType() == BlockType::GRASS) {
+                            BlockType bt = belowBlock.getType();
+                            if (bt == BlockType::AIR || bt == BlockType::GRASS || bt == BlockType::SAND) {
                                 chunk->setBlock(lx, localBelowPY, lz, Block(BlockType::DIRT));
                             }
                         }
@@ -2241,18 +2226,26 @@ float WorldGenerator::getHeight(float x, float z) const {
         bool villageSpawns = shouldSpawnH(villageGridBaseX, villageGridBaseZ, VILLAGE_GRID_F, 0.75f) &&
                              getMountainFactor(villageJX, villageJZ) < 0.35f;
 
+        // Check river mask - NEVER flatten river areas (preserve natural river channels)
+        float riverHere = getRiverMask(x, z);
+        float riverPreserve = 1.0f; // 1.0 = full flatten allowed, 0.0 = no flatten (river)
+        if (riverHere > 0.15f) {
+            // Smooth transition: fully preserved at riverMask >= 0.30, partial at 0.15-0.30
+            riverPreserve = 1.0f - std::clamp((riverHere - 0.15f) / 0.15f, 0.0f, 1.0f);
+        }
+
         if (citySpawns && cityDist < CITY_RADIUS_F + CITY_TRANSITION) {
             float outerR = CITY_RADIUS_F + CITY_TRANSITION;
             float edgeFade = std::clamp((outerR - cityDist) / CITY_TRANSITION, 0.0f, 1.0f);
             edgeFade = edgeFade * edgeFade * (3.0f - 2.0f * edgeFade);
-            float flattenStrength = edgeFade * 0.995f;
+            float flattenStrength = edgeFade * 0.995f * riverPreserve;
             finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
         } else if (villageSpawns && villageDist < VILLAGE_RADIUS_F + VILLAGE_TRANSITION &&
                    !(citySpawns && cityDist < CITY_RADIUS_F + CITY_TRANSITION)) {
             float outerR = VILLAGE_RADIUS_F + VILLAGE_TRANSITION;
             float edgeFade = std::clamp((outerR - villageDist) / VILLAGE_TRANSITION, 0.0f, 1.0f);
             edgeFade = edgeFade * edgeFade * (3.0f - 2.0f * edgeFade);
-            float flattenStrength = edgeFade * 0.90f;  // 90% flattened (much flatter villages)
+            float flattenStrength = edgeFade * 0.90f * riverPreserve;
             finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
         }
     }
