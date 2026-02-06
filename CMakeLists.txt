@@ -140,6 +140,7 @@ set(SOURCES
     src/World/Chunk.cpp
     src/World/ChunkManager.cpp
     src/World/WorldGenerator.cpp
+    src/World/RoadNetwork.cpp
     src/World/WorldSerializer.cpp
     src/World/Item.cpp
     src/World/FireSystem.cpp

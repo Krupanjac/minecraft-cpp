@@ -1,0 +1,314 @@
+{
+  "author": "system",
+  "blocks": [
+    {
+      "type": "gravel",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "gravel",
+      "x": 6,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "gravel",
+      "x": 0,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "gravel",
+      "x": 6,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "gravel",
+      "x": 0,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "gravel",
+      "x": 6,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "gravel",
+      "x": 0,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "gravel",
+      "x": 6,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "gravel",
+      "x": 0,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "gravel",
+      "x": 6,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "gravel",
+      "x": 0,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "gravel",
+      "x": 6,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "gravel",
+      "x": 0,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "gravel",
+      "x": 6,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "dirt",
+      "x": 1,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "dirt",
+      "x": 2,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "dirt",
+      "x": 3,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "dirt",
+      "x": 4,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "dirt",
+      "x": 5,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "dirt",
+      "x": 1,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "dirt",
+      "x": 2,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "dirt",
+      "x": 3,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "dirt",
+      "x": 4,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "dirt",
+      "x": 5,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "dirt",
+      "x": 1,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "dirt",
+      "x": 2,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "dirt",
+      "x": 3,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "dirt",
+      "x": 4,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "dirt",
+      "x": 5,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "dirt",
+      "x": 1,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "dirt",
+      "x": 2,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "dirt",
+      "x": 4,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "dirt",
+      "x": 5,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "dirt",
+      "x": 1,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "dirt",
+      "x": 2,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "dirt",
+      "x": 3,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "dirt",
+      "x": 4,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "dirt",
+      "x": 5,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "dirt",
+      "x": 1,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "dirt",
+      "x": 3,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "dirt",
+      "x": 4,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "dirt",
+      "x": 5,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "dirt",
+      "x": 1,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "dirt",
+      "x": 3,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "dirt",
+      "x": 4,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "dirt",
+      "x": 5,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "cobblestone",
+      "x": 3,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "dirt",
+      "x": 2,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "dirt",
+      "x": 2,
+      "y": 0,
+      "z": 5
+    }
+  ],
+  "category": "city_road",
+  "markers": [],
+  "min_ground_coverage": 0.5,
+  "name": "City Road Straight",
+  "requires_flat": false,
+  "size": {
+    "x": 7,
+    "y": 1,
+    "z": 7
+  },
+  "tags": [
+    "road",
+    "path",
+    "connector"
+  ]
+}

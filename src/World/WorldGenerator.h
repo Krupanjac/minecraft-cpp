@@ -2,6 +2,7 @@
 
 #include "../Util/Types.h"
 #include "Chunk.h"
+#include "RoadNetwork.h"
 #include <memory>
 #include <string>
 
@@ -65,6 +66,10 @@ public:
     BiomeInfo getBiomeInfo(BiomeType biome) const;
     unsigned int getSeed() const { return seed; }
     
+    // Terrain helpers (public for road network)
+    float getRiverMask(float x, float z) const;
+    float getMountainFactor(float x, float z) const;
+    
     // Structure placement
     StructurePlacer* getStructurePlacer() { return structurePlacer.get(); }
     const StructurePlacer* getStructurePlacer() const { return structurePlacer.get(); }
@@ -72,6 +77,7 @@ public:
 private:
     unsigned int seed;
     std::unique_ptr<StructurePlacer> structurePlacer;
+    RoadNetwork m_roadNetwork;
     
     // Randomized World Parameters
     float offsetContinentX = 0.0f;
@@ -122,9 +128,7 @@ private:
     float getTemperature(float x, float z) const;
     float getHumidity(float x, float z) const;
     
-    // River helpers - returns river strength [0,1] and mountain factor
-    float getRiverMask(float x, float z) const;
-    float getMountainFactor(float x, float z) const;
+    // Underground river helper
     bool isUndergroundRiver(float x, float y, float z, float riverMask, float mountainFactor) const;
     
     // Cave generation

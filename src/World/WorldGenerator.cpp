@@ -1379,7 +1379,11 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     bool isSidewalk = (isRoadX && isSidewalkZ) || (isRoadZ && isSidewalkX) ||
                                       (isSidewalkX && isSidewalkZ);
                     
-                    if (!isRoadX && !isRoadZ && !isSidewalk) continue;
+                    // Ring road at ~148 blocks to tie all grid roads together
+                    float ringRadius = cityRadius - 12.0f;
+                    bool isCityRingRoad = (dist >= ringRadius - 1.5f && dist <= ringRadius + 1.5f);
+                    
+                    if (!isRoadX && !isRoadZ && !isSidewalk && !isCityRingRoad) continue;
                     
                     int localRY = cityY - chunkBaseY;
                     if (localRY < 0 || localRY >= CHUNK_HEIGHT) continue;
@@ -1388,16 +1392,21 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     float riverMask = getRiverMask(static_cast<float>(worldRX), static_cast<float>(worldRZ));
                     bool isOnRiver = riverMask > 0.25f;
                     
-                    // Only the 2 main roads through center get bridges (relX near 0 = N-S, relZ near 0 = E-W)
-                    bool isMainRoadNS = (modX < roadWidth) && (std::abs(relX) < roadWidth); // The road segment closest to center X
-                    bool isMainRoadEW = (modZ < roadWidth) && (std::abs(relZ) < roadWidth); // The road segment closest to center Z
-                    bool isBridge = isOnRiver && (isMainRoadNS || isMainRoadEW);
+                    // Only the 2 main roads through center get bridges, plus ring road
+                    bool isMainRoadNS = (modX < roadWidth) && (std::abs(relX) < roadWidth);
+                    bool isMainRoadEW = (modZ < roadWidth) && (std::abs(relZ) < roadWidth);
+                    bool isBridge = isOnRiver && (isMainRoadNS || isMainRoadEW || isCityRingRoad);
                     
                     if (isOnRiver && !isBridge) continue; // Skip non-bridge road segments over rivers
                     
                     if (isBridge) {
                         // Simple bridge: just stone bricks, no railings
                         chunk->setBlock(lx, localRY, lz, Block(BlockType::STONE_BRICKS));
+                    } else if (isCityRingRoad && !isRoadX && !isRoadZ) {
+                        // Ring road material: stone edges, cobblestone fill
+                        bool isRingEdge = (dist <= ringRadius - 1.0f || dist >= ringRadius + 1.0f);
+                        chunk->setBlock(lx, localRY, lz, Block(
+                            isRingEdge ? BlockType::STONE : BlockType::COBBLESTONE));
                     } else {
                         // Normal road surface
                         if (isSidewalk && !isRoadX && !isRoadZ) {
@@ -1510,7 +1519,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     if (pathDist > 45.0f) continue;
                     
                     // === Path type detection ===
-                    // 1. Village square (7x7 cobblestone center)
+                    // 1. Village square (7x7 center)
                     bool isVillageSquare = (std::abs(relX) <= 3 && std::abs(relZ) <= 3);
                     
                     // 2. Main roads (3 blocks wide through center)
@@ -1518,65 +1527,86 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     bool isMainRoadEW = (std::abs(relZ) <= 1); // E-W
                     bool isMainRoad = isMainRoadNS || isMainRoadEW;
                     
-                    // 3. Side connecting lanes (1 block wide, every ~16 blocks)
-                    //    These branch off main roads to reach building areas
+                    // 3. Perimeter ring road at ~38 blocks from center (3-wide)
+                    //    Connects side lanes into loops, no dead ends
+                    int perimRoadRadius = 38;
+                    int absRelX = std::abs(relX);
+                    int absRelZ = std::abs(relZ);
+                    // Use Chebyshev distance for a square-ish ring
+                    int perimDistI = std::max(absRelX, absRelZ);
+                    bool isPerimeterRoad = (perimDistI >= perimRoadRadius - 1 && perimDistI <= perimRoadRadius + 1);
+                    // Cut corners: don't place ring road in the very corners
+                    if (isPerimeterRoad && absRelX > perimRoadRadius && absRelZ > perimRoadRadius)
+                        isPerimeterRoad = false;
+                    
+                    // 4. Side connecting lanes (1 block wide, every ~16 blocks)
+                    //    Extend from main roads TO the perimeter ring road
                     int lanePeriod = 16;
                     int laneModZ = ((relZ % lanePeriod) + lanePeriod) % lanePeriod;
                     int laneModX = ((relX % lanePeriod) + lanePeriod) % lanePeriod;
-                    // E-W side lanes at regular Z intervals, extending out from N-S main road
-                    bool isSideLaneEW = (laneModZ == 0) && (std::abs(relX) > 1) && (std::abs(relX) <= 14) && (relZ != 0);
-                    // N-S side lanes at regular X intervals, extending out from E-W main road
-                    bool isSideLaneNS = (laneModX == 0) && (std::abs(relZ) > 1) && (std::abs(relZ) <= 14) && (relX != 0);
+                    // E-W side lanes extending out from N-S main road to perimeter
+                    bool isSideLaneEW = (laneModZ == 0) && (absRelX > 1) && (absRelX <= perimRoadRadius) && (relZ != 0);
+                    // N-S side lanes extending out from E-W main road to perimeter
+                    bool isSideLaneNS = (laneModX == 0) && (absRelZ > 1) && (absRelZ <= perimRoadRadius) && (relX != 0);
                     bool isSideLane = isSideLaneEW || isSideLaneNS;
                     
-                    bool isAnyPath = isVillageSquare || isMainRoad || isSideLane;
+                    bool isAnyPath = isVillageSquare || isMainRoad || isPerimeterRoad || isSideLane;
                     if (!isAnyPath) continue;
                     
                     // === River / bridge handling ===
                     float pathRiver = getRiverMask(static_cast<float>(worldPX), static_cast<float>(worldPZ));
                     bool isOnRiver = pathRiver > 0.25f;
                     
-                    // Only main roads get bridges - side lanes just stop at rivers
+                    // Only main roads and perimeter get bridges - side lanes just stop at rivers
                     bool isBridge = false;
-                    if (isOnRiver && isMainRoad) {
+                    if (isOnRiver && (isMainRoad || isPerimeterRoad)) {
                         if (isMainRoadNS && !crossingsNS.empty()) isBridge = true;
                         if (!isBridge && isMainRoadEW && !crossingsEW.empty()) isBridge = true;
+                        if (!isBridge && isPerimeterRoad) isBridge = true;
                     }
                     
                     if (isOnRiver && !isBridge) continue;
                     
                     if (isBridge) {
-                        // Bridge: stone brick platform at village center height
+                        // Bridge at village center height with arch-style supports
                         int bridgeY = getSurfaceHeight(centerIX, centerIZ);
                         int localBridgeY = bridgeY - chunkBaseY;
                         if (localBridgeY < 0 || localBridgeY >= CHUNK_HEIGHT) continue;
                         
-                        // Bridge deck
-                        chunk->setBlock(lx, localBridgeY, lz, Block(BlockType::STONE_BRICKS));
-                        
-                        // Support pillars on edges only
+                        // Determine road direction and edge status
                         bool isEdge = false;
                         if (isMainRoadNS && (std::abs(relX) == 1)) isEdge = true;
                         if (isMainRoadEW && (std::abs(relZ) == 1)) isEdge = true;
                         
-                        for (int sy = bridgeY - 1; sy >= SEA_LEVEL - 2; sy--) {
-                            int localSY = sy - chunkBaseY;
-                            if (localSY < 0 || localSY >= CHUNK_HEIGHT) continue;
-                            Block below = chunk->getBlock(lx, localSY, lz);
-                            BlockType bt = below.getType();
-                            if (bt == BlockType::AIR || bt == BlockType::WATER) {
-                                if (isEdge) chunk->setBlock(lx, localSY, lz, Block(BlockType::STONE_BRICKS));
-                            } else break;
+                        // Bridge deck
+                        chunk->setBlock(lx, localBridgeY, lz, Block(BlockType::STONE_BRICKS));
+                        
+                        // Support pillars only every 4 blocks (intermittent supports)
+                        // and only on edges — creates open arches between pillars
+                        int pillarCoord = isMainRoadNS ? relZ : relX;
+                        bool isPillarPos = (((pillarCoord % 4) + 4) % 4 == 0);
+                        
+                        if (isEdge && isPillarPos) {
+                            // Place support pillar down to ground
+                            for (int sy = bridgeY - 1; sy >= SEA_LEVEL - 2; sy--) {
+                                int localSY = sy - chunkBaseY;
+                                if (localSY < 0 || localSY >= CHUNK_HEIGHT) continue;
+                                Block below = chunk->getBlock(lx, localSY, lz);
+                                BlockType bt = below.getType();
+                                if (bt == BlockType::AIR || bt == BlockType::WATER) {
+                                    chunk->setBlock(lx, localSY, lz, Block(BlockType::STONE_BRICKS));
+                                } else break;
+                            }
                         }
                         
-                        // Railings on edges
+                        // Railings on edges only (1 block above deck)
                         if (isEdge) {
                             int localRailY = localBridgeY + 1;
                             if (localRailY >= 0 && localRailY < CHUNK_HEIGHT)
-                                chunk->setBlock(lx, localRailY, lz, Block(BlockType::STONE_BRICKS));
+                                chunk->setBlock(lx, localRailY, lz, Block(BlockType::COBBLESTONE));
                         }
                         
-                        // Clear headroom
+                        // Clear headroom above bridge
                         int clearStart = isEdge ? 2 : 1;
                         for (int clearY = clearStart; clearY <= 5; clearY++) {
                             int localCY = localBridgeY + clearY;
@@ -1593,23 +1623,32 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                         if (localPY < 0 || localPY >= CHUNK_HEIGHT) continue;
                         
                         // Material selection based on path type
+                        // Matches v_road_straight vxstruct: gravel edges, dirt center
                         BlockType pathMaterial;
                         if (isVillageSquare) {
-                            // Village square: cobblestone with gravel trim
+                            // Village square: gravel border, dirt interior (v_road_section style)
                             if (std::abs(relX) == 3 || std::abs(relZ) == 3)
                                 pathMaterial = BlockType::GRAVEL;
                             else
-                                pathMaterial = BlockType::COBBLESTONE;
+                                pathMaterial = BlockType::DIRT;
                         } else if (isMainRoad) {
-                            // Main road: cobblestone center, gravel curb at edges
-                            bool isCenter = (isMainRoadNS && relX == 0) || (isMainRoadEW && relZ == 0);
-                            if (isCenter)
-                                pathMaterial = BlockType::COBBLESTONE;
-                            else
+                            // Main road: gravel edges, dirt center (v_road_straight style)
+                            bool isEdgeBlock = (isMainRoadNS && std::abs(relX) == 1) ||
+                                               (isMainRoadEW && std::abs(relZ) == 1);
+                            if (isEdgeBlock)
                                 pathMaterial = BlockType::GRAVEL;
+                            else
+                                pathMaterial = BlockType::DIRT;
+                        } else if (isPerimeterRoad) {
+                            // Perimeter ring road: gravel edges, dirt center
+                            bool isEdgeBlock = (perimDistI == perimRoadRadius - 1 || perimDistI == perimRoadRadius + 1);
+                            if (isEdgeBlock)
+                                pathMaterial = BlockType::GRAVEL;
+                            else
+                                pathMaterial = BlockType::DIRT;
                         } else {
-                            // Side lanes: gravel
-                            pathMaterial = BlockType::GRAVEL;
+                            // Side lanes: dirt path
+                            pathMaterial = BlockType::DIRT;
                         }
                         
                         chunk->setBlock(lx, localPY, lz, Block(pathMaterial));
@@ -1968,6 +2007,15 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             } // gridOffX
         } // !isCity
     }();
+    
+    // ---- INTER-SETTLEMENT ROAD NETWORK ----
+    // Connect cities and villages with roads, bridges, and tunnels
+    {
+        int roadChunkBaseX = static_cast<int>(worldPos.x);
+        int roadChunkBaseZ = static_cast<int>(worldPos.z);
+        int roadChunkBaseY = static_cast<int>(worldPos.y);
+        m_roadNetwork.placeRoadsInChunk(roadChunkBaseX, roadChunkBaseZ, roadChunkBaseY, *this, chunk);
+    }
     
     chunk->setState(ChunkState::MESH_BUILD);
 }
