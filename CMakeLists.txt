@@ -184,6 +184,10 @@ set(SOURCES
     src/Network/NetworkManager.cpp
     src/Server/DedicatedServer.cpp
     src/UI/UIManager.cpp
+    src/UI/UIMenuSetup.cpp
+    src/UI/UIUpdate.cpp
+    src/UI/UIRenderer.cpp
+    src/UI/UIDrawing.cpp
     src/UI/Console.cpp
     src/Entity/Entity.cpp
     src/Entity/PlayerEntity.cpp
