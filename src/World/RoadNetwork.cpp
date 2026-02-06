@@ -378,8 +378,11 @@ std::vector<RoadWaypoint> RoadNetwork::findRoadPath(
             if (nMountain > 0.5f) mountainCost = 12.0f;
             else if (nMountain > 0.3f) mountainCost = 4.0f;
             
-            // Ocean = impassable
-            if (nh < static_cast<float>(SEA_LEVEL) - 5.0f && nRiver < 0.25f) continue;
+            // Ocean/deep water = impassable (only rivers are crossable)
+            if (nh < static_cast<float>(SEA_LEVEL) - 2.0f && nRiver < 0.25f) continue;
+            
+            // Shallow water penalty (discourage but don't block)
+            if (nh < static_cast<float>(SEA_LEVEL) + 1.0f && nRiver < 0.25f) waterCost += 50.0f;
             
             float totalCost = stepDist + heightCost + waterCost + mountainCost;
             float newG = current.g + totalCost;
@@ -442,14 +445,11 @@ std::vector<RoadWaypoint> RoadNetwork::findRoadPath(
     }
     
     // ====================================================================
-    // Phase 2: Compute a FLAT road height profile
-    // Linearly interpolate between settlement base heights (startY → endY)
-    // with a max slope constraint. Tag bridge/tunnel per waypoint.
+    // Phase 2: TERRAIN-FOLLOWING height profile with smoothing.
+    // Road follows terrain surface but smoothed. Only bridges over rivers.
+    // Start/end snapped to settlement heights.
     // ====================================================================
     if (path.size() >= 2) {
-        float startH = static_cast<float>(startY);
-        float endH   = static_cast<float>(endY);
-        
         // Cumulative horizontal distance along the path
         std::vector<float> cumDist(path.size(), 0.0f);
         for (size_t i = 1; i < path.size(); i++) {
@@ -459,15 +459,29 @@ std::vector<RoadWaypoint> RoadNetwork::findRoadPath(
         }
         float totalDist = cumDist.back();
         
-        // Linear interpolation from start to end height
+        // Start with real terrain heights
         std::vector<float> idealY(path.size());
         for (size_t i = 0; i < path.size(); i++) {
-            float t = (totalDist > 0.0f) ? cumDist[i] / totalDist : 0.0f;
-            idealY[i] = startH + (endH - startH) * t;
+            idealY[i] = static_cast<float>(worldGen.getSurfaceHeight(path[i].x, path[i].z));
+        }
+        // Force endpoints to settlement heights
+        idealY.front() = static_cast<float>(startY);
+        idealY.back() = static_cast<float>(endY);
+        
+        // Smooth pass: average with neighbors (3 iterations)
+        for (int pass = 0; pass < 3; pass++) {
+            std::vector<float> smoothed = idealY;
+            for (size_t i = 1; i + 1 < path.size(); i++) {
+                smoothed[i] = idealY[i] * 0.5f + (idealY[i-1] + idealY[i+1]) * 0.25f;
+            }
+            idealY = smoothed;
+            // Re-force endpoints
+            idealY.front() = static_cast<float>(startY);
+            idealY.back() = static_cast<float>(endY);
         }
         
-        // Max slope constraint: 1 block rise per 8 blocks horizontal
-        constexpr float MAX_GRADE = 1.0f / 8.0f;
+        // Max slope constraint: 1 block rise per 6 blocks horizontal
+        constexpr float MAX_GRADE = 1.0f / 6.0f;
         
         // Forward pass — clamp slope
         for (size_t i = 1; i < path.size(); i++) {
@@ -484,7 +498,7 @@ std::vector<RoadWaypoint> RoadNetwork::findRoadPath(
             idealY[i] = std::min(idealY[i], idealY[i+1] + maxChange);
         }
         
-        // Apply flat heights and determine bridge/tunnel from terrain comparison
+        // Apply heights and tag bridge/tunnel
         for (size_t i = 0; i < path.size(); i++) {
             int terrainY = worldGen.getSurfaceHeight(path[i].x, path[i].z);
             path[i].y = static_cast<int>(std::round(idealY[i]));
@@ -494,8 +508,8 @@ std::vector<RoadWaypoint> RoadNetwork::findRoadPath(
             
             // Tunnel when terrain is significantly above road level
             path[i].isTunnel = (terrainY > path[i].y + 2);
-            // Bridge when over river OR road is above terrain (valley)
-            path[i].isBridge = (rm > 0.25f) || (terrainY < path[i].y - 2);
+            // Bridge ONLY over rivers — not on random terrain dips
+            path[i].isBridge = (rm > 0.25f);
         }
     }
     
@@ -568,18 +582,11 @@ void RoadNetwork::placeRoadsInChunk(
             computeEdgePoint(to, from.x, from.z, edgeToX, edgeToZ);
             
             // Use surface height AT THE EDGE points (not center) so roads
-            // match the settlement internal road heights at the connection
-            int edgeFromY = worldGen.getSurfaceHeight(
-                static_cast<int>(std::round(edgeFromX)),
-                static_cast<int>(std::round(edgeFromZ)));
-            int edgeToY = worldGen.getSurfaceHeight(
-                static_cast<int>(std::round(edgeToX)),
-                static_cast<int>(std::round(edgeToZ)));
-            
-            // For cities, internal roads are at a unified cityY (center height)
-            // so snap to that instead
-            if (from.isCity) edgeFromY = from.groundY;
-            if (to.isCity) edgeToY = to.groundY;
+            // match the settlement internal road heights at the connection.
+            // Both cities and villages use unified flat road heights (groundY),
+            // so always use settlement center groundY.
+            int edgeFromY = from.groundY;
+            int edgeToY = to.groundY;
             
             // Compute path between edges
             auto path = findRoadPath(edgeFromX, edgeFromZ, edgeFromY,
@@ -680,32 +687,37 @@ void RoadNetwork::placeRoadsInChunk(
                     float rm = worldGen.getRiverMask(static_cast<float>(worldBX), static_cast<float>(worldBZ));
                     int heightDiff = naturalY - roadY;  // positive = terrain above road
                     
-                    bool doBridge = (rm > 0.25f) || (heightDiff < -2);
+                    // Bridge ONLY over rivers (no random height-based bridges)
+                    bool doBridge = (rm > 0.25f);
                     bool doTunnel = (heightDiff > 2);
                     bool isEdge = (std::abs(w) == halfWidth);
                     
-                    // === BRIDGE (road above terrain / over river) ===
+                    // Road surface material matching vxstruct exactly:
+                    // City: stone_bricks edges, cobblestone fill, gravel center
+                    // Village: gravel edges, dirt fill, cobblestone center
+                    BlockType roadMat;
+                    if (isCityRoad) {
+                        roadMat = isEdge ? BlockType::STONE_BRICKS :
+                                  (w == 0 ? BlockType::GRAVEL : BlockType::COBBLESTONE);
+                    } else {
+                        roadMat = isEdge ? BlockType::GRAVEL :
+                                  (w == 0 ? BlockType::COBBLESTONE : BlockType::DIRT);
+                    }
+                    
+                    // === BRIDGE (over river only) ===
                     if (doBridge) {
-                        // Bridge deck
-                        chunk->setBlock(localBX, localRoadY, localBZ, Block(
-                            isCityRoad ? BlockType::STONE_BRICKS : BlockType::COBBLESTONE));
+                        // Bridge deck uses same road material pattern (no guardrails)
+                        chunk->setBlock(localBX, localRoadY, localBZ, Block(roadMat));
                         
-                        // Railings on edges
-                        if (isEdge) {
-                            int railY = localRoadY + 1;
-                            if (railY >= 0 && railY < CHUNK_HEIGHT) {
-                                chunk->setBlock(localBX, railY, localBZ, Block(BlockType::COBBLESTONE));
-                            }
-                        }
-                        
-                        // Support pillars only every 4 blocks along road (intermittent)
+                        // Support pillars every 4 blocks on edges only
                         bool isPillarPos = (s % 4 == 0);
                         if (isEdge && isPillarPos) {
                             for (int py = localRoadY - 1; py >= 0; py--) {
                                 Block below = chunk->getBlock(localBX, py, localBZ);
                                 BlockType bt = below.getType();
                                 if (bt == BlockType::AIR || bt == BlockType::WATER) {
-                                    chunk->setBlock(localBX, py, localBZ, Block(BlockType::STONE_BRICKS));
+                                    chunk->setBlock(localBX, py, localBZ, Block(
+                                        isCityRoad ? BlockType::STONE_BRICKS : BlockType::COBBLESTONE));
                                 } else break;
                             }
                         }
@@ -713,7 +725,6 @@ void RoadNetwork::placeRoadsInChunk(
                         // Clear headroom above bridge
                         for (int cy = 1; cy <= 5; cy++) {
                             int clearY = localRoadY + cy;
-                            if (isEdge && cy == 1) continue; // Railing
                             if (clearY >= 0 && clearY < CHUNK_HEIGHT) {
                                 Block above = chunk->getBlock(localBX, clearY, localBZ);
                                 if (above.getType() != BlockType::AIR && above.getType() != BlockType::WATER) {
@@ -726,9 +737,8 @@ void RoadNetwork::placeRoadsInChunk(
                     
                     // === TUNNEL (terrain above road) ===
                     if (doTunnel) {
-                        // Road surface
-                        chunk->setBlock(localBX, localRoadY, localBZ, Block(
-                            isCityRoad ? BlockType::STONE_BRICKS : BlockType::COBBLESTONE));
+                        // Road surface (same material pattern as normal road)
+                        chunk->setBlock(localBX, localRoadY, localBZ, Block(roadMat));
                         
                         // Carve air above road (tunnel clearance = 4 blocks)
                         for (int cy = 1; cy <= 4; cy++) {
@@ -738,7 +748,7 @@ void RoadNetwork::placeRoadsInChunk(
                             }
                         }
                         
-                        // Tunnel ceiling (reinforce with stone bricks)
+                        // Tunnel ceiling
                         int ceilingY = localRoadY + 5;
                         if (ceilingY >= 0 && ceilingY < CHUNK_HEIGHT) {
                             chunk->setBlock(localBX, ceilingY, localBZ, Block(BlockType::STONE_BRICKS));
@@ -780,17 +790,8 @@ void RoadNetwork::placeRoadsInChunk(
                         }
                     }
                     
-                    // Road surface material (matching vxstruct road styles)
-                    BlockType roadSurface;
-                    if (isCityRoad) {
-                        // City road: stone_bricks edges, cobblestone fill, gravel center
-                        roadSurface = isEdge ? BlockType::STONE_BRICKS : 
-                                     (w == 0 ? BlockType::GRAVEL : BlockType::COBBLESTONE);
-                    } else {
-                        // Village road: gravel edges, dirt center (matching v_road_straight)
-                        roadSurface = isEdge ? BlockType::GRAVEL : BlockType::DIRT;
-                    }
-                    chunk->setBlock(localBX, localRoadY, localBZ, Block(roadSurface));
+                    // Road surface uses same vxstruct material (roadMat computed above)
+                    chunk->setBlock(localBX, localRoadY, localBZ, Block(roadMat));
                     
                     // Foundation (support below road)
                     for (int fd = 1; fd <= 3; fd++) {

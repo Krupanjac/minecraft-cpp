@@ -151,6 +151,23 @@ inline void BlockPhysicsDatabase::initializeData() {
         0.6f, 0.6f, 1.8f, 0.7f, 0.1f, false, 0.0f, false, false, false, true, 3.0f
     };
     
+    // Road blocks - hard terracotta surface, high friction
+    {
+        BlockPhysicsData roadData = {
+            1.25f, 4.5f, 2.2f, 0.8f, 0.1f, false, 0.0f, true, false, false, true, 8.0f
+        };
+        BlockType roadTypes[] = {
+            BlockType::ROAD_STRAIGHT, BlockType::ROAD_LEFT, BlockType::ROAD_RIGHT,
+            BlockType::ROAD_LEFT_RIGHT, BlockType::ROAD_T_JUNCTION, BlockType::ROAD_INTERSECTION_YELLOW,
+            BlockType::ROAD_MIDDLE_LINES, BlockType::ROAD_MIDDLE_LINES_YELLOW,
+            BlockType::ROAD_MIDDLE_RIGHT, BlockType::ROAD_MIDDLE_RIGHT_YELLOW,
+            BlockType::ROAD_LEFT_DIAG_45, BlockType::ROAD_LEFT_DIAG_45_YELLOW,
+            BlockType::ROAD_LEFT_DIAG_60, BlockType::ROAD_LEFT_DIAG_60_YELLOW,
+            BlockType::ROAD_RIGHT_DIAG_60, BlockType::ROAD_RIGHT_DIAG_YELLOW,
+        };
+        for (auto rt : roadTypes) data[static_cast<size_t>(rt)] = roadData;
+    }
+    
     // Wood - medium hardness, flammable
     data[static_cast<size_t>(BlockType::WOOD)] = {
         2.0f, 3.0f, 0.8f, 0.6f, 0.2f, false, 0.0f, true, false, false, true, 5.0f

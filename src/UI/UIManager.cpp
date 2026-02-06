@@ -1595,6 +1595,15 @@ void UIManager::setupInventoryMenu() {
         BlockType::SPONGE, BlockType::NOTE_BLOCK, BlockType::JUKEBOX,
         BlockType::FARMLAND,
         
+        // Road blocks
+        BlockType::ROAD_STRAIGHT, BlockType::ROAD_LEFT, BlockType::ROAD_RIGHT,
+        BlockType::ROAD_LEFT_RIGHT, BlockType::ROAD_T_JUNCTION, BlockType::ROAD_INTERSECTION_YELLOW,
+        BlockType::ROAD_MIDDLE_LINES, BlockType::ROAD_MIDDLE_LINES_YELLOW,
+        BlockType::ROAD_MIDDLE_RIGHT, BlockType::ROAD_MIDDLE_RIGHT_YELLOW,
+        BlockType::ROAD_LEFT_DIAG_45, BlockType::ROAD_LEFT_DIAG_45_YELLOW,
+        BlockType::ROAD_LEFT_DIAG_60, BlockType::ROAD_LEFT_DIAG_60_YELLOW,
+        BlockType::ROAD_RIGHT_DIAG_60, BlockType::ROAD_RIGHT_DIAG_YELLOW,
+        
         // Bedrock (last - creative only)
         BlockType::BEDROCK
     };
@@ -3362,6 +3371,25 @@ int UIManager::getBlockTextureIndex(BlockType type, int face) {
             return 2;                      // Dirt sides
         case BlockType::SUGAR_CANE:
             return 73;                     // Sugar cane
+        
+        // Road blocks - use stone as atlas fallback (PBR has actual textures)
+        case BlockType::ROAD_STRAIGHT:
+        case BlockType::ROAD_LEFT:
+        case BlockType::ROAD_RIGHT:
+        case BlockType::ROAD_LEFT_RIGHT:
+        case BlockType::ROAD_T_JUNCTION:
+        case BlockType::ROAD_INTERSECTION_YELLOW:
+        case BlockType::ROAD_MIDDLE_LINES:
+        case BlockType::ROAD_MIDDLE_LINES_YELLOW:
+        case BlockType::ROAD_MIDDLE_RIGHT:
+        case BlockType::ROAD_MIDDLE_RIGHT_YELLOW:
+        case BlockType::ROAD_LEFT_DIAG_45:
+        case BlockType::ROAD_LEFT_DIAG_45_YELLOW:
+        case BlockType::ROAD_LEFT_DIAG_60:
+        case BlockType::ROAD_LEFT_DIAG_60_YELLOW:
+        case BlockType::ROAD_RIGHT_DIAG_60:
+        case BlockType::ROAD_RIGHT_DIAG_YELLOW:
+            return 1;                      // Stone placeholder for atlas
             
         default:
             return 1;                      // Default to stone
@@ -3631,6 +3659,24 @@ std::string UIManager::getBlockName(BlockType type) {
         case BlockType::JUKEBOX: return "Jukebox";
         case BlockType::FARMLAND: return "Farmland";
         case BlockType::SUGAR_CANE: return "Sugar Cane";
+        
+        // Road blocks
+        case BlockType::ROAD_STRAIGHT: return "Road Straight";
+        case BlockType::ROAD_LEFT: return "Road Left";
+        case BlockType::ROAD_RIGHT: return "Road Right";
+        case BlockType::ROAD_LEFT_RIGHT: return "Road Left-Right";
+        case BlockType::ROAD_T_JUNCTION: return "Road T-Junction";
+        case BlockType::ROAD_INTERSECTION_YELLOW: return "Road Intersection";
+        case BlockType::ROAD_MIDDLE_LINES: return "Road Middle Lines";
+        case BlockType::ROAD_MIDDLE_LINES_YELLOW: return "Road Middle Lines Yellow";
+        case BlockType::ROAD_MIDDLE_RIGHT: return "Road Middle Right";
+        case BlockType::ROAD_MIDDLE_RIGHT_YELLOW: return "Road Middle Right Yellow";
+        case BlockType::ROAD_LEFT_DIAG_45: return "Road Diag 45 Left";
+        case BlockType::ROAD_LEFT_DIAG_45_YELLOW: return "Road Diag 45 Yellow";
+        case BlockType::ROAD_LEFT_DIAG_60: return "Road Diag 60 Left";
+        case BlockType::ROAD_LEFT_DIAG_60_YELLOW: return "Road Diag 60 Yellow";
+        case BlockType::ROAD_RIGHT_DIAG_60: return "Road Diag 60 Right";
+        case BlockType::ROAD_RIGHT_DIAG_YELLOW: return "Road Diag Right Yellow";
         
         default: return "Unknown";
     }

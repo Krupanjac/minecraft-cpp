@@ -383,6 +383,132 @@ bool ResourcePackManager::loadTextures(const std::string& texturePath) {
         specularFromStbiFlags.push_back(specularFromStbi);
     }
     
+    // ===========================================
+    // Load road textures from assets/roads/ with alternate PBR naming
+    // PBR naming: _normal (normal map), _roughness/_metallic/_ao (packed into specular)
+    // ===========================================
+    {
+        std::string roadTexPath = "assets/roads";
+        if (fs::exists(roadTexPath)) {
+            // Known PBR suffixes to skip when finding base textures
+            auto isRoadPBR = [](const std::string& name) -> bool {
+                const std::string suffixes[] = {"_ao", "_normal", "_metallic", "_metalic", "_roughness"};
+                for (const auto& s : suffixes) {
+                    if (name.length() > s.length() && name.substr(name.length() - s.length()) == s)
+                        return true;
+                }
+                return false;
+            };
+            
+            std::vector<std::string> roadBaseTextures;
+            for (const auto& entry : fs::directory_iterator(roadTexPath)) {
+                if (entry.path().extension() != ".png") continue;
+                std::string filename = entry.path().stem().string();
+                if (isRoadPBR(filename)) continue;
+                roadBaseTextures.push_back(filename);
+            }
+            std::sort(roadBaseTextures.begin(), roadBaseTextures.end());
+            
+            for (const auto& baseName : roadBaseTextures) {
+                // Skip if already loaded
+                if (albedoTextureMap.count(baseName)) continue;
+                
+                std::string albedoPath = roadTexPath + "/" + baseName + ".png";
+                int w, h;
+                unsigned char* albedo = loadImage(albedoPath, w, h);
+                if (!albedo) continue;
+                
+                // Resize to match standard texture size if needed
+                if (w != textureSize || h != textureSize) {
+                    unsigned char* resized = resizeTexture(albedo, w, h, textureSize, textureSize);
+                    stbi_image_free(albedo);
+                    albedo = resized;
+                    if (!albedo) continue;
+                    LOG_DEBUG("Resized road texture: " + baseName + " from " + std::to_string(w) + "x" + std::to_string(h) + " to " + std::to_string(textureSize));
+                }
+                
+                fixTransparentPixels(albedo, textureSize, textureSize);
+                
+                int index = static_cast<int>(albedoData.size());
+                albedoTextureMap[baseName] = index;
+                albedoData.push_back(albedo);
+                albedoNames.push_back(baseName);
+                
+                // Load normal map: try _normal.png
+                unsigned char* normal = nullptr;
+                bool normalFromStbi = false;
+                std::string normalPath = roadTexPath + "/" + baseName + "_normal.png";
+                if (fs::exists(normalPath)) {
+                    normal = loadImage(normalPath, w, h);
+                    if (normal && (w != textureSize || h != textureSize)) {
+                        unsigned char* resized = resizeTexture(normal, w, h, textureSize, textureSize);
+                        stbi_image_free(normal);
+                        normal = resized;
+                    } else if (normal) {
+                        normalFromStbi = true;
+                    }
+                }
+                if (!normal) { normal = createDefaultNormalMap(); normalFromStbi = false; }
+                normalTextureMap[baseName] = index;
+                normalData.push_back(normal);
+                normalNames.push_back(baseName);
+                normalFromStbiFlags.push_back(normalFromStbi);
+                
+                // Build packed specular from separate _roughness, _metallic/_metalic, _ao
+                // Specular format: R=roughness, G=metallic, B=AO, A=255
+                unsigned char* specular = nullptr;
+                bool specularFromStbi = false;
+                int pixelCount = textureSize * textureSize;
+                
+                auto loadChannelTex = [&](const std::string& suffix) -> unsigned char* {
+                    std::string path = roadTexPath + "/" + baseName + suffix + ".png";
+                    if (!fs::exists(path)) return nullptr;
+                    int cw, ch;
+                    unsigned char* img = loadImage(path, cw, ch);
+                    if (!img) return nullptr;
+                    if (cw != textureSize || ch != textureSize) {
+                        unsigned char* resized = resizeTexture(img, cw, ch, textureSize, textureSize);
+                        stbi_image_free(img);
+                        return resized;
+                    }
+                    return img;
+                };
+                
+                unsigned char* roughTex = loadChannelTex("_roughness");
+                unsigned char* metalTex = loadChannelTex("_metallic");
+                if (!metalTex) metalTex = loadChannelTex("_metalic"); // Handle typo in assets
+                unsigned char* aoTex = loadChannelTex("_ao");
+                
+                if (roughTex || metalTex || aoTex) {
+                    specular = new unsigned char[pixelCount * 4];
+                    for (int i = 0; i < pixelCount; i++) {
+                        // R channel from roughness (default: 128 = mid roughness)
+                        specular[i * 4 + 0] = roughTex ? roughTex[i * 4 + 0] : 128;
+                        // G channel from metallic (default: 0 = non-metallic)
+                        specular[i * 4 + 1] = metalTex ? metalTex[i * 4 + 0] : 0;
+                        // B channel from AO (default: 255 = no occlusion)
+                        specular[i * 4 + 2] = aoTex ? aoTex[i * 4 + 0] : 255;
+                        specular[i * 4 + 3] = 255;
+                    }
+                    specularFromStbi = false;
+                }
+                
+                // Free channel textures
+                if (roughTex) stbi_image_free(roughTex);
+                if (metalTex) stbi_image_free(metalTex);
+                if (aoTex) stbi_image_free(aoTex);
+                
+                if (!specular) { specular = createDefaultSpecularMap(); specularFromStbi = false; }
+                specularTextureMap[baseName] = index;
+                specularData.push_back(specular);
+                specularNames.push_back(baseName);
+                specularFromStbiFlags.push_back(specularFromStbi);
+                
+                LOG_INFO("Loaded road texture: " + baseName + " at index " + std::to_string(index));
+            }
+        }
+    }
+    
     textureCount = static_cast<int>(albedoData.size());
     
     if (textureCount == 0) {
@@ -1429,6 +1555,41 @@ void ResourcePackManager::setupBlockMappings() {
         mapping.bottom.albedoIndex = idx;
         mapping.side.albedoIndex = idx;
         blockMappings[BlockType::SUGAR_CANE] = mapping;
+    }
+    
+    // Road blocks (glazed terracotta road surfaces) - all faces use same texture
+    {
+        struct RoadBlockDef { BlockType type; std::string texName; };
+        RoadBlockDef roadBlocks[] = {
+            { BlockType::ROAD_STRAIGHT,              "glazed_terracotta_up" },
+            { BlockType::ROAD_LEFT,                  "glazed_terracotta_left" },
+            { BlockType::ROAD_RIGHT,                 "glazed_terracotta_right" },
+            { BlockType::ROAD_LEFT_RIGHT,            "glazed_terracotta_left_right" },
+            { BlockType::ROAD_T_JUNCTION,            "glazed_terracotta_left_right_no_forward" },
+            { BlockType::ROAD_INTERSECTION_YELLOW,   "glazed_terracotta_intersection_yellow_lines" },
+            { BlockType::ROAD_MIDDLE_LINES,          "glazed_terracotta_m_lines" },
+            { BlockType::ROAD_MIDDLE_LINES_YELLOW,   "glazed_terracotta_m_lines_yellow" },
+            { BlockType::ROAD_MIDDLE_RIGHT,          "glazed_terracotta_m_right" },
+            { BlockType::ROAD_MIDDLE_RIGHT_YELLOW,   "glazed_terracotta_m_right_yellow_lines" },
+            { BlockType::ROAD_LEFT_DIAG_45,          "glazed_terracotta_left_diag_45_lines" },
+            { BlockType::ROAD_LEFT_DIAG_45_YELLOW,   "glazed_terracotta_left_diag_45_lines_yellow" },
+            { BlockType::ROAD_LEFT_DIAG_60,          "glazed_terracotta_left_diag_60" },
+            { BlockType::ROAD_LEFT_DIAG_60_YELLOW,   "glazed_terracotta_left_diag_60_yellow_lines" },
+            { BlockType::ROAD_RIGHT_DIAG_60,         "glazed_terracotta_right_diag_60_lines" },
+            { BlockType::ROAD_RIGHT_DIAG_YELLOW,     "glazed_terracotta_right_diag_yellow" },
+        };
+        for (const auto& rb : roadBlocks) {
+            BlockTextureMapping mapping;
+            int idx = findTex(rb.texName);
+            if (idx < 0) {
+                LOG_WARNING("Road texture not found: " + rb.texName);
+                continue;
+            }
+            mapping.top.albedoIndex = idx;
+            mapping.bottom.albedoIndex = idx;
+            mapping.side.albedoIndex = idx;
+            blockMappings[rb.type] = mapping;
+        }
     }
     
     // Log loaded textures for debugging

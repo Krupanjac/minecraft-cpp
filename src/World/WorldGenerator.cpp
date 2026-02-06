@@ -1265,9 +1265,10 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         float cityRadius = isCity ? 160.0f : 45.0f;
         float edgeBlend = isCity ? 60.0f : 15.0f; // wide gradual transition at city edge
         
-        // ---- PHASE 1: CITY-WIDE TERRAIN FLATTENING ----
-        // Flatten the entire city area to cityY with grass/dirt, skip rivers
-        if (isCity) {
+        // ---- PHASE 1: TERRAIN FLATTENING ----
+        // Flatten the settlement area to cityY with grass/dirt, skip rivers.
+        // Applied to BOTH cities and villages so roads sit flush with ground.
+        {
             for (int lx = 0; lx < CHUNK_SIZE; lx++) {
                 for (int lz = 0; lz < CHUNK_SIZE; lz++) {
                     int worldFX = chunkBaseX + lx;
@@ -1278,7 +1279,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     float dz = static_cast<float>(worldFZ) - settlementCenterZ;
                     float dist = std::sqrt(dx * dx + dz * dz);
                     
-                    if (dist > cityRadius + edgeBlend) continue; // Outside city
+                    if (dist > cityRadius + edgeBlend) continue; // Outside settlement
                     
                     // Check for rivers - preserve them! (rivers get bridges at roads)
                     float riverMask = getRiverMask(static_cast<float>(worldFX), static_cast<float>(worldFZ));
@@ -1286,7 +1287,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     
                     int naturalY = getSurfaceHeight(worldFX, worldFZ);
                     
-                    // Blend factor: 1.0 inside city, fades to 0.0 at edge
+                    // Blend factor: 1.0 inside settlement, fades to 0.0 at edge
                     float blend = 1.0f;
                     if (dist > cityRadius - edgeBlend) {
                         float t = std::clamp((cityRadius + edgeBlend - dist) / (edgeBlend * 2.0f), 0.0f, 1.0f);
@@ -1299,14 +1300,12 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     
                     // Fill up to targetY with dirt, place grass on top
                     if (naturalY < targetY) {
-                        // Need to build up terrain
                         for (int fy = naturalY + 1; fy <= targetY; fy++) {
                             int localFY = fy - chunkBaseY;
                             if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
                             chunk->setBlock(lx, localFY, lz, Block(fy == targetY ? BlockType::GRASS : BlockType::DIRT));
                         }
                     } else if (naturalY > targetY) {
-                        // Need to carve down terrain
                         for (int fy = targetY + 1; fy <= naturalY; fy++) {
                             int localFY = fy - chunkBaseY;
                             if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
@@ -1318,7 +1317,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     if (localTY >= 0 && localTY < CHUNK_HEIGHT) {
                         chunk->setBlock(lx, localTY, lz, Block(BlockType::GRASS));
                     }
-                    // Ensure dirt layers below the grass (replace stone too - no exposed stone in settlements)
+                    // Ensure dirt layers below the grass
                     for (int d = 1; d <= 4; d++) {
                         int localDY = targetY - d - chunkBaseY;
                         if (localDY >= 0 && localDY < CHUNK_HEIGHT) {
@@ -1379,11 +1378,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     bool isSidewalk = (isRoadX && isSidewalkZ) || (isRoadZ && isSidewalkX) ||
                                       (isSidewalkX && isSidewalkZ);
                     
-                    // Ring road at ~148 blocks to tie all grid roads together
-                    float ringRadius = cityRadius - 12.0f;
-                    bool isCityRingRoad = (dist >= ringRadius - 1.5f && dist <= ringRadius + 1.5f);
-                    
-                    if (!isRoadX && !isRoadZ && !isSidewalk && !isCityRingRoad) continue;
+                    if (!isRoadX && !isRoadZ && !isSidewalk) continue;
                     
                     int localRY = cityY - chunkBaseY;
                     if (localRY < 0 || localRY >= CHUNK_HEIGHT) continue;
@@ -1392,21 +1387,16 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     float riverMask = getRiverMask(static_cast<float>(worldRX), static_cast<float>(worldRZ));
                     bool isOnRiver = riverMask > 0.25f;
                     
-                    // Only the 2 main roads through center get bridges, plus ring road
+                    // Only the 2 main roads through center get bridges
                     bool isMainRoadNS = (modX < roadWidth) && (std::abs(relX) < roadWidth);
                     bool isMainRoadEW = (modZ < roadWidth) && (std::abs(relZ) < roadWidth);
-                    bool isBridge = isOnRiver && (isMainRoadNS || isMainRoadEW || isCityRingRoad);
+                    bool isBridge = isOnRiver && (isMainRoadNS || isMainRoadEW);
                     
                     if (isOnRiver && !isBridge) continue; // Skip non-bridge road segments over rivers
                     
                     if (isBridge) {
                         // Simple bridge: just stone bricks, no railings
                         chunk->setBlock(lx, localRY, lz, Block(BlockType::STONE_BRICKS));
-                    } else if (isCityRingRoad && !isRoadX && !isRoadZ) {
-                        // Ring road material: stone edges, cobblestone fill
-                        bool isRingEdge = (dist <= ringRadius - 1.0f || dist >= ringRadius + 1.0f);
-                        chunk->setBlock(lx, localRY, lz, Block(
-                            isRingEdge ? BlockType::STONE : BlockType::COBBLESTONE));
                     } else {
                         // Normal road surface
                         if (isSidewalk && !isRoadX && !isRoadZ) {
@@ -1518,6 +1508,13 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     float pathDist = std::sqrt(pdx * pdx + pdz * pdz);
                     if (pathDist > 45.0f) continue;
                     
+                    // Skip roads over water bodies (ocean/lake) - rivers handled separately via bridges
+                    int waterCheckSurface = getSurfaceHeight(worldPX, worldPZ);
+                    if (waterCheckSurface < SEA_LEVEL - 1) {
+                        float waterCheckRm = getRiverMask(static_cast<float>(worldPX), static_cast<float>(worldPZ));
+                        if (waterCheckRm <= 0.25f) continue; // Not a river → ocean/lake, skip
+                    }
+                    
                     // === Path type detection ===
                     // 1. Village square (7x7 center)
                     bool isVillageSquare = (std::abs(relX) <= 3 && std::abs(relZ) <= 3);
@@ -1568,47 +1565,51 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     if (isOnRiver && !isBridge) continue;
                     
                     if (isBridge) {
-                        // Bridge at village center height with arch-style supports
-                        int bridgeY = getSurfaceHeight(centerIX, centerIZ);
+                        // Bridge at village center height — flat, NO railings
+                        int bridgeY = cityY; // Use flat road Y
                         int localBridgeY = bridgeY - chunkBaseY;
                         if (localBridgeY < 0 || localBridgeY >= CHUNK_HEIGHT) continue;
                         
-                        // Determine road direction and edge status
+                        // Bridge deck uses same vxstruct material as the road
+                        // v_road_straight: gravel edges, dirt fill, cobblestone center
+                        BlockType bridgeMat;
+                        if (isMainRoad) {
+                            bool isEdgeBlock = (isMainRoadNS && std::abs(relX) == 1) ||
+                                               (isMainRoadEW && std::abs(relZ) == 1);
+                            bool isCenterBlock = (isMainRoadNS && relX == 0) ||
+                                                 (isMainRoadEW && relZ == 0);
+                            bridgeMat = isEdgeBlock ? BlockType::GRAVEL :
+                                        (isCenterBlock ? BlockType::COBBLESTONE : BlockType::DIRT);
+                        } else {
+                            // Perimeter road
+                            bool isEdgeBlock = (perimDistI == perimRoadRadius - 1 || perimDistI == perimRoadRadius + 1);
+                            bridgeMat = isEdgeBlock ? BlockType::GRAVEL : BlockType::DIRT;
+                        }
+                        chunk->setBlock(lx, localBridgeY, lz, Block(bridgeMat));
+                        
+                        // Support pillars every 4 blocks on edges only (no railings)
                         bool isEdge = false;
                         if (isMainRoadNS && (std::abs(relX) == 1)) isEdge = true;
                         if (isMainRoadEW && (std::abs(relZ) == 1)) isEdge = true;
+                        if (isPerimeterRoad && (perimDistI == perimRoadRadius - 1 || perimDistI == perimRoadRadius + 1)) isEdge = true;
                         
-                        // Bridge deck
-                        chunk->setBlock(lx, localBridgeY, lz, Block(BlockType::STONE_BRICKS));
-                        
-                        // Support pillars only every 4 blocks (intermittent supports)
-                        // and only on edges — creates open arches between pillars
                         int pillarCoord = isMainRoadNS ? relZ : relX;
                         bool isPillarPos = (((pillarCoord % 4) + 4) % 4 == 0);
                         
                         if (isEdge && isPillarPos) {
-                            // Place support pillar down to ground
                             for (int sy = bridgeY - 1; sy >= SEA_LEVEL - 2; sy--) {
                                 int localSY = sy - chunkBaseY;
                                 if (localSY < 0 || localSY >= CHUNK_HEIGHT) continue;
                                 Block below = chunk->getBlock(lx, localSY, lz);
                                 BlockType bt = below.getType();
                                 if (bt == BlockType::AIR || bt == BlockType::WATER) {
-                                    chunk->setBlock(lx, localSY, lz, Block(BlockType::STONE_BRICKS));
+                                    chunk->setBlock(lx, localSY, lz, Block(BlockType::COBBLESTONE));
                                 } else break;
                             }
                         }
                         
-                        // Railings on edges only (1 block above deck)
-                        if (isEdge) {
-                            int localRailY = localBridgeY + 1;
-                            if (localRailY >= 0 && localRailY < CHUNK_HEIGHT)
-                                chunk->setBlock(lx, localRailY, lz, Block(BlockType::COBBLESTONE));
-                        }
-                        
-                        // Clear headroom above bridge
-                        int clearStart = isEdge ? 2 : 1;
-                        for (int clearY = clearStart; clearY <= 5; clearY++) {
+                        // Clear headroom above bridge (no railings)
+                        for (int clearY = 1; clearY <= 5; clearY++) {
                             int localCY = localBridgeY + clearY;
                             if (localCY >= 0 && localCY < CHUNK_HEIGHT) {
                                 Block above = chunk->getBlock(lx, localCY, lz);
@@ -1617,26 +1618,42 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                             }
                         }
                     } else {
-                        // Normal path - baked into terrain surface
+                        // ---- FLAT ROAD with tunnel/bridge logic ----
+                        // Use village center height (cityY) as target road level,
+                        // same as cities, so roads are actually flat.
+                        int roadY = cityY;
                         int naturalY = getSurfaceHeight(worldPX, worldPZ);
-                        int localPY = naturalY - chunkBaseY;
-                        if (localPY < 0 || localPY >= CHUNK_HEIGHT) continue;
+                        int heightDiff = naturalY - roadY; // positive = terrain above road
+                        int localRoadY = roadY - chunkBaseY;
+                        if (localRoadY < 0 || localRoadY >= CHUNK_HEIGHT) continue;
+                        
+                        // Determine road edge status for tunnels/bridges
+                        bool isEdgePath = false;
+                        if (isMainRoadNS && std::abs(relX) == 1) isEdgePath = true;
+                        if (isMainRoadEW && std::abs(relZ) == 1) isEdgePath = true;
+                        if (isPerimeterRoad && (perimDistI == perimRoadRadius - 1 || perimDistI == perimRoadRadius + 1)) isEdgePath = true;
                         
                         // Material selection based on path type
-                        // Matches v_road_straight vxstruct: gravel edges, dirt center
+                        // v_road_straight: gravel edges, dirt fill, cobblestone center
                         BlockType pathMaterial;
                         if (isVillageSquare) {
-                            // Village square: gravel border, dirt interior (v_road_section style)
+                            // Village square: gravel border, dirt interior, cobblestone center
                             if (std::abs(relX) == 3 || std::abs(relZ) == 3)
                                 pathMaterial = BlockType::GRAVEL;
+                            else if (relX == 0 || relZ == 0)
+                                pathMaterial = BlockType::COBBLESTONE;
                             else
                                 pathMaterial = BlockType::DIRT;
                         } else if (isMainRoad) {
-                            // Main road: gravel edges, dirt center (v_road_straight style)
+                            // Main road: gravel edges, cobblestone center, dirt fill
                             bool isEdgeBlock = (isMainRoadNS && std::abs(relX) == 1) ||
                                                (isMainRoadEW && std::abs(relZ) == 1);
+                            bool isCenterBlock = (isMainRoadNS && relX == 0) ||
+                                                 (isMainRoadEW && relZ == 0);
                             if (isEdgeBlock)
                                 pathMaterial = BlockType::GRAVEL;
+                            else if (isCenterBlock)
+                                pathMaterial = BlockType::COBBLESTONE;
                             else
                                 pathMaterial = BlockType::DIRT;
                         } else if (isPerimeterRoad) {
@@ -1651,25 +1668,103 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                             pathMaterial = BlockType::DIRT;
                         }
                         
-                        chunk->setBlock(lx, localPY, lz, Block(pathMaterial));
-                        
-                        // Ensure dirt below the path (no floating)
-                        int localBelowPY = localPY - 1;
-                        if (localBelowPY >= 0 && localBelowPY < CHUNK_HEIGHT) {
-                            Block belowBlock = chunk->getBlock(lx, localBelowPY, lz);
-                            BlockType bt = belowBlock.getType();
-                            if (bt == BlockType::AIR || bt == BlockType::GRASS || bt == BlockType::SAND) {
-                                chunk->setBlock(lx, localBelowPY, lz, Block(BlockType::DIRT));
+                        // === TUNNEL: terrain significantly above road ===
+                        if (heightDiff > 2) {
+                            // Road surface
+                            chunk->setBlock(lx, localRoadY, lz, Block(pathMaterial));
+                            
+                            // Carve tunnel clearance (4 blocks of air)
+                            for (int cy = 1; cy <= 4; cy++) {
+                                int clearY = localRoadY + cy;
+                                if (clearY >= 0 && clearY < CHUNK_HEIGHT) {
+                                    if (isEdgePath) {
+                                        // Tunnel walls on edges
+                                        chunk->setBlock(lx, clearY, lz, Block(BlockType::COBBLESTONE));
+                                    } else {
+                                        chunk->setBlock(lx, clearY, lz, Block(BlockType::AIR));
+                                    }
+                                }
+                            }
+                            // Tunnel ceiling
+                            int ceilingY = localRoadY + 5;
+                            if (ceilingY >= 0 && ceilingY < CHUNK_HEIGHT) {
+                                chunk->setBlock(lx, ceilingY, lz, Block(BlockType::COBBLESTONE));
+                            }
+                            // Foundation
+                            int belowY = localRoadY - 1;
+                            if (belowY >= 0 && belowY < CHUNK_HEIGHT) {
+                                chunk->setBlock(lx, belowY, lz, Block(BlockType::COBBLESTONE));
                             }
                         }
-                        
-                        // Clear above path for headroom
-                        for (int clearY = 1; clearY <= 4; clearY++) {
-                            int localCY = localPY + clearY;
-                            if (localCY >= 0 && localCY < CHUNK_HEIGHT) {
-                                Block above = chunk->getBlock(lx, localCY, lz);
-                                if (above.getType() != BlockType::AIR && above.getType() != BlockType::WATER)
-                                    chunk->setBlock(lx, localCY, lz, Block(BlockType::AIR));
+                        // === BRIDGE: road over river (flat, no railings) ===
+                        else if (heightDiff < -2) {
+                            // Bridge deck uses same vxstruct material
+                            chunk->setBlock(lx, localRoadY, lz, Block(pathMaterial));
+                            
+                            // Support pillars every 4 blocks on edges only
+                            int pillarCoord = (isMainRoadNS || isSideLaneNS) ? relZ : relX;
+                            bool isPillarPos = (((pillarCoord % 4) + 4) % 4 == 0);
+                            if (isEdgePath && isPillarPos) {
+                                for (int py = localRoadY - 1; py >= 0; py--) {
+                                    Block below = chunk->getBlock(lx, py, lz);
+                                    BlockType bt = below.getType();
+                                    if (bt == BlockType::AIR || bt == BlockType::WATER)
+                                        chunk->setBlock(lx, py, lz, Block(BlockType::COBBLESTONE));
+                                    else break;
+                                }
+                            }
+                            
+                            // Clear headroom (no railings)
+                            for (int cy = 1; cy <= 5; cy++) {
+                                int clearY = localRoadY + cy;
+                                if (clearY >= 0 && clearY < CHUNK_HEIGHT) {
+                                    Block above = chunk->getBlock(lx, clearY, lz);
+                                    if (above.getType() != BlockType::AIR)
+                                        chunk->setBlock(lx, clearY, lz, Block(BlockType::AIR));
+                                }
+                            }
+                        }
+                        // === NORMAL: terrain close to road level, flatten ===
+                        else {
+                            // Carve terrain down to road level
+                            if (naturalY > roadY) {
+                                for (int cy = roadY + 1; cy <= naturalY + 2; cy++) {
+                                    int localCY = cy - chunkBaseY;
+                                    if (localCY >= 0 && localCY < CHUNK_HEIGHT)
+                                        chunk->setBlock(lx, localCY, lz, Block(BlockType::AIR));
+                                }
+                            }
+                            // Fill up to road level
+                            else if (naturalY < roadY) {
+                                for (int fy = naturalY + 1; fy < roadY; fy++) {
+                                    int localFY = fy - chunkBaseY;
+                                    if (localFY >= 0 && localFY < CHUNK_HEIGHT)
+                                        chunk->setBlock(lx, localFY, lz, Block(BlockType::DIRT));
+                                }
+                            }
+                            
+                            // Road surface
+                            chunk->setBlock(lx, localRoadY, lz, Block(pathMaterial));
+                            
+                            // Foundation below road
+                            for (int fd = 1; fd <= 3; fd++) {
+                                int localFY = localRoadY - fd;
+                                if (localFY >= 0 && localFY < CHUNK_HEIGHT) {
+                                    Block below = chunk->getBlock(lx, localFY, lz);
+                                    BlockType bt = below.getType();
+                                    if (bt == BlockType::AIR || bt == BlockType::WATER)
+                                        chunk->setBlock(lx, localFY, lz, Block(BlockType::DIRT));
+                                }
+                            }
+                            
+                            // Clear above road for headroom
+                            for (int cy = 1; cy <= 4; cy++) {
+                                int clearY = localRoadY + cy;
+                                if (clearY >= 0 && clearY < CHUNK_HEIGHT) {
+                                    Block above = chunk->getBlock(lx, clearY, lz);
+                                    if (above.getType() != BlockType::AIR && above.getType() != BlockType::WATER)
+                                        chunk->setBlock(lx, clearY, lz, Block(BlockType::AIR));
+                                }
                             }
                         }
                     }
@@ -2293,7 +2388,9 @@ float WorldGenerator::getHeight(float x, float z) const {
             float outerR = VILLAGE_RADIUS_F + VILLAGE_TRANSITION;
             float edgeFade = std::clamp((outerR - villageDist) / VILLAGE_TRANSITION, 0.0f, 1.0f);
             edgeFade = edgeFade * edgeFade * (3.0f - 2.0f * edgeFade);
-            float flattenStrength = edgeFade * 0.90f * riverPreserve;
+            // High flatten strength (matching cities) so roads sit flush with terrain.
+            // Without this, terrain bumps remain and flat roads float above ground.
+            float flattenStrength = edgeFade * 0.995f * riverPreserve;
             finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
         }
     }

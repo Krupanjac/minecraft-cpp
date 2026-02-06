@@ -102,6 +102,24 @@ const std::vector<BlockColorInfo>& getBlockPalette() {
 
         // Water
         {BlockType::WATER,           "Water",             {0.15f, 0.35f, 0.75f}, "Liquid"},
+
+        // Road blocks
+        {BlockType::ROAD_STRAIGHT,           "Road Straight",      {0.35f, 0.35f, 0.38f}, "Road"},
+        {BlockType::ROAD_LEFT,               "Road Left",          {0.35f, 0.35f, 0.38f}, "Road"},
+        {BlockType::ROAD_RIGHT,              "Road Right",         {0.35f, 0.35f, 0.38f}, "Road"},
+        {BlockType::ROAD_LEFT_RIGHT,         "Road Left-Right",    {0.35f, 0.35f, 0.38f}, "Road"},
+        {BlockType::ROAD_T_JUNCTION,         "Road T-Junction",    {0.35f, 0.35f, 0.38f}, "Road"},
+        {BlockType::ROAD_INTERSECTION_YELLOW,"Road Intersection",  {0.40f, 0.38f, 0.25f}, "Road"},
+        {BlockType::ROAD_MIDDLE_LINES,       "Road Mid Lines",     {0.35f, 0.35f, 0.38f}, "Road"},
+        {BlockType::ROAD_MIDDLE_LINES_YELLOW,"Road Mid Lines Yel", {0.40f, 0.38f, 0.25f}, "Road"},
+        {BlockType::ROAD_MIDDLE_RIGHT,       "Road Mid Right",     {0.35f, 0.35f, 0.38f}, "Road"},
+        {BlockType::ROAD_MIDDLE_RIGHT_YELLOW,"Road Mid Right Yel", {0.40f, 0.38f, 0.25f}, "Road"},
+        {BlockType::ROAD_LEFT_DIAG_45,       "Road Diag 45 L",     {0.35f, 0.35f, 0.38f}, "Road"},
+        {BlockType::ROAD_LEFT_DIAG_45_YELLOW,"Road Diag 45 Yel",   {0.40f, 0.38f, 0.25f}, "Road"},
+        {BlockType::ROAD_LEFT_DIAG_60,       "Road Diag 60 L",     {0.35f, 0.35f, 0.38f}, "Road"},
+        {BlockType::ROAD_LEFT_DIAG_60_YELLOW,"Road Diag 60 Yel",   {0.40f, 0.38f, 0.25f}, "Road"},
+        {BlockType::ROAD_RIGHT_DIAG_60,      "Road Diag 60 R",     {0.35f, 0.35f, 0.38f}, "Road"},
+        {BlockType::ROAD_RIGHT_DIAG_YELLOW,  "Road Diag R Yel",    {0.40f, 0.38f, 0.25f}, "Road"},
     };
     return palette;
 }

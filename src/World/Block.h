@@ -92,6 +92,24 @@ enum class BlockType : u8 {
     // Sand variants
     CHISELED_SANDSTONE = 102,
     
+    // Road blocks (glazed terracotta road surfaces)
+    ROAD_STRAIGHT = 83,
+    ROAD_LEFT = 84,
+    ROAD_RIGHT = 85,
+    ROAD_LEFT_RIGHT = 86,
+    ROAD_T_JUNCTION = 87,                // left_right_no_forward
+    ROAD_INTERSECTION_YELLOW = 88,
+    ROAD_MIDDLE_LINES = 89,
+    ROAD_MIDDLE_LINES_YELLOW = 90,
+    ROAD_MIDDLE_RIGHT = 91,
+    ROAD_MIDDLE_RIGHT_YELLOW = 92,
+    ROAD_LEFT_DIAG_45 = 93,
+    ROAD_LEFT_DIAG_45_YELLOW = 94,
+    ROAD_LEFT_DIAG_60 = 95,
+    ROAD_LEFT_DIAG_60_YELLOW = 96,
+    ROAD_RIGHT_DIAG_60 = 97,
+    ROAD_RIGHT_DIAG_YELLOW = 98,
+    
     // Misc blocks
     CLAY = 104,
     SPONGE = 107,

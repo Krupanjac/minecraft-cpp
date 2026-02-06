@@ -37,8 +37,8 @@ public:
     static constexpr int ROAD_STEP = 4;          // A* grid resolution (blocks)
     static constexpr float SEARCH_RADIUS = 600.0f; // How far to look for settlements to connect
     static constexpr int MAX_CONNECTIONS = 3;     // Max roads per settlement
-    static constexpr int ROAD_HALF_WIDTH = 2;     // Half-width of village road (total = 2*2+1 = 5)
-    static constexpr int CITY_ROAD_HALF_WIDTH = 3; // Wider roads for city connections (total = 7)
+    static constexpr int ROAD_HALF_WIDTH = 3;     // Half-width of road (total = 2*3+1 = 7, matches vxstruct)
+    static constexpr int CITY_ROAD_HALF_WIDTH = 3; // Same width for city connections (total = 7)
     static constexpr float CITY_RADIUS = 160.0f;
     static constexpr float VILLAGE_RADIUS = 45.0f;
     
