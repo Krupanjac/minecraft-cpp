@@ -1188,10 +1188,10 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         auto& registry = StructureRegistry::instance();
         auto allStructures = registry.getAllStructureIds();
         
-        // Sub-grid spacing: cities 8 blocks (4 per chunk), villages 16 blocks (1 per chunk)
-        int structSpacing = isCity ? 8 : 16;
+        // Sub-grid spacing: cities 6 blocks (many per chunk), villages 16 blocks (1 per chunk)
+        int structSpacing = isCity ? 6 : 16;
         // City block size for road grid (must be consistent between road and structure code)
-        int cityBlockSize = 16;
+        int cityBlockSize = 24;  // Bigger city blocks = more room for buildings
         
         // Find the settlement center for this biome (from getBiome grid logic)
         float settlementCenterX, settlementCenterZ;
@@ -1203,17 +1203,108 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             settlementCenterZ = std::floor(static_cast<float>(chunkBaseZ + 8) / 150.0f) * 150.0f + 75.0f;
         }
         
-        // ---- CITY ROAD GRID ----
-        // Cities get a road grid pattern: roads every 24 blocks aligned to settlement center
+        // ======== UNIFIED CITY Y LEVEL ========
+        // One flat height for the entire city: roads, buildings, ground - all at the same level.
+        // Rivers are preserved and get bridges where roads cross them.
+        int cityY = getSurfaceHeight(static_cast<int>(settlementCenterX), static_cast<int>(settlementCenterZ));
+        float cityRadius = isCity ? 160.0f : 45.0f;
+        float edgeBlend = isCity ? 30.0f : 10.0f; // smooth transition at city edge
+        
+        // ---- PHASE 1: CITY-WIDE TERRAIN FLATTENING ----
+        // Flatten the entire city area to cityY with grass/dirt, skip rivers
         if (isCity) {
-            int roadSpacing = cityBlockSize; // road every 16 blocks (tighter city blocks)
-            int roadWidth = 4;   // 4-block wide roads (proper streets)
+            for (int lx = 0; lx < CHUNK_SIZE; lx++) {
+                for (int lz = 0; lz < CHUNK_SIZE; lz++) {
+                    int worldFX = chunkBaseX + lx;
+                    int worldFZ = chunkBaseZ + lz;
+                    
+                    // Distance from settlement center for edge blending
+                    float dx = static_cast<float>(worldFX) - settlementCenterX;
+                    float dz = static_cast<float>(worldFZ) - settlementCenterZ;
+                    float dist = std::sqrt(dx * dx + dz * dz);
+                    
+                    if (dist > cityRadius + edgeBlend) continue; // Outside city
+                    
+                    // Check for rivers - preserve them! (rivers get bridges at roads)
+                    float riverMask = getRiverMask(static_cast<float>(worldFX), static_cast<float>(worldFZ));
+                    if (riverMask > 0.25f) continue; // This is a river area, skip flattening
+                    
+                    int naturalY = getSurfaceHeight(worldFX, worldFZ);
+                    
+                    // Blend factor: 1.0 inside city, fades to 0.0 at edge
+                    float blend = 1.0f;
+                    if (dist > cityRadius - edgeBlend) {
+                        float t = std::clamp((cityRadius + edgeBlend - dist) / (edgeBlend * 2.0f), 0.0f, 1.0f);
+                        blend = t * t * (3.0f - 2.0f * t); // smoothstep
+                    }
+                    
+                    // Target Y: blend between cityY and natural height at edges
+                    int targetY = static_cast<int>(std::round(
+                        blend * static_cast<float>(cityY) + (1.0f - blend) * static_cast<float>(naturalY)));
+                    
+                    // Fill up to targetY with dirt, place grass on top
+                    if (naturalY < targetY) {
+                        // Need to build up terrain
+                        for (int fy = naturalY + 1; fy <= targetY; fy++) {
+                            int localFY = fy - chunkBaseY;
+                            if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
+                            chunk->setBlock(lx, localFY, lz, Block(fy == targetY ? BlockType::GRASS : BlockType::DIRT));
+                        }
+                    } else if (naturalY > targetY) {
+                        // Need to carve down terrain
+                        for (int fy = targetY + 1; fy <= naturalY; fy++) {
+                            int localFY = fy - chunkBaseY;
+                            if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
+                            chunk->setBlock(lx, localFY, lz, Block(BlockType::AIR));
+                        }
+                    }
+                    // Ensure grass block on top surface
+                    int localTY = targetY - chunkBaseY;
+                    if (localTY >= 0 && localTY < CHUNK_HEIGHT) {
+                        chunk->setBlock(lx, localTY, lz, Block(BlockType::GRASS));
+                    }
+                    // Ensure dirt layer right below the grass
+                    int localDY = targetY - 1 - chunkBaseY;
+                    if (localDY >= 0 && localDY < CHUNK_HEIGHT) {
+                        Block below = chunk->getBlock(lx, localDY, lz);
+                        if (below.getType() != BlockType::STONE && below.getType() != BlockType::BEDROCK) {
+                            chunk->setBlock(lx, localDY, lz, Block(BlockType::DIRT));
+                        }
+                    }
+                    
+                    // Clear any trees/vegetation above for 8 blocks
+                    for (int clearY = 1; clearY <= 8; clearY++) {
+                        int localCY = localTY + clearY;
+                        if (localCY >= 0 && localCY < CHUNK_HEIGHT) {
+                            Block above = chunk->getBlock(lx, localCY, lz);
+                            BlockType atype = above.getType();
+                            if (atype != BlockType::AIR && atype != BlockType::WATER) {
+                                chunk->setBlock(lx, localCY, lz, Block(BlockType::AIR));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // ---- PHASE 2: CITY ROAD GRID ----
+        // Cities get a road grid pattern at the unified cityY level.
+        // Only the 2 main roads (through center) get bridges over rivers.
+        if (isCity) {
+            int roadSpacing = cityBlockSize; // road every cityBlockSize blocks
+            int roadWidth = 3;   // 3-block wide roads
             int sidewalkWidth = 1; // 1-block sidewalk on each side
             
             for (int lx = 0; lx < CHUNK_SIZE; lx++) {
                 for (int lz = 0; lz < CHUNK_SIZE; lz++) {
                     int worldRX = chunkBaseX + lx;
                     int worldRZ = chunkBaseZ + lz;
+                    
+                    // Distance check - only within city radius
+                    float dx = static_cast<float>(worldRX) - settlementCenterX;
+                    float dz = static_cast<float>(worldRZ) - settlementCenterZ;
+                    float dist = std::sqrt(dx * dx + dz * dz);
+                    if (dist > cityRadius) continue;
                     
                     // Offset from settlement center
                     int relX = worldRX - static_cast<int>(settlementCenterX);
@@ -1223,9 +1314,8 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     int modX = ((relX % roadSpacing) + roadSpacing) % roadSpacing;
                     int modZ = ((relZ % roadSpacing) + roadSpacing) % roadSpacing;
                     
-                    bool isRoadX = modX < roadWidth; // E-W road
-                    bool isRoadZ = modZ < roadWidth; // N-S road
-                    // Sidewalks: one block on each side of the road
+                    bool isRoadX = modX < roadWidth;
+                    bool isRoadZ = modZ < roadWidth;
                     bool isSidewalkX = (modX == roadWidth) || (modX == roadSpacing - sidewalkWidth);
                     bool isSidewalkZ = (modZ == roadWidth) || (modZ == roadSpacing - sidewalkWidth);
                     bool isSidewalk = (isRoadX && isSidewalkZ) || (isRoadZ && isSidewalkX) ||
@@ -1233,29 +1323,43 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     
                     if (!isRoadX && !isRoadZ && !isSidewalk) continue;
                     
-                    int groundRY = getSurfaceHeight(worldRX, worldRZ);
-                    int localRY = groundRY - chunkBaseY;
+                    int localRY = cityY - chunkBaseY;
                     if (localRY < 0 || localRY >= CHUNK_HEIGHT) continue;
                     
-                    if (isSidewalk && !isRoadX && !isRoadZ) {
-                        // Sidewalk: stone slab raised feel (use stone bricks)
+                    // Check for river
+                    float riverMask = getRiverMask(static_cast<float>(worldRX), static_cast<float>(worldRZ));
+                    bool isOnRiver = riverMask > 0.25f;
+                    
+                    // Only the 2 main roads through center get bridges (relX near 0 = N-S, relZ near 0 = E-W)
+                    bool isMainRoadNS = (modX < roadWidth) && (std::abs(relX) < roadWidth); // The road segment closest to center X
+                    bool isMainRoadEW = (modZ < roadWidth) && (std::abs(relZ) < roadWidth); // The road segment closest to center Z
+                    bool isBridge = isOnRiver && (isMainRoadNS || isMainRoadEW);
+                    
+                    if (isOnRiver && !isBridge) continue; // Skip non-bridge road segments over rivers
+                    
+                    if (isBridge) {
+                        // Simple bridge: just stone bricks, no railings
                         chunk->setBlock(lx, localRY, lz, Block(BlockType::STONE_BRICKS));
                     } else {
-                        // Road surface
-                        bool isIntersection = isRoadX && isRoadZ;
-                        bool isEdge = (modX == 0 || modX == roadWidth - 1) ||
-                                      (modZ == 0 || modZ == roadWidth - 1);
-                        
-                        if (isIntersection)
+                        // Normal road surface
+                        if (isSidewalk && !isRoadX && !isRoadZ) {
                             chunk->setBlock(lx, localRY, lz, Block(BlockType::STONE_BRICKS));
-                        else if (isEdge)
-                            chunk->setBlock(lx, localRY, lz, Block(BlockType::STONE));
-                        else
-                            chunk->setBlock(lx, localRY, lz, Block(BlockType::GRAVEL));
+                        } else {
+                            bool isIntersection = isRoadX && isRoadZ;
+                            bool isEdge = (modX == 0 || modX == roadWidth - 1) ||
+                                          (modZ == 0 || modZ == roadWidth - 1);
+                            
+                            if (isIntersection)
+                                chunk->setBlock(lx, localRY, lz, Block(BlockType::STONE_BRICKS));
+                            else if (isEdge)
+                                chunk->setBlock(lx, localRY, lz, Block(BlockType::STONE));
+                            else
+                                chunk->setBlock(lx, localRY, lz, Block(BlockType::GRAVEL));
+                        }
                     }
                     
-                    // Clear blocks above road/sidewalk for 5 blocks
-                    for (int clearY = 1; clearY <= 5; clearY++) {
+                    // Clear blocks above road/bridge for headroom
+                    for (int clearY = 1; clearY <= 6; clearY++) {
                         int localCY = localRY + clearY;
                         if (localCY >= 0 && localCY < CHUNK_HEIGHT) {
                             Block above = chunk->getBlock(lx, localCY, lz);
@@ -1303,114 +1407,200 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             }
         }
         
-        // ---- STRUCTURE PLACEMENT (sub-grid) ----
-        for (int gridOffX = 0; gridOffX < CHUNK_SIZE; gridOffX += structSpacing) {
-            for (int gridOffZ = 0; gridOffZ < CHUNK_SIZE; gridOffZ += structSpacing) {
-                int anchorX = chunkBaseX + gridOffX + 1; // +1 offset from grid edge
-                int anchorZ = chunkBaseZ + gridOffZ + 1;
-                
-                // Deterministic hash for this specific grid point (not chunk!)
-                unsigned int h = seed;
-                h ^= static_cast<unsigned int>(anchorX) * 374761393u;
-                h ^= static_cast<unsigned int>(anchorZ) * 668265263u;
-                h = ((h << 17) | (h >> 15)) * 2654435761u;
-                
-                // Spawn chance: cities ~80%, villages ~65%
-                int spawnChance = isCity ? 80 : 65;
-                if ((h % 100) >= static_cast<unsigned int>(spawnChance)) continue;
-                
-                // Check if anchor is on a city road (skip - don't build on roads)
-                if (isCity) {
-                    int relAX = anchorX - static_cast<int>(settlementCenterX);
-                    int relAZ = anchorZ - static_cast<int>(settlementCenterZ);
-                    int modAX = ((relAX % cityBlockSize) + cityBlockSize) % cityBlockSize;
-                    int modAZ = ((relAZ % cityBlockSize) + cityBlockSize) % cityBlockSize;
-                    if (modAX < 4 || modAZ < 4) continue; // On a road line
-                }
-                
-                // Footprint size depends on biome and available space
-                int structFootprint = isCity ? (structSpacing - 2) : (structSpacing - 2);
-                // City structures use up to 10 blocks, village up to 14
-                structFootprint = isCity ? 10 : 14;
-                
-                // Sample terrain heights
-                int samplePoints[5][2] = {
-                    {anchorX, anchorZ},
-                    {anchorX + structFootprint - 1, anchorZ},
-                    {anchorX, anchorZ + structFootprint - 1},
-                    {anchorX + structFootprint - 1, anchorZ + structFootprint - 1},
-                    {anchorX + structFootprint / 2, anchorZ + structFootprint / 2}
-                };
-                
-                int minGroundY = 9999, maxGroundY = -9999;
-                bool hasWater = false;
-                for (int i = 0; i < 5; i++) {
-                    int sy = getSurfaceHeight(samplePoints[i][0], samplePoints[i][1]);
-                    minGroundY = std::min(minGroundY, sy);
-                    maxGroundY = std::max(maxGroundY, sy);
-                    if (sy <= SEA_LEVEL) hasWater = true;
-                }
-                
-                // NO buildings on water
-                if (hasWater) continue;
-                
-                // Terrain variation check
-                int maxVariation = isCity ? 5 : 4;
-                if ((maxGroundY - minGroundY) > maxVariation) continue;
-                
-                int groundY = (minGroundY + maxGroundY) / 2;
-                
-                // Check if this vertical chunk slice overlaps the structure vertically
-                int maxStructHeight = isCity ? 40 : 12;
-                if (chunkBaseY > groundY + maxStructHeight) continue;
-                if (chunkBaseY + CHUNK_HEIGHT <= groundY - 2) continue;
-                
-                // ---- TERRAIN FLATTENING ----
-                {
-                    int flatRadius = isCity ? 1 : 1;
-                    BlockType surfaceBlock = isCity ? BlockType::COBBLESTONE : BlockType::GRASS;
-                    BlockType fillBlock = isCity ? BlockType::STONE : BlockType::DIRT;
+        // ---- STRUCTURE PLACEMENT ----
+        // For cities: place buildings on a WORLD-SPACE grid aligned to city blocks,
+        // so structures never overlap and never get cut at chunk boundaries.
+        // For villages: use chunk-relative grid as before.
+        if (isCity) {
+            int roadWidth = 3;
+            int sidewalkWidth = 1;
+            int roadZone = roadWidth + sidewalkWidth; // Blocks reserved for road+sidewalk on each axis
+            int buildableSize = cityBlockSize - roadZone - sidewalkWidth; // Usable interior per city block
+            int structFootprint = 8; // Max footprint per structure slot
+            
+            // We need to check structure anchors that could place blocks INTO this chunk,
+            // including anchors from neighboring chunks. Scan a range larger than CHUNK_SIZE.
+            int scanMargin = structFootprint + 2; // Extra blocks to check beyond chunk boundaries
+            int scanMinX = chunkBaseX - scanMargin;
+            int scanMinZ = chunkBaseZ - scanMargin;
+            int scanMaxX = chunkBaseX + CHUNK_SIZE + scanMargin;
+            int scanMaxZ = chunkBaseZ + CHUNK_SIZE + scanMargin;
+            
+            // Iterate over WORLD-SPACE city block grid
+            // Each city block's interior can hold multiple structure slots
+            int cityBlockStartX = static_cast<int>(std::floor(static_cast<float>(scanMinX - static_cast<int>(settlementCenterX)) / cityBlockSize)) * cityBlockSize + static_cast<int>(settlementCenterX);
+            int cityBlockStartZ = static_cast<int>(std::floor(static_cast<float>(scanMinZ - static_cast<int>(settlementCenterZ)) / cityBlockSize)) * cityBlockSize + static_cast<int>(settlementCenterZ);
+            
+            for (int blockX = cityBlockStartX; blockX < scanMaxX; blockX += cityBlockSize) {
+                for (int blockZ = cityBlockStartZ; blockZ < scanMaxZ; blockZ += cityBlockSize) {
+                    // Interior of this city block starts after road+sidewalk zone
+                    int interiorStartX = blockX + roadZone;
+                    int interiorStartZ = blockZ + roadZone;
                     
-                    for (int fx = -flatRadius; fx < structFootprint + flatRadius; fx++) {
-                        for (int fz = -flatRadius; fz < structFootprint + flatRadius; fz++) {
-                            int worldFX = anchorX + fx;
-                            int worldFZ = anchorZ + fz;
-                            int localFX = worldFX - chunkBaseX;
-                            int localFZ = worldFZ - chunkBaseZ;
+                    // Place structures in a sub-grid within the interior
+                    // Number of slots that fit: buildableSize / structFootprint
+                    int slotsPerAxis = buildableSize / structFootprint;
+                    if (slotsPerAxis < 1) slotsPerAxis = 1;
+                    
+                    for (int slotX = 0; slotX < slotsPerAxis; slotX++) {
+                        for (int slotZ = 0; slotZ < slotsPerAxis; slotZ++) {
+                            int anchorX = interiorStartX + slotX * structFootprint;
+                            int anchorZ = interiorStartZ + slotZ * structFootprint;
                             
-                            if (localFX < 0 || localFX >= CHUNK_SIZE) continue;
-                            if (localFZ < 0 || localFZ >= CHUNK_SIZE) continue;
+                            // Quick bounds check - does this anchor's footprint touch our chunk at all?
+                            if (anchorX + structFootprint <= chunkBaseX || anchorX >= chunkBaseX + CHUNK_SIZE) continue;
+                            if (anchorZ + structFootprint <= chunkBaseZ || anchorZ >= chunkBaseZ + CHUNK_SIZE) continue;
                             
-                            int naturalY = getSurfaceHeight(worldFX, worldFZ);
+                            // Deterministic hash for this world-space anchor
+                            unsigned int h = seed;
+                            h ^= static_cast<unsigned int>(anchorX) * 374761393u;
+                            h ^= static_cast<unsigned int>(anchorZ) * 668265263u;
+                            h = ((h << 17) | (h >> 15)) * 2654435761u;
                             
-                            for (int fy = naturalY + 1; fy <= groundY; fy++) {
-                                int localFY = fy - chunkBaseY;
-                                if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
-                                chunk->setBlock(localFX, localFY, localFZ, Block(fy == groundY ? surfaceBlock : fillBlock));
-                            }
-                            for (int fy = groundY + 1; fy <= naturalY; fy++) {
-                                int localFY = fy - chunkBaseY;
-                                if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
-                                chunk->setBlock(localFX, localFY, localFZ, Block(BlockType::AIR));
-                            }
-                            int localGY = groundY - chunkBaseY;
-                            if (localGY >= 0 && localGY < CHUNK_HEIGHT) {
-                                chunk->setBlock(localFX, localGY, localFZ, Block(surfaceBlock));
+                            // Spawn chance: 80%
+                            if ((h % 100) >= 80u) continue;
+                            
+                            // Check for river at anchor
+                            float riverAtAnchor = getRiverMask(static_cast<float>(anchorX), static_cast<float>(anchorZ));
+                            if (riverAtAnchor > 0.25f) continue;
+                            
+                            // Check if anchor is within city radius
+                            float adx = static_cast<float>(anchorX) - settlementCenterX;
+                            float adz = static_cast<float>(anchorZ) - settlementCenterZ;
+                            float anchorDist = std::sqrt(adx * adx + adz * adz);
+                            if (anchorDist > cityRadius - 10.0f) continue;
+                            
+                            int groundY = cityY;
+                            
+                            // Check if this vertical chunk slice overlaps the structure vertically
+                            int maxStructHeight = 40;
+                            if (chunkBaseY > groundY + maxStructHeight) continue;
+                            if (chunkBaseY + CHUNK_HEIGHT <= groundY - 2) continue;
+                            
+                            // ---- PLACE STRUCTURE ----
+                            if (!allStructures.empty()) {
+                                StructureCategory category;
+                                int roll = h % 100;
+                                if (roll < 45) category = StructureCategory::CITY_BUILDING;
+                                else if (roll < 80) category = StructureCategory::CITY_SKYSCRAPER;
+                                else if (roll < 90) category = StructureCategory::CITY_PARK;
+                                else category = StructureCategory::CITY_DECORATION;
+                                
+                                auto structureIds = registry.getStructuresByCategory(category);
+                                if (structureIds.empty()) structureIds = registry.getAllStructureIds();
+                                if (structureIds.empty()) continue;
+                                
+                                size_t idx = (h >> 16) % structureIds.size();
+                                auto structure = registry.getStructure(structureIds[idx]);
+                                if (!structure) continue;
+                                
+                                int rotation = ((h >> 24) % 4) * 90;
+                                auto blocks = structure->getRotatedBlocks(rotation);
+                                
+                                for (const auto& block : blocks) {
+                                    int worldBX = anchorX + block.position.x;
+                                    int worldBY = groundY + block.position.y;
+                                    int worldBZ = anchorZ + block.position.z;
+                                    
+                                    int localBX = worldBX - chunkBaseX;
+                                    int localBY = worldBY - chunkBaseY;
+                                    int localBZ = worldBZ - chunkBaseZ;
+                                    
+                                    if (localBX < 0 || localBX >= CHUNK_SIZE) continue;
+                                    if (localBZ < 0 || localBZ >= CHUNK_SIZE) continue;
+                                    if (localBY < 0 || localBY >= CHUNK_HEIGHT) continue;
+                                    if (block.type == BlockType::AIR) continue;
+                                    
+                                    Block existing = chunk->getBlock(localBX, localBY, localBZ);
+                                    BlockType existingType = existing.getType();
+                                    if (existingType != BlockType::BEDROCK && existingType != BlockType::WATER) {
+                                        chunk->setBlock(localBX, localBY, localBZ, block.type);
+                                    }
+                                }
                             }
                         }
                     }
                 }
-                
-                // ---- PLACE STRUCTURE ----
-                if (!allStructures.empty()) {
-                    StructureCategory category;
-                    if (isCity) {
-                        int roll = h % 100;
-                        if (roll < 45) category = StructureCategory::CITY_BUILDING;
-                        else if (roll < 80) category = StructureCategory::CITY_SKYSCRAPER;
-                        else if (roll < 90) category = StructureCategory::CITY_PARK;
-                        else category = StructureCategory::CITY_DECORATION;
-                    } else {
+            }
+        }
+        
+        // ---- VILLAGE STRUCTURE PLACEMENT (chunk-relative, unchanged) ----
+        if (!isCity) {
+            int structFootprint = 14;
+            for (int gridOffX = 0; gridOffX < CHUNK_SIZE; gridOffX += structSpacing) {
+                for (int gridOffZ = 0; gridOffZ < CHUNK_SIZE; gridOffZ += structSpacing) {
+                    int anchorX = chunkBaseX + gridOffX + 1;
+                    int anchorZ = chunkBaseZ + gridOffZ + 1;
+                    
+                    unsigned int h = seed;
+                    h ^= static_cast<unsigned int>(anchorX) * 374761393u;
+                    h ^= static_cast<unsigned int>(anchorZ) * 668265263u;
+                    h = ((h << 17) | (h >> 15)) * 2654435761u;
+                    
+                    if ((h % 100) >= 65u) continue;
+                    
+                    // Village: sample terrain heights
+                    int samplePoints[5][2] = {
+                        {anchorX, anchorZ},
+                        {anchorX + structFootprint - 1, anchorZ},
+                        {anchorX, anchorZ + structFootprint - 1},
+                        {anchorX + structFootprint - 1, anchorZ + structFootprint - 1},
+                        {anchorX + structFootprint / 2, anchorZ + structFootprint / 2}
+                    };
+                    
+                    int minGroundY = 9999, maxGroundY = -9999;
+                    bool hasWater = false;
+                    for (int i = 0; i < 5; i++) {
+                        int sy = getSurfaceHeight(samplePoints[i][0], samplePoints[i][1]);
+                        minGroundY = std::min(minGroundY, sy);
+                        maxGroundY = std::max(maxGroundY, sy);
+                        if (sy <= SEA_LEVEL) hasWater = true;
+                    }
+                    
+                    if (hasWater) continue;
+                    if ((maxGroundY - minGroundY) > 4) continue;
+                    int groundY = (minGroundY + maxGroundY) / 2;
+                    
+                    int maxStructHeight = 12;
+                    if (chunkBaseY > groundY + maxStructHeight) continue;
+                    if (chunkBaseY + CHUNK_HEIGHT <= groundY - 2) continue;
+                    
+                    // Terrain flattening for villages
+                    {
+                        int flatRadius = 1;
+                        for (int fx = -flatRadius; fx < structFootprint + flatRadius; fx++) {
+                            for (int fz = -flatRadius; fz < structFootprint + flatRadius; fz++) {
+                                int worldFX = anchorX + fx;
+                                int worldFZ = anchorZ + fz;
+                                int localFX = worldFX - chunkBaseX;
+                                int localFZ = worldFZ - chunkBaseZ;
+                                
+                                if (localFX < 0 || localFX >= CHUNK_SIZE) continue;
+                                if (localFZ < 0 || localFZ >= CHUNK_SIZE) continue;
+                                
+                                int naturalY = getSurfaceHeight(worldFX, worldFZ);
+                                
+                                for (int fy = naturalY + 1; fy <= groundY; fy++) {
+                                    int localFY = fy - chunkBaseY;
+                                    if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
+                                    chunk->setBlock(localFX, localFY, localFZ, Block(fy == groundY ? BlockType::GRASS : BlockType::DIRT));
+                                }
+                                for (int fy = groundY + 1; fy <= naturalY; fy++) {
+                                    int localFY = fy - chunkBaseY;
+                                    if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
+                                    chunk->setBlock(localFX, localFY, localFZ, Block(BlockType::AIR));
+                                }
+                                int localGY = groundY - chunkBaseY;
+                                if (localGY >= 0 && localGY < CHUNK_HEIGHT) {
+                                    chunk->setBlock(localFX, localGY, localFZ, Block(BlockType::GRASS));
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Place structure
+                    if (!allStructures.empty()) {
+                        StructureCategory category;
                         int roll = (h >> 8) % 100;
                         if (roll < 35) category = StructureCategory::VILLAGE_HOUSE;
                         else if (roll < 55) category = StructureCategory::VILLAGE_BUILDING;
@@ -1418,70 +1608,70 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                         else if (roll < 80) category = StructureCategory::VILLAGE_WELL;
                         else if (roll < 90) category = StructureCategory::VILLAGE_DECORATION;
                         else category = StructureCategory::VILLAGE_PATH;
-                    }
-                    
-                    auto structureIds = registry.getStructuresByCategory(category);
-                    if (structureIds.empty()) structureIds = registry.getAllStructureIds();
-                    if (structureIds.empty()) continue;
-                    
-                    size_t idx = (h >> 16) % structureIds.size();
-                    auto structure = registry.getStructure(structureIds[idx]);
-                    if (!structure) continue;
-                    
-                    int rotation = ((h >> 24) % 4) * 90;
-                    auto blocks = structure->getRotatedBlocks(rotation);
-                    
-                    for (const auto& block : blocks) {
-                        int worldBX = anchorX + block.position.x;
-                        int worldBY = groundY + block.position.y;
-                        int worldBZ = anchorZ + block.position.z;
                         
-                        int localBX = worldBX - chunkBaseX;
-                        int localBY = worldBY - chunkBaseY;
-                        int localBZ = worldBZ - chunkBaseZ;
+                        auto structureIds = registry.getStructuresByCategory(category);
+                        if (structureIds.empty()) structureIds = registry.getAllStructureIds();
+                        if (structureIds.empty()) continue;
                         
-                        if (localBX < 0 || localBX >= CHUNK_SIZE) continue;
-                        if (localBZ < 0 || localBZ >= CHUNK_SIZE) continue;
-                        if (localBY < 0 || localBY >= CHUNK_HEIGHT) continue;
-                        if (block.type == BlockType::AIR) continue;
+                        size_t idx = (h >> 16) % structureIds.size();
+                        auto structure = registry.getStructure(structureIds[idx]);
+                        if (!structure) continue;
                         
-                        Block existing = chunk->getBlock(localBX, localBY, localBZ);
-                        BlockType existingType = existing.getType();
-                        if (existingType != BlockType::BEDROCK && existingType != BlockType::WATER) {
-                            chunk->setBlock(localBX, localBY, localBZ, block.type);
+                        int rotation = ((h >> 24) % 4) * 90;
+                        auto blocks = structure->getRotatedBlocks(rotation);
+                        
+                        for (const auto& block : blocks) {
+                            int worldBX = anchorX + block.position.x;
+                            int worldBY = groundY + block.position.y;
+                            int worldBZ = anchorZ + block.position.z;
+                            
+                            int localBX = worldBX - chunkBaseX;
+                            int localBY = worldBY - chunkBaseY;
+                            int localBZ = worldBZ - chunkBaseZ;
+                            
+                            if (localBX < 0 || localBX >= CHUNK_SIZE) continue;
+                            if (localBZ < 0 || localBZ >= CHUNK_SIZE) continue;
+                            if (localBY < 0 || localBY >= CHUNK_HEIGHT) continue;
+                            if (block.type == BlockType::AIR) continue;
+                            
+                            Block existing = chunk->getBlock(localBX, localBY, localBZ);
+                            BlockType existingType = existing.getType();
+                            if (existingType != BlockType::BEDROCK && existingType != BlockType::WATER) {
+                                chunk->setBlock(localBX, localBY, localBZ, block.type);
+                            }
                         }
-                    }
-                } else {
-                    // Fallback: pink wool house
-                    int houseSize = 5;
-                    int houseHeight = 5;
-                    for (int hx = 0; hx < houseSize; hx++) {
-                        for (int hz = 0; hz < houseSize; hz++) {
-                            for (int hy = 0; hy <= houseHeight; hy++) {
-                                int worldBY = groundY + hy;
-                                int localBX = (gridOffX + 1) + hx;
-                                int localBY = worldBY - chunkBaseY;
-                                int localBZ = (gridOffZ + 1) + hz;
-                                
-                                if (localBX < 0 || localBX >= CHUNK_SIZE) continue;
-                                if (localBZ < 0 || localBZ >= CHUNK_SIZE) continue;
-                                if (localBY < 0 || localBY >= CHUNK_HEIGHT) continue;
-                                
-                                bool isWall = (hx == 0 || hx == houseSize-1 || hz == 0 || hz == houseSize-1);
-                                bool isDoor = (hx == houseSize/2 && hz == 0 && hy >= 1 && hy <= 2);
-                                
-                                if (hy == 0)
-                                    chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::COBBLESTONE));
-                                else if (hy == houseHeight)
-                                    chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::RED_WOOL));
-                                else if (isWall && !isDoor)
-                                    chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::PINK_WOOL));
+                    } else {
+                        // Fallback: pink wool house
+                        int houseSize = 5;
+                        int houseHeight = 5;
+                        for (int hx = 0; hx < houseSize; hx++) {
+                            for (int hz = 0; hz < houseSize; hz++) {
+                                for (int hy = 0; hy <= houseHeight; hy++) {
+                                    int worldBY = groundY + hy;
+                                    int localBX = (gridOffX + 1) + hx;
+                                    int localBY = worldBY - chunkBaseY;
+                                    int localBZ = (gridOffZ + 1) + hz;
+                                    
+                                    if (localBX < 0 || localBX >= CHUNK_SIZE) continue;
+                                    if (localBZ < 0 || localBZ >= CHUNK_SIZE) continue;
+                                    if (localBY < 0 || localBY >= CHUNK_HEIGHT) continue;
+                                    
+                                    bool isWall = (hx == 0 || hx == houseSize-1 || hz == 0 || hz == houseSize-1);
+                                    bool isDoor = (hx == houseSize/2 && hz == 0 && hy >= 1 && hy <= 2);
+                                    
+                                    if (hy == 0)
+                                        chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::COBBLESTONE));
+                                    else if (hy == houseHeight)
+                                        chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::RED_WOOL));
+                                    else if (isWall && !isDoor)
+                                        chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::PINK_WOOL));
+                                }
                             }
                         }
                     }
-                }
-            } // gridOffZ
-        } // gridOffX
+                } // gridOffZ
+            } // gridOffX
+        } // !isCity
     }();
     
     chunk->setState(ChunkState::MESH_BUILD);
@@ -1718,7 +1908,7 @@ float WorldGenerator::getHeight(float x, float z) const {
             float edgeFade = std::clamp((outerR - cityDist) / CITY_TRANSITION, 0.0f, 1.0f);
             // Smooth-step for natural blending at boundary
             edgeFade = edgeFade * edgeFade * (3.0f - 2.0f * edgeFade);
-            float flattenStrength = edgeFade * 0.98f;  // 98% flattened (nearly dead flat)
+            float flattenStrength = edgeFade * 0.995f; // 99.5% flattened (almost perfectly flat)
             finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
         } else if (villageDist < VILLAGE_RADIUS_F + VILLAGE_TRANSITION &&
                    cityDist > CITY_RADIUS_F + CITY_TRANSITION) {
