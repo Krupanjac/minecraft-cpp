@@ -75,8 +75,8 @@ bool StructurePlacer::isTerrainSuitable(int worldX, int worldZ, const Structure&
         maxH = std::max(maxH, h);
     }
     
-    // Allow up to 3 blocks of variation for "flat" terrain
-    return (maxH - minH) <= 3;
+    // Allow up to 6 blocks of variation (cities are pre-flattened)
+    return (maxH - minH) <= 6;
 }
 
 void StructurePlacer::planStructuresForChunk(int chunkX, int chunkZ, BiomeType biome,
@@ -116,7 +116,7 @@ void StructurePlacer::planStructuresForChunk(int chunkX, int chunkZ, BiomeType b
             unsigned int localSeed = hashPosition(gx, gz);
             
             // Probability of structure spawning (higher in city)
-            float spawnChance = (biome == BiomeType::CITY) ? 0.85f : 0.65f;
+            float spawnChance = (biome == BiomeType::CITY) ? 0.95f : 0.65f;
             float roll = static_cast<float>(localSeed % 1000) / 1000.0f;
             
             if (roll > spawnChance) continue;
@@ -124,10 +124,11 @@ void StructurePlacer::planStructuresForChunk(int chunkX, int chunkZ, BiomeType b
             // Pick structure category based on biome and random variation
             StructureCategory category;
             if (biome == BiomeType::CITY) {
-                // City structure distribution
+                // City structure distribution: mostly buildings and skyscrapers
                 unsigned int typeRoll = (localSeed >> 8) % 100;
-                if (typeRoll < 50) category = StructureCategory::CITY_BUILDING;
-                else if (typeRoll < 80) category = StructureCategory::CITY_ROAD;
+                if (typeRoll < 45) category = StructureCategory::CITY_BUILDING;
+                else if (typeRoll < 80) category = StructureCategory::CITY_SKYSCRAPER;
+                else if (typeRoll < 90) category = StructureCategory::CITY_PARK;
                 else category = StructureCategory::CITY_DECORATION;
             } else {
                 // Village structure distribution

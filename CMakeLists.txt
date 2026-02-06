@@ -290,24 +290,16 @@ else()
 endif()
 
 # Copy assets and shaders to build directory
+# Only copy from the main target since all targets share the same output directory.
+# This avoids races when building in parallel with /m.
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
+    "${CMAKE_SOURCE_DIR}/shaders" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders"
 )
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
-)
-
-add_custom_command(TARGET minecraft_server POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:minecraft_server>/shaders
-)
-
-add_custom_command(TARGET minecraft_server POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:minecraft_server>/assets
+    "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
 )
 
 # ============================================================================
@@ -350,16 +342,7 @@ if(WIN32)
     # Keep console window for editor (useful for debug output)
 endif()
 
-# Copy shaders and assets for editor
-add_custom_command(TARGET vxstruct_editor POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:vxstruct_editor>/shaders
-)
-
-add_custom_command(TARGET vxstruct_editor POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:vxstruct_editor>/assets
-)
+# Editor shares the same output directory as the other targets, no separate copy needed
 
 # Platform-specific settings
 if(WIN32)

@@ -60,7 +60,7 @@ public:
     
     // Grid spacing for village/city layout (in blocks)
     static constexpr int VILLAGE_GRID_SIZE = 24;   // Village structures every 24 blocks
-    static constexpr int CITY_GRID_SIZE = 16;      // City structures every 16 blocks (denser)
+    static constexpr int CITY_GRID_SIZE = 12;      // City structures every 12 blocks (dense)
     
     // Check if a world position has a structure
     bool hasStructureAt(int worldX, int worldZ) const;

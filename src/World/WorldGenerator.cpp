@@ -311,7 +311,7 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
     const float VILLAGE_GRID = 150.0f;  // Village every 150 blocks
     const float CITY_GRID = 400.0f;     // City every 400 blocks  
     const float VILLAGE_RADIUS = 45.0f; // Village biome radius (~5-30 buildings)
-    const float CITY_RADIUS = 100.0f;   // City biome radius (~50-100 buildings)
+    const float CITY_RADIUS = 160.0f;   // City biome radius (large cities with many buildings)
     
     // City check first (takes priority)
     float cityGridX = std::floor(x / CITY_GRID) * CITY_GRID + CITY_GRID / 2;
@@ -1190,6 +1190,8 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         
         // Sub-grid spacing: cities 8 blocks (4 per chunk), villages 16 blocks (1 per chunk)
         int structSpacing = isCity ? 8 : 16;
+        // City block size for road grid (must be consistent between road and structure code)
+        int cityBlockSize = 16;
         
         // Find the settlement center for this biome (from getBiome grid logic)
         float settlementCenterX, settlementCenterZ;
@@ -1204,8 +1206,9 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         // ---- CITY ROAD GRID ----
         // Cities get a road grid pattern: roads every 24 blocks aligned to settlement center
         if (isCity) {
-            int roadSpacing = 24; // road every 24 blocks
-            int roadWidth = 3;   // 3-block wide roads
+            int roadSpacing = cityBlockSize; // road every 16 blocks (tighter city blocks)
+            int roadWidth = 4;   // 4-block wide roads (proper streets)
+            int sidewalkWidth = 1; // 1-block sidewalk on each side
             
             for (int lx = 0; lx < CHUNK_SIZE; lx++) {
                 for (int lz = 0; lz < CHUNK_SIZE; lz++) {
@@ -1222,26 +1225,37 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     
                     bool isRoadX = modX < roadWidth; // E-W road
                     bool isRoadZ = modZ < roadWidth; // N-S road
+                    // Sidewalks: one block on each side of the road
+                    bool isSidewalkX = (modX == roadWidth) || (modX == roadSpacing - sidewalkWidth);
+                    bool isSidewalkZ = (modZ == roadWidth) || (modZ == roadSpacing - sidewalkWidth);
+                    bool isSidewalk = (isRoadX && isSidewalkZ) || (isRoadZ && isSidewalkX) ||
+                                      (isSidewalkX && isSidewalkZ);
                     
-                    if (!isRoadX && !isRoadZ) continue;
+                    if (!isRoadX && !isRoadZ && !isSidewalk) continue;
                     
                     int groundRY = getSurfaceHeight(worldRX, worldRZ);
                     int localRY = groundRY - chunkBaseY;
                     if (localRY < 0 || localRY >= CHUNK_HEIGHT) continue;
                     
-                    bool isIntersection = isRoadX && isRoadZ;
-                    bool isCenterLine = (modX == roadWidth / 2 && isRoadX && !isRoadZ) ||
-                                       (modZ == roadWidth / 2 && isRoadZ && !isRoadX);
-                    
-                    if (isIntersection)
+                    if (isSidewalk && !isRoadX && !isRoadZ) {
+                        // Sidewalk: stone slab raised feel (use stone bricks)
                         chunk->setBlock(lx, localRY, lz, Block(BlockType::STONE_BRICKS));
-                    else if (isCenterLine)
-                        chunk->setBlock(lx, localRY, lz, Block(BlockType::GRAVEL));
-                    else
-                        chunk->setBlock(lx, localRY, lz, Block(BlockType::COBBLESTONE));
+                    } else {
+                        // Road surface
+                        bool isIntersection = isRoadX && isRoadZ;
+                        bool isEdge = (modX == 0 || modX == roadWidth - 1) ||
+                                      (modZ == 0 || modZ == roadWidth - 1);
+                        
+                        if (isIntersection)
+                            chunk->setBlock(lx, localRY, lz, Block(BlockType::STONE_BRICKS));
+                        else if (isEdge)
+                            chunk->setBlock(lx, localRY, lz, Block(BlockType::STONE));
+                        else
+                            chunk->setBlock(lx, localRY, lz, Block(BlockType::GRAVEL));
+                    }
                     
-                    // Clear blocks above road for 4 blocks (prevent terrain covering road)
-                    for (int clearY = 1; clearY <= 4; clearY++) {
+                    // Clear blocks above road/sidewalk for 5 blocks
+                    for (int clearY = 1; clearY <= 5; clearY++) {
                         int localCY = localRY + clearY;
                         if (localCY >= 0 && localCY < CHUNK_HEIGHT) {
                             Block above = chunk->getBlock(lx, localCY, lz);
@@ -1301,23 +1315,23 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                 h ^= static_cast<unsigned int>(anchorZ) * 668265263u;
                 h = ((h << 17) | (h >> 15)) * 2654435761u;
                 
-                // Spawn chance: cities ~45%, villages ~65%
-                int spawnChance = isCity ? 45 : 65;
+                // Spawn chance: cities ~80%, villages ~65%
+                int spawnChance = isCity ? 80 : 65;
                 if ((h % 100) >= static_cast<unsigned int>(spawnChance)) continue;
                 
                 // Check if anchor is on a city road (skip - don't build on roads)
                 if (isCity) {
                     int relAX = anchorX - static_cast<int>(settlementCenterX);
                     int relAZ = anchorZ - static_cast<int>(settlementCenterZ);
-                    int modAX = ((relAX % 24) + 24) % 24;
-                    int modAZ = ((relAZ % 24) + 24) % 24;
-                    if (modAX < 3 || modAZ < 3) continue; // On a road line
+                    int modAX = ((relAX % cityBlockSize) + cityBlockSize) % cityBlockSize;
+                    int modAZ = ((relAZ % cityBlockSize) + cityBlockSize) % cityBlockSize;
+                    if (modAX < 4 || modAZ < 4) continue; // On a road line
                 }
                 
                 // Footprint size depends on biome and available space
                 int structFootprint = isCity ? (structSpacing - 2) : (structSpacing - 2);
-                // City structures use up to 6 blocks, village up to 14
-                structFootprint = isCity ? 6 : 14;
+                // City structures use up to 10 blocks, village up to 14
+                structFootprint = isCity ? 10 : 14;
                 
                 // Sample terrain heights
                 int samplePoints[5][2] = {
@@ -1341,13 +1355,13 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                 if (hasWater) continue;
                 
                 // Terrain variation check
-                int maxVariation = isCity ? 3 : 4;
+                int maxVariation = isCity ? 5 : 4;
                 if ((maxGroundY - minGroundY) > maxVariation) continue;
                 
                 int groundY = (minGroundY + maxGroundY) / 2;
                 
                 // Check if this vertical chunk slice overlaps the structure vertically
-                int maxStructHeight = isCity ? 25 : 12;
+                int maxStructHeight = isCity ? 40 : 12;
                 if (chunkBaseY > groundY + maxStructHeight) continue;
                 if (chunkBaseY + CHUNK_HEIGHT <= groundY - 2) continue;
                 
@@ -1392,9 +1406,9 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     StructureCategory category;
                     if (isCity) {
                         int roll = h % 100;
-                        if (roll < 35) category = StructureCategory::CITY_BUILDING;
-                        else if (roll < 60) category = StructureCategory::CITY_SKYSCRAPER;
-                        else if (roll < 75) category = StructureCategory::CITY_PARK;
+                        if (roll < 45) category = StructureCategory::CITY_BUILDING;
+                        else if (roll < 80) category = StructureCategory::CITY_SKYSCRAPER;
+                        else if (roll < 90) category = StructureCategory::CITY_PARK;
                         else category = StructureCategory::CITY_DECORATION;
                     } else {
                         int roll = (h >> 8) % 100;
@@ -1680,11 +1694,11 @@ float WorldGenerator::getHeight(float x, float z) const {
     // Uses the same grid logic as getBiome() for consistency.
     {
         const float CITY_GRID_F    = 400.0f;
-        const float CITY_RADIUS_F  = 100.0f;
+        const float CITY_RADIUS_F  = 160.0f;
         const float VILLAGE_GRID_F    = 150.0f;
         const float VILLAGE_RADIUS_F  = 45.0f;
         // Transition band outside the biome radius for smooth edges
-        const float CITY_TRANSITION    = 30.0f;
+        const float CITY_TRANSITION    = 40.0f;
         const float VILLAGE_TRANSITION = 15.0f;
 
         float cityGridCX = std::floor(x / CITY_GRID_F) * CITY_GRID_F + CITY_GRID_F / 2.0f;
@@ -1704,7 +1718,7 @@ float WorldGenerator::getHeight(float x, float z) const {
             float edgeFade = std::clamp((outerR - cityDist) / CITY_TRANSITION, 0.0f, 1.0f);
             // Smooth-step for natural blending at boundary
             edgeFade = edgeFade * edgeFade * (3.0f - 2.0f * edgeFade);
-            float flattenStrength = edgeFade * 0.92f;  // 92% flattened at center
+            float flattenStrength = edgeFade * 0.98f;  // 98% flattened (nearly dead flat)
             finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
         } else if (villageDist < VILLAGE_RADIUS_F + VILLAGE_TRANSITION &&
                    cityDist > CITY_RADIUS_F + CITY_TRANSITION) {
