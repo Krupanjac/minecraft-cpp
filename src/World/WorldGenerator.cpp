@@ -116,7 +116,7 @@ static void initBiomeInfoCache(BiomeInfo* cache) {
     cache[12].surfaceBlock = BlockType::GRASS; cache[12].subsurfaceBlock = BlockType::DIRT; cache[12].surfaceDepth = 4;
     cache[12].grassColorR = 0.55f; cache[12].grassColorG = 0.72f; cache[12].grassColorB = 0.38f;
     cache[12].foliageColorR = 0.50f; cache[12].foliageColorG = 0.68f; cache[12].foliageColorB = 0.35f;
-    cache[12].mapColorR = 1.0f; cache[12].mapColorG = 0.4f; cache[12].mapColorB = 0.8f;  // PINK
+    cache[12].mapColorR = 0.70f; cache[12].mapColorG = 0.55f; cache[12].mapColorB = 0.35f;  // Warm brown
     
     // CITY - flat area with city buildings
     cache[13].type = BiomeType::CITY;
@@ -124,7 +124,7 @@ static void initBiomeInfoCache(BiomeInfo* cache) {
     cache[13].surfaceBlock = BlockType::COBBLESTONE; cache[13].subsurfaceBlock = BlockType::STONE; cache[13].surfaceDepth = 3;
     cache[13].grassColorR = 0.45f; cache[13].grassColorG = 0.50f; cache[13].grassColorB = 0.40f;
     cache[13].foliageColorR = 0.40f; cache[13].foliageColorG = 0.45f; cache[13].foliageColorB = 0.38f;
-    cache[13].mapColorR = 1.0f; cache[13].mapColorG = 0.4f; cache[13].mapColorB = 0.8f;  // PINK
+    cache[13].mapColorR = 0.60f; cache[13].mapColorG = 0.60f; cache[13].mapColorB = 0.65f;  // Gray stone
 }
 
 WorldGenerator::WorldGenerator(unsigned int seed) : seed(seed), structurePlacer(std::make_unique<StructurePlacer>(seed)) {
@@ -306,35 +306,66 @@ BiomeType WorldGenerator::getBiome(float x, float z) const {
     float riverMask = std::pow(std::clamp((riverVal - 0.85f) / 0.15f, 0.0f, 1.0f), 3.0f);  // Higher threshold = rarer rivers
     
     // ========== SETTLEMENT GENERATION ==========
-    // Villages and cities ALWAYS spawn on a grid - no terrain restrictions
+    // Settlements spawn on a jittered grid for natural-looking placement.
+    // Each grid cell gets a deterministic random offset so settlements aren't in a perfect grid.
+    // Some grid points are skipped based on noise for organic distribution.
     
-    const float VILLAGE_GRID = 150.0f;  // Village every 150 blocks
-    const float CITY_GRID = 400.0f;     // City every 400 blocks  
-    const float VILLAGE_RADIUS = 45.0f; // Village biome radius (~5-30 buildings)
-    const float CITY_RADIUS = 160.0f;   // City biome radius (large cities with many buildings)
+    const float VILLAGE_GRID = 180.0f;  // Average village spacing
+    const float CITY_GRID = 500.0f;     // Average city spacing  
+    const float VILLAGE_RADIUS = 45.0f; // Village biome radius
+    const float CITY_RADIUS = 160.0f;   // City biome radius
+    const float CITY_JITTER = 120.0f;   // Max offset from grid center for cities
+    const float VILLAGE_JITTER = 50.0f; // Max offset from grid center for villages
+    
+    // Helper lambda: deterministic jitter for a grid cell
+    auto settlementJitter = [&](float gridCX, float gridCZ, float jitterAmount, float gridSize) -> std::pair<float, float> {
+        // Hash the grid cell to get deterministic random offsets
+        unsigned int hx = static_cast<unsigned int>(static_cast<int>(std::floor(gridCX / gridSize))) * 374761393u;
+        unsigned int hz = static_cast<unsigned int>(static_cast<int>(std::floor(gridCZ / gridSize))) * 668265263u;
+        unsigned int h1 = (seed ^ hx ^ hz) * 2654435761u;
+        unsigned int h2 = (seed ^ hz ^ (hx * 2246822519u)) * 3266489917u;
+        float offsetX = ((h1 & 0xFFFF) / 32768.0f - 1.0f) * jitterAmount;
+        float offsetZ = ((h2 & 0xFFFF) / 32768.0f - 1.0f) * jitterAmount;
+        return {gridCX + offsetX, gridCZ + offsetZ};
+    };
+    
+    // Helper lambda: should this grid cell spawn a settlement?
+    auto shouldSpawnSettlement = [&](float gridCX, float gridCZ, float gridSize, float spawnChance) -> bool {
+        unsigned int hx = static_cast<unsigned int>(static_cast<int>(std::floor(gridCX / gridSize))) * 374761393u;
+        unsigned int hz = static_cast<unsigned int>(static_cast<int>(std::floor(gridCZ / gridSize))) * 668265263u;
+        unsigned int h = (seed ^ hx ^ hz ^ 987654321u) * 2246822519u;
+        float roll = (h & 0xFFFF) / 65536.0f;
+        return roll < spawnChance;
+    };
     
     // City check first (takes priority)
-    float cityGridX = std::floor(x / CITY_GRID) * CITY_GRID + CITY_GRID / 2;
-    float cityGridZ = std::floor(z / CITY_GRID) * CITY_GRID + CITY_GRID / 2;
-    float cityCenterX = cityGridX;
-    float cityCenterZ = cityGridZ;
+    float cityGridBaseX = std::floor(x / CITY_GRID) * CITY_GRID + CITY_GRID / 2.0f;
+    float cityGridBaseZ = std::floor(z / CITY_GRID) * CITY_GRID + CITY_GRID / 2.0f;
+    auto [cityCenterX, cityCenterZ] = settlementJitter(cityGridBaseX, cityGridBaseZ, CITY_JITTER, CITY_GRID);
     float cityDist = std::sqrt((x - cityCenterX) * (x - cityCenterX) + (z - cityCenterZ) * (z - cityCenterZ));
     
-    // ALWAYS spawn cities at grid points - no conditions!
-    if (cityDist < CITY_RADIUS) {
-        return BiomeType::CITY;
+    // Cities: ~70% of grid points spawn, avoid mountains
+    if (cityDist < CITY_RADIUS && shouldSpawnSettlement(cityGridBaseX, cityGridBaseZ, CITY_GRID, 0.70f)) {
+        // Check mountain factor at city center - cities prefer flat terrain
+        float cityMtFactor = getMountainFactor(cityCenterX, cityCenterZ);
+        if (cityMtFactor < 0.25f) {
+            return BiomeType::CITY;
+        }
     }
     
     // Village check (more common, smaller)
-    float villageGridX = std::floor(x / VILLAGE_GRID) * VILLAGE_GRID + VILLAGE_GRID / 2;
-    float villageGridZ = std::floor(z / VILLAGE_GRID) * VILLAGE_GRID + VILLAGE_GRID / 2;
-    float villageCenterX = villageGridX;
-    float villageCenterZ = villageGridZ;
+    float villageGridBaseX = std::floor(x / VILLAGE_GRID) * VILLAGE_GRID + VILLAGE_GRID / 2.0f;
+    float villageGridBaseZ = std::floor(z / VILLAGE_GRID) * VILLAGE_GRID + VILLAGE_GRID / 2.0f;
+    auto [villageCenterX, villageCenterZ] = settlementJitter(villageGridBaseX, villageGridBaseZ, VILLAGE_JITTER, VILLAGE_GRID);
     float villageDist = std::sqrt((x - villageCenterX) * (x - villageCenterX) + (z - villageCenterZ) * (z - villageCenterZ));
     
-    // ALWAYS spawn villages - only skip if overlapping a city
-    if (villageDist < VILLAGE_RADIUS && cityDist > CITY_RADIUS + 10) {
-        return BiomeType::VILLAGE;
+    // Villages: ~75% of grid points spawn, skip if overlapping a city, avoid deep ocean
+    if (villageDist < VILLAGE_RADIUS && cityDist > CITY_RADIUS + 10.0f &&
+        shouldSpawnSettlement(villageGridBaseX, villageGridBaseZ, VILLAGE_GRID, 0.75f)) {
+        float villageMtFactor = getMountainFactor(villageCenterX, villageCenterZ);
+        if (villageMtFactor < 0.35f) {
+            return BiomeType::VILLAGE;
+        }
     }
     
     // ========== BIOME SELECTION ==========
@@ -1193,14 +1224,31 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         // City block size for road grid (must be consistent between road and structure code)
         int cityBlockSize = 24;  // Bigger city blocks = more room for buildings
         
-        // Find the settlement center for this biome (from getBiome grid logic)
+        // Find the settlement center for this biome (from jittered grid logic in getBiome)
+        // Must match getBiome exactly!
+        auto settlementJitterG = [&](float gridCX, float gridCZ, float jitterAmount, float gridSize) -> std::pair<float, float> {
+            unsigned int hx = static_cast<unsigned int>(static_cast<int>(std::floor(gridCX / gridSize))) * 374761393u;
+            unsigned int hz = static_cast<unsigned int>(static_cast<int>(std::floor(gridCZ / gridSize))) * 668265263u;
+            unsigned int h1 = (seed ^ hx ^ hz) * 2654435761u;
+            unsigned int h2 = (seed ^ hz ^ (hx * 2246822519u)) * 3266489917u;
+            float offsetX = ((h1 & 0xFFFF) / 32768.0f - 1.0f) * jitterAmount;
+            float offsetZ = ((h2 & 0xFFFF) / 32768.0f - 1.0f) * jitterAmount;
+            return {gridCX + offsetX, gridCZ + offsetZ};
+        };
+        
         float settlementCenterX, settlementCenterZ;
         if (isCity) {
-            settlementCenterX = std::floor(static_cast<float>(chunkBaseX + 8) / 400.0f) * 400.0f + 200.0f;
-            settlementCenterZ = std::floor(static_cast<float>(chunkBaseZ + 8) / 400.0f) * 400.0f + 200.0f;
+            float cityGridBaseX = std::floor(static_cast<float>(chunkBaseX + 8) / 500.0f) * 500.0f + 250.0f;
+            float cityGridBaseZ = std::floor(static_cast<float>(chunkBaseZ + 8) / 500.0f) * 500.0f + 250.0f;
+            auto [cx, cz] = settlementJitterG(cityGridBaseX, cityGridBaseZ, 120.0f, 500.0f);
+            settlementCenterX = cx;
+            settlementCenterZ = cz;
         } else {
-            settlementCenterX = std::floor(static_cast<float>(chunkBaseX + 8) / 150.0f) * 150.0f + 75.0f;
-            settlementCenterZ = std::floor(static_cast<float>(chunkBaseZ + 8) / 150.0f) * 150.0f + 75.0f;
+            float villageGridBaseX = std::floor(static_cast<float>(chunkBaseX + 8) / 180.0f) * 180.0f + 90.0f;
+            float villageGridBaseZ = std::floor(static_cast<float>(chunkBaseZ + 8) / 180.0f) * 180.0f + 90.0f;
+            auto [vx, vz] = settlementJitterG(villageGridBaseX, villageGridBaseZ, 50.0f, 180.0f);
+            settlementCenterX = vx;
+            settlementCenterZ = vz;
         }
         
         // ======== UNIFIED CITY Y LEVEL ========
@@ -1373,10 +1421,12 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         }
         
         // ---- VILLAGE PATH NETWORK ----
-        // Villages get paths radiating from center
+        // Villages get paths radiating from center, baked into terrain (replace surface block)
         if (!isCity) {
             int centerIX = static_cast<int>(settlementCenterX);
             int centerIZ = static_cast<int>(settlementCenterZ);
+            // Use the village center height as the unified path Y level
+            int villageY = getSurfaceHeight(centerIX, centerIZ);
             
             for (int lx = 0; lx < CHUNK_SIZE; lx++) {
                 for (int lz = 0; lz < CHUNK_SIZE; lz++) {
@@ -1391,18 +1441,52 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     
                     if (!isMainPath) continue;
                     
-                    int groundPY = getSurfaceHeight(worldPX, worldPZ);
-                    int localPY = groundPY - chunkBaseY;
+                    // Distance check - only within village radius
+                    float pdx = static_cast<float>(worldPX) - settlementCenterX;
+                    float pdz = static_cast<float>(worldPZ) - settlementCenterZ;
+                    float pathDist = std::sqrt(pdx * pdx + pdz * pdz);
+                    if (pathDist > 45.0f) continue;
+                    
+                    // Check for water - don't path over rivers
+                    float pathRiver = getRiverMask(static_cast<float>(worldPX), static_cast<float>(worldPZ));
+                    if (pathRiver > 0.25f) continue;
+                    
+                    int naturalY = getSurfaceHeight(worldPX, worldPZ);
+                    // Blend path height: mostly villageY, slight blend with natural for gentle slope
+                    int pathY = static_cast<int>(std::round(0.7f * static_cast<float>(villageY) + 0.3f * static_cast<float>(naturalY)));
+                    int localPY = pathY - chunkBaseY;
                     if (localPY < 0 || localPY >= CHUNK_HEIGHT) continue;
                     
-                    // Don't overwrite water
-                    Block existing = chunk->getBlock(lx, localPY, lz);
-                    if (existing.getType() == BlockType::WATER) continue;
+                    // Fill up or carve down to path level
+                    if (naturalY < pathY) {
+                        for (int fy = naturalY + 1; fy < pathY; fy++) {
+                            int localFY = fy - chunkBaseY;
+                            if (localFY >= 0 && localFY < CHUNK_HEIGHT)
+                                chunk->setBlock(lx, localFY, lz, Block(BlockType::DIRT));
+                        }
+                    } else if (naturalY > pathY) {
+                        for (int fy = pathY + 1; fy <= naturalY; fy++) {
+                            int localFY = fy - chunkBaseY;
+                            if (localFY >= 0 && localFY < CHUNK_HEIGHT)
+                                chunk->setBlock(lx, localFY, lz, Block(BlockType::AIR));
+                        }
+                    }
                     
+                    // Place path block at surface level (baked into terrain)
                     if (std::abs(relX) == 0 || std::abs(relZ) == 0)
                         chunk->setBlock(lx, localPY, lz, Block(BlockType::COBBLESTONE));
                     else
                         chunk->setBlock(lx, localPY, lz, Block(BlockType::GRAVEL));
+                    
+                    // Clear above path for headroom
+                    for (int clearY = 1; clearY <= 4; clearY++) {
+                        int localCY = localPY + clearY;
+                        if (localCY >= 0 && localCY < CHUNK_HEIGHT) {
+                            Block above = chunk->getBlock(lx, localCY, lz);
+                            if (above.getType() != BlockType::AIR && above.getType() != BlockType::WATER)
+                                chunk->setBlock(lx, localCY, lz, Block(BlockType::AIR));
+                        }
+                    }
                 }
             }
         }
@@ -1881,41 +1965,63 @@ float WorldGenerator::getHeight(float x, float z) const {
 
     // ========== SETTLEMENT FLATTENING (applied last so nothing overrides it) ==========
     // Flatten terrain in city/village biome areas so structures sit on level ground.
-    // Uses the same grid logic as getBiome() for consistency.
+    // Uses the same jittered grid logic as getBiome() for consistency.
     {
-        const float CITY_GRID_F    = 400.0f;
+        const float CITY_GRID_F    = 500.0f;
         const float CITY_RADIUS_F  = 160.0f;
-        const float VILLAGE_GRID_F    = 150.0f;
+        const float CITY_JITTER_F  = 120.0f;
+        const float VILLAGE_GRID_F    = 180.0f;
         const float VILLAGE_RADIUS_F  = 45.0f;
-        // Transition band outside the biome radius for smooth edges
+        const float VILLAGE_JITTER_F  = 50.0f;
         const float CITY_TRANSITION    = 40.0f;
         const float VILLAGE_TRANSITION = 15.0f;
 
-        float cityGridCX = std::floor(x / CITY_GRID_F) * CITY_GRID_F + CITY_GRID_F / 2.0f;
-        float cityGridCZ = std::floor(z / CITY_GRID_F) * CITY_GRID_F + CITY_GRID_F / 2.0f;
-        float cityDist = std::sqrt((x - cityGridCX) * (x - cityGridCX) +
-                                   (z - cityGridCZ) * (z - cityGridCZ));
+        // Same jitter function as getBiome
+        auto settlementJitterH = [&](float gridCX, float gridCZ, float jitterAmount, float gridSize) -> std::pair<float, float> {
+            unsigned int hx = static_cast<unsigned int>(static_cast<int>(std::floor(gridCX / gridSize))) * 374761393u;
+            unsigned int hz = static_cast<unsigned int>(static_cast<int>(std::floor(gridCZ / gridSize))) * 668265263u;
+            unsigned int h1 = (seed ^ hx ^ hz) * 2654435761u;
+            unsigned int h2 = (seed ^ hz ^ (hx * 2246822519u)) * 3266489917u;
+            float offsetX = ((h1 & 0xFFFF) / 32768.0f - 1.0f) * jitterAmount;
+            float offsetZ = ((h2 & 0xFFFF) / 32768.0f - 1.0f) * jitterAmount;
+            return {gridCX + offsetX, gridCZ + offsetZ};
+        };
+        auto shouldSpawnH = [&](float gridCX, float gridCZ, float gridSize, float spawnChance) -> bool {
+            unsigned int hx = static_cast<unsigned int>(static_cast<int>(std::floor(gridCX / gridSize))) * 374761393u;
+            unsigned int hz = static_cast<unsigned int>(static_cast<int>(std::floor(gridCZ / gridSize))) * 668265263u;
+            unsigned int h = (seed ^ hx ^ hz ^ 987654321u) * 2246822519u;
+            float roll = (h & 0xFFFF) / 65536.0f;
+            return roll < spawnChance;
+        };
 
-        float villageGridCX = std::floor(x / VILLAGE_GRID_F) * VILLAGE_GRID_F + VILLAGE_GRID_F / 2.0f;
-        float villageGridCZ = std::floor(z / VILLAGE_GRID_F) * VILLAGE_GRID_F + VILLAGE_GRID_F / 2.0f;
-        float villageDist = std::sqrt((x - villageGridCX) * (x - villageGridCX) +
-                                      (z - villageGridCZ) * (z - villageGridCZ));
+        float cityGridBaseX = std::floor(x / CITY_GRID_F) * CITY_GRID_F + CITY_GRID_F / 2.0f;
+        float cityGridBaseZ = std::floor(z / CITY_GRID_F) * CITY_GRID_F + CITY_GRID_F / 2.0f;
+        auto [cityJX, cityJZ] = settlementJitterH(cityGridBaseX, cityGridBaseZ, CITY_JITTER_F, CITY_GRID_F);
+        float cityDist = std::sqrt((x - cityJX) * (x - cityJX) + (z - cityJZ) * (z - cityJZ));
+        
+        float villageGridBaseX = std::floor(x / VILLAGE_GRID_F) * VILLAGE_GRID_F + VILLAGE_GRID_F / 2.0f;
+        float villageGridBaseZ = std::floor(z / VILLAGE_GRID_F) * VILLAGE_GRID_F + VILLAGE_GRID_F / 2.0f;
+        auto [villageJX, villageJZ] = settlementJitterH(villageGridBaseX, villageGridBaseZ, VILLAGE_JITTER_F, VILLAGE_GRID_F);
+        float villageDist = std::sqrt((x - villageJX) * (x - villageJX) + (z - villageJZ) * (z - villageJZ));
 
-        if (cityDist < CITY_RADIUS_F + CITY_TRANSITION) {
-            // Use baseHeight as target — the flat continental base without hills/mountains
+        // Only flatten if this grid cell actually spawns a settlement
+        bool citySpawns = shouldSpawnH(cityGridBaseX, cityGridBaseZ, CITY_GRID_F, 0.70f) &&
+                          getMountainFactor(cityJX, cityJZ) < 0.25f;
+        bool villageSpawns = shouldSpawnH(villageGridBaseX, villageGridBaseZ, VILLAGE_GRID_F, 0.75f) &&
+                             getMountainFactor(villageJX, villageJZ) < 0.35f;
+
+        if (citySpawns && cityDist < CITY_RADIUS_F + CITY_TRANSITION) {
             float outerR = CITY_RADIUS_F + CITY_TRANSITION;
-            // Full strength inside the radius, fade to 0 in transition band
             float edgeFade = std::clamp((outerR - cityDist) / CITY_TRANSITION, 0.0f, 1.0f);
-            // Smooth-step for natural blending at boundary
             edgeFade = edgeFade * edgeFade * (3.0f - 2.0f * edgeFade);
-            float flattenStrength = edgeFade * 0.995f; // 99.5% flattened (almost perfectly flat)
+            float flattenStrength = edgeFade * 0.995f;
             finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
-        } else if (villageDist < VILLAGE_RADIUS_F + VILLAGE_TRANSITION &&
-                   cityDist > CITY_RADIUS_F + CITY_TRANSITION) {
+        } else if (villageSpawns && villageDist < VILLAGE_RADIUS_F + VILLAGE_TRANSITION &&
+                   !(citySpawns && cityDist < CITY_RADIUS_F + CITY_TRANSITION)) {
             float outerR = VILLAGE_RADIUS_F + VILLAGE_TRANSITION;
             float edgeFade = std::clamp((outerR - villageDist) / VILLAGE_TRANSITION, 0.0f, 1.0f);
             edgeFade = edgeFade * edgeFade * (3.0f - 2.0f * edgeFade);
-            float flattenStrength = edgeFade * 0.70f;  // 70% flattened
+            float flattenStrength = edgeFade * 0.90f;  // 90% flattened (much flatter villages)
             finalHeight = lerp(finalHeight, baseHeight, flattenStrength);
         }
     }

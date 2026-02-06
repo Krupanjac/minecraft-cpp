@@ -2260,11 +2260,22 @@ void UIManager::render() {
                     float worldPerPixel = mapScale * 4.0f; // Simpler calculation
                     float halfMapWorld = (pixelRes / 2.0f) * worldPerPixel;
                     
-                    for (int py = 0; py < pixelRes; py++) {
-                        for (int px = 0; px < pixelRes; px++) {
-                            // Convert pixel coords to world coords
-                            float worldX = mapCenterX + (px - pixelRes / 2) * worldPerPixel;
-                            float worldZ = mapCenterZ + (py - pixelRes / 2) * worldPerPixel;
+                    // Snap sampling center to worldPerPixel grid to prevent pixel shimmer during pan
+                    float snappedCenterX = std::floor(mapCenterX / worldPerPixel) * worldPerPixel;
+                    float snappedCenterZ = std::floor(mapCenterZ / worldPerPixel) * worldPerPixel;
+                    float subPixelX = (mapCenterX - snappedCenterX) / worldPerPixel * pixelSize;
+                    float subPixelZ = (mapCenterZ - snappedCenterZ) / worldPerPixel * pixelSize;
+                    
+                    // Enable scissor to clip pixels that overflow due to sub-pixel offset
+                    glEnable(GL_SCISSOR_TEST);
+                    glScissor((GLint)mapEl.x, (GLint)(height - mapEl.y - mapEl.h), (GLsizei)mapEl.w, (GLsizei)mapEl.h);
+                    
+                    // Render with 1 extra pixel border on each side to cover sub-pixel offset
+                    for (int py = -1; py <= pixelRes; py++) {
+                        for (int px = -1; px <= pixelRes; px++) {
+                            // Convert pixel coords to world coords using snapped center
+                            float worldX = snappedCenterX + (px - pixelRes / 2) * worldPerPixel;
+                            float worldZ = snappedCenterZ + (py - pixelRes / 2) * worldPerPixel;
                             
                             // Get height and biome
                             float h = worldGenerator->getHeight(worldX, worldZ);
@@ -2282,11 +2293,12 @@ void UIManager::render() {
                                 BiomeInfo biomeInfo = worldGenerator->getBiomeInfo(biome);
                                 float heightFactor = std::min(h / 100.0f, 1.0f);
                                 
-                                // Special highlight for villages and cities - PINK for both
-                                if (biome == BiomeType::VILLAGE || biome == BiomeType::CITY) {
-                                    color = glm::vec4(1.0f, 0.4f, 0.8f, 1.0f); // Bright PINK
-                                } else if (false) {
-                                    color = glm::vec4(1.0f, 0.4f, 0.8f, 1.0f); // unused
+                                if (biome == BiomeType::CITY) {
+                                    // City - gray stone color
+                                    color = glm::vec4(0.55f + 0.1f * heightFactor, 0.55f + 0.1f * heightFactor, 0.6f + 0.08f * heightFactor, 1.0f);
+                                } else if (biome == BiomeType::VILLAGE) {
+                                    // Village - warm brown
+                                    color = glm::vec4(0.65f + 0.1f * heightFactor, 0.52f + 0.08f * heightFactor, 0.35f, 1.0f);
                                 } else if (biome == BiomeType::OCEAN) {
                                     color = glm::vec4(0.15f, 0.35f, 0.7f, 1.0f);
                                 } else if (biome == BiomeType::MOUNTAINS && h > 115) {
@@ -2299,43 +2311,54 @@ void UIManager::render() {
                                 }
                             }
                             
-                            float rx = mapEl.x + px * pixelSize;
-                            float ry = mapEl.y + py * pixelSize;
+                            // Apply sub-pixel offset for smooth, stable panning
+                            float rx = mapEl.x + px * pixelSize - subPixelX;
+                            float ry = mapEl.y + py * pixelSize - subPixelZ;
                             drawRect(rx, ry, pixelSize + 1, pixelSize + 1, color);
                         }
                     }
                     
+                    glDisable(GL_SCISSOR_TEST);
+                    
                     // Second pass: find and label settlements with icons
                     for (int py = 0; py < pixelRes; py += 4) {
                         for (int px = 0; px < pixelRes; px += 4) {
-                            float worldX = mapCenterX + (px - pixelRes / 2) * worldPerPixel;
-                            float worldZ = mapCenterZ + (py - pixelRes / 2) * worldPerPixel;
+                            float worldX = snappedCenterX + (px - pixelRes / 2) * worldPerPixel;
+                            float worldZ = snappedCenterZ + (py - pixelRes / 2) * worldPerPixel;
                             BiomeType biome = worldGenerator->getBiome(worldX, worldZ);
                             
-                            float screenX = mapEl.x + px * pixelSize;
-                            float screenY = mapEl.y + py * pixelSize;
+                            float screenX = mapEl.x + px * pixelSize - subPixelX;
+                            float screenY = mapEl.y + py * pixelSize - subPixelZ;
                             
-                            if (biome == BiomeType::VILLAGE || biome == BiomeType::CITY) {
-                                // Draw settlement icon - PINK for both
-                                float iconSize = biome == BiomeType::CITY ? std::max(12.0f, 30.0f / mapScale) : std::max(8.0f, 22.0f / mapScale);
+                            // Clip icons to map bounds
+                            if (screenX < mapEl.x - 10 || screenX > mapEl.x + mapEl.w + 10 ||
+                                screenY < mapEl.y - 10 || screenY > mapEl.y + mapEl.h + 10) continue;
+                            
+                            if (biome == BiomeType::CITY) {
+                                // City icon - gray
+                                float iconSize = std::max(12.0f, 30.0f / mapScale);
                                 float ix = screenX - iconSize/2;
                                 float iy = screenY - iconSize/2;
-                                
-                                // Pink background with black border
                                 drawRect(ix-2, iy-2, iconSize+4, iconSize+4, glm::vec4(0.0f, 0.0f, 0.0f, 0.9f));
-                                drawRect(ix, iy, iconSize, iconSize, glm::vec4(1.0f, 0.4f, 0.8f, 1.0f));
-                                
-                                // Letter: V for village, C for city
-                                const char* letter = biome == BiomeType::CITY ? "C" : "V";
+                                drawRect(ix, iy, iconSize, iconSize, glm::vec4(0.6f, 0.6f, 0.65f, 1.0f));
                                 float textScale = std::max(0.6f, 1.2f / mapScale);
-                                drawText(ix + iconSize/2 - 3*textScale, iy + iconSize/2 - 4*textScale, textScale, letter, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+                                drawText(ix + iconSize/2 - 3*textScale, iy + iconSize/2 - 4*textScale, textScale, "C", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+                            } else if (biome == BiomeType::VILLAGE) {
+                                // Village icon - brown
+                                float iconSize = std::max(8.0f, 22.0f / mapScale);
+                                float ix = screenX - iconSize/2;
+                                float iy = screenY - iconSize/2;
+                                drawRect(ix-2, iy-2, iconSize+4, iconSize+4, glm::vec4(0.0f, 0.0f, 0.0f, 0.9f));
+                                drawRect(ix, iy, iconSize, iconSize, glm::vec4(0.7f, 0.55f, 0.35f, 1.0f));
+                                float textScale = std::max(0.6f, 1.2f / mapScale);
+                                drawText(ix + iconSize/2 - 3*textScale, iy + iconSize/2 - 4*textScale, textScale, "V", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
                             }
                         }
                     }
                     
-                    // Draw player marker
-                    float playerScreenX = mapEl.x + ((currentPlayerPos.x - mapCenterX) / halfMapWorld + 1.0f) * 0.5f * mapEl.w;
-                    float playerScreenZ = mapEl.y + ((currentPlayerPos.z - mapCenterZ) / halfMapWorld + 1.0f) * 0.5f * mapEl.h;
+                    // Draw player marker (uses actual center, mathematically equivalent)
+                    float playerScreenX = mapEl.x + ((currentPlayerPos.x - snappedCenterX) / halfMapWorld + 1.0f) * 0.5f * mapEl.w - subPixelX;
+                    float playerScreenZ = mapEl.y + ((currentPlayerPos.z - snappedCenterZ) / halfMapWorld + 1.0f) * 0.5f * mapEl.h - subPixelZ;
                     
                     // Check if player is on map
                     if (playerScreenX >= mapEl.x && playerScreenX <= mapEl.x + mapEl.w &&
@@ -2369,14 +2392,19 @@ void UIManager::render() {
                     float lx = mapEl.x + mapEl.w + 12;
                     float ly = mapEl.y;
                     
-                    drawRect(lx - 4, ly - 4, 90, 115, glm::vec4(0.0f, 0.0f, 0.0f, 0.85f));
+                    drawRect(lx - 4, ly - 4, 90, 130, glm::vec4(0.0f, 0.0f, 0.0f, 0.85f));
                     
                     drawText(lx, ly, 1.0f, "LEGEND", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
                     ly += 18;
                     
-                    // Settlement swatch - PINK
-                    drawRect(lx, ly, 12, 12, glm::vec4(1.0f, 0.4f, 0.8f, 1.0f));
-                    drawText(lx + 16, ly + 1, 0.9f, "Settlmt", glm::vec4(1.0f, 0.5f, 0.85f, 1.0f));
+                    // City swatch - gray
+                    drawRect(lx, ly, 12, 12, glm::vec4(0.6f, 0.6f, 0.65f, 1.0f));
+                    drawText(lx + 16, ly + 1, 0.9f, "City", glm::vec4(0.7f, 0.7f, 0.75f, 1.0f));
+                    ly += 16;
+                    
+                    // Village swatch - brown
+                    drawRect(lx, ly, 12, 12, glm::vec4(0.7f, 0.55f, 0.35f, 1.0f));
+                    drawText(lx + 16, ly + 1, 0.9f, "Village", glm::vec4(0.75f, 0.6f, 0.4f, 1.0f));
                     ly += 18;
                     
                     // Player swatch
@@ -3844,16 +3872,16 @@ void UIManager::generateMapTexture() {
                         b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
                         break;
                     case BiomeType::VILLAGE:
-                        // Bright orange/yellow - very visible on map
-                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255);
-                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255);
-                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
+                        // Warm brown
+                        r = static_cast<unsigned char>((0.65f + 0.1f * heightFactor) * 255);
+                        g = static_cast<unsigned char>((0.52f + 0.08f * heightFactor) * 255);
+                        b = static_cast<unsigned char>(0.35f * 255);
                         break;
                     case BiomeType::CITY:
-                        // Cyan/teal - very visible on map
-                        r = static_cast<unsigned char>(biomeInfo.mapColorR * 255);
-                        g = static_cast<unsigned char>(biomeInfo.mapColorG * 255);
-                        b = static_cast<unsigned char>(biomeInfo.mapColorB * 255);
+                        // Gray stone
+                        r = static_cast<unsigned char>((0.55f + 0.1f * heightFactor) * 255);
+                        g = static_cast<unsigned char>((0.55f + 0.1f * heightFactor) * 255);
+                        b = static_cast<unsigned char>((0.6f + 0.08f * heightFactor) * 255);
                         break;
                     default:
                         r = 128; g = 128; b = 128;
