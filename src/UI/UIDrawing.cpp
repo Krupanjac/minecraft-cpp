@@ -292,6 +292,10 @@ int UIManager::getBlockTextureIndex(BlockType type, int face) {
             return 52;                     // Use oak leaves
         case BlockType::JUNGLE_LEAVES:
             return 52;                     // Use oak leaves
+        case BlockType::ACACIA_LEAVES:
+            return 52;                     // Use oak leaves (atlas fallback)
+        case BlockType::DARK_OAK_LEAVES:
+            return 52;                     // Use oak leaves (atlas fallback)
             
         // Wool colors (using wool row starting at index 64)
         case BlockType::WHITE_WOOL:
@@ -611,6 +615,8 @@ std::string UIManager::getBlockName(BlockType type) {
         case BlockType::SPRUCE_LEAVES: return "Spruce Leaves";
         case BlockType::BIRCH_LEAVES: return "Birch Leaves";
         case BlockType::JUNGLE_LEAVES: return "Jungle Leaves";
+        case BlockType::ACACIA_LEAVES: return "Acacia Leaves";
+        case BlockType::DARK_OAK_LEAVES: return "Dark Oak Leaves";
         
         // Wool
         case BlockType::WHITE_WOOL: return "White Wool";

@@ -34,6 +34,8 @@ static std::string blockTypeToString(BlockType type) {
         case BlockType::SPRUCE_PLANKS: return "spruce_planks";
         case BlockType::JUNGLE_LOG: return "jungle_log";
         case BlockType::JUNGLE_LEAVES: return "jungle_leaves";
+        case BlockType::ACACIA_LEAVES: return "acacia_leaves";
+        case BlockType::DARK_OAK_LEAVES: return "dark_oak_leaves";
         case BlockType::JUNGLE_PLANKS: return "jungle_planks";
         case BlockType::GLASS: return "glass";
         case BlockType::COAL_ORE: return "coal_ore";
@@ -131,6 +133,8 @@ static BlockType stringToBlockType(const std::string& str) {
         {"spruce_planks", BlockType::SPRUCE_PLANKS},
         {"jungle_log", BlockType::JUNGLE_LOG},
         {"jungle_leaves", BlockType::JUNGLE_LEAVES},
+        {"acacia_leaves", BlockType::ACACIA_LEAVES},
+        {"dark_oak_leaves", BlockType::DARK_OAK_LEAVES},
         {"jungle_planks", BlockType::JUNGLE_PLANKS},
         {"glass", BlockType::GLASS},
         {"coal_ore", BlockType::COAL_ORE},

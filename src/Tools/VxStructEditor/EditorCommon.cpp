@@ -40,6 +40,8 @@ const std::vector<BlockColorInfo>& getBlockPalette() {
         {BlockType::SPRUCE_LEAVES,   "Spruce Leaves",     {0.15f, 0.40f, 0.18f}, "Nature"},
         {BlockType::BIRCH_LEAVES,    "Birch Leaves",      {0.35f, 0.60f, 0.25f}, "Nature"},
         {BlockType::JUNGLE_LEAVES,   "Jungle Leaves",     {0.20f, 0.55f, 0.10f}, "Nature"},
+        {BlockType::ACACIA_LEAVES,   "Acacia Leaves",     {0.30f, 0.55f, 0.12f}, "Nature"},
+        {BlockType::DARK_OAK_LEAVES, "Dark Oak Leaves",   {0.18f, 0.42f, 0.10f}, "Nature"},
         {BlockType::TALL_GRASS,      "Tall Grass",        {0.30f, 0.55f, 0.15f}, "Nature"},
         {BlockType::ROSE,            "Flower",            {0.85f, 0.20f, 0.20f}, "Nature"},
         {BlockType::SUGAR_CANE,      "Sugar Cane",        {0.45f, 0.70f, 0.30f}, "Nature"},
@@ -297,7 +299,8 @@ void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset
             if (type == BlockType::GRASS && face.faceCategory == 0) {
                 tint = {0.49f, 0.78f, 0.30f}; // Green biome tint
             } else if (type == BlockType::OAK_LEAVES || type == BlockType::BIRCH_LEAVES ||
-                       type == BlockType::JUNGLE_LEAVES || type == BlockType::SPRUCE_LEAVES) {
+                       type == BlockType::JUNGLE_LEAVES || type == BlockType::SPRUCE_LEAVES ||
+                       type == BlockType::ACACIA_LEAVES || type == BlockType::DARK_OAK_LEAVES) {
                 tint = {0.40f, 0.65f, 0.20f}; // Leaf biome tint
             }
         } else if (textureMode == 2 && pbrMap) {
@@ -433,7 +436,8 @@ void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset
             if (type == BlockType::GRASS && faceCategory == 0) {
                 tint = {0.49f, 0.78f, 0.30f};
             } else if (type == BlockType::OAK_LEAVES || type == BlockType::BIRCH_LEAVES ||
-                       type == BlockType::JUNGLE_LEAVES || type == BlockType::SPRUCE_LEAVES) {
+                       type == BlockType::JUNGLE_LEAVES || type == BlockType::SPRUCE_LEAVES ||
+                       type == BlockType::ACACIA_LEAVES || type == BlockType::DARK_OAK_LEAVES) {
                 tint = {0.40f, 0.65f, 0.20f};
             }
         } else if (textureMode == 2 && pbrMap) {
@@ -625,6 +629,8 @@ int getBlockTextureIndex(BlockType type, int face) {
         case BlockType::SPRUCE_LEAVES: return 132;
         case BlockType::BIRCH_LEAVES:  return 52;
         case BlockType::JUNGLE_LEAVES: return 52;
+        case BlockType::ACACIA_LEAVES: return 52;
+        case BlockType::DARK_OAK_LEAVES: return 52;
         case BlockType::TALL_GRASS:    return 39;
         case BlockType::ROSE:          return 12;
         case BlockType::SUGAR_CANE:    return 73;
@@ -1028,6 +1034,8 @@ static std::string getPBRTextureName(BlockType type, int face) {
         case BlockType::SPRUCE_LEAVES: return "spruce_leaves";
         case BlockType::BIRCH_LEAVES:  return "birch_leaves";
         case BlockType::JUNGLE_LEAVES: return "jungle_leaves";
+        case BlockType::ACACIA_LEAVES: return "acacia_leaves";
+        case BlockType::DARK_OAK_LEAVES: return "dark_oak_leaves";
         case BlockType::TALL_GRASS:    return "grass";
         case BlockType::ROSE:          return "dandelion";
         case BlockType::SUGAR_CANE:    return "sugar_cane";

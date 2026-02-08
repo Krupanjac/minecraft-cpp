@@ -217,6 +217,12 @@ inline void BlockPhysicsDatabase::initializeData() {
     data[static_cast<size_t>(BlockType::JUNGLE_LEAVES)] = {
         0.2f, 0.2f, 0.1f, 0.4f, 0.1f, false, 0.0f, false, true, false, false, 0.0f
     };
+    data[static_cast<size_t>(BlockType::ACACIA_LEAVES)] = {
+        0.2f, 0.2f, 0.1f, 0.4f, 0.1f, false, 0.0f, false, true, false, false, 0.0f
+    };
+    data[static_cast<size_t>(BlockType::DARK_OAK_LEAVES)] = {
+        0.2f, 0.2f, 0.1f, 0.4f, 0.1f, false, 0.0f, false, true, false, false, 0.0f
+    };
     
     // Glass - fragile
     data[static_cast<size_t>(BlockType::GLASS)] = {

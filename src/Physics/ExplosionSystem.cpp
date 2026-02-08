@@ -428,6 +428,8 @@ bool ExplosionSystem::isBlockFlammable(BlockType type) const {
         case BlockType::SPRUCE_LEAVES:
         case BlockType::BIRCH_LEAVES:
         case BlockType::JUNGLE_LEAVES:
+        case BlockType::ACACIA_LEAVES:
+        case BlockType::DARK_OAK_LEAVES:
         // Wool
         case BlockType::WHITE_WOOL:
         case BlockType::ORANGE_WOOL:

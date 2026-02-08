@@ -679,6 +679,7 @@ void RoadNetwork::placeRoadsInChunk(
                    bt == BlockType::BIRCH_LOG || bt == BlockType::JUNGLE_LOG ||
                    bt == BlockType::OAK_LEAVES || bt == BlockType::SPRUCE_LEAVES ||
                    bt == BlockType::BIRCH_LEAVES || bt == BlockType::JUNGLE_LEAVES ||
+                   bt == BlockType::ACACIA_LEAVES || bt == BlockType::DARK_OAK_LEAVES ||
                    bt == BlockType::TALL_GRASS || bt == BlockType::ROSE ||
                    bt == BlockType::WOOD || bt == BlockType::SUGAR_CANE;
         };

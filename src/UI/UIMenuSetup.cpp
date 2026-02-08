@@ -1151,7 +1151,7 @@ void UIManager::setupInventoryMenu() {
         
         // Leaves
         BlockType::LEAVES, BlockType::OAK_LEAVES, BlockType::SPRUCE_LEAVES, BlockType::BIRCH_LEAVES,
-        BlockType::JUNGLE_LEAVES,
+        BlockType::JUNGLE_LEAVES, BlockType::ACACIA_LEAVES, BlockType::DARK_OAK_LEAVES,
         
         // Nature
         BlockType::TALL_GRASS, BlockType::ROSE, BlockType::COBWEB, BlockType::SUGAR_CANE,

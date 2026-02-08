@@ -1054,6 +1054,7 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                         if (existingType == BlockType::AIR || existing.isCrossModel() ||
                             existingType == BlockType::OAK_LEAVES || existingType == BlockType::BIRCH_LEAVES ||
                             existingType == BlockType::SPRUCE_LEAVES || existingType == BlockType::JUNGLE_LEAVES ||
+                            existingType == BlockType::ACACIA_LEAVES || existingType == BlockType::DARK_OAK_LEAVES ||
                             existingType == BlockType::LEAVES) {
                             chunk->setBlock(localX, localY, localZ, Block(block.type));
                         }

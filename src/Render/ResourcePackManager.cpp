@@ -1348,6 +1348,26 @@ void ResourcePackManager::setupBlockMappings() {
         blockMappings[BlockType::JUNGLE_LEAVES] = mapping;
     }
     
+    // ACACIA_LEAVES
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("acacia_leaves");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::ACACIA_LEAVES] = mapping;
+    }
+    
+    // DARK_OAK_LEAVES
+    {
+        BlockTextureMapping mapping;
+        int idx = findTex("dark_oak_leaves");
+        mapping.top.albedoIndex = idx;
+        mapping.bottom.albedoIndex = idx;
+        mapping.side.albedoIndex = idx;
+        blockMappings[BlockType::DARK_OAK_LEAVES] = mapping;
+    }
+    
     
     // WOOL - All 16 colors
     {

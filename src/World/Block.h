@@ -70,6 +70,8 @@ enum class BlockType : u8 {
     SPRUCE_LEAVES = 62,
     BIRCH_LEAVES = 63,
     JUNGLE_LEAVES = 64,
+    ACACIA_LEAVES = 65,
+    DARK_OAK_LEAVES = 66,
     
     // Wool colors
     WHITE_WOOL = 67,
@@ -157,6 +159,8 @@ struct Block {
                type != BlockType::SPRUCE_LEAVES &&
                type != BlockType::BIRCH_LEAVES &&
                type != BlockType::JUNGLE_LEAVES &&
+               type != BlockType::ACACIA_LEAVES &&
+               type != BlockType::DARK_OAK_LEAVES &&
                type != BlockType::TALL_GRASS &&
                type != BlockType::ROSE &&
                type != BlockType::GLASS &&
@@ -185,6 +189,8 @@ struct Block {
                type == BlockType::SPRUCE_LEAVES ||
                type == BlockType::BIRCH_LEAVES ||
                type == BlockType::JUNGLE_LEAVES ||
+               type == BlockType::ACACIA_LEAVES ||
+               type == BlockType::DARK_OAK_LEAVES ||
                type == BlockType::TALL_GRASS ||
                type == BlockType::ROSE ||
                type == BlockType::GLASS ||
@@ -204,7 +210,9 @@ struct Block {
                type == BlockType::OAK_LEAVES ||
                type == BlockType::SPRUCE_LEAVES ||
                type == BlockType::BIRCH_LEAVES ||
-               type == BlockType::JUNGLE_LEAVES;
+               type == BlockType::JUNGLE_LEAVES ||
+               type == BlockType::ACACIA_LEAVES ||
+               type == BlockType::DARK_OAK_LEAVES;
     }
     
     bool isGlass() const {
