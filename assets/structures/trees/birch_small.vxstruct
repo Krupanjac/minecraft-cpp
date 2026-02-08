@@ -1,0 +1,339 @@
+{
+  "name": "Small Birch Tree",
+  "author": "generator",
+  "category": "tree_birch",
+  "requires_flat": false,
+  "min_ground_coverage": 0.3,
+  "tags": [
+    "tree",
+    "birch",
+    "small",
+    "birch_forest"
+  ],
+  "size": {
+    "x": 5,
+    "y": 6,
+    "z": 5
+  },
+  "blocks": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "type": "birch_log"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "type": "birch_log"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "type": "birch_log"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "type": "birch_log"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 0,
+      "type": "birch_log"
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 2,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 0,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 1,
+      "type": "birch_leaves"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 0,
+      "type": "birch_leaves"
+    }
+  ],
+  "markers": []
+}

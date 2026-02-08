@@ -222,6 +222,11 @@ static std::string categoryToString(StructureCategory cat) {
         case StructureCategory::CITY_ROAD: return "city_road";
         case StructureCategory::CITY_PARK: return "city_park";
         case StructureCategory::CITY_DECORATION: return "city_decoration";
+        case StructureCategory::TREE_OAK: return "tree_oak";
+        case StructureCategory::TREE_BIRCH: return "tree_birch";
+        case StructureCategory::TREE_SPRUCE: return "tree_spruce";
+        case StructureCategory::TREE_SPRUCE_SNOWY: return "tree_spruce_snowy";
+        case StructureCategory::TREE_JUNGLE: return "tree_jungle";
         default: return "misc";
     }
 }
@@ -239,6 +244,11 @@ static StructureCategory stringToCategory(const std::string& str) {
         {"city_road", StructureCategory::CITY_ROAD},
         {"city_park", StructureCategory::CITY_PARK},
         {"city_decoration", StructureCategory::CITY_DECORATION},
+        {"tree_oak", StructureCategory::TREE_OAK},
+        {"tree_birch", StructureCategory::TREE_BIRCH},
+        {"tree_spruce", StructureCategory::TREE_SPRUCE},
+        {"tree_spruce_snowy", StructureCategory::TREE_SPRUCE_SNOWY},
+        {"tree_jungle", StructureCategory::TREE_JUNGLE},
         {"misc", StructureCategory::MISC}
     };
     auto it = lookup.find(str);

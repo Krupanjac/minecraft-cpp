@@ -1,0 +1,1029 @@
+{
+  "name": "Large Spruce Tree",
+  "author": "generator",
+  "category": "tree_spruce",
+  "requires_flat": false,
+  "min_ground_coverage": 0.3,
+  "tags": [
+    "tree",
+    "spruce",
+    "large",
+    "taiga"
+  ],
+  "size": {
+    "x": 5,
+    "y": 12,
+    "z": 5
+  },
+  "blocks": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "type": "spruce_log"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "type": "spruce_log"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "type": "spruce_log"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "type": "spruce_log"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 0,
+      "type": "spruce_log"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 0,
+      "type": "spruce_log"
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 0,
+      "type": "spruce_log"
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": 0,
+      "type": "spruce_log"
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 0,
+      "type": "spruce_log"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 0,
+      "type": "spruce_log"
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 6,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 6,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 6,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 6,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 6,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 7,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 7,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 7,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 7,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 7,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 7,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 7,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 7,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 7,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 7,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 7,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": -2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 2,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": -1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 1,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": 0,
+      "type": "spruce_leaves"
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": 0,
+      "type": "spruce_leaves"
+    }
+  ],
+  "markers": []
+}

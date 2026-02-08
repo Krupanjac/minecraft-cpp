@@ -407,7 +407,9 @@ void VxStructEditor::renderProperties() {
     static const char* catNames[] = {
         "Village House", "Village Building", "Village Farm", "Village Well",
         "Village Path", "Village Decoration", "City Building", "City Skyscraper",
-        "City Road", "City Park", "City Decoration", "Misc"
+        "City Road", "City Park", "City Decoration",
+        "Tree Oak", "Tree Birch", "Tree Spruce", "Tree Spruce Snowy", "Tree Jungle",
+        "Misc"
     };
     if (ImGui::Combo("##category", &m_categoryIndex, catNames, IM_ARRAYSIZE(catNames))) {
         m_structure.setCategory(static_cast<StructureCategory>(m_categoryIndex));

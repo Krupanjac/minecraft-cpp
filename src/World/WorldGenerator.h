@@ -26,14 +26,6 @@ enum class BiomeType {
     CITY              // Flat area with city buildings
 };
 
-enum class TreeType {
-    OAK,
-    BIRCH,
-    SPRUCE,
-    JUNGLE,
-    NONE
-};
-
 struct BiomeInfo {
     BiomeType type;
     float temperature;    // 0 = cold, 1 = hot
@@ -137,10 +129,6 @@ private:
     
     // Vegetation helpers
     bool hasTree(int x, int z, BiomeType biome) const;
-    int getTreeHeight(int x, int z, BiomeType biome) const;
-    TreeType getTreeType(BiomeType biome) const;
-    BlockType getLogType(TreeType tree) const;
-    BlockType getLeavesType(TreeType tree) const;
 };
 
     

@@ -34,6 +34,11 @@ enum class StructureCategory {
     CITY_ROAD,
     CITY_PARK,
     CITY_DECORATION,
+    TREE_OAK,
+    TREE_BIRCH,
+    TREE_SPRUCE,
+    TREE_SPRUCE_SNOWY,
+    TREE_JUNGLE,
     MISC
 };
 

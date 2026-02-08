@@ -1,0 +1,2048 @@
+{
+  "name": "Large Jungle Tree",
+  "author": "generator",
+  "category": "tree_jungle",
+  "requires_flat": false,
+  "min_ground_coverage": 0.3,
+  "tags": [
+    "tree",
+    "jungle",
+    "large"
+  ],
+  "size": {
+    "x": 8,
+    "y": 15,
+    "z": 8
+  },
+  "blocks": [
+    {
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 0,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 0,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 1,
+      "type": "jungle_log"
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": -3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 4,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 14,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 14,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 14,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 14,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 14,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 2,
+      "y": 14,
+      "z": 3,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 14,
+      "z": -2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 14,
+      "z": -1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 14,
+      "z": 0,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 14,
+      "z": 1,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 14,
+      "z": 2,
+      "type": "jungle_leaves"
+    },
+    {
+      "x": 3,
+      "y": 14,
+      "z": 3,
+      "type": "jungle_leaves"
+    }
+  ],
+  "markers": []
+}

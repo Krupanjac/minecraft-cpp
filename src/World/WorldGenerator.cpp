@@ -7,7 +7,6 @@
 #include <cmath>
 #include <random>
 #include <algorithm>
-#include <map>
 #include <utility>
 
 // Static BiomeInfo cache - initialized once for fast lookups
@@ -671,55 +670,6 @@ bool WorldGenerator::hasTree(int x, int z, BiomeType biome) const {
     return true;
 }
 
-int WorldGenerator::getTreeHeight(int x, int z, BiomeType biome) const {
-    unsigned int h = seed + x * 123 + z * 456;
-    h = (h ^ (h >> 13)) * 1274126177;
-    
-    // Height variation based on biome
-    switch (biome) {
-        case BiomeType::JUNGLE:       return 8 + (h % 8);  // 8-15 tall jungle trees
-        case BiomeType::TAIGA:        return 6 + (h % 5);  // 6-10 tall spruce
-        case BiomeType::SWAMP:        return 4 + (h % 3);  // 4-6 shorter swamp trees
-        case BiomeType::BIRCH_FOREST: return 5 + (h % 4);  // 5-8 birch trees
-        default:                      return 4 + (h % 5);  // 4-8 oak trees
-    }
-}
-
-TreeType WorldGenerator::getTreeType(BiomeType biome) const {
-    switch (biome) {
-        case BiomeType::BIRCH_FOREST: return TreeType::BIRCH;
-        case BiomeType::TAIGA:        return TreeType::SPRUCE;
-        case BiomeType::SNOWY_TUNDRA: return TreeType::SPRUCE;
-        case BiomeType::JUNGLE:       return TreeType::JUNGLE;
-        case BiomeType::SWAMP:        return TreeType::OAK;     // Swamp oak
-        case BiomeType::FOREST:       return TreeType::OAK;
-        case BiomeType::PLAINS:       return TreeType::OAK;
-        case BiomeType::SAVANNA:      return TreeType::OAK;     // Would be acacia if available
-        case BiomeType::MOUNTAINS:    return TreeType::SPRUCE;
-        default:                      return TreeType::NONE;
-    }
-}
-
-BlockType WorldGenerator::getLogType(TreeType tree) const {
-    switch (tree) {
-        case TreeType::OAK:    return BlockType::OAK_LOG;
-        case TreeType::BIRCH:  return BlockType::BIRCH_LOG;
-        case TreeType::SPRUCE: return BlockType::SPRUCE_LOG;
-        case TreeType::JUNGLE: return BlockType::JUNGLE_LOG;
-        default:               return BlockType::OAK_LOG;
-    }
-}
-
-BlockType WorldGenerator::getLeavesType(TreeType tree) const {
-    switch (tree) {
-        case TreeType::OAK:    return BlockType::OAK_LEAVES;
-        case TreeType::BIRCH:  return BlockType::BIRCH_LEAVES;
-        case TreeType::SPRUCE: return BlockType::SPRUCE_LEAVES;
-        case TreeType::JUNGLE: return BlockType::JUNGLE_LEAVES;
-        default:               return BlockType::OAK_LEAVES;
-    }
-}
-
 void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
     const ChunkPos& chunkPos = chunk->getPosition();
     glm::vec3 worldPos = ChunkManager::chunkToWorld(chunkPos);
@@ -963,48 +913,51 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         }
     }
     
-    // 3. Tree Pass (Neighborhood Search)
-    // Use precomputed column cache where possible to avoid redundant getBiome/getHeight calls
-    int pad = 3; // Increased for larger jungle trees
-    for (int nx = -pad; nx < CHUNK_SIZE + pad; ++nx) {
-        for (int nz = -pad; nz < CHUNK_SIZE + pad; ++nz) {
-            int worldX = static_cast<int>(worldPos.x) + nx;
-            int worldZ = static_cast<int>(worldPos.z) + nz;
-            float worldXf = static_cast<float>(worldX);
-            float worldZf = static_cast<float>(worldZ);
-            
-            // EARLY REJECTION: Check if this location is in a river (no trees in rivers)
-            float riverMaskCheck = getRiverMask(worldXf, worldZf);
-            float mountainFactorCheck = getMountainFactor(worldXf, worldZf);
-            float surfaceRiverCheck = riverMaskCheck * (1.0f - mountainFactorCheck * 0.95f);
-            if (surfaceRiverCheck > 0.35f) continue;  // Skip river and shore areas entirely
-            
-            // Use precomputed data if within chunk bounds, otherwise compute
-            BiomeType biome;
-            int treeBaseY;
-            float temp;
-            bool inChunkBounds = (nx >= 0 && nx < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE);
-            
-            if (inChunkBounds) {
-                const ColumnData& col = columnCache[nx][nz];
-                biome = col.biome;
-                treeBaseY = col.height;
-                temp = col.temp;
-            } else {
-                biome = getBiome(worldXf, worldZf);
-                treeBaseY = static_cast<int>(getHeight(worldXf, worldZf));
-                temp = getTemperature(worldXf, worldZf);
-            }
-            
-            // EARLY REJECTION: Below sea level or in cave - skip before hasTree check
-            if (treeBaseY < SEA_LEVEL) continue;
-            if (isCave(worldXf, static_cast<float>(treeBaseY - 1), worldZf, treeBaseY)) continue;
-            
-            if (hasTree(worldX, worldZ, biome)) {
-                // Removed duplicate checks - already done above
-
-                // Check if surface block can support a tree (must be grass, dirt, or snow)
-                // This prevents trees from spawning on stone in mountains
+    // 3. Tree Pass - Place .vxstruct tree structures from registry
+    // Trees are now loaded from assets/structures/trees/ as vxstruct files
+    // and placed using the same system as city/village structures.
+    {
+        auto& registry = StructureRegistry::instance();
+        int pad = 4; // Padding for tree canopy overlap across chunk borders
+        int chunkBaseY = static_cast<int>(worldPos.y);
+        
+        for (int nx = -pad; nx < CHUNK_SIZE + pad; ++nx) {
+            for (int nz = -pad; nz < CHUNK_SIZE + pad; ++nz) {
+                int worldX = static_cast<int>(worldPos.x) + nx;
+                int worldZ = static_cast<int>(worldPos.z) + nz;
+                float worldXf = static_cast<float>(worldX);
+                float worldZf = static_cast<float>(worldZ);
+                
+                // EARLY REJECTION: No trees in rivers
+                float riverMaskCheck = getRiverMask(worldXf, worldZf);
+                float mountainFactorCheck = getMountainFactor(worldXf, worldZf);
+                float surfaceRiverCheck = riverMaskCheck * (1.0f - mountainFactorCheck * 0.95f);
+                if (surfaceRiverCheck > 0.35f) continue;
+                
+                // Use precomputed data if within chunk bounds, otherwise compute
+                BiomeType biome;
+                int treeBaseY;
+                float temp;
+                bool inChunkBounds = (nx >= 0 && nx < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE);
+                
+                if (inChunkBounds) {
+                    const ColumnData& col = columnCache[nx][nz];
+                    biome = col.biome;
+                    treeBaseY = col.height;
+                    temp = col.temp;
+                } else {
+                    biome = getBiome(worldXf, worldZf);
+                    treeBaseY = static_cast<int>(getHeight(worldXf, worldZf));
+                    temp = getTemperature(worldXf, worldZf);
+                }
+                
+                // EARLY REJECTION: Below sea level or in cave
+                if (treeBaseY < SEA_LEVEL) continue;
+                if (isCave(worldXf, static_cast<float>(treeBaseY - 1), worldZf, treeBaseY)) continue;
+                
+                if (!hasTree(worldX, worldZ, biome)) continue;
+                
+                // Check if surface block can support a tree
                 int localTreeX = worldX - static_cast<int>(worldPos.x);
                 int localTreeZ = worldZ - static_cast<int>(worldPos.z);
                 int localBaseY = treeBaseY - static_cast<int>(worldPos.y) - 1;
@@ -1018,190 +971,101 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                                      groundType == BlockType::DIRT ||
                                      groundType == BlockType::SNOW);
                 } else {
-                    // For trees outside chunk bounds, check biome info
                     const BiomeInfo& info = biomeInfoCache[static_cast<int>(biome)];
                     canSupportTree = (info.surfaceBlock == BlockType::GRASS ||
                                      info.surfaceBlock == BlockType::DIRT ||
                                      info.surfaceBlock == BlockType::SNOW);
-                    // For mountains, check elevation for tree line
                     if (biome == BiomeType::MOUNTAINS && treeBaseY > SEA_LEVEL + 38) {
-                        canSupportTree = false;  // Above tree line
+                        canSupportTree = false;
                     }
                 }
                 
                 if (!canSupportTree) continue;
-
-                TreeType treeType = getTreeType(biome);
-                if (treeType == TreeType::NONE) continue;
                 
-                int treeH = getTreeHeight(worldX, worldZ, biome);
-                BlockType logType = getLogType(treeType);
-                BlockType leavesType = getLeavesType(treeType);
+                // Determine which tree structure category to use based on biome
+                StructureCategory treeCat;
+                bool addSnowToLeaves = false;
+                switch (biome) {
+                    case BiomeType::BIRCH_FOREST:
+                        treeCat = StructureCategory::TREE_BIRCH;
+                        break;
+                    case BiomeType::TAIGA:
+                        if (temp < 0.25f) {
+                            treeCat = StructureCategory::TREE_SPRUCE_SNOWY;
+                            addSnowToLeaves = true;
+                        } else {
+                            treeCat = StructureCategory::TREE_SPRUCE;
+                        }
+                        break;
+                    case BiomeType::SNOWY_TUNDRA:
+                        treeCat = StructureCategory::TREE_SPRUCE_SNOWY;
+                        addSnowToLeaves = true;
+                        break;
+                    case BiomeType::JUNGLE:
+                        treeCat = StructureCategory::TREE_JUNGLE;
+                        break;
+                    case BiomeType::MOUNTAINS:
+                        treeCat = StructureCategory::TREE_SPRUCE;
+                        break;
+                    case BiomeType::FOREST:
+                    case BiomeType::SWAMP:
+                    case BiomeType::PLAINS:
+                    case BiomeType::SAVANNA:
+                        treeCat = StructureCategory::TREE_OAK;
+                        break;
+                    default:
+                        continue; // No trees for other biomes
+                }
                 
-                int chunkBaseY = static_cast<int>(worldPos.y);
-                int treeTopY = treeBaseY + treeH + 1;
+                // Select a random tree structure from the category using position-based seed
+                unsigned int treeSeed = seed + static_cast<unsigned int>(worldX) * 374761393 + static_cast<unsigned int>(worldZ) * 668265263;
+                treeSeed = (treeSeed ^ (treeSeed >> 13)) * 1274126177;
                 
-                if (treeTopY < chunkBaseY || treeBaseY > chunkBaseY + CHUNK_HEIGHT) continue;
+                auto treeStruct = registry.getRandomStructure(treeCat, treeSeed);
+                if (!treeStruct) continue;
                 
-                unsigned int h = seed + worldX * 34123 + worldZ * 23123;
-                h = (h ^ (h >> 13)) * 1274126177;
+                // Get blocks (no rotation needed for trees - they're symmetric)
+                const auto& treeBlocks = treeStruct->getBlocks();
+                if (treeBlocks.empty()) continue;
                 
-                // Check if this is snowy biome - we'll add snow to leaves (use precomputed temp)
-                bool addSnowToLeaves = (biome == BiomeType::SNOWY_TUNDRA || 
-                                       (biome == BiomeType::TAIGA && temp < 0.25f));
-                
-                // Draw tree based on type
-                if (treeType == TreeType::SPRUCE) {
-                    // Spruce tree - conical shape
-                    // Draw Trunk
-                    if (nx >= 0 && nx < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE) {
-                        for (int i = 0; i < treeH; ++i) {
-                            int wy = treeBaseY + i;
-                            if (wy >= chunkBaseY && wy < chunkBaseY + CHUNK_HEIGHT) {
-                                chunk->setBlock(nx, wy - chunkBaseY, nz, Block(logType));
-                            }
+                // Place each block of the tree structure
+                for (const auto& block : treeBlocks) {
+                    int bx = worldX + block.position.x;
+                    int by = treeBaseY + block.position.y;
+                    int bz = worldZ + block.position.z;
+                    
+                    // Check if block is within this chunk
+                    int localX = bx - static_cast<int>(worldPos.x);
+                    int localZ = bz - static_cast<int>(worldPos.z);
+                    int localY = by - chunkBaseY;
+                    
+                    if (localX < 0 || localX >= CHUNK_SIZE || localZ < 0 || localZ >= CHUNK_SIZE) continue;
+                    if (localY < 0 || localY >= CHUNK_HEIGHT) continue;
+                    
+                    Block existing = chunk->getBlock(localX, localY, localZ);
+                    BlockType existingType = existing.getType();
+                    
+                    // Logs can overwrite air, grass plants, etc.
+                    // Leaves can only overwrite air or cross-model blocks
+                    bool isLog = (block.type == BlockType::OAK_LOG || block.type == BlockType::BIRCH_LOG ||
+                                  block.type == BlockType::SPRUCE_LOG || block.type == BlockType::JUNGLE_LOG);
+                    
+                    if (isLog) {
+                        if (existingType == BlockType::AIR || existing.isCrossModel() ||
+                            existingType == BlockType::OAK_LEAVES || existingType == BlockType::BIRCH_LEAVES ||
+                            existingType == BlockType::SPRUCE_LEAVES || existingType == BlockType::JUNGLE_LEAVES ||
+                            existingType == BlockType::LEAVES) {
+                            chunk->setBlock(localX, localY, localZ, Block(block.type));
                         }
-                    }
-                    
-                    // Track highest leaf at each position for snow placement
-                    std::map<std::pair<int,int>, int> highestLeafY;
-                    
-                    // Conical leaves
-                    for (int ly = treeBaseY + 2; ly <= treeBaseY + treeH + 1; ++ly) {
-                        if (ly < chunkBaseY || ly >= chunkBaseY + CHUNK_HEIGHT) continue;
-                        
-                        int dy = ly - (treeBaseY + treeH);
-                        int radius = (dy >= 0) ? 0 : std::min(2, (-dy) / 2 + 1);
-                        
-                        for (int lx = worldX - radius; lx <= worldX + radius; ++lx) {
-                            for (int lz = worldZ - radius; lz <= worldZ + radius; ++lz) {
-                                int localX = lx - static_cast<int>(worldPos.x);
-                                int localZ = lz - static_cast<int>(worldPos.z);
-                                
-                                if (localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE) {
-                                    bool isCorner = std::abs(lx - worldX) == radius && std::abs(lz - worldZ) == radius;
-                                    if (isCorner && radius > 1) continue;
-                                    
-                                    Block existing = chunk->getBlock(localX, ly - chunkBaseY, localZ);
-                                    if (existing.getType() == BlockType::AIR || existing.isCrossModel()) {
-                                        chunk->setBlock(localX, ly - chunkBaseY, localZ, Block(leavesType));
-                                        // Track highest leaf for snow
-                                        auto key = std::make_pair(localX, localZ);
-                                        if (highestLeafY.find(key) == highestLeafY.end() || ly > highestLeafY[key]) {
-                                            highestLeafY[key] = ly;
-                                        }
-                                    }
-                                }
-                            }
+                    } else if (block.type == BlockType::SNOW) {
+                        // Snow only on air
+                        if (existingType == BlockType::AIR) {
+                            chunk->setBlock(localX, localY, localZ, Block(block.type));
                         }
-                    }
-                    
-                    // Add snow layer on top of leaves for snowy biomes
-                    if (addSnowToLeaves) {
-                        for (auto& pair : highestLeafY) {
-                            int localX = pair.first.first;
-                            int localZ = pair.first.second;
-                            int snowY = pair.second + 1;
-                            
-                            if (snowY >= chunkBaseY && snowY < chunkBaseY + CHUNK_HEIGHT) {
-                                int localSnowY = snowY - chunkBaseY;
-                                Block existing = chunk->getBlock(localX, localSnowY, localZ);
-                                if (existing.getType() == BlockType::AIR) {
-                                    chunk->setBlock(localX, localSnowY, localZ, Block(BlockType::SNOW));
-                                }
-                            }
-                        }
-                    }
-                } else if (treeType == TreeType::JUNGLE) {
-                    // Jungle tree - thick trunk, dense canopy
-                    // Draw Trunk (2x2 for large trees)
-                    bool largeTrunk = treeH > 10;
-                    int trunkSize = largeTrunk ? 2 : 1;
-                    
-                    for (int tx = 0; tx < trunkSize; ++tx) {
-                        for (int tz = 0; tz < trunkSize; ++tz) {
-                            int localX = nx + tx;
-                            int localZ = nz + tz;
-                            if (localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE) {
-                                for (int i = 0; i < treeH; ++i) {
-                                    int wy = treeBaseY + i;
-                                    if (wy >= chunkBaseY && wy < chunkBaseY + CHUNK_HEIGHT) {
-                                        chunk->setBlock(localX, wy - chunkBaseY, localZ, Block(logType));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Dense canopy
-                    int canopyStart = treeBaseY + treeH - 4;
-                    for (int ly = canopyStart; ly <= treeBaseY + treeH + 1; ++ly) {
-                        if (ly < chunkBaseY || ly >= chunkBaseY + CHUNK_HEIGHT) continue;
-                        
-                        int dy = ly - (treeBaseY + treeH);
-                        int radius = (dy >= 0) ? 2 : 3;
-                        
-                        for (int lx = worldX - radius; lx <= worldX + radius + (largeTrunk ? 1 : 0); ++lx) {
-                            for (int lz = worldZ - radius; lz <= worldZ + radius + (largeTrunk ? 1 : 0); ++lz) {
-                                int localX = lx - static_cast<int>(worldPos.x);
-                                int localZ = lz - static_cast<int>(worldPos.z);
-                                
-                                if (localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE) {
-                                    bool isCorner = (std::abs(lx - worldX) >= radius) && (std::abs(lz - worldZ) >= radius);
-                                    if (isCorner && ((h + ly) % 3 == 0)) continue;
-                                    
-                                    Block existing = chunk->getBlock(localX, ly - chunkBaseY, localZ);
-                                    if (existing.getType() == BlockType::AIR || existing.isCrossModel()) {
-                                        chunk->setBlock(localX, ly - chunkBaseY, localZ, Block(leavesType));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // Oak/Birch tree - standard shape
-                    // Draw Trunk
-                    if (nx >= 0 && nx < CHUNK_SIZE && nz >= 0 && nz < CHUNK_SIZE) {
-                        for (int i = 0; i < treeH; ++i) {
-                            int wy = treeBaseY + i;
-                            if (wy >= chunkBaseY && wy < chunkBaseY + CHUNK_HEIGHT) {
-                                chunk->setBlock(nx, wy - chunkBaseY, nz, Block(logType));
-                            }
-                        }
-                    }
-                    
-                    // Standard leaves
-                    bool extraLeaves = (h % 2) == 0;
-                    
-                    for (int ly = treeBaseY + treeH - 3; ly <= treeBaseY + treeH; ++ly) {
-                        if (ly < chunkBaseY || ly >= chunkBaseY + CHUNK_HEIGHT) continue;
-                        
-                        int dy = ly - (treeBaseY + treeH);
-                        int radius = (dy >= -1) ? 1 : 2;
-                        
-                        for (int lx = worldX - radius; lx <= worldX + radius; ++lx) {
-                            for (int lz = worldZ - radius; lz <= worldZ + radius; ++lz) {
-                                int localX = lx - static_cast<int>(worldPos.x);
-                                int localZ = lz - static_cast<int>(worldPos.z);
-                                
-                                if (localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE) {
-                                    bool isCorner = std::abs(lx - worldX) == radius && std::abs(lz - worldZ) == radius;
-                                    
-                                    if (isCorner) {
-                                        if (radius == 1) continue;
-                                        if (radius == 2) {
-                                            if (!extraLeaves || (h % 3 != 0)) continue; 
-                                        }
-                                    }
-
-                                    if (lx == worldX && lz == worldZ) continue;
-                                    
-                                    Block existing = chunk->getBlock(localX, ly - chunkBaseY, localZ);
-                                    if (existing.getType() == BlockType::AIR || existing.isCrossModel()) {
-                                        chunk->setBlock(localX, ly - chunkBaseY, localZ, Block(leavesType));
-                                    }
-                                }
-                            }
+                    } else {
+                        // Leaves and other blocks - only on air or cross-model
+                        if (existingType == BlockType::AIR || existing.isCrossModel()) {
+                            chunk->setBlock(localX, localY, localZ, Block(block.type));
                         }
                     }
                 }
