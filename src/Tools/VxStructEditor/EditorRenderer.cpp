@@ -126,6 +126,12 @@ void VxStructEditor::render() {
     // Draw selection highlights
     renderSelectionHighlights();
 
+    // Draw rotation pivot marker
+    renderPivotMarker();
+
+    // Draw move offset indicator
+    renderMoveOffsetIndicator();
+
     // Draw marker positions
     const auto& markers = m_structure.getMarkers();
     if (!markers.empty()) {
@@ -182,5 +188,115 @@ void VxStructEditor::renderSelectionHighlights() {
         glDrawArrays(GL_LINES, 0, 24);
     }
     glBindVertexArray(0);
+    glLineWidth(1.0f);
+}
+
+void VxStructEditor::renderPivotMarker() {
+    // Show the rotation pivot when we have a selection and pivot is not bounding center
+    // Also show it when pivot is custom or origin, to give the user visual feedback
+    if (m_selectedBlocks.empty() && m_structure.getBlocks().empty()) return;
+
+    glm::vec3 pivotPos;
+    bool showPivot = false;
+
+    if (m_rotationPivot == RotationPivot::ORIGIN) {
+        pivotPos = glm::vec3(0.0f);
+        showPivot = true;
+    } else if (m_rotationPivot == RotationPivot::CUSTOM) {
+        pivotPos = glm::vec3(m_customPivot);
+        showPivot = true;
+    }
+    // Don't show for BOUNDING_CENTER - it's implicit
+
+    if (!showPivot) return;
+
+    int fbW, fbH;
+    glfwGetFramebufferSize(m_window, &fbW, &fbH);
+    if (fbW == 0 || fbH == 0) return;
+
+    float aspect = (float)fbW / (float)fbH;
+    glm::mat4 proj = m_camera.getProjectionMatrix(aspect);
+    glm::mat4 view = m_camera.getViewMatrix();
+
+    glUseProgram(m_wireShader);
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uProjection"), 1, GL_FALSE, glm::value_ptr(proj));
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uView"), 1, GL_FALSE, glm::value_ptr(view));
+
+    // Draw a distinctive cross/diamond at the pivot point
+    // Small wireframe cube (0.3 scale) in bright magenta
+    glm::mat4 pivotModel = glm::translate(glm::mat4(1.0f), pivotPos);
+    pivotModel = glm::scale(pivotModel, glm::vec3(0.3f));
+    pivotModel = glm::translate(pivotModel, glm::vec3(0.35f)); // center the small cube on the pivot
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uModel"), 1, GL_FALSE, glm::value_ptr(pivotModel));
+    glUniform4f(glGetUniformLocation(m_wireShader, "uColor"), 1.0f, 0.0f, 1.0f, 1.0f); // magenta
+    glLineWidth(3.0f);
+
+    glBindVertexArray(m_wireVAO);
+    glDrawArrays(GL_LINES, 0, 24);
+    glBindVertexArray(0);
+
+    // Also draw slightly larger wireframe to make it more visible
+    glm::mat4 pivotModel2 = glm::translate(glm::mat4(1.0f), pivotPos);
+    pivotModel2 = glm::scale(pivotModel2, glm::vec3(0.5f));
+    pivotModel2 = glm::translate(pivotModel2, glm::vec3(0.25f));
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uModel"), 1, GL_FALSE, glm::value_ptr(pivotModel2));
+    glUniform4f(glGetUniformLocation(m_wireShader, "uColor"), 1.0f, 0.3f, 1.0f, 0.6f);
+    glLineWidth(1.5f);
+
+    glBindVertexArray(m_wireVAO);
+    glDrawArrays(GL_LINES, 0, 24);
+    glBindVertexArray(0);
+
+    glLineWidth(1.0f);
+}
+
+void VxStructEditor::renderMoveOffsetIndicator() {
+    // Show ghost wireframe at the original position when we have an active move
+    if (!m_hasMoveOrigin || m_cumulativeMoveOffset == glm::ivec3(0)) return;
+    if (m_selectedBlocks.empty()) return;
+
+    int fbW, fbH;
+    glfwGetFramebufferSize(m_window, &fbW, &fbH);
+    if (fbW == 0 || fbH == 0) return;
+
+    float aspect = (float)fbW / (float)fbH;
+    glm::mat4 proj = m_camera.getProjectionMatrix(aspect);
+    glm::mat4 view = m_camera.getViewMatrix();
+
+    glUseProgram(m_wireShader);
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uProjection"), 1, GL_FALSE, glm::value_ptr(proj));
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uView"), 1, GL_FALSE, glm::value_ptr(view));
+
+    // Draw ghost outlines at original positions (current pos - cumulative offset)
+    glUniform4f(glGetUniformLocation(m_wireShader, "uColor"), 0.5f, 0.5f, 0.5f, 0.4f); // dim gray ghost
+    glLineWidth(1.0f);
+
+    glBindVertexArray(m_wireVAO);
+    for (int64_t enc : m_selectedBlocks) {
+        glm::ivec3 currentPos = decodePos(enc);
+        glm::ivec3 originalPos = currentPos - m_cumulativeMoveOffset;
+        glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(originalPos));
+        glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uModel"), 1, GL_FALSE, glm::value_ptr(m));
+        glDrawArrays(GL_LINES, 0, 24);
+    }
+    glBindVertexArray(0);
+
+    // Draw a line from origin center to current center
+    // We'll use a simple wireframe approach - draw a thin cube stretched along the offset direction
+    glm::vec3 originCenter = glm::vec3(m_moveOriginCenter) + glm::vec3(0.5f);
+    glm::vec3 currentCenter = originCenter + glm::vec3(m_cumulativeMoveOffset);
+
+    // Draw small markers at origin center
+    glm::mat4 originMarker = glm::translate(glm::mat4(1.0f), glm::vec3(m_moveOriginCenter));
+    originMarker = glm::scale(originMarker, glm::vec3(0.2f));
+    originMarker = glm::translate(originMarker, glm::vec3(0.4f));
+    glUniformMatrix4fv(glGetUniformLocation(m_wireShader, "uModel"), 1, GL_FALSE, glm::value_ptr(originMarker));
+    glUniform4f(glGetUniformLocation(m_wireShader, "uColor"), 1.0f, 0.6f, 0.0f, 0.9f); // orange
+    glLineWidth(2.0f);
+
+    glBindVertexArray(m_wireVAO);
+    glDrawArrays(GL_LINES, 0, 24);
+    glBindVertexArray(0);
+
     glLineWidth(1.0f);
 }

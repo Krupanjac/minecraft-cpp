@@ -33,11 +33,20 @@ out vec4 vCurrentClip;
 out vec4 vPrevClip;
 out vec3 vTangent;
 out vec3 vBitangent;
+flat out uint vFaceRot; // Face rotation for UV rotation in fragment shader
 
 const int kBlockTypeCount = 117;
 
 // Texture atlas indices for non-PBR mode (per block type, per face)
 uniform int uAtlasIndices[kBlockTypeCount * 6];
+
+// Face rotation remap table (same as block.vert)
+const int faceRemapTable[4][6] = int[4][6](
+    int[6](0, 1, 2, 3, 4, 5),
+    int[6](4, 5, 2, 3, 1, 0),
+    int[6](1, 0, 2, 3, 5, 4),
+    int[6](5, 4, 2, 3, 0, 1)
+);
 
 
 void main() {
@@ -95,8 +104,16 @@ void main() {
     
     vMaterial = aMaterial;
     
+    // Extract face rotation from data: bits 4-5
+    uint faceRot = (aData >> 4u) & 3u;
+    vFaceRot = faceRot;
+    
     int faceIdx = int(aNormal);
-    vFace = faceIdx;
+    int texFace = faceIdx;
+    if (faceRot != 0u) {
+        texFace = faceRemapTable[faceRot][faceIdx];
+    }
+    vFace = texFace;  // Use remapped face for PBR texture lookup too
 
     if (uUsePBRResourcePack == 1) {
         vCellOrigin = vec2(0.0);
@@ -105,7 +122,7 @@ void main() {
         // Original atlas-based texture mapping
         float atlasSize = 16.0;
         float cellSize = 1.0 / atlasSize;
-        int atlasLookup = int(aMaterial) * 6 + faceIdx;
+        int atlasLookup = int(aMaterial) * 6 + texFace;
         int textureIndex = 0;
         if (atlasLookup >= 0 && atlasLookup < (kBlockTypeCount * 6)) {
             textureIndex = uAtlasIndices[atlasLookup];
@@ -121,5 +138,6 @@ void main() {
     vAO = float(aAO) / 3.0;
     
     // Extract sky light from data field (lower 4 bits for non-water blocks)
+    // Bits 4-5 contain face rotation (already extracted above)
     vSkyLight = float(aData & 0xFu) / 15.0;
 }

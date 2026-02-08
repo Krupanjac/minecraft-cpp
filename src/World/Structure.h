@@ -56,6 +56,7 @@ public:
     
     // Querying
     BlockType getBlock(const glm::ivec3& pos) const;
+    uint8_t getBlockMetadata(const glm::ivec3& pos) const;
     bool hasBlock(const glm::ivec3& pos) const;
     const std::vector<StructureBlock>& getBlocks() const { return m_blocks; }
     const std::vector<StructureMarker>& getMarkers() const { return m_markers; }

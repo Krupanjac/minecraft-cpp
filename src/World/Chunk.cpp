@@ -17,7 +17,7 @@ void Chunk::setBlock(int x, int y, int z, Block block) {
         return;
     }
     int idx = getIndex(x, y, z);
-    if (blocks[idx].getType() != block.getType()) {
+    if (blocks[idx] != block) {
         blocks[idx] = block;
         dirty = true;
         modified = true;

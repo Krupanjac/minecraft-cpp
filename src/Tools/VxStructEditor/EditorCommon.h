@@ -48,6 +48,18 @@
 enum class MoveAxis { FREE, X, Y, Z };
 
 // ============================================================================
+// Rotation Axis
+// ============================================================================
+
+enum class RotationAxis { X, Y, Z };
+
+// ============================================================================
+// Rotation Pivot Mode
+// ============================================================================
+
+enum class RotationPivot { BOUNDING_CENTER, ORIGIN, CUSTOM };
+
+// ============================================================================
 // Editor Settings (persisted to editor_settings.ini)
 // ============================================================================
 
@@ -124,6 +136,20 @@ void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset
 void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset,
                           const glm::vec3& color, BlockType type, int textureMode,
                           const std::unordered_map<std::string, int>* pbrMap = nullptr);
+
+// Generate cube vertices with texture UVs + face rotation from metadata
+// metadata bits 0-1: Y-axis rotation (0=0, 1=90, 2=180, 3=270 degrees)
+void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset,
+                          const glm::vec3& color, BlockType type, int textureMode,
+                          uint8_t metadata,
+                          const std::unordered_map<std::string, int>* pbrMap = nullptr);
+
+// Metadata helpers for block face rotation
+// Face rotation is stored in the lower 2 bits of metadata (0-3 = 0/90/180/270 deg around Y)
+inline uint8_t getBlockFaceRotation(uint8_t metadata) { return metadata & 0x03; }
+inline uint8_t setBlockFaceRotation(uint8_t metadata, uint8_t rotation) {
+    return (metadata & 0xFC) | (rotation & 0x03);
+}
 
 // ============================================================================
 // Orbit Camera

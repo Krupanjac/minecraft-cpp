@@ -261,12 +261,17 @@ void VxStructEditor::mouseButtonCallback(GLFWwindow* window, int button, int act
                         // Always update anchor on plain click
                         editor->m_selectionAnchor = clickedPos;
                         editor->m_hasSelectionAnchor = true;
+                        // Reset move tracking on new selection
+                        editor->m_hasMoveOrigin = false;
+                        editor->m_cumulativeMoveOffset = glm::ivec3(0);
                     }
                 } else {
                     // Clicked empty space: deselect all
                     if (!(mods & GLFW_MOD_SHIFT)) {
                         editor->m_selectedBlocks.clear();
                         editor->m_hasSelectionAnchor = false;
+                        editor->m_hasMoveOrigin = false;
+                        editor->m_cumulativeMoveOffset = glm::ivec3(0);
                     }
                 }
                 break;
@@ -287,13 +292,27 @@ void VxStructEditor::keyCallback(GLFWwindow* window, int key, int /*scancode*/, 
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantCaptureKeyboard) return;
 
-    if (action != GLFW_PRESS) return;
+    if (action != GLFW_PRESS && action != GLFW_REPEAT) return;
 
     bool ctrl = (mods & GLFW_MOD_CONTROL) != 0;
     bool shift = (mods & GLFW_MOD_SHIFT) != 0;
+    bool isRepeat = (action == GLFW_REPEAT);
 
     // Tool selection (no modifiers)
     if (!ctrl && !shift) {
+        // Arrow/Page keys support key repeat for continuous movement
+        switch (key) {
+            case GLFW_KEY_RIGHT: editor->moveSelectionByOffset(glm::ivec3(1, 0, 0)); break;
+            case GLFW_KEY_LEFT:  editor->moveSelectionByOffset(glm::ivec3(-1, 0, 0)); break;
+            case GLFW_KEY_UP:    editor->moveSelectionByOffset(glm::ivec3(0, 0, -1)); break;
+            case GLFW_KEY_DOWN:  editor->moveSelectionByOffset(glm::ivec3(0, 0, 1)); break;
+            case GLFW_KEY_PAGE_UP:   editor->moveSelectionByOffset(glm::ivec3(0, 1, 0)); break;
+            case GLFW_KEY_PAGE_DOWN: editor->moveSelectionByOffset(glm::ivec3(0, -1, 0)); break;
+            default: break;
+        }
+
+        // Other tool keys only on first press
+        if (!isRepeat) {
         switch (key) {
             case GLFW_KEY_Q: editor->m_currentTool = EditorTool::SELECT; break;
             case GLFW_KEY_1: editor->m_currentTool = EditorTool::PLACE; break;
@@ -305,6 +324,15 @@ void VxStructEditor::keyCallback(GLFWwindow* window, int key, int /*scancode*/, 
             case GLFW_KEY_X: editor->m_showAxes = !editor->m_showAxes; break;
             case GLFW_KEY_DELETE: editor->deleteSelectedBlocks(); break;
             case GLFW_KEY_F1: editor->m_showHelpWindow = !editor->m_showHelpWindow; break;
+            case GLFW_KEY_R: {
+                // R key: rotate block faces (texture rotation) on hovered or selected blocks
+                if (!editor->m_selectedBlocks.empty()) {
+                    editor->rotateSelectedBlocksFaces();
+                } else if (editor->m_hoverHit.hit) {
+                    editor->rotateBlockFaces(editor->m_hoverHit.blockPos);
+                }
+                break;
+            }
             case GLFW_KEY_HOME: {
                 // Reset camera
                 editor->m_camera.distance = 20.0f;
@@ -339,10 +367,11 @@ void VxStructEditor::keyCallback(GLFWwindow* window, int key, int /*scancode*/, 
             }
             default: break;
         }
+        } // end if (!isRepeat)
     }
 
-    // Ctrl + key shortcuts
-    if (ctrl && !shift) {
+    // Ctrl + key shortcuts (only on first press)
+    if (ctrl && !shift && !isRepeat) {
         switch (key) {
             case GLFW_KEY_N: editor->newStructure(); break;
             case GLFW_KEY_O: editor->loadStructure(); break;
@@ -376,8 +405,8 @@ void VxStructEditor::keyCallback(GLFWwindow* window, int key, int /*scancode*/, 
         }
     }
 
-    // Ctrl + Shift shortcuts
-    if (ctrl && shift) {
+    // Ctrl + Shift shortcuts (only on first press)
+    if (ctrl && shift && !isRepeat) {
         switch (key) {
             case GLFW_KEY_S: editor->saveStructureAs(); break;
             case GLFW_KEY_A: editor->deselectAll(); break;

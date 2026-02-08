@@ -35,7 +35,7 @@ struct RoadSegment {
 class RoadNetwork {
 public:
     static constexpr int ROAD_STEP = 4;          // A* grid resolution (blocks)
-    static constexpr float SEARCH_RADIUS = 600.0f; // How far to look for settlements to connect
+    static constexpr float SEARCH_RADIUS = 900.0f; // How far to look for settlements to connect
     static constexpr int MAX_CONNECTIONS = 3;     // Max roads per settlement
     static constexpr int ROAD_HALF_WIDTH = 3;     // Half-width of road (total = 2*3+1 = 7, matches vxstruct)
     static constexpr int CITY_ROAD_HALF_WIDTH = 3; // Same width for city connections (total = 7)
@@ -60,7 +60,7 @@ private:
     };
     struct PairKeyHash {
         size_t operator()(const PairKey& k) const {
-            return std::hash<int64_t>()(k.a) ^ (std::hash<int64_t>()(k.b) << 32);
+            return std::hash<int64_t>()(k.a) ^ (std::hash<int64_t>()(k.b) << 16);
         }
     };
     

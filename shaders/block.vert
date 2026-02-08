@@ -27,6 +27,24 @@ out float vSkyLight;  // Sky light level (0.0 = underground, 1.0 = full sky acce
 out vec4 vFragPosLightSpace;
 out vec4 vCurrentClip;
 out vec4 vPrevClip;
+flat out uint vFaceRot; // Face rotation for UV rotation in fragment shader
+
+const int kBlockTypeCount = 117;
+uniform int uAtlasIndices[kBlockTypeCount * 6];
+
+// Face rotation remap table for Y-axis rotation of side faces
+// Game normals: 0=X+, 1=X-, 2=Y+, 3=Y-, 4=Z+, 5=Z-
+// For each rotation, maps rendered face -> source texture face (side faces only)
+// rot=0: identity
+// rot=1 (90° CW from above):  X+→Z+, X-→Z-, Z+→X-, Z-→X+
+// rot=2 (180°):                X+→X-, X-→X+, Z+→Z-, Z-→Z+
+// rot=3 (270° CW):            X+→Z-, X-→Z+, Z+→X+, Z-→X-
+const int faceRemapTable[4][6] = int[4][6](
+    int[6](0, 1, 2, 3, 4, 5), // rot=0: identity
+    int[6](4, 5, 2, 3, 1, 0), // rot=1: X+←Z+, X-←Z-, Z+←X-, Z-←X+
+    int[6](1, 0, 2, 3, 5, 4), // rot=2: X+←X-, X-←X+, Z+←Z-, Z-←Z+
+    int[6](5, 4, 2, 3, 0, 1)  // rot=3: X+←Z-, X-←Z+, Z+←X+, Z-←X-
+);
 
 void main() {
     vec4 worldPos = uModel * vec4(aPos, 1.0);
@@ -71,28 +89,24 @@ void main() {
     float atlasSize = 16.0;
     float cellSize = 1.0 / atlasSize;
     
-    // Map material to texture index
-    uint textureIndex = aMaterial - 1u; // Default mapping
+    // Extract face rotation from data: bits 4-5
+    uint faceRot = (aData >> 4u) & 3u;
+    vFaceRot = faceRot;
     
-    if (aMaterial == 1u) { // Grass
-        if (aNormal == 2u) textureIndex = 0u;      // Top
-        else if (aNormal == 3u) textureIndex = 2u; // Bottom (Dirt)
-        else textureIndex = 3u;                    // Side
+    // Determine effective face index for texture lookup
+    int faceIdx = int(aNormal);
+    int texFace = faceIdx;
+    if (faceRot != 0u) {
+        texFace = faceRemapTable[faceRot][faceIdx];
     }
-    else if (aMaterial == 2u) textureIndex = 2u;   // Dirt
-    else if (aMaterial == 3u) textureIndex = 1u;   // Stone
-    else if (aMaterial == 4u) textureIndex = 18u;  // Sand
-    else if (aMaterial == 10u) textureIndex = 19u; // Gravel (Minecraft terrain.png index)
-    else if (aMaterial == 6u) textureIndex = 4u;   // Wood (Plank)
-    else if (aMaterial == 7u) textureIndex = 52u;  // Leaves
-    else if (aMaterial == 12u) { // Log
-        if (aNormal == 2u || aNormal == 3u) textureIndex = 21u; // Top/Bottom
-        else textureIndex = 20u; // Side
+    
+    // Use atlas indices uniform for texture lookup
+    int atlasLookup = int(aMaterial) * 6 + texFace;
+    uint textureIndex = 0u;
+    if (atlasLookup >= 0 && atlasLookup < (kBlockTypeCount * 6)) {
+        textureIndex = uint(uAtlasIndices[atlasLookup]);
     }
-    else if (aMaterial == 8u) textureIndex = 240u;  // Snow
-    else if (aMaterial == 13u) textureIndex = 39u; // Tall Grass
-    else if (aMaterial == 14u) textureIndex = 12u; // Rose
-    else if (aMaterial == 11u) textureIndex = 192u; // Sandstone
+    if (int(textureIndex) < 0) textureIndex = 0u;
     
     float col = float(textureIndex % 16u);
     float row = float(textureIndex / 16u);
@@ -107,6 +121,7 @@ void main() {
     vAO = float(aAO) / 3.0;
     
     // Extract sky light from data field (lower 4 bits for non-water blocks)
+    // Bits 4-5 contain face rotation (already extracted above)
     // For water blocks, this will be 0 (water uses data for level/flags) but water 
     // is rendered separately and always gets daylight
     vSkyLight = float(aData & 0xFu) / 15.0;

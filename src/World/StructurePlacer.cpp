@@ -270,8 +270,8 @@ void StructurePlacer::placeStructuresInChunk(std::shared_ptr<Chunk> chunk,
             int localX = worldX - chunkMinX;
             int localZ = worldZ - chunkMinZ;
             
-            // Set block in chunk
-            chunk->setBlock(localX, worldY, localZ, block.type);
+            // Set block in chunk (preserve metadata for face rotation etc.)
+            chunk->setBlock(localX, worldY, localZ, Block(block.type, block.metadata));
         }
     }
 }

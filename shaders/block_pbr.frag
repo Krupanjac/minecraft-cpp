@@ -6,6 +6,7 @@ in vec2 vTexCoord;
 flat in vec2 vCellOrigin;
 flat in uint vMaterial;
 flat in int vFace;
+flat in uint vFaceRot; // Face rotation for UV rotation
 in float vAO;
 in float vSkyLight;  // Sky light level (0.0 = underground, 1.0 = full sky access)
 in vec3 vTangent;
@@ -228,6 +229,14 @@ void main() {
         // Sample from texture arrays with texel inset to prevent edge bleeding
         vec2 uv = fract(vTexCoord);
         
+        // Apply face rotation UV for top/bottom faces
+        if (vFaceRot != 0u && abs(vNormal.y) > 0.5) {
+            vec2 c = uv - 0.5;
+            if (vFaceRot == 1u) uv = vec2(-c.y + 0.5, c.x + 0.5);
+            else if (vFaceRot == 2u) uv = vec2(-c.x + 0.5, -c.y + 0.5);
+            else uv = vec2(c.y + 0.5, -c.x + 0.5);
+        }
+        
         // Apply half-texel inset to prevent sampling outside the texture
         // This fixes the small gaps/seams between block faces
         float texSize = 128.0;  // Texture array resolution
@@ -320,6 +329,15 @@ void main() {
         vec2 texel = 1.0 / vec2(textureSize(uTexture, 0));
         
         vec2 localUV = fract(vTexCoord);
+        
+        // Apply face rotation UV for top/bottom faces
+        if (vFaceRot != 0u && abs(vNormal.y) > 0.5) {
+            vec2 c = localUV - 0.5;
+            if (vFaceRot == 1u) localUV = vec2(-c.y + 0.5, c.x + 0.5);
+            else if (vFaceRot == 2u) localUV = vec2(-c.x + 0.5, -c.y + 0.5);
+            else localUV = vec2(c.y + 0.5, -c.x + 0.5);
+        }
+        
         vec2 uv = vCellOrigin + localUV * (vec2(cellSize) - 2.0 * texel) + texel;
         
         vec4 texColor = textureLod(uTexture, uv, 0.0);

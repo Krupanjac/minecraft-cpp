@@ -97,8 +97,42 @@ void VxStructEditor::renderMenuBar() {
             if (ImGui::MenuItem("Delete Selected", "Delete", false, !m_selectedBlocks.empty())) deleteSelectedBlocks();
             if (ImGui::MenuItem("Fill Selection", "Ctrl+F", false, !m_selectedBlocks.empty())) fillSelection(m_selectedBlock);
             ImGui::Separator();
+            if (ImGui::BeginMenu("Rotation Axis")) {
+                bool isX = (m_rotationAxis == RotationAxis::X);
+                bool isY = (m_rotationAxis == RotationAxis::Y);
+                bool isZ = (m_rotationAxis == RotationAxis::Z);
+                if (ImGui::MenuItem("X Axis", nullptr, isX)) m_rotationAxis = RotationAxis::X;
+                if (ImGui::MenuItem("Y Axis", nullptr, isY)) m_rotationAxis = RotationAxis::Y;
+                if (ImGui::MenuItem("Z Axis", nullptr, isZ)) m_rotationAxis = RotationAxis::Z;
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Rotation Pivot")) {
+                bool isCenter = (m_rotationPivot == RotationPivot::BOUNDING_CENTER);
+                bool isOrigin = (m_rotationPivot == RotationPivot::ORIGIN);
+                bool isCustom = (m_rotationPivot == RotationPivot::CUSTOM);
+                if (ImGui::MenuItem("Bounding Center", nullptr, isCenter)) m_rotationPivot = RotationPivot::BOUNDING_CENTER;
+                if (ImGui::MenuItem("World Origin (0,0,0)", nullptr, isOrigin)) m_rotationPivot = RotationPivot::ORIGIN;
+                if (ImGui::MenuItem("Custom Pivot", nullptr, isCustom)) m_rotationPivot = RotationPivot::CUSTOM;
+                ImGui::EndMenu();
+            }
+            if (ImGui::MenuItem("Rotate Block Faces 90 CW", "R", false, (m_hasHover && m_hoverHit.hit) || !m_selectedBlocks.empty()))
+            {
+                if (!m_selectedBlocks.empty()) rotateSelectedBlocksFaces();
+                else if (m_hasHover && m_hoverHit.hit) rotateBlockFaces(m_hoverHit.blockPos);
+            }
+            ImGui::Separator();
             if (ImGui::MenuItem("Rotate Structure 90", "Ctrl+R")) rotateStructure();
             if (ImGui::MenuItem("Rotate Selection 90", "Ctrl+Shift+R", false, !m_selectedBlocks.empty())) rotateSelection();
+            ImGui::Separator();
+            if (ImGui::BeginMenu("Move Selection", !m_selectedBlocks.empty())) {
+                if (ImGui::MenuItem("Move +X (1 block)")) moveSelectionByOffset(glm::ivec3(1, 0, 0));
+                if (ImGui::MenuItem("Move -X (1 block)")) moveSelectionByOffset(glm::ivec3(-1, 0, 0));
+                if (ImGui::MenuItem("Move +Y (1 block)")) moveSelectionByOffset(glm::ivec3(0, 1, 0));
+                if (ImGui::MenuItem("Move -Y (1 block)")) moveSelectionByOffset(glm::ivec3(0, -1, 0));
+                if (ImGui::MenuItem("Move +Z (1 block)")) moveSelectionByOffset(glm::ivec3(0, 0, 1));
+                if (ImGui::MenuItem("Move -Z (1 block)")) moveSelectionByOffset(glm::ivec3(0, 0, -1));
+                ImGui::EndMenu();
+            }
             ImGui::Separator();
             if (ImGui::MenuItem("Clear All Blocks")) {
                 EditorAction action;
@@ -443,6 +477,10 @@ void VxStructEditor::renderStructureInfo() {
             ImGui::Text("Hover Block: (%d, %d, %d)",
                         m_hoverHit.blockPos.x, m_hoverHit.blockPos.y, m_hoverHit.blockPos.z);
             ImGui::Text("Block Type: %s", getBlockName(bt));
+            uint8_t meta = m_structure.getBlockMetadata(m_hoverHit.blockPos);
+            int faceRot = getBlockFaceRotation(meta);
+            const char* rotLabels[] = {"0", "90", "180", "270"};
+            ImGui::Text("Face Rotation: %s deg", rotLabels[faceRot & 3]);
         }
         ImGui::Text("Place Pos: (%d, %d, %d)",
                     m_hoverPlacePos.x, m_hoverPlacePos.y, m_hoverPlacePos.z);
@@ -536,7 +574,118 @@ void VxStructEditor::renderSelectionPanel() {
     if (ImGui::Button("Cut (Ctrl+X)", ImVec2(-1, 0))) cutSelection();
     if (ImGui::Button("Duplicate (Ctrl+D)", ImVec2(-1, 0))) duplicateSelection();
     if (ImGui::Button("Delete (Del)", ImVec2(-1, 0))) deleteSelectedBlocks();
+
+    // ---- Face Rotation Section (in-place texture rotation) ----
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.8f, 1.0f), "Face Rotation [R]:");
+    ImGui::TextWrapped("Rotates block textures in-place (which face points where).");
+    if (ImGui::Button("Rotate Faces 90 CW (R)", ImVec2(-1, 0))) rotateSelectedBlocksFaces();
+
+    // ---- Spatial Rotation Section ----
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.3f, 1.0f), "Spatial Rotation (90 deg):");
+    ImGui::TextWrapped("Moves blocks to new positions around a pivot.");
+
+    ImGui::Text("Axis:");
+    int rotAxisInt = static_cast<int>(m_rotationAxis);
+    ImGui::RadioButton("X##rotaxis", &rotAxisInt, 0); ImGui::SameLine();
+    ImGui::RadioButton("Y##rotaxis", &rotAxisInt, 1); ImGui::SameLine();
+    ImGui::RadioButton("Z##rotaxis", &rotAxisInt, 2);
+    m_rotationAxis = static_cast<RotationAxis>(rotAxisInt);
+
+    ImGui::Text("Pivot:");
+    int pivotInt = static_cast<int>(m_rotationPivot);
+    ImGui::RadioButton("Center##pivot", &pivotInt, 0); ImGui::SameLine();
+    ImGui::RadioButton("Origin##pivot", &pivotInt, 1); ImGui::SameLine();
+    ImGui::RadioButton("Custom##pivot", &pivotInt, 2);
+    m_rotationPivot = static_cast<RotationPivot>(pivotInt);
+
+    if (m_rotationPivot == RotationPivot::CUSTOM) {
+        ImGui::SetNextItemWidth(-1);
+        ImGui::DragInt3("##custompivot", &m_customPivot.x, 1.0f);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Custom rotation pivot (X, Y, Z)");
+    }
+
     if (ImGui::Button("Rotate Selection (Ctrl+Shift+R)", ImVec2(-1, 0))) rotateSelection();
+    if (ImGui::Button("Rotate Entire Structure (Ctrl+R)", ImVec2(-1, 0))) rotateStructure();
+
+    // ---- Block-Based Move Section ----
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0.3f, 0.9f, 0.5f, 1.0f), "Move Selection (block-based):");
+
+    // Cumulative offset display (Blender-style)
+    if (m_hasMoveOrigin && m_cumulativeMoveOffset != glm::ivec3(0)) {
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Total Offset: (%d, %d, %d)",
+            m_cumulativeMoveOffset.x, m_cumulativeMoveOffset.y, m_cumulativeMoveOffset.z);
+        if (ImGui::SmallButton("Reset Tracking")) {
+            m_hasMoveOrigin = false;
+            m_cumulativeMoveOffset = glm::ivec3(0);
+        }
+    }
+
+    // Draggable X/Y/Z offsets (Blender-style DragInt)
+    int dragX = 0, dragY = 0, dragZ = 0;
+
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.4f, 0.1f, 0.1f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.6f, 0.15f, 0.15f, 0.7f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.8f, 0.2f, 0.2f, 0.9f));
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::DragInt("##dragMoveX", &dragX, 0.3f, 0, 0, "X: %d (drag)")) {
+        if (dragX != 0) moveSelectionByOffset(glm::ivec3(dragX, 0, 0));
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit()) dragX = 0;
+    ImGui::PopStyleColor(3);
+
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.35f, 0.1f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.15f, 0.5f, 0.15f, 0.7f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.2f, 0.7f, 0.2f, 0.9f));
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::DragInt("##dragMoveY", &dragY, 0.3f, 0, 0, "Y: %d (drag)")) {
+        if (dragY != 0) moveSelectionByOffset(glm::ivec3(0, dragY, 0));
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit()) dragY = 0;
+    ImGui::PopStyleColor(3);
+
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.15f, 0.4f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.15f, 0.2f, 0.6f, 0.7f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.2f, 0.3f, 0.8f, 0.9f));
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::DragInt("##dragMoveZ", &dragZ, 0.3f, 0, 0, "Z: %d (drag)")) {
+        if (dragZ != 0) moveSelectionByOffset(glm::ivec3(0, 0, dragZ));
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit()) dragZ = 0;
+    ImGui::PopStyleColor(3);
+
+    ImGui::Spacing();
+
+    // +/- buttons for precise 1-block movement
+    ImGui::Text("Step Move:");
+    if (ImGui::Button("-X", ImVec2(38, 22))) moveSelectionByOffset(glm::ivec3(-1, 0, 0));
+    ImGui::SameLine();
+    if (ImGui::Button("+X", ImVec2(38, 22))) moveSelectionByOffset(glm::ivec3(1, 0, 0));
+    ImGui::SameLine();
+    if (ImGui::Button("-Y", ImVec2(38, 22))) moveSelectionByOffset(glm::ivec3(0, -1, 0));
+    ImGui::SameLine();
+    if (ImGui::Button("+Y", ImVec2(38, 22))) moveSelectionByOffset(glm::ivec3(0, 1, 0));
+    ImGui::SameLine();
+    if (ImGui::Button("-Z", ImVec2(38, 22))) moveSelectionByOffset(glm::ivec3(0, 0, -1));
+    ImGui::SameLine();
+    if (ImGui::Button("+Z", ImVec2(38, 22))) moveSelectionByOffset(glm::ivec3(0, 0, 1));
+
+    // Custom offset input + apply
+    ImGui::Text("Custom Offset:");
+    ImGui::SetNextItemWidth(-1);
+    int customOff[3] = { m_moveOffsetX, m_moveOffsetY, m_moveOffsetZ };
+    if (ImGui::InputInt3("##customOffset", customOff)) {
+        m_moveOffsetX = customOff[0];
+        m_moveOffsetY = customOff[1];
+        m_moveOffsetZ = customOff[2];
+    }
+    if (ImGui::Button("Apply Offset", ImVec2(-1, 0))) {
+        glm::ivec3 offset(m_moveOffsetX, m_moveOffsetY, m_moveOffsetZ);
+        moveSelectionByOffset(offset);
+        m_moveOffsetX = m_moveOffsetY = m_moveOffsetZ = 0;
+    }
 
     ImGui::Separator();
     ImGui::Text("Fill with current block:");
@@ -620,10 +769,15 @@ void VxStructEditor::renderHelpWindow() {
         ImGui::BulletText("Ctrl + M     - Move clipboard to cursor");
         ImGui::BulletText("  (Set axis: Free/X/Y/Z in Selection panel)");
         ImGui::BulletText("Ctrl + D     - Duplicate selection");
-        ImGui::BulletText("Ctrl + R     - Rotate entire structure 90 deg");
-        ImGui::BulletText("Ctrl+Shift+R - Rotate selection 90 deg");
+        ImGui::BulletText("R            - Rotate block faces 90 deg CW");
+        ImGui::BulletText("  (In-place texture rotation, hovered or selected)");
+        ImGui::BulletText("Ctrl + R     - Rotate structure 90 deg (spatial)");
+        ImGui::BulletText("Ctrl+Shift+R - Rotate selection 90 deg (spatial)");
+        ImGui::BulletText("  (Set rotation axis: X/Y/Z in Selection panel)");
         ImGui::BulletText("Ctrl + F     - Fill selection with current block");
         ImGui::BulletText("Delete       - Delete selected blocks");
+        ImGui::BulletText("Arrow Keys   - Move selection +/- X/Z (1 block)");
+        ImGui::BulletText("PgUp/PgDn    - Move selection +/- Y (1 block)");
     }
 
     if (ImGui::CollapsingHeader("File", ImGuiTreeNodeFlags_DefaultOpen)) {

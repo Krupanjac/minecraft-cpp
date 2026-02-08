@@ -5,6 +5,7 @@ in vec3 vNormal;
 in vec2 vTexCoord;
 flat in vec2 vCellOrigin;
 flat in uint vMaterial;
+flat in uint vFaceRot; // Face rotation (0-3) for top/bottom UV rotation
 in float vAO;
 in float vSkyLight;  // Sky light level (0.0 = underground, 1.0 = full sky access)
 
@@ -121,6 +122,17 @@ void main() {
     
     // Inset UVs by 1 texel to prevent atlas bleeding (gaps between block faces)
     vec2 localUV = fract(vTexCoord);
+    
+    // Apply UV rotation for top/bottom faces when block has face rotation
+    // Top face: vNormal.y > 0.5, Bottom face: vNormal.y < -0.5
+    if (vFaceRot != 0u && abs(vNormal.y) > 0.5) {
+        // Rotate localUV around (0.5, 0.5) by faceRot * 90 degrees CW
+        vec2 c = localUV - 0.5;
+        if (vFaceRot == 1u) localUV = vec2(-c.y + 0.5, c.x + 0.5);  // 90 CW
+        else if (vFaceRot == 2u) localUV = vec2(-c.x + 0.5, -c.y + 0.5); // 180
+        else localUV = vec2(c.y + 0.5, -c.x + 0.5); // 270 CW
+    }
+    
     vec2 uv = vCellOrigin + localUV * (vec2(cellSize) - 2.0 * texel) + texel;
     
     vec4 texColor = textureLod(uTexture, uv, 0.0);

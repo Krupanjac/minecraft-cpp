@@ -451,12 +451,15 @@ void MeshBuilder::addQuad(const Quad& quad, MeshData& meshData) {
             if (isTop(y3)) data3 |= 0x10;
         }
     } else {
-        // For non-water blocks, store sky light in the data field (lower 4 bits)
+        // For non-water blocks: bits 0-3 = sky light, bits 4-5 = face rotation
         // Sky light is 0-15, where 15 = full sky access, 0 = underground
-        data0 = quad.skyLight;
-        data1 = quad.skyLight;
-        data2 = quad.skyLight;
-        data3 = quad.skyLight;
+        // Face rotation (from metadata) is in bits 0-1 of quad.data
+        u8 faceRot = (quad.data & 0x03);
+        u8 packedData = quad.skyLight | (faceRot << 4);
+        data0 = packedData;
+        data1 = packedData;
+        data2 = packedData;
+        data3 = packedData;
     }
     
     // Pass dimensions (w, h) as UVs for tiling

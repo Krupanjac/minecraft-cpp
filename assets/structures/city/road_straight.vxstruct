@@ -5,18 +5,6 @@
       "type": "road_middle_lines",
       "x": 1,
       "y": 0,
-      "z": 0
-    },
-    {
-      "type": "road_middle_lines",
-      "x": 1,
-      "y": 0,
-      "z": 1
-    },
-    {
-      "type": "road_middle_lines",
-      "x": 1,
-      "y": 0,
       "z": 2
     },
     {
@@ -159,6 +147,144 @@
     },
     {
       "type": "glazed_terracotta",
+      "x": 4,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 4,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 4,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 4,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 4,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 4,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "glazed_terracotta",
+      "x": 4,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "type": "stone_bricks",
+      "x": 6,
+      "y": 0,
+      "z": 6
+    },
+    {
+      "type": "road_middle_lines",
+      "x": 1,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "road_middle_lines",
+      "x": 1,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "type": "stone_bricks",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "type": "glazed_terracotta",
       "x": 2,
       "y": 0,
       "z": 1
@@ -168,151 +294,10 @@
       "x": 2,
       "y": 0,
       "z": 0
-    },
-    {
-      "type": "glazed_terracotta",
-      "x": 4,
-      "y": 0,
-      "z": 6
-    },
-    {
-      "type": "glazed_terracotta",
-      "x": 4,
-      "y": 0,
-      "z": 5
-    },
-    {
-      "type": "glazed_terracotta",
-      "x": 4,
-      "y": 0,
-      "z": 4
-    },
-    {
-      "type": "glazed_terracotta",
-      "x": 4,
-      "y": 0,
-      "z": 3
-    },
-    {
-      "type": "glazed_terracotta",
-      "x": 4,
-      "y": 0,
-      "z": 2
-    },
-    {
-      "type": "glazed_terracotta",
-      "x": 4,
-      "y": 0,
-      "z": 1
-    },
-    {
-      "type": "glazed_terracotta",
-      "x": 4,
-      "y": 0,
-      "z": 0
-    },
-    {
-      "type": "stone_bricks",
-      "x": 0,
-      "y": 0,
-      "z": 0
-    },
-    {
-      "type": "stone_bricks",
-      "x": 0,
-      "y": 0,
-      "z": 2
-    },
-    {
-      "type": "stone_bricks",
-      "x": 0,
-      "y": 0,
-      "z": 1
-    },
-    {
-      "type": "stone_bricks",
-      "x": 0,
-      "y": 0,
-      "z": 6
-    },
-    {
-      "type": "stone_bricks",
-      "x": 0,
-      "y": 0,
-      "z": 5
-    },
-    {
-      "type": "stone_bricks",
-      "x": 0,
-      "y": 0,
-      "z": 4
-    },
-    {
-      "type": "stone_bricks",
-      "x": 0,
-      "y": 0,
-      "z": 3
-    },
-    {
-      "type": "stone_bricks",
-      "x": 6,
-      "y": 0,
-      "z": 0
-    },
-    {
-      "type": "stone_bricks",
-      "x": 6,
-      "y": 0,
-      "z": 1
-    },
-    {
-      "type": "stone_bricks",
-      "x": 6,
-      "y": 0,
-      "z": 2
-    },
-    {
-      "type": "stone_bricks",
-      "x": 6,
-      "y": 0,
-      "z": 3
-    },
-    {
-      "type": "stone_bricks",
-      "x": 6,
-      "y": 0,
-      "z": 4
-    },
-    {
-      "type": "stone_bricks",
-      "x": 6,
-      "y": 0,
-      "z": 5
-    },
-    {
-      "type": "stone_bricks",
-      "x": 6,
-      "y": 0,
-      "z": 6
     }
   ],
   "category": "city_road",
-  "markers": [
-    {
-      "data": "north",
-      "type": "road_connection",
-      "x": 3,
-      "y": 0,
-      "z": 0
-    },
-    {
-      "data": "south",
-      "type": "road_connection",
-      "x": 3,
-      "y": 0,
-      "z": 6
-    }
-  ],
+  "markers": [],
   "min_ground_coverage": 0.5,
   "name": "City Road Straight",
   "requires_flat": false,

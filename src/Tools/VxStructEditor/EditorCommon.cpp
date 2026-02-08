@@ -322,6 +322,139 @@ void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset
     }
 }
 
+// Textured + metadata overload: rotates cube faces based on metadata bits 0-1
+// Rotation is around Y axis: 0=0°, 1=90°CW, 2=180°, 3=270°CW (looking down)
+// This remaps which side face gets which texture, and rotates top/bottom UVs
+void generateCubeVertices(std::vector<Vertex>& vertices, const glm::vec3& offset,
+                          const glm::vec3& color, BlockType type, int textureMode,
+                          uint8_t metadata,
+                          const std::unordered_map<std::string, int>* pbrMap) {
+    uint8_t faceRot = getBlockFaceRotation(metadata);
+
+    // If no rotation, delegate to the simpler overload
+    if (faceRot == 0) {
+        generateCubeVertices(vertices, offset, color, type, textureMode, pbrMap);
+        return;
+    }
+
+    // Face definitions: positions + normals (same geometry always)
+    struct Face {
+        glm::vec3 v[4];
+        glm::vec3 normal;
+    };
+
+    Face faces[6] = {
+        // Front (+Z)   BL       BR       TR       TL
+        {{{0,0,1}, {1,0,1}, {1,1,1}, {0,1,1}}, {0,0,1}},
+        // Back (-Z)
+        {{{1,0,0}, {0,0,0}, {0,1,0}, {1,1,0}}, {0,0,-1}},
+        // Right (+X)
+        {{{1,0,1}, {1,0,0}, {1,1,0}, {1,1,1}}, {1,0,0}},
+        // Left (-X)
+        {{{0,0,0}, {0,0,1}, {0,1,1}, {0,1,0}}, {-1,0,0}},
+        // Top (+Y)
+        {{{0,1,1}, {1,1,1}, {1,1,0}, {0,1,0}}, {0,1,0}},
+        // Bottom (-Y)
+        {{{0,0,0}, {1,0,0}, {1,0,1}, {0,0,1}}, {0,-1,0}},
+    };
+
+    // Face indices: 0=Front(+Z), 1=Back(-Z), 2=Right(+X), 3=Left(-X), 4=Top, 5=Bottom
+    // For Y-axis rotation, side faces remap. Top/bottom geometry stays but UVs rotate.
+    //
+    // Rotation maps (which original face's TEXTURE appears on which rendered face):
+    //   rot=0: Front=Front, Back=Back,   Right=Right, Left=Left
+    //   rot=1: Front=Left,  Back=Right,  Right=Front, Left=Back   (90° CW viewed from above)
+    //   rot=2: Front=Back,  Back=Front,  Right=Left,  Left=Right  (180°)
+    //   rot=3: Front=Right, Back=Left,   Right=Back,  Left=Front  (270° CW)
+    //
+    // texSource[i] = which original face's texture to use for rendered face i
+    static const int texSourceMap[4][4] = {
+        {0, 1, 2, 3}, // rot=0: identity
+        {3, 2, 0, 1}, // rot=1 (90° CW): Front gets Left's tex, Back gets Right's, Right gets Front's, Left gets Back's
+        {1, 0, 3, 2}, // rot=2 (180°)
+        {2, 3, 1, 0}, // rot=3 (270° CW)
+    };
+
+    // UV rotation for top/bottom faces (rotate UVs by 90° increments)
+    // base UVs: BL(0,0), BR(1,0), TR(1,1), TL(0,1)
+    // After 90° CW rotation: BL→(0,1), BR→(0,0), TR→(1,0), TL→(1,1)
+    static const glm::vec2 rotatedUVs[4][4] = {
+        {{0,0}, {1,0}, {1,1}, {0,1}}, // 0°
+        {{0,1}, {0,0}, {1,0}, {1,1}}, // 90° CW
+        {{1,1}, {0,1}, {0,0}, {1,0}}, // 180°
+        {{1,0}, {1,1}, {0,1}, {0,0}}, // 270° CW
+    };
+
+    const glm::vec2 baseUV[4] = {{0,0},{1,0},{1,1},{0,1}};
+
+    // Original face categories: 0=Front(side), 1=Back(side), 2=Right(side), 3=Left(side), 4=Top, 5=Bottom
+    // faceCategory: 0=top, 1=side, 2=bottom
+    int origFaceCategory[6] = {1, 1, 1, 1, 0, 2};
+
+    for (int i = 0; i < 6; i++) {
+        auto& face = faces[i];
+
+        // Determine which original face's texture to sample
+        int texFace;
+        const glm::vec2* uvSet;
+
+        if (i < 4) {
+            // Side face: remap texture source based on rotation
+            texFace = texSourceMap[faceRot][i];
+            uvSet = baseUV;
+        } else {
+            // Top (4) or Bottom (5): same texture category, but rotate UVs
+            texFace = i;
+            uvSet = rotatedUVs[faceRot];
+        }
+
+        int faceCategory = origFaceCategory[texFace];
+        glm::vec2 uv[4];
+        float layer = -1.0f;
+        glm::vec3 tint = {1.0f, 1.0f, 1.0f};
+
+        if (textureMode == 1) {
+            int atlasIdx = getBlockTextureIndex(type, faceCategory);
+            float cs = 1.0f / 16.0f;
+            int col = atlasIdx % 16;
+            int row = atlasIdx / 16;
+            float cellU0 = col * cs;
+            float cellU1 = (col + 1) * cs;
+            float cellV0 = 1.0f - (row + 1) * cs;
+            float cellV1 = 1.0f - row * cs;
+            float texel = 0.5f / 256.0f;
+            cellU0 += texel; cellV0 += texel;
+            cellU1 -= texel; cellV1 -= texel;
+            for (int j = 0; j < 4; j++) {
+                float u = cellU0 + uvSet[j].x * (cellU1 - cellU0);
+                float v = cellV0 + uvSet[j].y * (cellV1 - cellV0);
+                uv[j] = {u, v};
+            }
+            if (type == BlockType::GRASS && faceCategory == 0) {
+                tint = {0.49f, 0.78f, 0.30f};
+            } else if (type == BlockType::OAK_LEAVES || type == BlockType::BIRCH_LEAVES ||
+                       type == BlockType::JUNGLE_LEAVES || type == BlockType::SPRUCE_LEAVES) {
+                tint = {0.40f, 0.65f, 0.20f};
+            }
+        } else if (textureMode == 2 && pbrMap) {
+            for (int j = 0; j < 4; j++) {
+                uv[j] = uvSet[j];
+            }
+            layer = (float)getPBRTextureLayer(type, faceCategory, *pbrMap);
+        } else {
+            for (int j = 0; j < 4; j++) uv[j] = uvSet[j];
+            tint = color;
+        }
+
+        vertices.push_back({face.v[0] + offset, face.normal, tint, uv[0], layer});
+        vertices.push_back({face.v[1] + offset, face.normal, tint, uv[1], layer});
+        vertices.push_back({face.v[2] + offset, face.normal, tint, uv[2], layer});
+        vertices.push_back({face.v[0] + offset, face.normal, tint, uv[0], layer});
+        vertices.push_back({face.v[2] + offset, face.normal, tint, uv[2], layer});
+        vertices.push_back({face.v[3] + offset, face.normal, tint, uv[3], layer});
+    }
+}
+
 // ============================================================================
 // Orbit Camera
 // ============================================================================

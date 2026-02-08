@@ -443,6 +443,15 @@ BlockType Structure::getBlock(const glm::ivec3& pos) const {
     return BlockType::AIR;
 }
 
+uint8_t Structure::getBlockMetadata(const glm::ivec3& pos) const {
+    for (const auto& block : m_blocks) {
+        if (block.position == pos) {
+            return block.metadata;
+        }
+    }
+    return 0;
+}
+
 bool Structure::hasBlock(const glm::ivec3& pos) const {
     for (const auto& block : m_blocks) {
         if (block.position == pos) {
@@ -476,6 +485,13 @@ std::vector<StructureBlock> Structure::getRotatedBlocks(int rotation) const {
         }
         
         block.position = glm::ivec3(glm::round(pos + center));
+        
+        // Also rotate face rotation metadata to match the spatial rotation
+        // Face rotation is stored in bits 0-1 of metadata (0-3 = 0/90/180/270 deg)
+        uint8_t faceRot = block.metadata & 0x03;
+        uint8_t otherBits = block.metadata & ~0x03;
+        faceRot = (faceRot + rotation) & 0x03;
+        block.metadata = otherBits | faceRot;
     }
     
     return rotated;

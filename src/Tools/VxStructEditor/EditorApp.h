@@ -127,9 +127,22 @@ private:
 
     // --- Rotation ---
     int m_rotationAngle = 0;
+    RotationAxis m_rotationAxis = RotationAxis::Y;
+    RotationPivot m_rotationPivot = RotationPivot::BOUNDING_CENTER;
+    glm::ivec3 m_customPivot = {0, 0, 0};
 
     // --- Move axis constraint ---
     MoveAxis m_moveAxis = MoveAxis::FREE;
+
+    // --- Block-based move offset (for GUI move tool) ---
+    int m_moveOffsetX = 0;
+    int m_moveOffsetY = 0;
+    int m_moveOffsetZ = 0;
+
+    // --- Cumulative move tracking (Blender-style visible offset) ---
+    glm::ivec3 m_cumulativeMoveOffset = {0, 0, 0};
+    glm::ivec3 m_moveOriginCenter = {0, 0, 0}; // center of selection when move started
+    bool m_hasMoveOrigin = false;
 
     // --- Block atlas texture ---
     GLuint m_atlasTexture = 0;
@@ -168,6 +181,8 @@ private:
     // ---- Rendering ----
     void render();
     void renderSelectionHighlights();
+    void renderPivotMarker();
+    void renderMoveOffsetIndicator();
 
     // ---- UI ----
     void renderUI();
@@ -211,6 +226,11 @@ private:
     void selectRange(const glm::ivec3& from, const glm::ivec3& to);
     void rotateStructure();
     void rotateSelection();
+    void rotateStructureAroundAxis(RotationAxis axis);
+    void rotateSelectionAroundAxis(RotationAxis axis);
+    void rotateBlockFaces(const glm::ivec3& pos);          // Rotate single block's faces 90° CW
+    void rotateSelectedBlocksFaces();                       // Rotate all selected blocks' faces 90° CW
+    void moveSelectionByOffset(const glm::ivec3& offset);
     void fillSelection(BlockType type);
     void duplicateSelection();
 

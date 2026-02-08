@@ -346,7 +346,7 @@ void VxStructEditor::rebuildBlockMesh() {
         glm::vec3 color = getBlockColor(block.type);
         if (m_textureMode > 0) {
             generateCubeVertices(vertices, glm::vec3(block.position), color,
-                                block.type, m_textureMode,
+                                block.type, m_textureMode, block.metadata,
                                 m_textureMode == 2 ? &m_pbrTextureMap : nullptr);
         } else {
             generateCubeVertices(vertices, glm::vec3(block.position), color);
