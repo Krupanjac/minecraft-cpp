@@ -1227,8 +1227,6 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         auto& registry = StructureRegistry::instance();
         auto allStructures = registry.getAllStructureIds();
         
-        // Sub-grid spacing: cities 6 blocks (many per chunk), villages 16 blocks (1 per chunk)
-        int structSpacing = isCity ? 6 : 16;
         // City block size for road grid (must be consistent between road and structure code)
         int cityBlockSize = 24;  // Bigger city blocks = more room for buildings
         
@@ -1286,7 +1284,9 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     float riverMask = getRiverMask(static_cast<float>(worldFX), static_cast<float>(worldFZ));
                     if (riverMask > 0.25f) continue; // This is a river area, skip flattening
                     
+                    // Skip water/ocean areas — don't create land where there's water
                     int naturalY = getSurfaceHeight(worldFX, worldFZ);
+                    if (naturalY < SEA_LEVEL) continue;
                     
                     // Blend factor: 1.0 inside settlement, fades to 0.0 at edge
                     float blend = 1.0f;
@@ -1404,12 +1404,16 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                     float riverMask = getRiverMask(static_cast<float>(worldRX), static_cast<float>(worldRZ));
                     bool isOnRiver = riverMask > 0.25f;
                     
+                    // Check if road surface would be at or below water level
+                    int terrainHere = getSurfaceHeight(worldRX, worldRZ);
+                    bool isOnWater = (terrainHere < SEA_LEVEL) || isOnRiver;
+                    
                     // Only the 2 main roads through center get bridges
                     bool isMainRoadNS = isRoadX && (std::abs(relX) < roadWidth);
                     bool isMainRoadEW = isRoadZ && (std::abs(relZ) < roadWidth);
-                    bool isBridge = isOnRiver && (isMainRoadNS || isMainRoadEW);
+                    bool isBridge = isOnWater && (isMainRoadNS || isMainRoadEW);
                     
-                    if (isOnRiver && !isBridge) continue; // Skip non-bridge road segments over rivers
+                    if (isOnWater && !isBridge) continue; // Skip non-bridge road segments over water
                     
                     // Determine block type + metadata from vxstruct
                     std::pair<BlockType, uint8_t> roadMatPair;
@@ -1453,21 +1457,18 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             }
         }
         
-        // ---- VILLAGE PATH NETWORK ----
-        // Villages use vxstruct-defined road materials for main roads (7-wide),
-        // and simple DIRT for short connecting paths (side lanes, perimeter ring).
-        // Main roads get bridges over rivers (max 2 bridges per village).
+        // ---- VILLAGE ROAD GRID ----
+        // Simple grid-based roads like cities but smaller spacing.
+        // Uses village vxstruct files for materials.
         if (!isCity) {
-            int centerIX = static_cast<int>(settlementCenterX);
-            int centerIZ = static_cast<int>(settlementCenterZ);
+            int villageBlockSize = 16; // road grid every 16 blocks
+            int roadWidth = 7;         // 7-block wide roads (matches vxstruct)
             
-            // Load village road/bridge vxstructs for material lookup
+            // Load village road/bridge vxstructs
             auto vRoadStraightStruct = registry.getStructure("v_road_straight");
             auto vRoadTurnStruct = registry.getStructure("v_road_turn");
             auto vBridgeStraightStruct = registry.getStructure("v_bridge_straight");
             
-            // Helper: get block type + metadata from a village vxstruct at a given position
-            // Falls back to DIRT (village default) if structure is null or block is AIR
             auto getVxBlock = [](const std::shared_ptr<Structure>& structure, int crossPos, int alongPos) -> std::pair<BlockType, uint8_t> {
                 if (!structure) return {BlockType::DIRT, uint8_t(0)};
                 glm::ivec3 size = structure->getSize();
@@ -1480,296 +1481,105 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                 return {bt, meta};
             };
             
-            // --- Pre-scan for river crossings on main roads (for bridges) ---
-            struct RiverCrossing { float centerCoord; };
-            std::vector<RiverCrossing> crossingsNS;
-            std::vector<RiverCrossing> crossingsEW;
+            int centerIX = static_cast<int>(settlementCenterX);
+            int centerIZ = static_cast<int>(settlementCenterZ);
             
-            // Scan N-S main path for river crossings
-            {
-                bool inRiver = false;
-                int riverStart = 0;
-                for (int scanZ = centerIZ - 45; scanZ <= centerIZ + 45; scanZ++) {
-                    float rm = getRiverMask(static_cast<float>(centerIX), static_cast<float>(scanZ));
-                    if (rm > 0.25f && !inRiver) { inRiver = true; riverStart = scanZ; }
-                    else if (rm <= 0.25f && inRiver) {
-                        inRiver = false;
-                        crossingsNS.push_back({static_cast<float>(riverStart + scanZ) * 0.5f});
-                    }
-                }
-                if (inRiver) crossingsNS.push_back({static_cast<float>(riverStart + centerIZ + 45) * 0.5f});
-            }
-            // Scan E-W main path for river crossings
-            {
-                bool inRiver = false;
-                int riverStart = 0;
-                for (int scanX = centerIX - 45; scanX <= centerIX + 45; scanX++) {
-                    float rm = getRiverMask(static_cast<float>(scanX), static_cast<float>(centerIZ));
-                    if (rm > 0.25f && !inRiver) { inRiver = true; riverStart = scanX; }
-                    else if (rm <= 0.25f && inRiver) {
-                        inRiver = false;
-                        crossingsEW.push_back({static_cast<float>(riverStart + scanX) * 0.5f});
-                    }
-                }
-                if (inRiver) crossingsEW.push_back({static_cast<float>(riverStart + centerIX + 45) * 0.5f});
-            }
-            
-            // Limit to 2 total bridges closest to village center
-            if (static_cast<int>(crossingsNS.size() + crossingsEW.size()) > 2) {
-                struct CrossingInfo { float dist; bool isNS; int index; };
-                std::vector<CrossingInfo> allCrossings;
-                for (int i = 0; i < static_cast<int>(crossingsNS.size()); i++)
-                    allCrossings.push_back({std::abs(crossingsNS[i].centerCoord - static_cast<float>(centerIZ)), true, i});
-                for (int i = 0; i < static_cast<int>(crossingsEW.size()); i++)
-                    allCrossings.push_back({std::abs(crossingsEW[i].centerCoord - static_cast<float>(centerIX)), false, i});
-                std::sort(allCrossings.begin(), allCrossings.end(),
-                    [](const CrossingInfo& a, const CrossingInfo& b) { return a.dist < b.dist; });
-                std::vector<bool> keepNS(crossingsNS.size(), false), keepEW(crossingsEW.size(), false);
-                int kept = 0;
-                for (auto& ci : allCrossings) {
-                    if (kept >= 2) break;
-                    if (ci.isNS) keepNS[ci.index] = true; else keepEW[ci.index] = true;
-                    kept++;
-                }
-                std::vector<RiverCrossing> filteredNS, filteredEW;
-                for (int i = 0; i < static_cast<int>(crossingsNS.size()); i++) if (keepNS[i]) filteredNS.push_back(crossingsNS[i]);
-                for (int i = 0; i < static_cast<int>(crossingsEW.size()); i++) if (keepEW[i]) filteredEW.push_back(crossingsEW[i]);
-                crossingsNS = filteredNS;
-                crossingsEW = filteredEW;
-            }
-            
-            // --- Place paths ---
             for (int lx = 0; lx < CHUNK_SIZE; lx++) {
                 for (int lz = 0; lz < CHUNK_SIZE; lz++) {
-                    int worldPX = chunkBaseX + lx;
-                    int worldPZ = chunkBaseZ + lz;
-                    int relX = worldPX - centerIX;
-                    int relZ = worldPZ - centerIZ;
+                    int worldRX = chunkBaseX + lx;
+                    int worldRZ = chunkBaseZ + lz;
                     
-                    // Distance check - only within village radius
-                    float pdx = static_cast<float>(worldPX) - settlementCenterX;
-                    float pdz = static_cast<float>(worldPZ) - settlementCenterZ;
-                    float pathDist = std::sqrt(pdx * pdx + pdz * pdz);
-                    if (pathDist > 45.0f) continue;
+                    // Distance check — only within village radius
+                    float dx = static_cast<float>(worldRX) - settlementCenterX;
+                    float dz = static_cast<float>(worldRZ) - settlementCenterZ;
+                    float dist = std::sqrt(dx * dx + dz * dz);
+                    if (dist > cityRadius) continue;
                     
-                    // Skip roads over water bodies (ocean/lake) - rivers handled separately via bridges
-                    int waterCheckSurface = getSurfaceHeight(worldPX, worldPZ);
-                    if (waterCheckSurface < SEA_LEVEL - 1) {
-                        float waterCheckRm = getRiverMask(static_cast<float>(worldPX), static_cast<float>(worldPZ));
-                        if (waterCheckRm <= 0.25f) continue; // Not a river → ocean/lake, skip
-                    }
+                    // Offset from settlement center
+                    int relX = worldRX - centerIX;
+                    int relZ = worldRZ - centerIZ;
                     
-                    // === Path type detection ===
-                    // 1. Village square (7x7 center) — uses v_road_turn vxstruct
-                    bool isVillageSquare = (std::abs(relX) <= 3 && std::abs(relZ) <= 3);
+                    // Check if on a road line (modulo villageBlockSize)
+                    int modX = ((relX % villageBlockSize) + villageBlockSize) % villageBlockSize;
+                    int modZ = ((relZ % villageBlockSize) + villageBlockSize) % villageBlockSize;
                     
-                    // 2. Main roads (7 blocks wide through center) — uses v_road_straight vxstruct
-                    bool isMainRoadNS = (std::abs(relX) <= 3); // N-S road
-                    bool isMainRoadEW = (std::abs(relZ) <= 3); // E-W road
-                    bool isMainRoad = isMainRoadNS || isMainRoadEW;
+                    bool isRoadX = modX < roadWidth; // N-S road
+                    bool isRoadZ = modZ < roadWidth; // E-W road
                     
-                    // 3. Perimeter ring road at ~38 blocks from center (3-wide) — dirt path
-                    int perimRoadRadius = 38;
-                    int absRelX = std::abs(relX);
-                    int absRelZ = std::abs(relZ);
-                    int perimDistI = std::max(absRelX, absRelZ);
-                    bool isPerimeterRoad = (perimDistI >= perimRoadRadius - 1 && perimDistI <= perimRoadRadius + 1);
-                    if (isPerimeterRoad && absRelX > perimRoadRadius && absRelZ > perimRoadRadius)
-                        isPerimeterRoad = false;
+                    if (!isRoadX && !isRoadZ) continue;
                     
-                    // 4. Side connecting lanes (1 block wide, every ~16 blocks) — dirt path
-                    int lanePeriod = 16;
-                    int laneModZ = ((relZ % lanePeriod) + lanePeriod) % lanePeriod;
-                    int laneModX = ((relX % lanePeriod) + lanePeriod) % lanePeriod;
-                    bool isSideLaneEW = (laneModZ == 0) && (absRelX > 3) && (absRelX <= perimRoadRadius) && (relZ != 0);
-                    bool isSideLaneNS = (laneModX == 0) && (absRelZ > 3) && (absRelZ <= perimRoadRadius) && (relX != 0);
-                    bool isSideLane = isSideLaneEW || isSideLaneNS;
+                    int localRY = cityY - chunkBaseY;
+                    if (localRY < 0 || localRY >= CHUNK_HEIGHT) continue;
                     
-                    bool isAnyPath = isVillageSquare || isMainRoad || isPerimeterRoad || isSideLane;
-                    if (!isAnyPath) continue;
+                    // Skip water areas — only main roads (through center) get bridges
+                    float riverMask = getRiverMask(static_cast<float>(worldRX), static_cast<float>(worldRZ));
+                    bool isOnRiver = riverMask > 0.25f;
+                    int terrainHere = getSurfaceHeight(worldRX, worldRZ);
+                    bool isOnWater = (terrainHere < SEA_LEVEL) || isOnRiver;
                     
-                    // === River / bridge handling ===
-                    float pathRiver = getRiverMask(static_cast<float>(worldPX), static_cast<float>(worldPZ));
-                    bool isOnRiver = pathRiver > 0.25f;
+                    bool isMainRoadNS = isRoadX && (std::abs(relX) < roadWidth);
+                    bool isMainRoadEW = isRoadZ && (std::abs(relZ) < roadWidth);
+                    bool isBridge = isOnWater && (isMainRoadNS || isMainRoadEW);
                     
-                    bool isBridge = false;
-                    if (isOnRiver && (isMainRoad || isPerimeterRoad)) {
-                        if (isMainRoadNS && !crossingsNS.empty()) isBridge = true;
-                        if (!isBridge && isMainRoadEW && !crossingsEW.empty()) isBridge = true;
-                        if (!isBridge && isPerimeterRoad) isBridge = true;
-                    }
+                    if (isOnWater && !isBridge) continue;
                     
-                    if (isOnRiver && !isBridge) continue;
-                    
-                    // === Material selection ===
-                    // Main roads & village square: read from village vxstruct files
-                    // Short paths (side lanes, perimeter): plain dirt
-                    std::pair<BlockType, uint8_t> pathMatPair = {BlockType::DIRT, uint8_t(0)};
-                    if (isVillageSquare) {
-                        // Village square 7x7: map relX+3 -> vxstruct x (0..6), relZ+3 -> z (0..6)
-                        pathMatPair = getVxBlock(vRoadTurnStruct, relX + 3, relZ + 3);
-                    } else if (isMainRoad && !isSideLane) {
-                        // Main roads 7-wide: map directly to v_road_straight (7x1x7)
-                        if (isMainRoadNS) {
-                            // N-S road: cross-section is X (-3..3 → 0..6), along is Z
-                            pathMatPair = getVxBlock(vRoadStraightStruct, relX + 3, relZ);
-                        } else {
-                            // E-W road: cross-section is Z (-3..3 → 0..6), along is X
-                            pathMatPair = getVxBlock(vRoadStraightStruct, relZ + 3, relX);
-                            // Rotate face 90° CW to match E-W orientation
-                            pathMatPair.second = (pathMatPair.second + 1) & 0x03;
-                        }
-                    } else if (isPerimeterRoad || isSideLane) {
-                        // Short paths: plain dirt
-                        pathMatPair = {BlockType::DIRT, uint8_t(0)};
-                    } else {
-                        pathMatPair = {BlockType::DIRT, uint8_t(0)};
-                    }
+                    // Material from vxstruct
+                    std::pair<BlockType, uint8_t> roadMatPair;
+                    bool isIntersection = isRoadX && isRoadZ;
                     
                     if (isBridge) {
-                        // Use bridge vxstruct for bridge deck material (7-wide)
                         if (isMainRoadNS) {
-                            pathMatPair = getVxBlock(vBridgeStraightStruct, relX + 3, relZ);
-                        } else if (isMainRoadEW) {
-                            pathMatPair = getVxBlock(vBridgeStraightStruct, relZ + 3, relX);
-                            // Rotate face 90° CW to match E-W orientation
-                            pathMatPair.second = (pathMatPair.second + 1) & 0x03;
+                            roadMatPair = getVxBlock(vBridgeStraightStruct, modX, relZ);
+                        } else {
+                            roadMatPair = getVxBlock(vBridgeStraightStruct, modZ, relX);
+                            roadMatPair.second = (roadMatPair.second + 1) & 0x03;
                         }
-                        // Perimeter bridge stays as DIRT deck
-                        
-                        int bridgeY = cityY;
-                        int localBridgeY = bridgeY - chunkBaseY;
-                        if (localBridgeY < 0 || localBridgeY >= CHUNK_HEIGHT) continue;
-                        
-                        chunk->setBlock(lx, localBridgeY, lz, Block(pathMatPair.first, pathMatPair.second));
-                        
-                        // Support pillars every 4 blocks on edges only
+                    } else if (isIntersection) {
+                        roadMatPair = getVxBlock(vRoadTurnStruct, modX, modZ);
+                    } else if (isRoadX) {
+                        roadMatPair = getVxBlock(vRoadStraightStruct, modX, relZ);
+                    } else {
+                        roadMatPair = getVxBlock(vRoadStraightStruct, modZ, relX);
+                        roadMatPair.second = (roadMatPair.second + 1) & 0x03;
+                    }
+                    
+                    chunk->setBlock(lx, localRY, lz, Block(roadMatPair.first, roadMatPair.second));
+                    
+                    // Clear blocks above road for headroom
+                    for (int clearY = 1; clearY <= 6; clearY++) {
+                        int localCY = localRY + clearY;
+                        if (localCY >= 0 && localCY < CHUNK_HEIGHT) {
+                            Block above = chunk->getBlock(lx, localCY, lz);
+                            if (above.getType() != BlockType::AIR && above.getType() != BlockType::WATER) {
+                                chunk->setBlock(lx, localCY, lz, Block(BlockType::AIR));
+                            }
+                        }
+                    }
+                    
+                    // Bridge support
+                    if (isBridge) {
                         bool isEdge = false;
-                        if (isMainRoadNS && (std::abs(relX) == 3)) isEdge = true;
-                        if (isMainRoadEW && (std::abs(relZ) == 3)) isEdge = true;
-                        if (isPerimeterRoad && (perimDistI == perimRoadRadius - 1 || perimDistI == perimRoadRadius + 1)) isEdge = true;
+                        if (isMainRoadNS && (modX == 0 || modX == roadWidth - 1)) isEdge = true;
+                        if (isMainRoadEW && (modZ == 0 || modZ == roadWidth - 1)) isEdge = true;
                         
+                        // Guardrails
+                        if (isEdge) {
+                            int guardrailY = localRY + 1;
+                            if (guardrailY >= 0 && guardrailY < CHUNK_HEIGHT) {
+                                chunk->setBlock(lx, guardrailY, lz, Block(BlockType::OAK_LOG));
+                            }
+                        }
+                        
+                        // Pillars every 4 blocks on edges
                         int pillarCoord = isMainRoadNS ? relZ : relX;
                         bool isPillarPos = (((pillarCoord % 4) + 4) % 4 == 0);
-                        
                         if (isEdge && isPillarPos) {
-                            for (int sy = bridgeY - 1; sy >= SEA_LEVEL - 2; sy--) {
-                                int localSY = sy - chunkBaseY;
-                                if (localSY < 0 || localSY >= CHUNK_HEIGHT) continue;
-                                Block below = chunk->getBlock(lx, localSY, lz);
+                            for (int sy = localRY - 1; sy >= 0; sy--) {
+                                Block below = chunk->getBlock(lx, sy, lz);
                                 BlockType bt = below.getType();
                                 if (bt == BlockType::AIR || bt == BlockType::WATER) {
-                                    chunk->setBlock(lx, localSY, lz, Block(BlockType::COBBLESTONE));
+                                    chunk->setBlock(lx, sy, lz, Block(BlockType::OAK_LOG));
                                 } else break;
-                            }
-                        }
-                        
-                        // Clear headroom above bridge
-                        for (int clearY = 1; clearY <= 5; clearY++) {
-                            int localCY = localBridgeY + clearY;
-                            if (localCY >= 0 && localCY < CHUNK_HEIGHT) {
-                                Block above = chunk->getBlock(lx, localCY, lz);
-                                if (above.getType() != BlockType::AIR)
-                                    chunk->setBlock(lx, localCY, lz, Block(BlockType::AIR));
-                            }
-                        }
-                    } else {
-                        // ---- FLAT ROAD with tunnel/bridge logic ----
-                        int roadY = cityY;
-                        int naturalY = getSurfaceHeight(worldPX, worldPZ);
-                        int heightDiff = naturalY - roadY;
-                        int localRoadY = roadY - chunkBaseY;
-                        if (localRoadY < 0 || localRoadY >= CHUNK_HEIGHT) continue;
-                        
-                        // Determine road edge status for tunnels (outermost blocks of 7-wide road)
-                        bool isEdgePath = false;
-                        if (isMainRoadNS && std::abs(relX) == 3) isEdgePath = true;
-                        if (isMainRoadEW && std::abs(relZ) == 3) isEdgePath = true;
-                        if (isPerimeterRoad && (perimDistI == perimRoadRadius - 1 || perimDistI == perimRoadRadius + 1)) isEdgePath = true;
-                        
-                        // === TUNNEL: terrain significantly above road ===
-                        if (heightDiff > 2) {
-                            chunk->setBlock(lx, localRoadY, lz, Block(pathMatPair.first, pathMatPair.second));
-                            
-                            for (int cy = 1; cy <= 4; cy++) {
-                                int clearY = localRoadY + cy;
-                                if (clearY >= 0 && clearY < CHUNK_HEIGHT) {
-                                    if (isEdgePath) {
-                                        chunk->setBlock(lx, clearY, lz, Block(BlockType::COBBLESTONE));
-                                    } else {
-                                        chunk->setBlock(lx, clearY, lz, Block(BlockType::AIR));
-                                    }
-                                }
-                            }
-                            int ceilingY = localRoadY + 5;
-                            if (ceilingY >= 0 && ceilingY < CHUNK_HEIGHT) {
-                                chunk->setBlock(lx, ceilingY, lz, Block(BlockType::COBBLESTONE));
-                            }
-                            int belowY = localRoadY - 1;
-                            if (belowY >= 0 && belowY < CHUNK_HEIGHT) {
-                                chunk->setBlock(lx, belowY, lz, Block(BlockType::COBBLESTONE));
-                            }
-                        }
-                        // === BRIDGE: road over gap ===
-                        else if (heightDiff < -2) {
-                            chunk->setBlock(lx, localRoadY, lz, Block(pathMatPair.first, pathMatPair.second));
-                            
-                            int pillarCoord = (isMainRoadNS || isSideLaneNS) ? relZ : relX;
-                            bool isPillarPos = (((pillarCoord % 4) + 4) % 4 == 0);
-                            if (isEdgePath && isPillarPos) {
-                                for (int py = localRoadY - 1; py >= 0; py--) {
-                                    Block below = chunk->getBlock(lx, py, lz);
-                                    BlockType bt = below.getType();
-                                    if (bt == BlockType::AIR || bt == BlockType::WATER)
-                                        chunk->setBlock(lx, py, lz, Block(BlockType::COBBLESTONE));
-                                    else break;
-                                }
-                            }
-                            
-                            for (int cy = 1; cy <= 5; cy++) {
-                                int clearY = localRoadY + cy;
-                                if (clearY >= 0 && clearY < CHUNK_HEIGHT) {
-                                    Block above = chunk->getBlock(lx, clearY, lz);
-                                    if (above.getType() != BlockType::AIR)
-                                        chunk->setBlock(lx, clearY, lz, Block(BlockType::AIR));
-                                }
-                            }
-                        }
-                        // === NORMAL: terrain close to road level ===
-                        else {
-                            if (naturalY > roadY) {
-                                for (int cy = roadY + 1; cy <= naturalY + 2; cy++) {
-                                    int localCY = cy - chunkBaseY;
-                                    if (localCY >= 0 && localCY < CHUNK_HEIGHT)
-                                        chunk->setBlock(lx, localCY, lz, Block(BlockType::AIR));
-                                }
-                            } else if (naturalY < roadY) {
-                                for (int fy = naturalY + 1; fy < roadY; fy++) {
-                                    int localFY = fy - chunkBaseY;
-                                    if (localFY >= 0 && localFY < CHUNK_HEIGHT)
-                                        chunk->setBlock(lx, localFY, lz, Block(BlockType::DIRT));
-                                }
-                            }
-                            
-                            chunk->setBlock(lx, localRoadY, lz, Block(pathMatPair.first, pathMatPair.second));
-                            
-                            for (int fd = 1; fd <= 3; fd++) {
-                                int localFY = localRoadY - fd;
-                                if (localFY >= 0 && localFY < CHUNK_HEIGHT) {
-                                    Block below = chunk->getBlock(lx, localFY, lz);
-                                    BlockType bt = below.getType();
-                                    if (bt == BlockType::AIR || bt == BlockType::WATER)
-                                        chunk->setBlock(lx, localFY, lz, Block(BlockType::DIRT));
-                                }
-                            }
-                            
-                            for (int cy = 1; cy <= 4; cy++) {
-                                int clearY = localRoadY + cy;
-                                if (clearY >= 0 && clearY < CHUNK_HEIGHT) {
-                                    Block above = chunk->getBlock(lx, clearY, lz);
-                                    if (above.getType() != BlockType::AIR && above.getType() != BlockType::WATER)
-                                        chunk->setBlock(lx, clearY, lz, Block(BlockType::AIR));
-                                }
                             }
                         }
                     }
@@ -1782,11 +1592,11 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
         // so structures never overlap and never get cut at chunk boundaries.
         // For villages: use chunk-relative grid as before.
         if (isCity) {
-            int roadWidth = 3;
+            int roadWidth = 7;    // Must match road phase (7-wide roads, modX 0..6)
             int sidewalkWidth = 1;
-            int roadZone = roadWidth + sidewalkWidth; // Blocks reserved for road+sidewalk on each axis
-            int buildableSize = cityBlockSize - roadZone - sidewalkWidth; // Usable interior per city block
-            int structFootprint = 8; // Max footprint per structure slot
+            int roadZone = roadWidth + sidewalkWidth; // 7 road + 1 sidewalk = 8 offset
+            int buildableSize = cityBlockSize - roadZone - sidewalkWidth; // 24 - 8 - 1 = 15 usable
+            int structFootprint = 7; // 2 slots per axis (15/7 = 2), buildings never on roads
             
             // We need to check structure anchors that could place blocks INTO this chunk,
             // including anchors from neighboring chunks. Scan a range larger than CHUNK_SIZE.
@@ -1821,6 +1631,25 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                             if (anchorX + structFootprint <= chunkBaseX || anchorX >= chunkBaseX + CHUNK_SIZE) continue;
                             if (anchorZ + structFootprint <= chunkBaseZ || anchorZ >= chunkBaseZ + CHUNK_SIZE) continue;
                             
+                            // Safety: verify no corner of the building footprint lands on a road
+                            {
+                                bool onRoad = false;
+                                int corners[][2] = {
+                                    {anchorX, anchorZ},
+                                    {anchorX + structFootprint - 1, anchorZ},
+                                    {anchorX, anchorZ + structFootprint - 1},
+                                    {anchorX + structFootprint - 1, anchorZ + structFootprint - 1}
+                                };
+                                for (auto& c : corners) {
+                                    int rX = c[0] - static_cast<int>(settlementCenterX);
+                                    int rZ = c[1] - static_cast<int>(settlementCenterZ);
+                                    int mX = ((rX % cityBlockSize) + cityBlockSize) % cityBlockSize;
+                                    int mZ = ((rZ % cityBlockSize) + cityBlockSize) % cityBlockSize;
+                                    if (mX < 7 || mZ < 7) { onRoad = true; break; }
+                                }
+                                if (onRoad) continue;
+                            }
+                            
                             // Deterministic hash for this world-space anchor
                             unsigned int h = seed;
                             h ^= static_cast<unsigned int>(anchorX) * 374761393u;
@@ -1832,8 +1661,8 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                             
                             // Check for river across entire footprint (not just anchor)
                             {
-                                bool touchesRiver = false;
-                                int riverCheckPoints[][2] = {
+                                bool touchesWater = false;
+                                int waterCheckPoints[][2] = {
                                     {anchorX, anchorZ},
                                     {anchorX + structFootprint - 1, anchorZ},
                                     {anchorX, anchorZ + structFootprint - 1},
@@ -1841,11 +1670,12 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                                     {anchorX + structFootprint / 2, anchorZ + structFootprint / 2}
                                 };
                                 for (int rp = 0; rp < 5; rp++) {
-                                    float rm = getRiverMask(static_cast<float>(riverCheckPoints[rp][0]),
-                                                            static_cast<float>(riverCheckPoints[rp][1]));
-                                    if (rm > 0.25f) { touchesRiver = true; break; }
+                                    float rm = getRiverMask(static_cast<float>(waterCheckPoints[rp][0]),
+                                                            static_cast<float>(waterCheckPoints[rp][1]));
+                                    int surfH = getSurfaceHeight(waterCheckPoints[rp][0], waterCheckPoints[rp][1]);
+                                    if (rm > 0.25f || surfH < SEA_LEVEL) { touchesWater = true; break; }
                                 }
-                                if (touchesRiver) continue;
+                                if (touchesWater) continue;
                             }
                             
                             // Check if anchor is within city radius
@@ -1897,9 +1727,13 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                                     
                                     Block existing = chunk->getBlock(localBX, localBY, localBZ);
                                     BlockType existingType = existing.getType();
-                                    if (existingType != BlockType::BEDROCK && existingType != BlockType::WATER) {
-                                        chunk->setBlock(localBX, localBY, localBZ, Block(block.type, block.metadata));
+                                    // Never overwrite bedrock, water, or road surface blocks
+                                    if (existingType == BlockType::BEDROCK || existingType == BlockType::WATER ||
+                                        existingType == BlockType::COBBLESTONE || existingType == BlockType::STONE_BRICKS ||
+                                        existingType == BlockType::GRAVEL || existingType == BlockType::GLAZED_TERRACOTTA) {
+                                        continue;
                                     }
+                                    chunk->setBlock(localBX, localBY, localBZ, Block(block.type, block.metadata));
                                 }
                                 
                                 // Fill foundation below structure to prevent floating buildings
@@ -1936,101 +1770,92 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
             }
         }
         
-        // ---- VILLAGE STRUCTURE PLACEMENT (chunk-relative, unchanged) ----
+        // ---- VILLAGE STRUCTURE PLACEMENT (world-space grid, matching road grid) ----
         if (!isCity) {
-            int structFootprint = 14;
-            for (int gridOffX = 0; gridOffX < CHUNK_SIZE; gridOffX += structSpacing) {
-                for (int gridOffZ = 0; gridOffZ < CHUNK_SIZE; gridOffZ += structSpacing) {
-                    int anchorX = chunkBaseX + gridOffX + 1;
-                    int anchorZ = chunkBaseZ + gridOffZ + 1;
+            int villageBlockSize = 16; // Must match village road grid spacing
+            int roadWidth = 7;
+            int roadZone = roadWidth + 1; // 7 road + 1 gap = 8 offset
+            int structFootprint = 7;
+            
+            int centerIX = static_cast<int>(settlementCenterX);
+            int centerIZ = static_cast<int>(settlementCenterZ);
+            
+            int scanMargin = structFootprint + 2;
+            int scanMinX = chunkBaseX - scanMargin;
+            int scanMinZ = chunkBaseZ - scanMargin;
+            int scanMaxX = chunkBaseX + CHUNK_SIZE + scanMargin;
+            int scanMaxZ = chunkBaseZ + CHUNK_SIZE + scanMargin;
+            
+            int vBlockStartX = static_cast<int>(std::floor(static_cast<float>(scanMinX - centerIX) / villageBlockSize)) * villageBlockSize + centerIX;
+            int vBlockStartZ = static_cast<int>(std::floor(static_cast<float>(scanMinZ - centerIZ) / villageBlockSize)) * villageBlockSize + centerIZ;
+            
+            for (int blockX = vBlockStartX; blockX < scanMaxX; blockX += villageBlockSize) {
+                for (int blockZ = vBlockStartZ; blockZ < scanMaxZ; blockZ += villageBlockSize) {
+                    // Building slot in interior of block (after road zone)
+                    int anchorX = blockX + roadZone;
+                    int anchorZ = blockZ + roadZone;
                     
+                    // Check if footprint touches our chunk
+                    if (anchorX + structFootprint <= chunkBaseX || anchorX >= chunkBaseX + CHUNK_SIZE) continue;
+                    if (anchorZ + structFootprint <= chunkBaseZ || anchorZ >= chunkBaseZ + CHUNK_SIZE) continue;
+                    
+                    // Check within village radius
+                    float adx = static_cast<float>(anchorX + structFootprint / 2) - settlementCenterX;
+                    float adz = static_cast<float>(anchorZ + structFootprint / 2) - settlementCenterZ;
+                    float anchorDist = std::sqrt(adx * adx + adz * adz);
+                    if (anchorDist > cityRadius - 5.0f) continue;
+                    
+                    // Safety: no corner on a road
+                    {
+                        bool onRoad = false;
+                        int corners[][2] = {
+                            {anchorX, anchorZ},
+                            {anchorX + structFootprint - 1, anchorZ},
+                            {anchorX, anchorZ + structFootprint - 1},
+                            {anchorX + structFootprint - 1, anchorZ + structFootprint - 1}
+                        };
+                        for (auto& c : corners) {
+                            int rX = c[0] - centerIX;
+                            int rZ = c[1] - centerIZ;
+                            int mX = ((rX % villageBlockSize) + villageBlockSize) % villageBlockSize;
+                            int mZ = ((rZ % villageBlockSize) + villageBlockSize) % villageBlockSize;
+                            if (mX < roadWidth || mZ < roadWidth) { onRoad = true; break; }
+                        }
+                        if (onRoad) continue;
+                    }
+                    
+                    // Deterministic hash
                     unsigned int h = seed;
                     h ^= static_cast<unsigned int>(anchorX) * 374761393u;
                     h ^= static_cast<unsigned int>(anchorZ) * 668265263u;
                     h = ((h << 17) | (h >> 15)) * 2654435761u;
                     
+                    // Spawn chance: 65%
                     if ((h % 100) >= 65u) continue;
                     
-                    // Village: sample terrain heights
-                    int samplePoints[5][2] = {
-                        {anchorX, anchorZ},
-                        {anchorX + structFootprint - 1, anchorZ},
-                        {anchorX, anchorZ + structFootprint - 1},
-                        {anchorX + structFootprint - 1, anchorZ + structFootprint - 1},
-                        {anchorX + structFootprint / 2, anchorZ + structFootprint / 2}
-                    };
-                    
-                    int minGroundY = 9999, maxGroundY = -9999;
-                    bool hasWater = false;
-                    bool touchesRiver = false;
-                    for (int i = 0; i < 5; i++) {
-                        int sy = getSurfaceHeight(samplePoints[i][0], samplePoints[i][1]);
-                        minGroundY = std::min(minGroundY, sy);
-                        maxGroundY = std::max(maxGroundY, sy);
-                        if (sy <= SEA_LEVEL) hasWater = true;
-                        float rm = getRiverMask(static_cast<float>(samplePoints[i][0]),
-                                                static_cast<float>(samplePoints[i][1]));
-                        if (rm > 0.25f) touchesRiver = true;
+                    // Check for water/river
+                    {
+                        bool touchesWater = false;
+                        int checkPts[][2] = {
+                            {anchorX, anchorZ},
+                            {anchorX + structFootprint - 1, anchorZ},
+                            {anchorX, anchorZ + structFootprint - 1},
+                            {anchorX + structFootprint - 1, anchorZ + structFootprint - 1},
+                            {anchorX + structFootprint / 2, anchorZ + structFootprint / 2}
+                        };
+                        for (int rp = 0; rp < 5; rp++) {
+                            float rm = getRiverMask(static_cast<float>(checkPts[rp][0]),
+                                                    static_cast<float>(checkPts[rp][1]));
+                            int surfH = getSurfaceHeight(checkPts[rp][0], checkPts[rp][1]);
+                            if (rm > 0.25f || surfH < SEA_LEVEL) { touchesWater = true; break; }
+                        }
+                        if (touchesWater) continue;
                     }
                     
-                    if (hasWater || touchesRiver) continue;
-                    if ((maxGroundY - minGroundY) > 4) continue;
-                    int groundY = (minGroundY + maxGroundY) / 2;
-                    
+                    int groundY = cityY;
                     int maxStructHeight = 12;
                     if (chunkBaseY > groundY + maxStructHeight) continue;
                     if (chunkBaseY + CHUNK_HEIGHT <= groundY - 2) continue;
-                    
-                    // Terrain flattening for villages
-                    {
-                        int flatRadius = 1;
-                        for (int fx = -flatRadius; fx < structFootprint + flatRadius; fx++) {
-                            for (int fz = -flatRadius; fz < structFootprint + flatRadius; fz++) {
-                                int worldFX = anchorX + fx;
-                                int worldFZ = anchorZ + fz;
-                                int localFX = worldFX - chunkBaseX;
-                                int localFZ = worldFZ - chunkBaseZ;
-                                
-                                if (localFX < 0 || localFX >= CHUNK_SIZE) continue;
-                                if (localFZ < 0 || localFZ >= CHUNK_SIZE) continue;
-                                
-                                // Skip river areas - don't flatten over rivers
-                                float flatRiver = getRiverMask(static_cast<float>(worldFX), static_cast<float>(worldFZ));
-                                if (flatRiver > 0.25f) continue;
-                                
-                                int naturalY = getSurfaceHeight(worldFX, worldFZ);
-                                
-                                // Fill up terrain to groundY
-                                for (int fy = naturalY + 1; fy <= groundY; fy++) {
-                                    int localFY = fy - chunkBaseY;
-                                    if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
-                                    chunk->setBlock(localFX, localFY, localFZ, Block(fy == groundY ? BlockType::GRASS : BlockType::DIRT));
-                                }
-                                // Carve down terrain to groundY
-                                for (int fy = groundY + 1; fy <= naturalY; fy++) {
-                                    int localFY = fy - chunkBaseY;
-                                    if (localFY < 0 || localFY >= CHUNK_HEIGHT) continue;
-                                    chunk->setBlock(localFX, localFY, localFZ, Block(BlockType::AIR));
-                                }
-                                // Ensure grass on top
-                                int localGY = groundY - chunkBaseY;
-                                if (localGY >= 0 && localGY < CHUNK_HEIGHT) {
-                                    chunk->setBlock(localFX, localGY, localFZ, Block(BlockType::GRASS));
-                                }
-                                // Replace exposed stone/cobble below grass with dirt
-                                for (int d = 1; d <= 3; d++) {
-                                    int localDY = groundY - d - chunkBaseY;
-                                    if (localDY >= 0 && localDY < CHUNK_HEIGHT) {
-                                        Block below = chunk->getBlock(localFX, localDY, localFZ);
-                                        BlockType bt = below.getType();
-                                        if (bt == BlockType::STONE || bt == BlockType::COBBLESTONE || bt == BlockType::AIR) {
-                                            chunk->setBlock(localFX, localDY, localFZ, Block(BlockType::DIRT));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
                     
                     // Place structure
                     if (!allStructures.empty()) {
@@ -2074,37 +1899,9 @@ void WorldGenerator::generate(std::shared_ptr<Chunk> chunk) {
                                 chunk->setBlock(localBX, localBY, localBZ, Block(block.type, block.metadata));
                             }
                         }
-                    } else {
-                        // Fallback: pink wool house
-                        int houseSize = 5;
-                        int houseHeight = 5;
-                        for (int hx = 0; hx < houseSize; hx++) {
-                            for (int hz = 0; hz < houseSize; hz++) {
-                                for (int hy = 0; hy <= houseHeight; hy++) {
-                                    int worldBY = groundY + hy;
-                                    int localBX = (gridOffX + 1) + hx;
-                                    int localBY = worldBY - chunkBaseY;
-                                    int localBZ = (gridOffZ + 1) + hz;
-                                    
-                                    if (localBX < 0 || localBX >= CHUNK_SIZE) continue;
-                                    if (localBZ < 0 || localBZ >= CHUNK_SIZE) continue;
-                                    if (localBY < 0 || localBY >= CHUNK_HEIGHT) continue;
-                                    
-                                    bool isWall = (hx == 0 || hx == houseSize-1 || hz == 0 || hz == houseSize-1);
-                                    bool isDoor = (hx == houseSize/2 && hz == 0 && hy >= 1 && hy <= 2);
-                                    
-                                    if (hy == 0)
-                                        chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::COBBLESTONE));
-                                    else if (hy == houseHeight)
-                                        chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::RED_WOOL));
-                                    else if (isWall && !isDoor)
-                                        chunk->setBlock(localBX, localBY, localBZ, Block(BlockType::PINK_WOOL));
-                                }
-                            }
-                        }
                     }
-                } // gridOffZ
-            } // gridOffX
+                }
+            }
         } // !isCity
     }();
     
