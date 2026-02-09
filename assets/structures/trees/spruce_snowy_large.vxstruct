@@ -818,10 +818,10 @@
       "z": 1
     }
   ],
-  "category": "tree_spruce",
+  "category": "tree_spruce_snowy",
   "markers": [],
   "min_ground_coverage": 0.30000001192092896,
-  "name": "Large Spruce Tree",
+  "name": "Large Snowy Spruce Tree",
   "requires_flat": false,
   "size": {
     "x": 8,

@@ -674,10 +674,10 @@
       "z": 0
     }
   ],
-  "category": "tree_spruce",
+  "category": "tree_spruce_snowy",
   "markers": [],
   "min_ground_coverage": 0.30000001192092896,
-  "name": "Small Spruce Tree",
+  "name": "Small Snowy Spruce Tree",
   "requires_flat": false,
   "size": {
     "x": 7,
